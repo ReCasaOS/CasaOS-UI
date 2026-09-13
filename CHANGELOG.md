@@ -2,6 +2,12 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.57] - 2026-09-13
+
+### Added
+
+- **Restore.** Every finished backup in the History tab has a Restore button. The confirmation says what will happen before anything is touched: the app is stopped, its data is replaced by that backup, and files added since then are removed. A restore shows in the same list afterwards, tagged as one, with its outcome. Needs AppManagement v0.4.41.
+
 ## [0.4.56] - 2026-09-12
 
 ### Added
