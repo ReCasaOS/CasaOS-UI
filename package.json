@@ -1,6 +1,6 @@
 {
   "name": "casaos-main",
-  "version": "0.4.58",
+  "version": "0.4.59",
   "private": true,
   "packageManager": "pnpm@9.0.6",
   "scripts": {

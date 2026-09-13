@@ -2,6 +2,14 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.59] - 2026-09-13
+
+### Added
+
+- **A card while a backup or a restore runs**, the same one an install gets: how far along, and a toast at the end that says where it went or what went wrong. Until now a two-hundred-gigabyte app copied for an hour with nothing on screen.
+- **Encrypt a destination.** A checkbox on the destination form puts rclone's crypt backend on top of the one chosen: names and contents are ciphertext before they leave this box. The warning is on the form, because the password never comes back and a destination without it is a bucket of ciphertext.
+- **Delete one backup** from the destination browser, with the same kind of confirmation a restore gets. Needs AppManagement v0.4.44.
+
 ## [0.4.58] - 2026-09-13
 
 ### Added
