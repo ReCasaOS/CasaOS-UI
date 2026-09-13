@@ -2,6 +2,12 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.61] - 2026-09-13
+
+### Fixed
+
+- **A rebuild names itself the way a recreate does.** The rebuild of a v1 app passed an object where the generated client expects a boolean, the client happened to flatten it into a query parameter, and the card matched on the echo of that accident. It sends `rebuild:container:id` now, the mechanism a recreate already uses under its own name.
+
 ## [0.4.60] - 2026-09-13
 
 ### Added
