@@ -67,13 +67,28 @@
 							@click="draft.rows.splice(index, 1)" />
 					</div>
 
+					<b-field class="mt-3">
+						<b-checkbox v-model="draft.encrypt" size="is-small">{{ $t('Encrypt this destination') }}</b-checkbox>
+					</b-field>
+					<template v-if="draft.encrypt">
+						<b-field :label="$t('Encryption password')" label-position="on-border">
+							<b-input v-model="draft.password" expanded password-reveal size="is-small" type="password" />
+						</b-field>
+						<!-- said here rather than in a dialog later: the password is kept by
+							rclone and never comes back, and a destination without it is a
+							bucket of ciphertext -->
+						<p class="has-text-full-03 is-size-7 mb-2">
+							{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}
+						</p>
+					</template>
+
 					<div class="is-flex is-align-items-center mt-2">
 						<b-button class="mr-2" rounded size="is-small" @click="draft.rows.push({ key: '', value: '' })">
 							{{ $t('Add') }}
 						</b-button>
 						<div class="is-flex-grow-1"></div>
-						<b-button :disabled="!draft.name || !draft.backend" :loading="busy === 'save'" rounded size="is-small"
-							type="is-primary" @click="save">
+						<b-button :disabled="!draft.name || !draft.backend || (draft.encrypt && !draft.password)" :loading="busy === 'save'"
+							rounded size="is-small" type="is-primary" @click="save">
 							{{ $t('Save destination') }}
 						</b-button>
 					</div>
@@ -115,7 +130,7 @@ export default {
 			error: '',
 			busy: '',
 			backends: BACKUP_BACKENDS,
-			draft: { name: '', backend: 's3', rows: suggestedFields('s3') },
+			draft: { name: '', backend: 's3', rows: suggestedFields('s3'), encrypt: false, password: '' },
 		}
 	},
 	mounted() {
@@ -168,10 +183,12 @@ export default {
 					this.draft.name.trim(),
 					this.draft.backend,
 					parametersFrom(this.draft.rows),
+					this.draft.encrypt,
+					this.draft.password,
 				)
 
 				const saved = this.draft.name.trim()
-				this.draft = { name: '', backend: this.draft.backend, rows: suggestedFields(this.draft.backend) }
+				this.draft = { name: '', backend: this.draft.backend, rows: suggestedFields(this.draft.backend), encrypt: false, password: '' }
 				await this.load()
 				// Checked straight away: a destination that cannot be reached is worth
 				// knowing about now rather than the first time a backup needs it.

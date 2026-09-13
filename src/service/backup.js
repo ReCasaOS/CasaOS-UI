@@ -11,10 +11,15 @@ const backup = {
 
 	// `backend` is an rclone backend name -- s3, sftp, ftp -- and `parameters` are
 	// that backend's own options, passed through untouched.
-	saveDestination(name, backend, parameters) {
+	// `encrypt` puts rclone's crypt backend on top: names and contents are
+	// ciphertext before they leave this box. The password is kept by rclone and
+	// never comes back; losing it loses every backup at that destination.
+	saveDestination(name, backend, parameters, encrypt = false, password = '') {
 		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}`, {
 			backend,
 			parameters,
+			encrypt,
+			password: encrypt ? password : undefined,
 		})
 	},
 
@@ -70,6 +75,11 @@ const backup = {
 	// log is empty.
 	getDestinationRuns(name) {
 		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
+	},
+
+	// Removes one backup from the destination. The run log keeps its record.
+	deleteRun(name, app, stamp) {
+		return api.delete(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs/${encodeURIComponent(app)}/${encodeURIComponent(stamp)}`)
 	},
 }
 

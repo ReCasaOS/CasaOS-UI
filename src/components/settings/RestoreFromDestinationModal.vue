@@ -34,6 +34,10 @@
 							{{ $t('Restore') }}
 						</b-button>
 					</p>
+					<p class="control">
+						<b-button :loading="deleting === entry.app" icon-left="close-outline" icon-pack="casa" rounded
+							size="is-small" @click="confirmDelete(entry)" />
+					</p>
 				</b-field>
 			</div>
 		</section>
@@ -53,7 +57,7 @@ export default {
 	},
 	emits: ['close'],
 	data() {
-		return { held: [], chosen: {}, isLoading: false, error: '', restoring: '' }
+		return { held: [], chosen: {}, isLoading: false, error: '', restoring: '', deleting: '' }
 	},
 	mounted() {
 		this.load()
@@ -98,6 +102,33 @@ export default {
 				hasIcon: true,
 				onConfirm: () => this.restore(entry, stamp),
 			})
+		},
+
+		// A backup gone is gone: nothing here can be walked back either.
+		confirmDelete(entry) {
+			const stamp = this.chosen[entry.app]
+			this.$buefy.dialog.confirm({
+				title: this.$t('Delete this backup of {app}?', { app: entry.app }),
+				message: this.$t('The backup taken on {when} is removed from {name}. This cannot be undone.', { when: this.when(stamp), name: this.destination }),
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-danger',
+				hasIcon: true,
+				onConfirm: () => this.remove(entry, stamp),
+			})
+		},
+
+		async remove(entry, stamp) {
+			this.deleting = entry.app
+			try {
+				await this.$api.backup.deleteRun(this.destination, entry.app, stamp)
+				await this.load()
+			} catch (error) {
+				const data = error.response && error.response.data
+				this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+			} finally {
+				this.deleting = ''
+			}
 		},
 
 		async restore(entry, stamp) {
