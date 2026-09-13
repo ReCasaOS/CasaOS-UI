@@ -38,10 +38,9 @@ const DECLARED = new Set([
 	'file_operate',
 	// Sent by this dashboard itself as query parameters, which AppManagement
 	// echoes onto every event of that request (route/v2/route.go,
-	// PropertiesFromQueryParams). The second one is an object smuggled through
-	// the boolean `dry_run` parameter; the client flattens it with a dot.
+	// PropertiesFromQueryParams).
 	'recreate:container:id',
-	'dry_run.name',
+	'rebuild:container:id',
 ])
 
 function walk(dir, out = []) {

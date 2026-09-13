@@ -180,6 +180,15 @@ import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
 // events it publishes for it, so this comes back on each app:update-* of that
 // recreate and on no other event.
 const RECREATE_TAG = 'recreate:container:id'
+// A rebuild is an install of a compose app made from a v1 container, and the
+// events of that install name the compose app -- which is not the name this
+// card knows the container by. So the card sends the container's id along as a
+// query parameter, which AppManagement echoes onto every event of the request,
+// and matches on that. The same mechanism a recreate uses, under its own name.
+// It used to smuggle the id through the boolean `dry_run` parameter as an
+// object the client happened to flatten to `dry_run.name`, which worked by
+// accident of the serializer.
+const REBUILD_TAG = 'rebuild:container:id'
 
 export default {
 	name: 'AppCard',
@@ -785,7 +794,9 @@ export default {
 				// 2. archive
 				await this.$api.container.archive(app.name)
 				// 3.install compose
-				await this.$openAPI.appManagement.compose.installComposeApp(file, { name: app.name })
+				await this.$openAPI.appManagement.compose.installComposeApp(file, undefined, undefined, undefined, {
+					params: { [REBUILD_TAG]: app.name },
+				})
 			} catch (e) {
 				this.isRebuilding = false
 				console.error('rebuild Error:', e)
@@ -972,7 +983,7 @@ export default {
 			}
 		},
 		'app:install-end': function (res) {
-			if (res.Properties['dry_run.name'] === this.item.name) {
+			if (res.Properties[REBUILD_TAG] === this.item.name) {
 				// 4.sockiet :: install-end :: change UI status.
 				this.isRebuilding = false
 				// 5.message toast
@@ -983,7 +994,7 @@ export default {
 			}
 		},
 		'app:install-error': function (res) {
-			if (res.Properties['dry_run.name'] === this.item.name) {
+			if (res.Properties[REBUILD_TAG] === this.item.name) {
 				// 4.sockiet :: install-end :: change UI status.
 				this.isRebuilding = false
 				// 5.message toast
