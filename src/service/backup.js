@@ -77,6 +77,13 @@ const backup = {
 		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
 	},
 
+	// The box itself: its users, shares, schedules, destinations. Filed under
+	// `casaos-system`, which the destination browser and History show as
+	// "This box". The services holding those files are stopped for the copy.
+	backupSystem(destination, holdStill = true) {
+		return api.post(`${PREFIX}/backup/system`, { destination, hold_still: holdStill })
+	},
+
 	// Removes one backup from the destination. The run log keeps its record.
 	deleteRun(name, app, stamp) {
 		return api.delete(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs/${encodeURIComponent(app)}/${encodeURIComponent(stamp)}`)

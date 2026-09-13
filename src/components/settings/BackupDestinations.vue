@@ -41,6 +41,22 @@
 						</b-button>
 					</div>
 
+					<!-- The box itself: users, shares and their accounts, schedules, the
+						destinations above. Restored from the destination browser like an app,
+						under "This box". -->
+					<div v-if="destinations.length" class="is-flex is-align-items-center mt-3 mb-2">
+						<p class="has-text-full-03 is-size-7 is-flex-grow-1">
+							{{ $t('Back up this box itself: its users, its shares and their accounts, its schedules, these destinations.') }}
+						</p>
+						<b-select v-model="systemDestination" class="mr-2" size="is-small">
+							<option v-for="name in destinations" :key="name" :value="name">{{ name }}</option>
+						</b-select>
+						<b-button :disabled="!systemDestination" :loading="busy === 'system'" rounded size="is-small"
+							@click="backupSystem">
+							{{ $t('Back up this box') }}
+						</b-button>
+					</div>
+
 					<hr>
 
 					<b-field :label="$t('Name')" label-position="on-border">
@@ -131,12 +147,36 @@ export default {
 			busy: '',
 			backends: BACKUP_BACKENDS,
 			draft: { name: '', backend: 's3', rows: suggestedFields('s3'), encrypt: false, password: '' },
+			systemDestination: '',
 		}
 	},
 	mounted() {
 		this.load()
 	},
 	methods: {
+		// The dashboard goes away for a few seconds: the core is among the services
+		// stopped for the copy, and that is said before the button is pressed.
+		backupSystem() {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Back up this box to {name}?', { name: this.systemDestination }),
+				message: this.$t('The services holding its files are stopped for the length of the copy, so the dashboard is unreachable for a few seconds. The backup shows in History as "This box".'),
+				confirmText: this.$t('Back up'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: async () => {
+					this.busy = 'system'
+					try {
+						await this.$api.backup.backupSystem(this.systemDestination, true)
+						this.$buefy.toast.open({ message: this.$t('Backup of this box started.'), type: 'is-success', duration: 5000 })
+					} catch (error) {
+						const data = error.response && error.response.data
+						this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+					} finally {
+						this.busy = ''
+					}
+				},
+			})
+		},
+
 		// For a box whose own run log is empty: what the destination holds, and a
 		// way back from it.
 		browse(name) {

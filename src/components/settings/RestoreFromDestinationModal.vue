@@ -18,7 +18,7 @@
 
 			<div v-for="entry in held" :key="entry.app" class="held mb-3">
 				<div class="is-flex is-align-items-center mb-1">
-					<span class="has-text-weight-medium is-flex-grow-1">{{ entry.app }}</span>
+					<span class="has-text-weight-medium is-flex-grow-1">{{ entry.app === 'casaos-system' ? $t('This box') : entry.app }}</span>
 					<!-- said before the button: a restore of an app that is not here
 						installs it, which is a bigger thing than putting files back -->
 					<b-tag v-if="entry.installed" type="is-light">{{ $t('Installed here') }}</b-tag>

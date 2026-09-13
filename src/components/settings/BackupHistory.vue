@@ -10,7 +10,9 @@
 		<b-message v-if="error" class="mb-0" size="is-small" type="is-danger">{{ error }}</b-message>
 
 		<b-table v-else :data="runs" :loading="isLoading" :mobile-cards="false" class="is-size-7">
-			<b-table-column v-slot="{ row }" :label="$t('App')" field="app">{{ row.app }}</b-table-column>
+			<b-table-column v-slot="{ row }" :label="$t('App')" field="app">
+				{{ row.app === 'casaos-system' ? $t('This box') : row.app }}
+			</b-table-column>
 
 			<b-table-column v-slot="{ row }" :label="$t('Destination')" field="destination">
 				{{ row.destination }}
