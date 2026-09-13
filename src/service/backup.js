@@ -54,10 +54,12 @@ const backup = {
 	// Returns as soon as the copy has started; it takes as long as it takes.
 	// `holdStill` stops the app for the length of the copy -- leaving it running
 	// takes a copy that may not restore.
-	backupApp(id, destination, holdStill) {
+	backupApp(id, destination, holdStill, keep = 0) {
 		return api.post(`${PREFIX}/compose/${encodeURIComponent(id)}/backup`, {
 			destination,
 			hold_still: holdStill,
+			// keep the last `keep` backups of this app here once this one has landed; zero keeps everything
+			...(keep > 0 ? { keep } : {}),
 		})
 	},
 

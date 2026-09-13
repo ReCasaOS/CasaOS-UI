@@ -876,7 +876,7 @@ export default {
 			this.$buefy.modal.open({
 				component: NewFolderModal,
 				hasModalCard: true,
-				customClass: 'new-folder-panel file-modal',
+				customClass: 'file-modal',
 				trapFocus: true,
 				canCancel: [''],
 				scroll: 'keep',
@@ -904,7 +904,7 @@ export default {
 			this.$buefy.modal.open({
 				component: NewFileModal,
 				hasModalCard: true,
-				customClass: 'new-folder-panel file-modal',
+				customClass: 'file-modal',
 				trapFocus: true,
 				canCancel: [''],
 				scroll: 'keep',
@@ -933,7 +933,7 @@ export default {
 			this.$buefy.modal.open({
 				component: RenameModal,
 				hasModalCard: true,
-				customClass: 'rename-panel file-modal',
+				customClass: 'file-modal',
 				trapFocus: true,
 				canCancel: [''],
 				scroll: 'keep',

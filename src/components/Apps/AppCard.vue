@@ -142,8 +142,9 @@
 					</div>
 
 					<p class="mt-3 one-line">
+						<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
 						<a class="one-line" style="cursor:default">
-							{{ i18n(item.title) }}
+							{{ i18n(item.title) || item.name }}
 						</a>
 					</p>
 
@@ -398,7 +399,6 @@ export default {
 			this.$buefy.modal.open({
 				component: BackupAppModal,
 				hasModalCard: true,
-				customClass: 'account-modal',
 				trapFocus: true,
 				canCancel: ['escape'],
 				animation: 'zoom-in',

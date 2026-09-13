@@ -29,6 +29,13 @@
 						? $t('The app will be unavailable until the copy finishes, and comes back on its own afterwards.')
 						: $t('The app keeps running. Anything writing while it is copied — a database above all — may not restore.') }}
 				</p>
+
+				<b-field :label="$t('Backups to keep here')" class="mt-4" label-position="on-border">
+					<b-input v-model="keep" :placeholder="$t('every one')" min="1" size="is-small" type="number"></b-input>
+				</b-field>
+				<p class="has-text-full-03 is-size-7">
+					{{ $t('Once this one has landed, older backups of this app at this destination beyond this number are deleted. Empty keeps everything.') }}
+				</p>
 			</template>
 		</section>
 
@@ -56,6 +63,9 @@ export default {
 			// Copying a database while it is writing produces a backup that looks
 			// fine and does not restore, so this starts on.
 			holdStill: true,
+			// Empty keeps everything; the manual backups used to pile up for ever,
+			// with only the scheduled ones under a retention.
+			keep: '',
 			isLoading: false,
 			busy: false,
 			error: '',
@@ -81,7 +91,7 @@ export default {
 		async start() {
 			this.busy = true
 			try {
-				const res = await this.$api.backup.backupApp(this.appId, this.destination, this.holdStill)
+				const res = await this.$api.backup.backupApp(this.appId, this.destination, this.holdStill, Number(this.keep) || 0)
 				this.$buefy.toast.open({ message: res.data.message, type: 'is-success', duration: 5000 })
 				this.$emit('close')
 			} catch (error) {

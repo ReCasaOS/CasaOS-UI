@@ -23,6 +23,7 @@
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation, Pagination } from 'swiper/modules'
 import sortBy from 'lodash/sortBy'
+import { failuresToAnnounce, rememberBackupFailures, seenBackupFailures } from '@/components/settings/backupFailures'
 import noticeBlock from '@/components/noticBlock/noticeBlock'
 import { mixin } from '@/mixins/mixin'
 import SyncBlock from '@/components/syncthing/SyncBlock.vue'
@@ -106,6 +107,7 @@ export default {
 	},
 	mounted() {
 		this.WSHub = this.initMessageBus()
+		this.announceBackupFailures()
 	},
 	beforeUnmount() {
 		for (const key in this.WSHub) {
@@ -118,6 +120,35 @@ export default {
 		// Swiper recognises as its own.
 		setSwiper(swiper) {
 			this.swiper = swiper
+		},
+
+		// A scheduled backup that failed in the night was in the run log and
+		// nowhere else. Said once per failure, here, where the dashboard opens.
+		async announceBackupFailures() {
+			let runs = []
+			try {
+				const res = await this.$api.backup.getRuns()
+				runs = res.data.data || []
+			} catch {
+				return
+			}
+
+			const seen = seenBackupFailures()
+			for (const run of failuresToAnnounce(runs, seen)) {
+				this.$buefy.notification.open({
+					type: 'is-danger',
+					position: 'is-top',
+					indefinite: true,
+					queue: false,
+					message: this.$t('Scheduled backup of {app} to {destination} failed: {error}', {
+						app: run.app,
+						destination: run.destination,
+						error: run.error,
+					}),
+				})
+				seen.push(run.stamp)
+			}
+			rememberBackupFailures(seen)
 		},
 		_isValidDiskEvent(evt) {
 			let p = {}

@@ -2,6 +2,19 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.62] - 2026-09-13
+
+### Added
+
+- **A scheduled backup that failed is said once, where the dashboard opens.** It went into the run log and nowhere else: the dashboard was closed at three in the morning, and History is a tab nobody opens until they need a backup. A failure still standing (the latest backup of that app to that destination, scheduled, failed) is a red notification at the next open, once per failure.
+- **Backups to keep, from the backup dialog.** The manual backups used to pile up for ever, with only the scheduled ones under a retention. The dialog takes a number; once the backup has landed, older ones of that app at that destination beyond it are deleted. Empty keeps everything. Needs AppManagement v0.4.50.
+
+### Changed
+
+- **An app with no `x-casaos` block goes through the screens in a test.** Seven defects on this distribution began with one such app, each found by a person; the card, the backup dialog and the legacy grouping now take it in the suite.
+- **The class every modal is opened with is checked**, not just the app panel's: a class passed is a class some stylesheet styles. `account-modal`, passed by the backup dialog and the port panel and styled nowhere, is gone; the two are at Buefy's default width as they always were, and say so.
+- **The card of an app with no title shows its name.** The first run of the new test found it: a compose file without `x-casaos` gave a nameless card.
+
 ## [0.4.61] - 2026-09-13
 
 ### Fixed

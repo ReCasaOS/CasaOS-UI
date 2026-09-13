@@ -641,7 +641,6 @@ export default {
 			this.$buefy.modal.open({
 				component: PortPanel,
 				hasModalCard: true,
-				customClass: 'account-modal',
 				trapFocus: true,
 				canCancel: ['escape'],
 				scroll: 'keep',
