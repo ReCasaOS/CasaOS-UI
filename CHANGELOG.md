@@ -2,6 +2,12 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.60] - 2026-09-13
+
+### Added
+
+- **Back up this box.** A button on the Destinations tab copies the box itself -- its users, its shares and their accounts, its schedules, the destinations -- to the chosen destination. It shows in History and in the destination browser as "This box", and restores from there like an app. The confirmation says the dashboard goes away for a few seconds: the services holding those files are stopped for the copy. Needs AppManagement v0.4.45.
+
 ## [0.4.59] - 2026-09-13
 
 ### Added
