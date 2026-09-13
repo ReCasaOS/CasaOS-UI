@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -48,7 +48,7 @@ function walk(dir, out = []) {
 		const path = join(dir, name)
 		if (statSync(path).isDirectory())
 			walk(path, out)
-		else if (/\.(vue|js)$/.test(name) && !name.endsWith('.spec.js'))
+		else if (/\.(?:vue|js)$/.test(name) && !name.endsWith('.spec.js'))
 			out.push(path)
 	}
 	return out

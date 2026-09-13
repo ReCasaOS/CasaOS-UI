@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import ShareListPage from '@/components/filebrowser/shared/ShareListPage.vue'
 import { describe, expect, it, vi } from 'vitest'
+import ShareListPage from '@/components/filebrowser/shared/ShareListPage.vue'
 
 // Every row says who can open the folder, and a share with no account has to say
 // so out loud. "Nothing in that column" is exactly what a guest share looked like

@@ -107,8 +107,8 @@
 
 <script>
 import has from 'lodash/has'
-import { mixin, wallpaperType } from '@/mixins/mixin'
 import ShareAccessModal from '../shared/ShareAccessModal.vue'
+import { mixin, wallpaperType } from '@/mixins/mixin'
 
 export default {
 	mixins: [mixin],

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import CoreService from '@/components/CoreService.vue'
 import { describe, expect, it, vi } from 'vitest'
+import CoreService from '@/components/CoreService.vue'
 
 // An update emits app:update-begin, then app:install-progress while the images
 // pull, then app:update-end. All three name the app the same way, in `app:name`.

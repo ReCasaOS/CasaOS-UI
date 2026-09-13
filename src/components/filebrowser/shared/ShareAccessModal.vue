@@ -146,8 +146,7 @@ export default {
 						username,
 						time_machine: this.timeMachine,
 					}])
-				}
-				else {
+				} else {
 					await this.$api.samba.updateShare(this.share.id, {
 						username,
 						time_machine: this.timeMachine,

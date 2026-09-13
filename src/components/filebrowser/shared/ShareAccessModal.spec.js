@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import ShareAccessModal from '@/components/filebrowser/shared/ShareAccessModal.vue'
 import { describe, expect, it, vi } from 'vitest'
+import ShareAccessModal from '@/components/filebrowser/shared/ShareAccessModal.vue'
 
 // Sharing a folder from its own menu posted `anonymous: true` and opened no
 // dialog at all, so the obvious route was also the one that could not protect
