@@ -32,6 +32,9 @@
 							@click="check(name)">
 							{{ $t('Check') }}
 						</b-button>
+						<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
+							{{ $t('Restore\u2026') }}
+						</b-button>
 						<b-button :loading="busy === `delete:${name}`" rounded size="is-small" type="is-danger"
 							@click="confirmForget(name)">
 							{{ $t('Forget') }}
@@ -93,6 +96,7 @@
 
 <script>
 import BackupHistory from './BackupHistory.vue'
+import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import BackupSchedules from './BackupSchedules.vue'
 import { BACKUP_BACKENDS, parametersFrom, suggestedFields } from './backupBackends'
 import { renderSize } from '@/mixins/file_utils'
@@ -118,6 +122,21 @@ export default {
 		this.load()
 	},
 	methods: {
+		// For a box whose own run log is empty: what the destination holds, and a
+		// way back from it.
+		browse(name) {
+			this.$buefy.modal.open({
+				component: RestoreFromDestinationModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				customClass: 'backup-modal',
+				props: { destination: name },
+			})
+		},
+
 		// A value that looks like a credential is not shown while it is typed. The
 		// field names are rclone's, and its secrets are consistently named.
 		isSecret(key) {

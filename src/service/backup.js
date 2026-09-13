@@ -64,6 +64,13 @@ const backup = {
 	restore(destination, app, stamp) {
 		return api.post(`${PREFIX}/backup/restore`, { destination, app, stamp })
 	},
+
+	// What a destination holds: the apps it has backups of, their runs newest
+	// first, and whether this box runs each app now. For a box whose own run
+	// log is empty.
+	getDestinationRuns(name) {
+		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
+	},
 }
 
 export default backup
