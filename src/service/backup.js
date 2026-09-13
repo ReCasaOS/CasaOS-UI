@@ -55,6 +55,15 @@ const backup = {
 			hold_still: holdStill,
 		})
 	},
+
+	// Puts the app back the way the backup at `stamp` had it. Returns as soon as
+	// it has started; the outcome lands in the run log, marked as a restore. The
+	// app is stopped for the copy, and files added since the backup are removed:
+	// a restore means "as it was". An app that is not installed is installed
+	// first, from the compose file the backup holds.
+	restore(destination, app, stamp) {
+		return api.post(`${PREFIX}/backup/restore`, { destination, app, stamp })
+	},
 }
 
 export default backup
