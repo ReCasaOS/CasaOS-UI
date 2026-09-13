@@ -444,6 +444,16 @@ export default {
 			return res.Properties['app:name']
 		},
 
+		backupCardName(res) {
+			return `${res.Properties['backup:kind'] || 'backup'}:${res.Properties['app:name']}`
+		},
+
+		backupCardTitle(res) {
+			return res.Properties['backup:kind'] === 'restore'
+				? this.$t('Restoring {title}', { title: this.appTitle(res) })
+				: this.$t('Backing up {title}', { title: this.appTitle(res) })
+		},
+
 		transformAppInstallationProgress(res) {
 			if (res.finished) {
 				if (this.noticesData[res.name]) {
@@ -461,7 +471,9 @@ export default {
 					try {
 						const progress = Number(res.message) < 0 ? 0 : Number(res.message)
 						let currentInstallAppText = ''
-						if (progress?.toString() === '0') {
+						if (String(res.name).startsWith('backup:') || String(res.name).startsWith('restore:')) {
+							currentInstallAppText = this.$t('{percent}% done', { percent: progress })
+						} else if (progress?.toString() === '0') {
 							currentInstallAppText = this.$t('Starting installation')
 						} else if (progress?.toString() === '100') {
 							currentInstallAppText = this.$t('Installation completed')
@@ -623,6 +635,49 @@ export default {
 				title: `${this.appTitle(res)} Error Info`,
 				message: res.Properties.message,
 				icon: res.Properties['app:icon'],
+			})
+		},
+		// A backup or a restore, on the card an install uses. Keyed on the kind and
+		// the app rather than the app alone, so a backup running while the same app
+		// updates does not fight it for one card.
+		'backup:begin': function (res) {
+			this.transformAppInstallationProgress({
+				finished: false,
+				name: this.backupCardName(res),
+				title: this.backupCardTitle(res),
+				id: this.backupCardName(res),
+				icon: res.Properties['app:icon'] || '',
+				message: this.$t('Starting'),
+			})
+		},
+		'backup:progress': function (res) {
+			this.transformAppInstallationProgress({
+				finished: false,
+				name: this.backupCardName(res),
+				title: this.backupCardTitle(res),
+				id: this.backupCardName(res),
+				icon: res.Properties['app:icon'] || '',
+				message: res.Properties['app:progress'],
+			})
+		},
+		'backup:end': function (res) {
+			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
+			this.$buefy.toast.open({
+				message: res.Properties['backup:kind'] === 'restore'
+					? this.$t('{title} restored from {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] })
+					: this.$t('{title} backed up to {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] }),
+				type: 'is-success',
+				duration: 5000,
+			})
+		},
+		'backup:error': function (res) {
+			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
+			this.$buefy.toast.open({
+				message: res.Properties['backup:kind'] === 'restore'
+					? this.$t('Restoring {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message })
+					: this.$t('Backing up {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message }),
+				type: 'is-danger',
+				duration: 8000,
 			})
 		},
 		'app:install-progress': function (res) {

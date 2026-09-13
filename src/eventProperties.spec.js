@@ -31,6 +31,9 @@ const DECLARED = new Set([
 	'docker:image:updated',
 	'dry_run',
 	'message',
+	'backup:destination',
+	'backup:stamp',
+	'backup:kind',
 	// CasaOS core, service/notify.go -- set as map keys, not declared
 	'file_operate',
 	// Sent by this dashboard itself as query parameters, which AppManagement
