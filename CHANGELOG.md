@@ -2,6 +2,12 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.58] - 2026-09-13
+
+### Added
+
+- **Restore to a box that has nothing.** Every destination has a Restore… button that lists what it holds: each app, whether this box runs it now, and its backups newest first. Restoring an app that is not installed here installs it from the compose file its backup kept and then puts its data back; the confirmation says which of the two will happen. Needs AppManagement v0.4.43.
+
 ## [0.4.57] - 2026-09-13
 
 ### Added
