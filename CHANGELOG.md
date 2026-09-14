@@ -2,6 +2,12 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.63] - 2026-09-14
+
+### Added
+
+- **Every app at once.** The grid updated one app at a time: a click, a card, a toast. `Update every app…` in the apps menu opens a list of what an update would do, app by app and image by image, checked against the registries first; the apps to take are ticked, and the button names their number. Once confirmed the box runs them one after another on its own, so closing the page changes nothing, and the dialog shows what became of each: updated, already current with the reason, or failed with the error. Reopened during a run, it finds the run where it is. Needs AppManagement v0.4.52.
+
 ## [0.4.62] - 2026-09-13
 
 ### Added

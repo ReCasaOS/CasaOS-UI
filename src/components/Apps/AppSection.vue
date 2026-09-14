@@ -24,6 +24,9 @@
 				<b-dropdown-item :disabled="isCheckingImages" aria-role="menuitem" @click="checkImageUpdates">
 					{{ $t('Check for image updates') }}
 				</b-dropdown-item>
+				<b-dropdown-item aria-role="menuitem" @click="showUpdateAll">
+					{{ $t('Update every app…') }}
+				</b-dropdown-item>
 			</b-dropdown>
 		</div>
 		<!-- Title Bar End -->
@@ -98,6 +101,7 @@ import AppCardSkeleton from './AppCardSkeleton.vue'
 import AppPanel from './AppPanel.vue'
 import AppSectionTitleTip from './AppSectionTitleTip.vue'
 import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
+import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -222,6 +226,19 @@ export default {
 		 * per distinct image, which is why this is a button and not something the
 		 * grid does on its own.
 		 */
+		// Every app at once: the menu item is the first click, the list in the
+		// dialog the second, and the run is the box's own once confirmed.
+		showUpdateAll() {
+			this.$buefy.modal.open({
+				component: UpdateAllModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
 		async checkImageUpdates() {
 			if (this.isCheckingImages) {
 				return
