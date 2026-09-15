@@ -2,6 +2,13 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.65] - 2026-09-15
+
+### Fixed
+
+- **A service built from its Dockerfile can be saved in Settings.** The form asked for a Docker image and a tag on every service, and a service with a `build` section may name no image, so the form never validated and the save sent nothing. Such a service now says its image is built on this box, and nothing is asked of it. The round trip keeps the `build` section, and no longer writes `image: null` for an image the form never had, which compose refuses. Needs AppManagement v0.4.55 for the save itself to go through.
+- **A container whose stack CasaOS cannot read says why.** Its card under Managed elsewhere says that CasaOS cannot read its compose file, with the reason on hover, and its detail panel shows the loader's words, which name the file and the field. Needs AppManagement v0.4.55.
+
 ## [0.4.64] - 2026-09-15
 
 ### Added
