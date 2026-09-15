@@ -135,3 +135,30 @@ x-casaos:
 		expect(configData['x-casaos'].title.en_us).toBe('Jellyfin Media Server')
 	})
 })
+
+// A stack somebody started by hand can build a service from its Dockerfile. That service
+// may name no image, and the form must neither invent one nor drop the build on the way out.
+const builtYaml = `name: jarvis
+services:
+  jarvis:
+    build: .
+    env_file: .env
+  redis:
+    image: redis:7
+`
+
+describe('composeConfig service built from a Dockerfile', () => {
+	it('keeps the build section in the form model', () => {
+		const model = editorModel(builtYaml)
+		expect(model.services.jarvis.build).toBe('.')
+		expect(model.services.jarvis.image).toBeUndefined()
+	})
+
+	it('writes the build back, and no image for it', () => {
+		const out = emitYaml(editorModel(builtYaml), builtYaml)
+		expect(out.services.jarvis.build).toBe('.')
+		expect(out.services.jarvis).not.toHaveProperty('image')
+		expect(out.services.redis.image).toBe('redis:7')
+		expect(out.services.redis).not.toHaveProperty('build')
+	})
+})

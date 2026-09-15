@@ -26,6 +26,13 @@
 					</div>
 				</dl>
 
+				<!-- Why this stack is not an app here. The loader names the file and the field,
+					which is what the owner needs to fix it. -->
+				<b-message v-if="composeLoadError" class="mb-4" size="is-small" type="is-warning">
+					<p class="mb-1">{{ $t('CasaOS cannot load the compose file of this project, so it does not manage it.') }}</p>
+					<p class="_mono _wrap">{{ composeLoadError }}</p>
+				</b-message>
+
 				<h4 class="_heading">{{ $t('Published ports') }}</h4>
 				<p v-if="!ports.length" class="has-text-full-03 is-size-7 mb-3">{{ $t('None') }}</p>
 				<p v-for="port in ports" :key="port" class="_mono is-size-7">{{ port }}</p>
@@ -81,6 +88,8 @@ export default {
 	name: 'container-detail-panel',
 	props: {
 		containerId: { type: String, required: true },
+		// why the compose list could not load this container's project, as the app grid says
+		composeLoadError: { type: String, default: '' },
 	},
 	emits: ['close', 'removed'],
 	data() {

@@ -402,3 +402,20 @@ describe('what a finished recreate may claim', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('a stack CasaOS cannot load', () => {
+	const reason = 'validating /opt/jarvis/docker-compose.yml: services.jarvis Additional property gpus is not allowed'
+	const container = { name: 'ab12cd34ef56', app_type: 'container', title: { en_us: 'jarvis-jarvis-1' }, compose_project: 'jarvis' }
+
+	it('says so on the card, with the reason on hover', async () => {
+		const wrapper = await card({ ...container, compose_load_error: reason })
+		const line = wrapper.findAll('p').find(p => p.text() === 'CasaOS cannot read its compose file.')
+		expect(line).toBeTruthy()
+		expect(line.attributes('title')).toBe(reason)
+	})
+
+	it('says nothing for a stack that loaded', async () => {
+		const wrapper = await card(container)
+		expect(wrapper.text()).not.toContain('CasaOS cannot read its compose file.')
+	})
+})

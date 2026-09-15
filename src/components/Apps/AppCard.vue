@@ -154,6 +154,12 @@
 					<p v-if="facts.length" class="one-line has-text-full-03 _facts">
 						{{ facts.join(' · ') }}
 					</p>
+					<!-- The compose list could not load this container's stack. Saying so, with
+						the loader's words on hover and in the detail panel, turns "why can I not
+						edit it" into something to fix. -->
+					<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
+						{{ $t('CasaOS cannot read its compose file.') }}
+					</p>
 				</div>
 			</b-tooltip>
 			<!-- Card Content End -->
@@ -389,7 +395,7 @@ export default {
 				trapFocus: true,
 				canCancel: ['escape'],
 				animation: 'zoom-in',
-				props: { containerId: this.item.name },
+				props: { containerId: this.item.name, composeLoadError: this.item.compose_load_error || '' },
 				events: { removed: () => this.$emit('updateState') },
 			})
 		},

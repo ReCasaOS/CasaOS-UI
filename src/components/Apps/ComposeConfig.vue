@@ -3,7 +3,16 @@
 		<b-tabs class="has-text-full-03" style="height: 100%" :model-value="firstAppName">
 			<b-tab-item v-for="(service, key) in configData.services" :key="key" :label="key" :value="key" @click="current_service = key">
 				<VeeForm :ref="`${key}valida`" as="span">
-					<b-field grouped>
+					<!-- A service with a build section runs the image built on this box from its
+						Dockerfile. It may name no image at all, and CasaOS never builds, so there
+						is no image or tag to pick here, and none to require: required, it blocked
+						every save of such an app before a request was even sent. -->
+					<b-field v-if="service.build" :label="$t('Docker Image')" class="mb-3">
+						<p class="has-text-full-03">
+							{{ service.image ? `${service.image} · ` : '' }}{{ $t('Built on this box from its Dockerfile.') }}
+						</p>
+					</b-field>
+					<b-field v-else grouped>
 						<VeeField v-slot="{ errors, meta }" :model-value="getFirstField(service.image)" name="Image0" rules="required">
 							<b-field :label="`${$t('Docker Image')} *`" :message="errors" :type="{ 'is-danger': errors[0], 'is-success': meta.valid }" class="mb-3 is-flex-grow-1 mr-3">
 								<b-input :key="service.image" :readonly="state === 'update' || serviceStableVersion !== ''" :model-value="getFirstField(service.image)" :placeholder="$t('e.g.,hello-world:latest')" @update:model-value="(V) => changeIcon(V)" @blur="
@@ -544,6 +553,10 @@ export default {
 			const composeServicesItem = {}
 			// Image
 			composeServicesItem.image = composeServicesItemInput.image
+			// what tells the form the image is built here rather than pulled; only when there is
+			// one, since an undefined key comes out of the save as `build: null`
+			if (composeServicesItemInput.build)
+				composeServicesItem.build = composeServicesItemInput.build
 			// Envs
 			if (composeServicesItemInput.environment) {
 				const envArray = Array.isArray(composeServicesItemInput.environment)
@@ -771,6 +784,10 @@ export default {
 				const service = val.services[servicesKey]
 				// 输出结果
 				const outputService = ConfigData.services[servicesKey]
+				// A service built on this box may name no image. Absent has to stay absent: merged
+				// below, an undefined image came out as `image: null`, which compose refuses.
+				if (!service.image)
+					delete outputService.image
 				// memory
 				outputService.deploy.resources.limits.memory = `${service.deploy.resources.limits.memory}M`
 				// cpus is a hard cap, and the field is free text: anything that is not a

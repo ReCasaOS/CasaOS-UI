@@ -1033,6 +1033,12 @@ export interface WebAppGridItem {
      */
     'compose_project'?: string;
     /**
+     * Why the compose project named in `compose_project` is missing from the compose list, absent when the container belongs to no project or its project loaded. These are the loader's own words, which name the file and the field, so the owner knows what to change.
+     * @type {string}
+     * @memberof WebAppGridItem
+     */
+    'compose_load_error'?: string;
+    /**
      * 
      * @type {string}
      * @memberof WebAppGridItem
