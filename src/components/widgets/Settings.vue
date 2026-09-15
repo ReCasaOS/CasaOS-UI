@@ -20,17 +20,28 @@
 				</template>
 				<b-dropdown-item :focusable="false" aria-role="menu-item" class="has-text-white has-text-left" custom>
 					<h2 class="title is-5 has-text-white">{{ $t('Widgets Settings') }}</h2>
-					<div v-for="(item, index) in settingsData" :key="`setting_${index}`"
-						class="is-flex is-align-items-center item">
-						<div class="is-flex is-align-items-center is-flex-grow-1">
-							<b-icon :icon="getIcon(item.name)" pack="casa" class="mr-2"></b-icon>
-							<b>{{ $t(getTitle(item.name)) }}</b>
-						</div>
-						<b-field>
-							<b-switch v-model="item.show" class="is-flex-direction-row-reverse mr-0" size="is-small"
-								type="is-dark" @update:model-value="handleInput"></b-switch>
-						</b-field>
-					</div>
+					<draggable v-model="settingsData" :animation="200" ghost-class="ghost" handle=".drag-handle"
+						item-key="name" tag="div" @end="handleInput">
+						<template #item="{ element: item, index }">
+							<div class="is-flex is-align-items-center item">
+								<span :aria-label="$t('Move {name} up or down with the arrow keys', { name: $t(getTitle(item.name)) })"
+									:title="$t('Drag to reorder')" class="drag-handle mr-2" role="button" tabindex="0"
+									@keydown.down.prevent="move(index, 1)" @keydown.up.prevent="move(index, -1)">
+									<span class="dot"></span><span class="dot"></span>
+									<span class="dot"></span><span class="dot"></span>
+									<span class="dot"></span><span class="dot"></span>
+								</span>
+								<div class="is-flex is-align-items-center is-flex-grow-1">
+									<b-icon :icon="getIcon(item.name)" class="mr-2" pack="casa"></b-icon>
+									<b>{{ $t(getTitle(item.name)) }}</b>
+								</div>
+								<b-field>
+									<b-switch v-model="item.show" class="is-flex-direction-row-reverse mr-0" size="is-small"
+										type="is-dark" @update:model-value="handleInput"></b-switch>
+								</b-field>
+							</div>
+						</template>
+					</draggable>
 					<div class="is-flex is-align-items-center item">
 						<div class="is-flex is-align-items-center is-flex-grow-1">
 							<b-icon icon="show-search-outline" pack="casa" class="mr-2"></b-icon>
@@ -50,6 +61,8 @@
 
 <script>
 import find from 'lodash/find'
+import draggable from 'vuedraggable'
+import { moveWidget } from './widgetOrder'
 
 const widgetsComponents = require.context(
 	'@/widgets',
@@ -59,15 +72,18 @@ const widgetsComponents = require.context(
 
 export default {
 	name: 'settings',
+	components: {
+		Draggable: draggable,
+	},
+	props: {
+		modelValue: Array,
+	},
 	data() {
 		return {
 			apps: [],
 			settingsData: [],
 			position: 'is-top-left',
 		}
-	},
-	props: {
-		modelValue: Array,
 	},
 	computed: {
 		searchBarShown() {
@@ -100,6 +116,9 @@ export default {
 	mounted() {
 		window.addEventListener('resize', this.onRezise)
 	},
+	unmounted() {
+		window.removeEventListener('resize', this.onRezise)
+	},
 	methods: {
 		getIcon(value) {
 			const obj = find(this.apps, (o) => {
@@ -113,6 +132,18 @@ export default {
 			})
 			return obj.app.default.title
 		},
+		// The arrow keys on a handle do what dragging it does, for whoever does not
+		// use a mouse. Focus follows the widget that moved.
+		move(index, offset) {
+			const moved = moveWidget(this.settingsData, index, offset)
+			if (moved === this.settingsData)
+				return
+			this.settingsData = moved
+			this.handleInput()
+			this.$nextTick(() => {
+				this.$el.querySelectorAll('.drag-handle')[index + offset]?.focus()
+			})
+		},
 		handleInput() {
 			this.$emit('update:modelValue', this.settingsData)
 			this.$emit('change', this.settingsData)
@@ -123,9 +154,6 @@ export default {
 		onRezise() {
 		},
 	},
-	unmounted() {
-		window.addEventListener('resize', this.onRezise)
-	},
 }
 </script>
 
@@ -135,6 +163,42 @@ export default {
 
 	.item {
 		margin: 1.25rem 0;
+	}
+
+	.drag-handle {
+		display: inline-grid;
+		flex: none;
+		grid-template-columns: repeat(2, 3px);
+		gap: 2px;
+		padding: 2px;
+		cursor: grab;
+		opacity: 0.5;
+
+		&:hover,
+		&:focus-visible {
+			opacity: 1;
+		}
+
+		&:focus-visible {
+			outline: 2px solid #fff;
+			outline-offset: 2px;
+			border-radius: 2px;
+		}
+
+		&:active {
+			cursor: grabbing;
+		}
+
+		.dot {
+			width: 3px;
+			height: 3px;
+			border-radius: 50%;
+			background: #fff;
+		}
+	}
+
+	.ghost {
+		opacity: 0.4;
 	}
 
 	.circle-btn {

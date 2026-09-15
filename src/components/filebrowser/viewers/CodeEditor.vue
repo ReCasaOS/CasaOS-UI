@@ -131,10 +131,10 @@ window.jsonlint = jsonlint
 window.jsyaml = jsyaml
 
 export default {
-	mixins: [mixin],
 	components: {
 		Codemirror: codemirror,
 	},
+	mixins: [mixin],
 	props: {
 		item: {
 			type: Object,
@@ -214,6 +214,9 @@ export default {
 				mode = 'text/x-go'
 			} else if (ext.toLowerCase() == 'vue') {
 				mode = 'text/x-vue'
+			} else if (ext.toLowerCase() === 'env' || /^\.env(?:\.|$)/i.test(this.item.name)) {
+				// .env, .env.local, app.env: KEY=value lines, which read best as shell
+				mode = 'text/x-sh'
 			}
 			this.codemirror.setOption('mode', mode)
 			this.$api.file.download(this.item.path).then((res) => {

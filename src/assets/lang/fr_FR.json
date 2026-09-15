@@ -630,6 +630,8 @@
   "Yes": "Oui",
   "No": "Non",
   "No backup has run yet.": "Aucune sauvegarde n'a encore tourné.",
+  "Drag to reorder": "Glisser pour réordonner",
+  "Move {name} up or down with the arrow keys": "Déplacer {name} vers le haut ou le bas avec les flèches",
   "Update every app…": "Tout mettre à jour…",
   "Update every app": "Tout mettre à jour",
   "Asking every image’s registry what its tag points at now…": "Interrogation des registres pour savoir où pointe chaque tag…",

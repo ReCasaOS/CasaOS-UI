@@ -18,6 +18,7 @@ import camelCase from 'lodash/camelCase'
 import find from 'lodash/find'
 import isEqual from 'lodash/isEqual'
 import Settings from '@/components/widgets/Settings.vue'
+import { combineWidgetSettings } from '@/components/widgets/widgetOrder'
 
 const widgetsComponents = require.context(
 	'@/widgets',
@@ -103,20 +104,7 @@ export default {
 			})
 		},
 		diffAndCombineData(initData, remoteData) {
-			const newData = initData.map((item) => {
-				const remoteItem = find(remoteData, el => el.name === item.name)
-				if (remoteItem && item.name === remoteItem.name) {
-					return {
-						name: item.name,
-						show: (item.show === remoteItem.show) ? item.show : remoteItem.show,
-					}
-				} else {
-					return {
-						name: item.name,
-						show: item.show,
-					}
-				}
-			})
+			const newData = combineWidgetSettings(initData, remoteData)
 			this.widgetsSettings = newData
 			if (!isEqual(newData, remoteData)) {
 				this.saveData(newData)

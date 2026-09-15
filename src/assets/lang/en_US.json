@@ -630,6 +630,8 @@
   "Yes": "Yes",
   "No": "No",
   "No backup has run yet.": "No backup has run yet.",
+  "Drag to reorder": "Drag to reorder",
+  "Move {name} up or down with the arrow keys": "Move {name} up or down with the arrow keys",
   "Update every app…": "Update every app…",
   "Update every app": "Update every app",
   "Asking every image’s registry what its tag points at now…": "Asking every image’s registry what its tag points at now…",

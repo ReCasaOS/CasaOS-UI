@@ -2,6 +2,16 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [0.4.64] - 2026-09-15
+
+### Added
+
+- **The widgets can be put in any order.** Each one in Widgets Settings has a handle: drag it, or focus it and use the arrow keys. The sidebar used to rebuild the saved list in the order the dashboard ships its widgets and write that back over it, so an order could not have survived a reload even if one could be set; the saved order wins now, and a widget a newer version adds goes at the end. The idea comes from IceWhaleTech/CasaOS-UI#270, which as submitted lost the order on the next load.
+
+### Fixed
+
+- **A `.env` file opens as shell in the file editor**, not as JavaScript: `.env`, `.env.local` and `app.env` alike. From IceWhaleTech/CasaOS-UI#269; the other half of it, showing hidden files, was already here.
+
 ## [0.4.63] - 2026-09-14
 
 ### Added
