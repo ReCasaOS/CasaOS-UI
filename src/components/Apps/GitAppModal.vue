@@ -42,6 +42,9 @@
 						<b-button :label="$t('Copy')" rounded size="is-small" @click="copyKey"></b-button>
 					</div>
 				</template>
+
+				<!-- the check runs on the server, and Cancel waits for it: say what takes the time -->
+				<p v-if="busy === 'clone'" class="is-size-7 has-text-full-03 mt-2">{{ $t('Cloning the repository…') }}</p>
 			</template>
 
 			<!-- 2. what the repository will run, before anything runs -->
@@ -217,7 +220,7 @@ export default {
 		// A clone that failed -- no access, no compose file -- says why in
 		// check.error, and a missing compose file comes with an example to add.
 		async clone() {
-			this.busy = true
+			this.busy = 'clone'
 			this.error = ''
 			this.example = ''
 			try {

@@ -455,7 +455,7 @@
 				<div v-if="gitNotice" class="px-4 pt-3 git-notice">
 					<b-message class="mb-0" size="is-small" type="is-info">
 						{{ $t('This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.') }}
-						<a @click="setEditorTab('repository')">{{ $t('Open the Repository tab') }}</a>
+						<a href="#" @click.prevent="setEditorTab('repository')">{{ $t('Open the Repository tab') }}</a>
 					</b-message>
 				</div>
 

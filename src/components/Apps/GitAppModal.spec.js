@@ -167,6 +167,7 @@ describe('gitAppModal repository step', () => {
 			await click('Next')
 			expect(gitApps.check).toHaveBeenCalledWith('jarvis')
 			expect(button('Cancel').attributes('disabled')).toBeDefined()
+			expect(wrapper.text()).toContain('Cloning the repository…')
 
 			await vi.advanceTimersByTimeAsync(2000)
 			expect(get).toHaveBeenCalledTimes(1)
@@ -176,6 +177,7 @@ describe('gitAppModal repository step', () => {
 			await flushPromises()
 			expect(get).toHaveBeenCalledWith('jarvis')
 			expect(wrapper.text()).toContain('Read from {files}.')
+			expect(wrapper.text()).not.toContain('Cloning the repository…')
 			wrapper.unmount()
 		})
 	})
@@ -290,5 +292,32 @@ describe('gitAppModal deploy step', () => {
 		expect(tools.gitApps.remove).toHaveBeenCalledWith('jarvis')
 		expect(modal.emitted('close')).toHaveLength(1)
 		modal.unmount()
+	})
+
+	it('keeps what the last attempt said when deploying again is refused', async () => {
+		const deploy = vi.fn()
+			.mockResolvedValueOnce({ data: { data: cloned({ state: 'building' }) } })
+			.mockRejectedValueOnce({ response: { status: 409, data: { message: 'deploy is running' } } })
+		const { wrapper, click, fire } = await deploying({ deploy })
+		fire('app:git-build-error', { 'app:name': 'jarvis', 'message': 'no Dockerfile' })
+		await flushPromises()
+
+		await click('Deploy again')
+		expect(wrapper.text()).toContain('deploy is running')
+		expect(wrapper.text()).toContain('The build failed: {reason}')
+		wrapper.unmount()
+	})
+
+	it('stays open, with what the server said, when deleting the app is refused', async () => {
+		const remove = vi.fn().mockRejectedValue({ response: { status: 409, data: { message: 'deploy is running' } } })
+		const { wrapper, click, fire } = await deploying({ remove })
+		fire('app:git-build-error', { 'app:name': 'jarvis', 'message': 'no Dockerfile' })
+		await flushPromises()
+
+		await click('Delete this app')
+		expect(remove).toHaveBeenCalledWith('jarvis')
+		expect(wrapper.text()).toContain('deploy is running')
+		expect(wrapper.emitted('close')).toBeUndefined()
+		wrapper.unmount()
 	})
 })
