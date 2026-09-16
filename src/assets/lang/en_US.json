@@ -782,5 +782,6 @@
   "The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.": "The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.",
   "Repository": "Repository",
   "This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.": "This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.",
-  "Open the Repository tab": "Open the Repository tab"
+  "Open the Repository tab": "Open the Repository tab",
+  "From a git repository…": "From a git repository…"
 }

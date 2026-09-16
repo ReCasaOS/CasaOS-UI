@@ -18,6 +18,9 @@
 				<b-dropdown-item aria-role="menuitem" @click="showInstall(0, 'custom')">
 					{{ $t('Custom Install APP') }}
 				</b-dropdown-item>
+				<b-dropdown-item aria-role="menuitem" @click="showGitApp">
+					{{ $t('From a git repository…') }}
+				</b-dropdown-item>
 				<b-dropdown-item aria-role="menuitem" @click="showExternalLinkPanel">
 					{{ $t('Add external link/APP') }}
 				</b-dropdown-item>
@@ -101,6 +104,8 @@ import AppCardSkeleton from './AppCardSkeleton.vue'
 import AppPanel from './AppPanel.vue'
 import AppSectionTitleTip from './AppSectionTitleTip.vue'
 import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
+import GitAppModal from '@/components/Apps/GitAppModal.vue'
+import { withoutContainer } from '@/components/Apps/gitApps'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -234,6 +239,20 @@ export default {
 				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// An app built from its own repository. Only the dialog's buttons close it:
+		// its Cancel deletes an app registered and never deployed, which escape or a
+		// click outside would leave behind, holding its name.
+		showGitApp() {
+			this.$buefy.modal.open({
+				component: GitAppModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: [],
 				scroll: 'keep',
 				animation: 'zoom-in',
 			})
@@ -465,12 +484,17 @@ export default {
 					networks: networks.data.data,
 					memory,
 				}
-				const ret = await this.$openAPI.appManagement.compose.myComposeApp(name, {
-					headers: {
-						'content-type': 'application/yaml',
-						'accept': 'application/yaml',
-					},
-				})
+				// A git app no deployment has given a container has no compose app to
+				// read: its panel is its Repository tab alone.
+				const repositoryOnly = withoutContainer(item)
+				const ret = repositoryOnly
+					? { data: '' }
+					: await this.$openAPI.appManagement.compose.myComposeApp(name, {
+						headers: {
+							'content-type': 'application/yaml',
+							'accept': 'application/yaml',
+						},
+					})
 				this.$buefy.modal.open({
 					component: AppPanel,
 					hasModalCard: true,
@@ -493,6 +517,7 @@ export default {
 						configData,
 						// settingData: ret.data,
 						settingComposeData: ret.data,
+						repositoryOnly,
 					},
 				})
 			} catch (e) {
