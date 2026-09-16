@@ -2,7 +2,29 @@
 	<div class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
 		@mouseleave="hover = true" @mouseover="hover = true">
 		<!-- Action Button Start -->
-		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
+		<!-- A git app no deployment has given a container: its panel, which holds the
+			Repository tab, and deleting it are all there is to do with it. -->
+		<div v-if="isGitAppWithoutContainer && !isUninstalling" class="action-btn">
+			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
+				append-to-body aria-role="list" class="app-card-drop" :position="dropdownPosition"
+				@active-change="setDropState">
+				<template #trigger>
+					<p role="button" @click="handleDorpdownPosition">
+						<b-icon class="is-clickable" icon="dots-vertical-outline" pack="casa" />
+					</p>
+				</template>
+
+				<b-dropdown-item :focusable="false" aria-role="menu-item" custom>
+					<b-button expanded type="is-text" @click="configApp()">
+						{{ $t('Setting') }}
+					</b-button>
+					<b-button class="has-text-red" expanded type="is-text" @click="deleteGitAppConfirm">
+						{{ $t('Delete') }}
+					</b-button>
+				</b-dropdown-item>
+			</b-dropdown>
+		</div>
+		<div v-else-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
 				append-to-body aria-role="list" class="app-card-drop" :position="dropdownPosition"
 				@active-change="setDropState">
@@ -129,6 +151,9 @@
 							<!-- Shown from what the last image check found, so an app nobody has
 								checked yet carries no badge rather than a claim of being current.
 								v-else so it never stacks on top of the NEW marker. -->
+							<!-- A git app's state, or its new commits: gitApps.js says which wins. Before
+								the image badge, since a failed build matters more than a newer image. -->
+							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
 							<CTooltip v-else-if="item.update_available" class="__position __position-wide" content="Update available" />
 						</div>
 
@@ -172,6 +197,7 @@ import isNull from 'lodash/isNull'
 import YAML from 'yaml'
 import FileSaver from 'file-saver'
 import { ageKey, containerFacts } from './legacyApps'
+import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
 import events from '@/events/events'
@@ -251,6 +277,9 @@ export default {
 				return this.$t('Rebuilding')
 			} else if (this.isCheckThenUpdate) {
 				return this.$t('CheckThenUpdate')
+			} else if (this.isGitAppWithoutContainer) {
+				// nothing to launch: a click opens its panel
+				return this.$t('Setting')
 			} else if (this.item.status === 'running') {
 				return this.$t('Open')
 			} else {
@@ -287,6 +316,13 @@ export default {
 
 		isContainerApp() {
 			return this.item.app_type === 'container'
+		},
+		// from the grid item's `git`, which only a git app carries
+		repoBadge() {
+			return gitBadge(this.item.git)
+		},
+		isGitAppWithoutContainer() {
+			return withoutContainer(this.item)
 		},
 		isLinkApp() {
 			return this.item.app_type === 'LinkApp'
@@ -365,6 +401,10 @@ export default {
 		openApp(item) {
 			if (this.isContainerApp) {
 				this.$emit('importApp', item, false)
+				return false
+			}
+			if (this.isGitAppWithoutContainer) {
+				this.configApp()
 				return false
 			}
 			if (item.app_type === 'system') {
@@ -500,6 +540,38 @@ export default {
 					this.uninstallApp(checkDelConfig)
 				},
 			})
+		},
+
+		// A git app with no container goes through its own route, which takes what
+		// CasaOS cloned, built or left behind for it: the compose route knows no such app.
+		deleteGitAppConfirm() {
+			this.$refs.dro.isActive = false
+			this.$buefy.dialog.confirm({
+				title: this.$t('Attention'),
+				message: this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName }),
+				type: 'is-dark',
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.deleteGitApp(),
+			})
+		},
+
+		async deleteGitApp() {
+			this.isUninstalling = true
+			try {
+				await this.$api.gitApps.remove(this.item.name)
+				this.removeIdFromSessionStorage(this.item.name)
+				// the section reads the grid again, and this card is gone from it
+				this.$emit('updateState')
+			} catch (err) {
+				this.isUninstalling = false
+				this.$buefy.toast.open({
+					message: err.response?.data?.message || err.message,
+					type: 'is-danger',
+					position: 'is-top',
+					duration: 5000,
+				})
+			}
 		},
 
 		/**

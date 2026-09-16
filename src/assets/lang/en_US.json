@@ -732,5 +732,6 @@
   "Host process namespace": "Host process namespace",
   "Added capabilities": "Added capabilities",
   "Host devices": "Host devices",
-  "Docker socket": "Docker socket"
+  "Docker socket": "Docker socket",
+  "Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.": "Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched."
 }

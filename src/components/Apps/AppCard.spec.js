@@ -85,6 +85,80 @@ describe('app card update badge', () => {
 	})
 })
 
+describe('app card git badge', () => {
+	// the grid's item for a git app no deployment has given a container
+	const withoutContainer = { name: 'jarvis', app_type: 'v2app', status: '', title: { en_us: 'jarvis' }, git: { new_commits: false, state: 'build_failed', deployed: false } }
+
+	it('shows the state of a git app, in red when it failed', async () => {
+		const wrapper = await card({ git: { state: 'build_failed', new_commits: true } })
+		expect(badges(wrapper)).toEqual(['Build failed'])
+		expect(wrapper.findComponent(cTooltip).props('modal')).toBe('is-danger')
+		wrapper.unmount()
+	})
+
+	it('says new commits wait on an idle git app', async () => {
+		const wrapper = await card({ git: { state: 'idle', new_commits: true } })
+		expect(badges(wrapper)).toEqual(['New commits'])
+		expect(wrapper.findComponent(cTooltip).props('modal')).toBe('is-success')
+		wrapper.unmount()
+	})
+
+	it('says nothing of an idle git app with nothing new', async () => {
+		const wrapper = await card({ git: { state: 'idle', new_commits: false } })
+		expect(badges(wrapper)).toEqual([])
+		wrapper.unmount()
+	})
+
+	it('offers a git app with no container only its panel and its deletion', async () => {
+		const wrapper = await card(withoutContainer)
+		expect([...document.body.querySelectorAll('button')].map(b => b.textContent.trim())).toEqual(['Setting', 'Delete'])
+		wrapper.unmount()
+	})
+
+	it('opens the panel of a git app with no container, which has nothing to start', async () => {
+		const wrapper = await card(withoutContainer, { $messageBus: () => {} })
+		wrapper.vm.openApp(wrapper.props('item'))
+		expect(wrapper.emitted('configApp')).toEqual([[wrapper.props('item'), true]])
+		wrapper.unmount()
+	})
+
+	it('deletes a git app with no container through its own route, once confirmed', async () => {
+		const confirm = vi.fn()
+		const remove = vi.fn().mockResolvedValue({ data: {} })
+		const wrapper = await card(withoutContainer, { $buefy: { dialog: { confirm } }, $api: { gitApps: { remove } } })
+		document.body.querySelectorAll('button').forEach((b) => {
+			if (b.textContent.trim() === 'Delete')
+				b.click()
+		})
+		expect(remove).not.toHaveBeenCalled()
+
+		await confirm.mock.calls[0][0].onConfirm()
+		expect(remove).toHaveBeenCalledWith('jarvis')
+		expect(wrapper.emitted('updateState')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('keeps the whole menu of a git app whose first deployment left containers', async () => {
+		const wrapper = await card({ ...withoutContainer, status: 'exited' })
+		const labels = [...document.body.querySelectorAll('button')].map(b => b.textContent.trim())
+		expect(labels).toContain('Uninstall')
+		expect(labels).not.toContain('Delete')
+		wrapper.unmount()
+	})
+
+	it('puts a git state before the image badge, and the NEW marker before both', async () => {
+		const building = await card({ git: { state: 'building', new_commits: false }, update_available: true })
+		expect(badges(building)).toEqual(['Building'])
+		building.unmount()
+
+		sessionStorage.setItem('newAppTag', JSON.stringify(['syncthing']))
+		const fresh = await card({ git: { state: 'building', new_commits: false } })
+		expect(badges(fresh)).toEqual(['NEW'])
+		sessionStorage.removeItem('newAppTag')
+		fresh.unmount()
+	})
+})
+
 describe('app card update button', () => {
 	function offersUpdate() {
 		return [...document.body.querySelectorAll('button')]
