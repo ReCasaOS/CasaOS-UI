@@ -44,7 +44,7 @@
 				</template>
 
 				<!-- the check runs on the server, and Cancel waits for it: say what takes the time -->
-				<p v-if="busy === 'clone'" class="is-size-7 has-text-full-03 mt-2">{{ $t('Cloning the repository…') }}</p>
+				<p v-if="cloning" class="is-size-7 has-text-full-03 mt-2">{{ $t('Cloning the repository…') }}</p>
 			</template>
 
 			<!-- 2. what the repository will run, before anything runs -->
@@ -144,6 +144,7 @@ export default {
 			outcome: '',
 			reason: '',
 			busy: false,
+			cloning: false,
 			error: '',
 			example: '',
 			// set as the dialog goes, so a check it waits for stops being read
@@ -220,7 +221,8 @@ export default {
 		// A clone that failed -- no access, no compose file -- says why in
 		// check.error, and a missing compose file comes with an example to add.
 		async clone() {
-			this.busy = 'clone'
+			this.busy = true
+			this.cloning = true
 			this.error = ''
 			this.example = ''
 			try {
@@ -241,6 +243,7 @@ export default {
 				this.fail(error)
 			} finally {
 				this.busy = false
+				this.cloning = false
 			}
 		},
 
