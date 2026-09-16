@@ -2,9 +2,7 @@
 	<div class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
 		@mouseleave="hover = true" @mouseover="hover = true">
 		<!-- Action Button Start -->
-		<!-- A git app no deployment has given a container: its panel, which holds the
-			Repository tab, and deleting it are all there is to do with it. -->
-		<div v-if="isGitAppWithoutContainer && !isUninstalling" class="action-btn">
+		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
 				append-to-body aria-role="list" class="app-card-drop" :position="dropdownPosition"
 				@active-change="setDropState">
@@ -14,7 +12,9 @@
 					</p>
 				</template>
 
-				<b-dropdown-item :focusable="false" aria-role="menu-item" custom>
+				<!-- A git app no deployment has given a container: its panel, which holds the
+					Repository tab, and deleting it are all there is to do with it. -->
+				<b-dropdown-item v-if="isGitAppWithoutContainer" :focusable="false" aria-role="menu-item" custom>
 					<b-button expanded type="is-text" @click="configApp()">
 						{{ $t('Setting') }}
 					</b-button>
@@ -22,19 +22,7 @@
 						{{ $t('Delete') }}
 					</b-button>
 				</b-dropdown-item>
-			</b-dropdown>
-		</div>
-		<div v-else-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
-			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
-				append-to-body aria-role="list" class="app-card-drop" :position="dropdownPosition"
-				@active-change="setDropState">
-				<template #trigger>
-					<p role="button" @click="handleDorpdownPosition">
-						<b-icon class="is-clickable" icon="dots-vertical-outline" pack="casa" />
-					</p>
-				</template>
-
-				<b-dropdown-item :focusable="false" aria-role="menu-item" custom>
+				<b-dropdown-item v-else :focusable="false" aria-role="menu-item" custom>
 					<!-- a container CasaOS did not install has no app to open, start or
 						uninstall: the one thing it can be offered is the recreate below -->
 					<template v-if="!isContainerApp">
