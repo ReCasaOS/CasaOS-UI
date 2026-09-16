@@ -8,10 +8,10 @@ import i18n from '@/plugins/i18n'
 // require.context has no Vite equivalent; an empty table makes $t return its key.
 vi.mock('@/assets/lang', () => ({ default: { en_us: {} } }))
 
-function setup(value = '') {
+function setup(value = '', props = {}) {
 	const applyComposeEnv = vi.fn().mockResolvedValue({ data: { message: 'ok' } })
 	const wrapper = mount(EnvEditor, {
-		props: { appId: 'jellyfin', value },
+		props: { appId: 'jellyfin', value, ...props },
 		global: {
 			plugins: [Buefy, i18n],
 			mocks: {
@@ -70,6 +70,19 @@ describe('envEditor', () => {
 		expect(applyComposeEnv).toHaveBeenCalledTimes(1)
 		expect(wrapper.text()).toContain('line 2: unexpected character "!"')
 		expect(wrapper.emitted('applied')).toBeUndefined()
+		wrapper.unmount()
+	})
+
+	it('stays read-only and never applies when the repository tracks the file', async () => {
+		const { wrapper, applyComposeEnv, type, lastState } = setup('A=1\n', { readonly: true })
+		expect(wrapper.findComponent({ name: 'CodeMirrorEditor' }).vm.codemirror.getOption('readOnly')).toBe(true)
+		expect(wrapper.text()).not.toContain('Applying an empty file deletes it.')
+
+		type('A=2\n')
+		await wrapper.vm.$nextTick()
+		expect(lastState().canApply).toBe(false)
+		await wrapper.vm.apply()
+		expect(applyComposeEnv).not.toHaveBeenCalled()
 		wrapper.unmount()
 	})
 

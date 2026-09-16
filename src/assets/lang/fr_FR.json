@@ -779,5 +779,8 @@
   "Last deployments": "Derniers déploiements",
   "No deployment yet.": "Aucun déploiement pour l'instant.",
   "Revert to this version": "Revenir à cette version",
-  "The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.": "L'application revient à {commit}, et la reconstruction automatique est mise en pause jusqu'à ce que vous la réactiviez ou déployiez à la main."
+  "The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.": "L'application revient à {commit}, et la reconstruction automatique est mise en pause jusqu'à ce que vous la réactiviez ou déployiez à la main.",
+  "Repository": "Dépôt",
+  "This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.": "Cette application est définie par son dépôt git : modifiez-la là-bas. Une modification ici toucherait des fichiers suivis et bloquerait tous les déploiements suivants.",
+  "Open the Repository tab": "Ouvrir l'onglet Dépôt"
 }

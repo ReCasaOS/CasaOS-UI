@@ -1,17 +1,20 @@
 <template>
 	<section class="modal-card-body env-editor">
-		<p class="has-text-full-03 is-size-7 mb-2">
-			{{ $t('Edit the .env file of this app. Applying an empty file deletes it.') }}
-		</p>
+		<!-- read-only, the panel above says why and there is nothing to explain -->
+		<template v-if="!readonly">
+			<p class="has-text-full-03 is-size-7 mb-2">
+				{{ $t('Edit the .env file of this app. Applying an empty file deletes it.') }}
+			</p>
 
-		<b-message class="mb-3" size="is-small" type="is-info">
-			<ul>
-				<li>{{ $t('One KEY=VALUE per line; a line starting with # is a comment.') }}</li>
-				<li>{{ $t('Quote values as in a Docker Compose .env file.') }}</li>
-				<li>{{ $t('Reference a key from the Compose file as {ref}.', { ref: '${KEY}' }) }}</li>
-				<li>{{ $t('Keys set by CasaOS (TZ, PUID, PGID) cannot be overridden here.') }}</li>
-			</ul>
-		</b-message>
+			<b-message class="mb-3" size="is-small" type="is-info">
+				<ul>
+					<li>{{ $t('One KEY=VALUE per line; a line starting with # is a comment.') }}</li>
+					<li>{{ $t('Quote values as in a Docker Compose .env file.') }}</li>
+					<li>{{ $t('Reference a key from the Compose file as {ref}.', { ref: '${KEY}' }) }}</li>
+					<li>{{ $t('Keys set by CasaOS (TZ, PUID, PGID) cannot be overridden here.') }}</li>
+				</ul>
+			</b-message>
+		</template>
 
 		<Codemirror :options="cmOptions"
 			:value="draft"
@@ -52,6 +55,8 @@ export default {
 	props: {
 		appId: { type: String, required: true },
 		value: { type: String, default: '' },
+		// A git app whose repository tracks .env: an edit would modify a tracked file.
+		readonly: { type: Boolean, default: false },
 	},
 	emits: ['applied', 'state'],
 	data() {
@@ -65,6 +70,7 @@ export default {
 				lineNumbers: true,
 				lineWrapping: true,
 				styleActiveLine: true,
+				readOnly: this.readonly,
 			},
 		}
 	},
@@ -87,7 +93,7 @@ export default {
 		},
 
 		canApply() {
-			return !this.localError && this.isDirty && !this.isApplying
+			return !this.readonly && !this.localError && this.isDirty && !this.isApplying
 		},
 	},
 	watch: {

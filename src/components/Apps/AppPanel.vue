@@ -411,7 +411,7 @@
 			<!-- App Install Form Start -->
 			<template v-if="currentSlide == 1">
 				<!-- Settings / raw Compose switch, on installed CasaOS apps only -->
-				<div v-if="isCasa && state == 'update'" class="is-flex px-4 pt-3 compose-mode-switch">
+				<div v-if="isCasa && state == 'update' && !repositoryOnly" class="is-flex px-4 pt-3 compose-mode-switch">
 					<b-button :type="editorTab === 'settings' ? 'is-primary' : 'is-text'"
 						class="mr-2"
 						rounded
@@ -439,13 +439,36 @@
 						@click="setEditorTab('containers')">
 						{{ $t('Containers') }}
 					</b-button>
+					<!-- a git app, or a compose app whose folder is a git work tree -->
+					<b-button v-if="gitApp"
+						:type="editorTab === 'repository' ? 'is-primary' : 'is-text'"
+						class="ml-2"
+						rounded
+						size="is-small"
+						@click="setEditorTab('repository')">
+						{{ $t('Repository') }}
+					</b-button>
 				</div>
+
+				<!-- A git or adoptable app is its repository: an edit here would modify
+					tracked files, and modified tracked files refuse every later deployment. -->
+				<div v-if="gitNotice" class="px-4 pt-3 git-notice">
+					<b-message class="mb-0" size="is-small" type="is-info">
+						{{ $t('This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.') }}
+						<a @click="setEditorTab('repository')">{{ $t('Open the Repository tab') }}</a>
+					</b-message>
+				</div>
+
+				<GitRepoTab v-if="gitApp && editorTab === 'repository'"
+					:app-id="id"
+					:git-app="gitApp"
+					@change="gitApp = $event" />
 
 				<ContainersTab v-if="isCasa && state == 'update' && editorTab === 'containers'"
 					:app-id="id"
 					@open="openServicePanel" />
 
-				<ComposeEditor v-if="isCasa && state == 'update' && editorTab === 'compose'"
+				<ComposeEditor v-if="isCasa && state == 'update' && editorTab === 'compose' && !gitApp"
 					ref="composeEditor"
 					:app-id="id"
 					:value="dockerComposeConfig"
@@ -456,6 +479,7 @@
 					<EnvEditor v-if="envLoaded"
 						ref="envEditor"
 						:app-id="id"
+						:readonly="envTracked"
 						:value="envText"
 						@applied="onEnvApplied"
 						@state="onEditorState" />
@@ -468,7 +492,10 @@
 					</section>
 				</template>
 
+				<!-- still mounted for a git or adoptable app, hidden: it names the service
+					the terminal opens on and the app the title shows -->
 				<ComposeConfig v-if="isCasa && editorTab === 'settings'"
+					v-show="!gitApp"
 					ref="ComposeConfig"
 					:cap-array="capArray"
 					:docker-compose-commands="dockerComposeConfig"
@@ -575,13 +602,13 @@
 					rounded
 					type="is-primary"
 					@click="checkComposeAppAndInstallComposeApp(dockerComposeCommands, currentInstallId)" />
-				<b-button v-if="isCasa && currentSlide == 1 && state == 'update' && editorTab === 'settings'"
+				<b-button v-if="isCasa && currentSlide == 1 && state == 'update' && editorTab === 'settings' && !gitApp"
 					:label="$t('Save')"
 					:loading="isLoading"
 					rounded
 					type="is-primary"
 					@click="updateApp()" />
-				<b-button v-if="isCasa && currentSlide == 1 && state == 'update' && (editorTab === 'compose' || editorTab === 'env')"
+				<b-button v-if="isCasa && currentSlide == 1 && state == 'update' && ((editorTab === 'compose' && !gitApp) || (editorTab === 'env' && !envTracked))"
 					:disabled="!editorState.canApply"
 					:label="$t('Apply')"
 					:loading="editorState.isApplying"
@@ -635,6 +662,7 @@ import ComposeConfig from '@/components/Apps/ComposeConfig.vue'
 import ComposeEditor from '@/components/Apps/ComposeEditor.vue'
 import EnvEditor from '@/components/Apps/EnvEditor.vue'
 import ContainersTab from '@/components/Apps/ContainersTab.vue'
+import GitRepoTab from '@/components/Apps/GitRepoTab.vue'
 import { pickContainerId } from '@/components/Apps/containerSummary'
 import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -683,6 +711,7 @@ export default {
 		ComposeEditor,
 		EnvEditor,
 		ContainersTab,
+		GitRepoTab,
 		VeeField,
 		VeeForm,
 	},
@@ -710,6 +739,12 @@ export default {
 		// for compose app.
 		settingComposeData: {
 			type: String,
+		},
+		// A git app no deployment has given a container: there is no compose app to
+		// set, and the panel is its Repository tab alone.
+		repositoryOnly: {
+			type: Boolean,
+			default: false,
 		},
 	},
 
@@ -742,9 +777,11 @@ export default {
 			capArray: data,
 			errInfo: {},
 			dockerComposeCommands: '',
-			// 'settings' | 'compose' | 'env'; the last two mount an editor whose
-			// state the footer Apply button reads.
-			editorTab: 'settings',
+			// 'settings' | 'compose' | 'env' | 'containers' | 'repository'; compose
+			// and env mount an editor whose state the footer Apply button reads.
+			editorTab: this.repositoryOnly ? 'repository' : 'settings',
+			// the GitApp of a git or adoptable app, null for any other app
+			gitApp: null,
 			editorState: { canApply: false, isApplying: false, isDirty: false },
 			envText: '',
 			envLoaded: false,
@@ -856,7 +893,7 @@ export default {
 			return this.currentSlide == 1 && this.state == 'install'
 		},
 		showExportButton() {
-			return this.currentSlide == 1 && this.state == 'update'
+			return this.currentSlide == 1 && this.state == 'update' && !this.repositoryOnly
 		},
 		showTerminalButton() {
 			return this.currentSlide == 1 && this.state == 'update' && this.runningStatus == 'running'
@@ -909,6 +946,13 @@ export default {
 		},
 		isMobile() {
 			return this.$store.state.isMobile
+		},
+		// A git app or an adoptable one alike: its repository defines it.
+		envTracked() {
+			return Boolean(this.gitApp && this.gitApp.env_tracked)
+		},
+		gitNotice() {
+			return Boolean(this.gitApp) && (this.editorTab === 'settings' || this.editorTab === 'compose' || (this.editorTab === 'env' && this.envTracked))
 		},
 	},
 	watch: {
@@ -987,6 +1031,14 @@ export default {
 			this.currentSlide = 1
 		} else {
 			this.getCategoryList()
+		}
+
+		if (this.isCasa && this.state === 'update') {
+			this.loadGitApp()
+		}
+		// no Settings form here to name the app in the title
+		if (this.repositoryOnly) {
+			this.currentInstallId = this.id
 		}
 
 		// If StoreId is not 0
@@ -1737,6 +1789,17 @@ export default {
 
 		onEditorState(state) {
 			this.editorState = state
+		},
+
+		// Any failure -- a 404, or a service without these routes -- is an app that
+		// is neither a git app nor adoptable, and the panel stays as it was.
+		async loadGitApp() {
+			try {
+				const res = await this.$api.gitApps.get(this.id)
+				this.gitApp = res.data.data
+			} catch {
+				this.gitApp = null
+			}
 		},
 
 		setEditorTab(tab) {
