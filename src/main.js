@@ -11,6 +11,7 @@ import api from '@/service/api.js'
 import openAPI from '@/service/index.js'
 import socketPlugin from '@/plugins/socket.js'
 import dropdownAppendToBody from '@/plugins/dropdown-append-to-body.js'
+import { dompurifyOptions } from '@/plugins/dompurify.js'
 import createEventBus from '@/events/eventBus.js'
 import messageBus from '@/events/index.js'
 // vee-validate 4 throws `No such validator '<name>' exists.` for a rule nobody
@@ -52,11 +53,7 @@ app.use(dropdownAppendToBody)
 app.use(VueFullscreen)
 app.use(VAnimateCss)
 app.use(socketPlugin, socket)
-app.use(VueDOMPurifyHTML, {
-	default: {
-		ALLOWED_ATTR: ['target', 'href'],
-	},
-})
+app.use(VueDOMPurifyHTML, dompurifyOptions)
 
 app.config.globalProperties.$api = api
 app.config.globalProperties.$openAPI = openAPI

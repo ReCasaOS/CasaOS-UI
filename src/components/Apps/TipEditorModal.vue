@@ -15,9 +15,8 @@
 
 		<!-- Modal-Card Body Start -->
 		<section class="modal-card-body">
-			<VMdEditor v-model="tips" :mode="controlEditorState" :placeholder="$t('Something to remember eg. password')"
-				left-toolbar right-toolbar>
-			</VMdEditor>
+			<textarea v-if="isEditing" v-model="tips" class="tips" :placeholder="$t('Something to remember eg. password')"></textarea>
+			<div v-else v-dompurify-html:markdown="tipsHtml" class="tips content"></div>
 			<div v-if="name" class="is-flex is-flex-direction-row-reverse mt-2">
 				<b-icon class="is-clickable"
 					:class="{ 'has-text-grey-800': !isEditing, 'has-text-green-default': isDifferentiation, 'has-text-grey-400': !isDifferentiation && isEditing }"
@@ -41,29 +40,16 @@
 <script>
 import YAML from 'yaml'
 import merge from 'lodash/merge'
-import VMdEditor from '@kangc/v-md-editor'
-import '@kangc/v-md-editor/lib/style/base-editor.css'
-import githubTheme from '@kangc/v-md-editor/lib/theme/github.js'
-import '@kangc/v-md-editor/lib/theme/style/github.css'
-import hljs from 'highlight.js'
+import { marked } from 'marked'
 import { ice_i18n } from '@/mixins/base/common-i18n'
-
-VMdEditor.use(githubTheme, {
-	Hljs: hljs,
-	// extend(md) {},
-})
 
 export default {
 	name: 'TipEditorModal',
-	components: {
-		VMdEditor,
-	},
 	data() {
 		return {
 			isEditing: false,
 			tips: '',
 			tempTips: '',
-			controlEditorState: 'preview',
 			icon: 'edit-outline',
 		}
 	},
@@ -81,18 +67,14 @@ export default {
 		isDifferentiation() {
 			return this.tempTips !== this.tips
 		},
+		// breaks: single newlines become <br>, as the markdown editor this replaced rendered them.
+		tipsHtml() {
+			return marked.parse(this.tips, { breaks: true })
+		},
 	},
 	watch: {
 		isEditing(val) {
-			if (val) {
-				// editor is editable
-				this.controlEditorState = 'edit'
-				this.icon = 'check-outline'
-			} else {
-				// editor is not editable
-				this.controlEditorState = 'preview'
-				this.icon = 'edit-outline'
-			}
+			this.icon = val ? 'check-outline' : 'edit-outline'
 			return this.isEditing
 		},
 		composeData: {
@@ -192,50 +174,35 @@ export default {
 	.modal-card-body {
 		padding: 1.5rem;
 
-		::v-deep .v-md-editor {
-			box-shadow: none;
+		.tips {
+			display: block;
+			width: 100%;
+			// Bulma's .content would otherwise push the edit icon 1.5rem down.
+			margin: 0;
 			border: 1px solid var(--casa-border-faint);
 			border-radius: 0.375rem;
+			padding: 0.75rem 1rem;
 
-			overflow: hidden;
+			overflow: auto;
 			resize: vertical;
 			max-height: 20.25rem;
 			min-height: 5.25rem;
 
-			&.v-md-editor--edit {
-				/* 覆盖上层 */
-				border: 0;
+			font-size: 14px;
+			line-height: 20px;
+		}
 
-				.scrollbar__wrap {
-					border: 1px solid hsla(208, 100%, 53%, 1);
-					border-radius: 0.625rem;
-				}
-			}
+		textarea.tips {
+			border-color: hsla(208, 100%, 53%, 1);
+			border-radius: 0.625rem;
+			background: transparent;
+			color: inherit;
+			outline: none;
 
-			.v-md-editor__right-area {
-				.v-md-editor__toolbar {
-					display: none;
-					padding: 0;
-					border: 0;
-				}
-
-				.v-md-editor__main {
-					.v-md-textarea-editor textarea {
-						padding: 0.75rem 1rem;
-						/* Text 400Regular/Text03 */
-
-						font-family: $family-sans-serif;
-						font-style: normal;
-						font-weight: 400;
-						font-size: 14px;
-						line-height: 20px;
-						/* identical to box height, or 143% */
-
-						font-feature-settings: 'pnum' on, 'lnum' on;
-
-					}
-				}
-			}
+			font-family: $family-sans-serif;
+			font-style: normal;
+			font-weight: 400;
+			font-feature-settings: 'pnum' on, 'lnum' on;
 		}
 
 		/*textarea {

@@ -150,7 +150,7 @@
 
 			<!-- App Info  Start -->
 			<div class="app-desc mt-4 mb-6 is-size-14px">
-				<VMdEditor :value="i18n(appDetailData.description)" mode="preview" left-toolbar right-toolbar />
+				<div v-dompurify-html:markdown="descriptionHtml" class="app-desc-body content"></div>
 			</div>
 			<!-- App Info  End -->
 		</section>
@@ -159,7 +159,7 @@
 
 <script>
 import { h } from 'vue'
-import VMdEditor from '@kangc/v-md-editor'
+import { marked } from 'marked'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Autoplay, Navigation } from 'swiper/modules'
 import YAML from 'yaml'
@@ -170,7 +170,7 @@ import app from '@/App.vue'
 
 export default {
 	name: 'AppDetailInfo',
-	components: { VMdEditor, Swiper, SwiperSlide },
+	components: { Swiper, SwiperSlide },
 	mixins: [business_ShowNewAppTag, business_OpenThirdApp, commonI18n],
 	props: {
 		appDetailData: {
@@ -244,6 +244,10 @@ export default {
 		unusable() {
 			return !this.appDetailData.architectures?.includes(this.arch)
 		},
+		// breaks: single newlines become <br>, as the markdown editor this replaced rendered them.
+		descriptionHtml() {
+			return marked.parse(this.i18n(this.appDetailData.description) || '', { breaks: true })
+		},
 	},
 	methods: {
 		updateSwiper() {
@@ -309,7 +313,7 @@ export default {
     }
 }
 
-.app-detial .modal-card-body .github-markdown-body {
+.app-detial .modal-card-body .app-desc-body {
     padding: 1rem 0 0 0;
     font-size: 0.875rem;
     line-height: 1.25rem;
