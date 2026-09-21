@@ -69,7 +69,9 @@ export default {
 		},
 		// breaks: single newlines become <br>, as the markdown editor this replaced rendered them.
 		tipsHtml() {
-			return marked.parse(this.tips, { breaks: true })
+			// ice_i18n gives undefined when the app has no tip in any language it knows,
+			// and marked throws on anything but a string.
+			return marked.parse(typeof this.tips === 'string' ? this.tips : '', { breaks: true })
 		},
 	},
 	watch: {

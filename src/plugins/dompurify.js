@@ -5,10 +5,12 @@ export const dompurifyOptions = {
 	},
 	namedConfigurations: {
 		// Markdown rendered by marked: app store descriptions and tips. DOMPurify's own
-		// allow-list keeps what markdown produces (<img src>, table alignment...); style
-		// is dropped so a description cannot restyle or cover the dashboard.
+		// allow-list keeps what markdown produces (<img src>, table alignment...). Styles,
+		// form controls and ids go: a description must not restyle the dashboard, put a
+		// working form in front of the user, or clobber an element the page looks up.
 		markdown: {
-			FORBID_ATTR: ['style'],
+			FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select', 'option'],
+			FORBID_ATTR: ['style', 'id'],
 		},
 	},
 }
