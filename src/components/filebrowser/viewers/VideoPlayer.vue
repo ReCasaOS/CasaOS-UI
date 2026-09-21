@@ -48,7 +48,7 @@
 <script>
 import Aplayer from 'vue-aplayer'
 import Artplayer from 'artplayer'
-import * as mm from 'music-metadata-browser'
+import { parseWebStream } from 'music-metadata'
 import { mixin } from '@/mixins/mixin'
 
 Aplayer.disableVersionBadge = true
@@ -105,7 +105,17 @@ export default {
 			if (this.isAudio) {
 				(async () => {
 					const fileUrl = this.getFileUrl(this.item)
-					const metadata = await mm.fetchFromUrl(fileUrl)
+					// What music-metadata-browser's fetchFromUrl did, on music-metadata's own API.
+					const response = await fetch(fileUrl)
+					if (!response.ok)
+						throw new Error(`Failed to fetch ${fileUrl}: ${response.status}`)
+					const metadata = await parseWebStream(response.body, {
+						mimeType: response.headers.get('Content-Type') ?? undefined,
+						size: Number(response.headers.get('Content-Length')) || undefined,
+					})
+					// The tags are parsed: stop downloading whatever is left of the file.
+					if (!response.body.locked)
+						await response.body.cancel()
 					if (metadata.common.picture) {
 						const blob = new Blob([metadata.common.picture[0].data], { type: metadata.common.picture[0].format })
 						const url = URL.createObjectURL(blob)
