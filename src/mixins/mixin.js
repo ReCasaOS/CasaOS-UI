@@ -35,7 +35,6 @@ const filePanelMap = {
 	'image-viewer': typeMap['image-x-generic'],
 	'doc-viewer': union(typeMap['application-vnd.ms-word']),
 	'excel-viewer': union(typeMap['application-vnd.ms-excel']),
-	// "mark-down-editor":typeMap['text-markdown'],
 	'pdf-viewer': typeMap['application-pdf'],
 }
 export const wallpaperType = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'svg']

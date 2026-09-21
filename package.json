@@ -17,12 +17,6 @@
   "dependencies": {
     "@fontsource/roboto": "^5.0.5",
     "@mdi/font": "^6.9.96",
-    "@tiptap/core": "^2.27.3",
-    "@tiptap/extension-highlight": "^2.27.3",
-    "@tiptap/extension-typography": "^2.27.3",
-    "@tiptap/pm": "^2.27.3",
-    "@tiptap/starter-kit": "^2.27.3",
-    "@tiptap/vue-3": "^2.27.3",
     "@vee-validate/rules": "^4.15.1",
     "@vue-office/docx": "^1.6.0",
     "@vue-office/excel": "^1.6.0",

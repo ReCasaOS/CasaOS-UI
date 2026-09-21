@@ -292,7 +292,6 @@ export default {
 		CodeEditor: defineAsyncComponent(() => import('./viewers/CodeEditor.vue')),
 		VideoPlayer: defineAsyncComponent(() => import('./viewers/VideoPlayer.vue')),
 		ImageViewer: defineAsyncComponent(() => import('./viewers/ImageViewer.vue')),
-		MarkDownEditor: defineAsyncComponent(() => import('./viewers/MarkdownEditor.vue')),
 		DocViewer: defineAsyncComponent(() => import('./viewers/DocViewer.vue')),
 		ExcelViewer: defineAsyncComponent(() => import('./viewers/ExcelViewer.vue')),
 		PdfViewer: defineAsyncComponent(() => import('./viewers/PdfViewer.vue')),
