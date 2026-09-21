@@ -23,7 +23,10 @@
 		<!-- Player Start -->
 		<div class="is-flex is-justify-content-center is-align-items-center is-flex-grow-1 v-container video">
 			<div class="scrollbars-light doc-container">
-				<vue-office-pdf :src="src" @rendered="rendered" />
+				<!-- @vue-office/pdf inlines pdf.js 3.2.0: with eval on, a crafted PDF runs script in the
+					dashboard (CVE-2024-4367, fixed in pdf.js 4.2.67). isEvalSupported: false is the fix
+					pdf.js documents for older versions. -->
+				<vue-office-pdf :src="src" :options="{ isEvalSupported: false }" @rendered="rendered" />
 			</div>
 		</div>
 		<!-- Player Start -->
