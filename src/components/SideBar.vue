@@ -74,7 +74,7 @@ export default {
 				),
 			)
 			this.comps.push(componentName)
-			this.apps.push({ app: require(`@/widgets/${fileName.replace('./', '')}`).default })
+			this.apps.push({ app: widgetsComponents(fileName).default })
 		})
 	},
 	mounted() {
