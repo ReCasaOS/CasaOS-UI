@@ -80,8 +80,8 @@ importers:
         specifier: ^5.41.0
         version: 5.65.18
       composerize:
-        specifier: ^1.2.0
-        version: 1.6.12
+        specifier: ^1.7.6
+        version: 1.7.6
       core-js:
         specifier: ^3.39.0
         version: 3.39.0
@@ -2529,6 +2529,10 @@ packages:
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
+  ansi-colors@4.1.3:
+    resolution: {integrity: sha512-/6w/C21Pm1A7aZitlI5Ni/2J6FFQN8i1Cvz3kHABAAbw93v/NlvKdVOqz7CCWz/3iv/JplRSEEZ83XION15ovw==}
+    engines: {node: '>=6'}
+
   ansi-escapes@3.2.0:
     resolution: {integrity: sha512-cBhpre4ma+U0T1oM5fXg7Dy1Jw7zzwv7lt/GoCpr+hDQJoYnKVPLL4dCvSEFMmQurOQvSrwT7SL/DAlhBI97RQ==}
     engines: {node: '>=4'}
@@ -3053,8 +3057,8 @@ packages:
   component-inherit@0.0.3:
     resolution: {integrity: sha512-w+LhYREhatpVqTESyGFg3NlP6Iu0kEKUHETY9GoZP/pQyW4mHFZuFWRUCIqVPZ36ueVLtoOEZaAqbCF2RDndaA==}
 
-  composerize@1.6.12:
-    resolution: {integrity: sha512-kPIEgkU2TRT1t4ZrBPUmmRr7RGA0E5JYx0rAgpWBRWNjZRDr2FV/8ne8S8iLp7oaqEX1ubDqZPEQvHaDM9d7cg==}
+  composerize@1.7.6:
+    resolution: {integrity: sha512-zFdKAE6H8j2OSdnOol+U1f+/rJxbd80cCpDSReVMDA2aOZPH+N2IUVor6UdMwtdLCl8Lpr9Qb8xBO0VOTj5jDg==}
     hasBin: true
 
   composeverter@1.7.5:
@@ -3797,6 +3801,10 @@ packages:
   enhanced-resolve@5.25.1:
     resolution: {integrity: sha512-nGXts5znJzmWPu+mIE9izCOzdg63oJca2mDzGWWTth7sr4aCToKcoyFVBQwN75Ij5Pf6p510EwkTqViTRzDV+w==}
     engines: {node: '>=10.13.0'}
+
+  enquirer@2.4.1:
+    resolution: {integrity: sha512-rRqJg/6gd538VHvR3PSrdRBb/1Vy2YfzHqzvbhGIQpDRKIa4FgV/54b5Q1xYSxOOwKvjXweS26E0Q+nAMwp2pQ==}
+    engines: {node: '>=8.6'}
 
   entities@1.0.0:
     resolution: {integrity: sha512-LbLqfXgJMmy81t+7c14mnulFHJ170cM6E+0vMXR9k/ZiZwgX8i5pNgjTCX3SO4VeUsFLV+8InixoretwU+MjBQ==}
@@ -10567,6 +10575,8 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
+  ansi-colors@4.1.3: {}
+
   ansi-escapes@3.2.0: {}
 
   ansi-html-community@0.0.8: {}
@@ -11136,13 +11146,13 @@ snapshots:
 
   component-inherit@0.0.3: {}
 
-  composerize@1.6.12:
+  composerize@1.7.6:
     dependencies:
       composeverter: 1.7.5
       core-js: 2.6.12
       deepmerge: 2.2.1
+      enquirer: 2.4.1
       invariant: 2.2.4
-      yaml: 1.10.3
       yargs-parser: 13.1.2
 
   composeverter@1.7.5:
@@ -11796,6 +11806,11 @@ snapshots:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
+
+  enquirer@2.4.1:
+    dependencies:
+      ansi-colors: 4.1.3
+      strip-ansi: 6.0.1
 
   entities@1.0.0: {}
 

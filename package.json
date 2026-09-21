@@ -36,7 +36,7 @@
     "bulma": "1.0.4",
     "clipboard-copy": "^4.0.1",
     "codemirror": "^5.41.0",
-    "composerize": "^1.2.0",
+    "composerize": "^1.7.6",
     "core-js": "^3.39.0",
     "csslint": "^1.0.5",
     "dateformat": "^5.0.3",
