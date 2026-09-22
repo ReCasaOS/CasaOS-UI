@@ -124,6 +124,17 @@ const sys = {
 		return api.post(`${PREFIX}/ssh-login`, data)
 	},
 
+	// Anonymous statistics: { enabled, notice_seen, preview: { event, properties } },
+	// the preview built by the core's sender at the moment of the call.
+	getTelemetry() {
+		return api.get(`${PREFIX}/telemetry`)
+	},
+
+	// data: { enabled?, notice_seen? }; answers the same object as getTelemetry.
+	setTelemetry(data) {
+		return api.put(`${PREFIX}/telemetry`, data)
+	},
+
 	// power -- data:shutdown
 	// power -- data:restart
 	power(data) {
