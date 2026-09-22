@@ -154,6 +154,7 @@ export default {
 		// once per box, here where the dashboard opens. Closing the notice and both
 		// of its actions mark it seen, in one request that also carries Turn off.
 		// A request that fails leaves the notice unseen: it comes back next time.
+		// If that request carried Turn off, statistics are still on, so the owner is told.
 		async announceTelemetry() {
 			let state
 			try {
@@ -196,7 +197,10 @@ export default {
 				onClose: () => {
 					this.$api.sys.setTelemetry(change)
 						.then(res => this.$EventBus.$emit(events.TELEMETRY_CHANGED, res.data.data.enabled))
-						.catch(() => {})
+						.catch(() => {
+							if (change.enabled === false)
+								this.$buefy.toast.open({ message: this.$t('The setting could not be saved.'), type: 'is-danger' })
+						})
 				},
 			})
 		},

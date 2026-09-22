@@ -118,6 +118,7 @@ describe('the anonymous statistics notice', () => {
 			},
 			$EventBus: { $emit: vi.fn() },
 			$buefy: {
+				toast: { open: vi.fn() },
 				modal: { open: vi.fn() },
 				// Buefy calls onClose whenever the notice closes: its cross, or close().
 				notification: {
@@ -206,5 +207,32 @@ describe('the anonymous statistics notice', () => {
 		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledTimes(1)
 		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledWith({ notice_seen: true, enabled: false })
 		expect(vm.$EventBus.$emit).toHaveBeenCalledWith(events.TELEMETRY_CHANGED, false)
+	})
+
+	// A box whose disk went read-only answers 500: statistics stay on, and the
+	// owner who pressed Turn off has to hear it.
+	it('says so when Turn off does not reach the core, and moves nothing', async () => {
+		const { vm, announce, click } = box({ enabled: true, notice_seen: false })
+		vm.$api.sys.setTelemetry.mockRejectedValue(new Error('500'))
+
+		await announce()
+		click('Turn off')
+		await flushPromises()
+
+		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith(expect.objectContaining({ message: 'The setting could not be saved.', type: 'is-danger' }))
+		expect(vm.$EventBus.$emit).not.toHaveBeenCalled()
+	})
+
+	it('stays quiet when only marking it seen fails: it comes back next time', async () => {
+		const { vm, announce, close } = box({ enabled: true, notice_seen: false })
+		vm.$api.sys.setTelemetry.mockRejectedValue(new Error('500'))
+
+		await announce()
+		close()
+		await flushPromises()
+
+		expect(vm.$buefy.toast.open).not.toHaveBeenCalled()
+		expect(vm.$EventBus.$emit).not.toHaveBeenCalled()
 	})
 })
