@@ -106,13 +106,9 @@ export default {
 		this.initUIEventBus()
 	},
 	mounted() {
-		this.WSHub = this.initMessageBus()
 		this.announceBackupFailures()
 	},
 	beforeUnmount() {
-		for (const key in this.WSHub) {
-			this.WSHub[key].close()
-		}
 		this.destroyUIEventBus()
 	},
 	methods: {
@@ -197,27 +193,6 @@ export default {
 
 			return `— / ${this.renderSize(size)}`
 		},
-		createWS(domain) {
-			// The bus wants the user's JWT, and a WebSocket cannot carry a header:
-			// it goes in the query, read afresh on every call.
-			const token = encodeURIComponent(this.$store.state.access_token)
-			const socket = new WebSocket(`${this.$wsProtocol}//${this.$baseURL}/v2/message_bus/event/${domain}?token=${token}`)
-			socket.onopen = () => {
-				console.log('socket open')
-			}
-			socket.onclose = () => {
-				console.log('close socket')
-			}
-			// Not the event: its target is the socket, whose url carries the token.
-			socket.onerror = () => {
-				console.log('socket failure')
-			}
-			socket.onmessage = (event) => {
-				const eventJson = JSON.parse(event.data)
-				this.patchTransform(eventJson)
-			}
-			return socket
-		},
 		initUIEventBus() {
 			this.$EventBus.$on('casaUI:openInFiles', (path) => {
 				this.homeShowFiles(path)
@@ -247,14 +222,6 @@ export default {
 		triggerUIEventBus(event) {
 			const eventJson = JSON.parse(event)
 			this.$emit(eventJson.name, eventJson.propertyTypeList)
-		},
-		initMessageBus() {
-			// config files
-			const WSHub = Object.create(null)
-			// subscriptionMessageSourse.forEach((item) => {
-			// 	WSHub[item] = this.createWS(item)
-			// })
-			return WSHub
 		},
 		getMessageFromLetter() {
 			this.$api.users.getLetter().then((res) => {

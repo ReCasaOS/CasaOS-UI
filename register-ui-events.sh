@@ -3,11 +3,11 @@
 
 # This script is used to register the UI events for the UI events
 #
-# The CasaOS core runs it at every start with /bin/sh (keep it POSIX) and stops
-# running the other start.d scripts at the first one that exits non-zero, so it
-# always exits 0, says on stderr and in the journal when the registration
-# failed, and gives up on a bus that does not answer within 30 seconds rather
-# than hold up the core's start.
+# The CasaOS core runs it once it is up, with the interpreter of the line above
+# (keep it POSIX), logs its output and carries on with the other start.d scripts
+# whatever it returns. It still exits 0, says on stderr and in the journal when
+# the registration failed, and gives up on a bus that does not answer within 30
+# seconds.
 
 # Get the message bus URL
 runtime_path="/var/run/casaos"
