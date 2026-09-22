@@ -1,11 +1,13 @@
-#!/usr/bin/bash
+#!/bin/sh
 
 
 # This script is used to register the UI events for the UI events
 #
 # The CasaOS core runs it at every start with /bin/sh (keep it POSIX) and stops
 # running the other start.d scripts at the first one that exits non-zero, so it
-# always exits 0 and says on stderr when the registration failed.
+# always exits 0, says on stderr and in the journal when the registration
+# failed, and gives up on a bus that does not answer within 30 seconds rather
+# than hold up the core's start.
 
 # Get the message bus URL
 runtime_path="/var/run/casaos"
@@ -25,11 +27,14 @@ then
         auth_header="Authorization: Internal $(cat "$secret_file")"
     fi
 
-    if status=$(printf '%s\n' "$auth_header" | curl -fsS -o /dev/null -w '%{http_code}' -X POST "$MESSAGE_BUS_URL/v2/message_bus/event_type" -H "Content-Type: application/json" -H @- -d @"$ui_message_bus_file")
+    if status=$(printf '%s\n' "$auth_header" | curl -fsS --max-time 30 -o /dev/null -w '%{http_code}' -X POST "$MESSAGE_BUS_URL/v2/message_bus/event_type" -H "Content-Type: application/json" -H @- -d @"$ui_message_bus_file")
     then
         echo "UI events registered"
     else
-        echo "Failed to register the UI events with the message bus (HTTP status ${status:-000})" >&2
+        message="Failed to register the UI events with the message bus (HTTP status ${status:-000})"
+        echo "$message" >&2
+        # the core throws start.d output away: the journal is where this is seen
+        logger -t casaos-ui-events "$message" 2>/dev/null || true
     fi
 else
     echo "Message bus URL or message json file not found" >&2
