@@ -784,5 +784,8 @@
   "This app is defined by its git repository: change it there. An edit here would modify tracked files and block every later deployment.": "Cette application est définie par son dépôt git : modifiez-la là-bas. Une modification ici toucherait des fichiers suivis et bloquerait tous les déploiements suivants.",
   "Open the Repository tab": "Ouvrir l'onglet Dépôt",
   "From a git repository…": "Depuis un dépôt git…",
-  "Cloning the repository…": "Clonage du dépôt…"
+  "Cloning the repository…": "Clonage du dépôt…",
+  "What is sent": "Ce qui est envoyé",
+  "When statistics are on, these properties go to PostHog (EU) once a day and after each install or update.": "Quand les statistiques sont activées, ces propriétés partent chez PostHog (UE) une fois par jour et après chaque installation ou mise à jour.",
+  "The preview could not be loaded.": "L'aperçu n'a pas pu être chargé."
 }
