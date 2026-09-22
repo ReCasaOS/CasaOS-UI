@@ -16,6 +16,45 @@
  * mutation/action dispatch (main.js never passed a store).
  */
 import { getCurrentInstance } from 'vue'
+import io from 'socket.io-client'
+
+/**
+ * The dashboard's one socket.io connection to the message bus.
+ *
+ * The bus wants the user's JWT on a subscription, and a browser cannot put a
+ * header on a WebSocket, so it goes in the `token` query parameter, which
+ * socket.io-client v2 sends on the handshake and on every polling request.
+ *
+ * The socket is created at startup, maybe before anybody has signed in, and a
+ * refresh replaces the token under it, so it follows store.state.access_token:
+ * shut while there is none, opened once there is, shut again on logout. A
+ * refresh leaves a live connection alone; the next reconnection carries it.
+ */
+export function connectBus(store) {
+	const socket = io({
+		transports: ['websocket', 'polling'],
+		path: '/v2/message_bus/socket.io/',
+		autoConnect: false,
+	})
+
+	// A reconnection reuses opts.query, which would otherwise still hold the token
+	// the socket first opened with, long after a refresh replaced it.
+	socket.io.on('reconnect_attempt', () => {
+		socket.io.opts.query = { token: store.state.access_token }
+	})
+
+	store.watch(state => state.access_token, (token) => {
+		if (!token) {
+			socket.close()
+			return
+		}
+		socket.io.opts.query = { token }
+		// A no-op when it is already connected, connecting or waiting to reconnect.
+		socket.open()
+	}, { immediate: true })
+
+	return socket
+}
 
 export default {
 	install(app, socket) {

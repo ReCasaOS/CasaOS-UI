@@ -98,3 +98,27 @@ describe('an app the catalogue knows nothing about', () => {
 		expect(vm.noticesData['gluetun-stack'].prelude.title).toBe('Installing gluetun-stack')
 	})
 })
+
+// The message bus takes the user's JWT from the query of a subscription.
+describe('a message bus subscription', () => {
+	it('carries the token of the moment, encoded', () => {
+		const opened = []
+		vi.stubGlobal('WebSocket', class {
+			constructor(url) {
+				opened.push(url)
+			}
+		})
+		const vm = { $wsProtocol: 'ws:', $baseURL: 'casa.local', $store: { state: { access_token: 'a.b+c/d' } } }
+		const createWS = CoreService.methods.createWS.bind(vm)
+
+		createWS('local-storage')
+		vm.$store.state.access_token = 'e.f'
+		createWS('local-storage')
+		vi.unstubAllGlobals()
+
+		expect(opened).toEqual([
+			'ws://casa.local/v2/message_bus/event/local-storage?token=a.b%2Bc%2Fd',
+			'ws://casa.local/v2/message_bus/event/local-storage?token=e.f',
+		])
+	})
+})

@@ -198,16 +198,19 @@ export default {
 			return `— / ${this.renderSize(size)}`
 		},
 		createWS(domain) {
-			// reference:
-			const socket = new WebSocket(`${this.$wsProtocol}//${this.$baseURL}/v2/message_bus/event/${domain}`)
+			// The bus wants the user's JWT, and a WebSocket cannot carry a header:
+			// it goes in the query, read afresh on every call.
+			const token = encodeURIComponent(this.$store.state.access_token)
+			const socket = new WebSocket(`${this.$wsProtocol}//${this.$baseURL}/v2/message_bus/event/${domain}?token=${token}`)
 			socket.onopen = () => {
 				console.log('socket open')
 			}
 			socket.onclose = () => {
 				console.log('close socket')
 			}
-			socket.onerror = (e) => {
-				console.log('socket failure', e)
+			// Not the event: its target is the socket, whose url carries the token.
+			socket.onerror = () => {
+				console.log('socket failure')
 			}
 			socket.onmessage = (event) => {
 				const eventJson = JSON.parse(event.data)

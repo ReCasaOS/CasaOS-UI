@@ -27,6 +27,15 @@ const router = createRouter({
 // gone: v4 has no prototype to patch, and it resolves with a NavigationFailure
 // instead of rejecting on a duplicate navigation.
 
+// The store too, not only localStorage: the message bus socket follows the
+// store's token, and one left there would keep it connected after a logout.
+function forgetTokens() {
+	localStorage.removeItem('access_token')
+	localStorage.removeItem('refresh_token')
+	store.commit('SET_ACCESS_TOKEN', '')
+	store.commit('SET_REFRESH_TOKEN', '')
+}
+
 async function needInit() {
 	if (store.state.needInitialization) {
 		return true
@@ -36,8 +45,7 @@ async function needInit() {
 		if (userStatusRes.data.success === 200 && !userStatusRes.data.data.initialized) {
 			store.commit('SET_NEED_INITIALIZATION', true)
 			store.commit('SET_INIT_KEY', userStatusRes.data.data.key)
-			localStorage.removeItem('access_token')
-			localStorage.removeItem('refresh_token')
+			forgetTokens()
 			return true
 		} else {
 			return false
@@ -74,8 +82,7 @@ router.beforeEach(async (to, from, next) => {
 						break
 
 					case '/logout':
-						localStorage.removeItem('access_token')
-						localStorage.removeItem('refresh_token')
+						forgetTokens()
 						localStorage.removeItem('wallpaper')
 						localStorage.removeItem('user')
 						return next('/login')

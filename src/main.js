@@ -9,7 +9,7 @@ import store from '@/store'
 import i18n from '@/plugins/i18n'
 import api from '@/service/api.js'
 import openAPI from '@/service/index.js'
-import socketPlugin from '@/plugins/socket.js'
+import socketPlugin, { connectBus } from '@/plugins/socket.js'
 import dropdownAppendToBody from '@/plugins/dropdown-append-to-body.js'
 import { dompurifyOptions } from '@/plugins/dompurify.js'
 import createEventBus from '@/events/eventBus.js'
@@ -29,8 +29,6 @@ import VAnimateCss from '@/plugins/animate-css'
 // paint; from here on the module owns it and follows the OS while on 'system'.
 applyThemePreference(readThemePreference())
 
-const io = require('socket.io-client')
-
 const isDev = process.env.NODE_ENV === 'dev'
 const protocol = document.location.protocol
 const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:'
@@ -41,18 +39,13 @@ const localhostName = document.location.hostname
 const baseIp = isDev ? `${devIp}` : `${localhostName}`
 const baseURL = isDev ? `${devIp}:${devPort}` : `${localhost}`
 
-const socket = io({
-	transports: ['websocket', 'polling'],
-	path: '/v2/message_bus/socket.io/',
-})
-
 const app = createApp(App)
 
 app.use(Buefy)
 app.use(dropdownAppendToBody)
 app.use(VueFullscreen)
 app.use(VAnimateCss)
-app.use(socketPlugin, socket)
+app.use(socketPlugin, connectBus(store))
 app.use(VueDOMPurifyHTML, dompurifyOptions)
 
 app.config.globalProperties.$api = api
