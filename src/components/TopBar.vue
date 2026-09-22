@@ -257,6 +257,28 @@
 					</div>
 					<!-- Automount USB Drive End  -->
 
+					<!-- Anonymous statistics Start -->
+					<div v-if="telemetryEnabled !== null" class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="chart-box-outline" />
+								{{ $t("Anonymous usage statistics") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch :model-value="telemetryEnabled"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="setTelemetry" />
+								</b-field>
+							</div>
+						</div>
+						<div class="pl-55 ml-1 is-size-7">
+							<a href="#" @click.prevent="showTelemetryPreview">{{ $t("See what is sent") }}</a>
+						</div>
+					</div>
+					<!-- Anonymous statistics End -->
+
 					<!-- Update Start -->
 					<div class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
@@ -399,6 +421,7 @@ import PortPanel from './settings/PortPanel.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
+import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import { mixin } from '@/mixins/mixin'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
@@ -444,6 +467,9 @@ export default {
 
 			port: '',
 			autoUsbMount: false,
+			// null until the core answers GET /v1/sys/telemetry: a core without the
+			// route shows no switch that could not work
+			telemetryEnabled: null,
 			deviceModel: '',
 			// Language Sets
 			languages: Object.entries(messages).map(([key, value]) => ({
@@ -536,7 +562,13 @@ export default {
 		this.checkVersion()
 		this.getUserInfo()
 		this.getUsbStatus()
+		this.getTelemetry()
 		this.getHardwareInfo()
+		// the notice's Turn off (CoreService) moves the switch too
+		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
+	},
+	beforeUnmount() {
+		this.$EventBus.$off(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
 	},
 
 	methods: {
@@ -693,6 +725,51 @@ export default {
 				this.$messageBus('dashboardsetting_automountusb', false.toString())
 				this.$api.sys.toggleUsbAutoMount({ state: 'off' })
 			}
+		},
+
+		/*************************************************
+		 * PART 1-4b  Dashboard Setting - Anonymous statistics
+		 **************************************************/
+		// Asked once, from mounted(). The row stays hidden until the core answers,
+		// so the switch cannot be flipped while this is in flight.
+		getTelemetry() {
+			this.$api.sys.getTelemetry().then((res) => {
+				this.telemetryEnabled = res.data.data.enabled
+			}).catch(() => {})
+		},
+
+		// The core's `enabled` after the notice's PUT (CoreService).
+		onTelemetryChanged(enabled) {
+			this.telemetryEnabled = enabled
+		},
+
+		// Using the switch shows the owner knows, so it also marks the notice seen:
+		// an owner who opts in here is not told about it at the next login.
+		// The switch ends where the core says it is: a refused PUT puts it back.
+		async setTelemetry(enabled) {
+			this.telemetryEnabled = enabled
+			try {
+				const res = await this.$api.sys.setTelemetry({ enabled, notice_seen: true })
+				this.telemetryEnabled = res.data.data.enabled
+			} catch {
+				this.telemetryEnabled = !enabled
+				this.$buefy.toast.open({
+					message: this.$t('The setting could not be saved.'),
+					type: 'is-danger',
+				})
+			}
+		},
+
+		showTelemetryPreview() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: TelemetryPreviewModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape', 'outside'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 		/**
 		 * @description: Get Hardware Info etc. Board Info

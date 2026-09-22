@@ -790,5 +790,7 @@
   "The preview could not be loaded.": "The preview could not be loaded.",
   "ReCasaOS sends anonymous statistics (versions, hardware, country).": "ReCasaOS sends anonymous statistics (versions, hardware, country).",
   "See what is sent": "See what is sent",
-  "Turn off": "Turn off"
+  "Turn off": "Turn off",
+  "Anonymous usage statistics": "Anonymous usage statistics",
+  "The setting could not be saved.": "The setting could not be saved."
 }

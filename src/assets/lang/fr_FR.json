@@ -790,5 +790,7 @@
   "The preview could not be loaded.": "L'aperçu n'a pas pu être chargé.",
   "ReCasaOS sends anonymous statistics (versions, hardware, country).": "ReCasaOS envoie des statistiques anonymes (versions, matériel, pays).",
   "See what is sent": "Voir ce qui est envoyé",
-  "Turn off": "Désactiver"
+  "Turn off": "Désactiver",
+  "Anonymous usage statistics": "Statistiques d'utilisation anonymes",
+  "The setting could not be saved.": "Le réglage n'a pas pu être enregistré."
 }
