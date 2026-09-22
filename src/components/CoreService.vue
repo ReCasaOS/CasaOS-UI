@@ -20,6 +20,7 @@
 </template>
 
 <script>
+import { h } from 'vue'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation, Pagination } from 'swiper/modules'
 import sortBy from 'lodash/sortBy'
@@ -31,6 +32,7 @@ import SmartBlock from '@/components/smartHome/SmartBlock.vue'
 import events from '@/events/events'
 import Business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import DiskLearnMore from '@/components/Storage/DiskLearnMore.vue'
+import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
 export default {
@@ -107,6 +109,7 @@ export default {
 	},
 	mounted() {
 		this.announceBackupFailures()
+		this.announceTelemetry()
 	},
 	beforeUnmount() {
 		this.destroyUIEventBus()
@@ -145,6 +148,68 @@ export default {
 				seen.push(run.stamp)
 			}
 			rememberBackupFailures(seen)
+		},
+
+		// Statistics are on unless the owner turned them off, so the owner is told,
+		// once per box, here where the dashboard opens. Closing the notice and both
+		// of its actions mark it seen, in one request that also carries Turn off.
+		// A request that fails leaves the notice unseen: it comes back next time.
+		async announceTelemetry() {
+			let state
+			try {
+				const res = await this.$api.sys.getTelemetry()
+				state = res.data.data
+			} catch {
+				return
+			}
+			if (!state?.enabled || state.notice_seen)
+				return
+
+			const change = { notice_seen: true }
+			const notice = this.$buefy.notification.open({
+				position: 'is-bottom-right',
+				indefinite: true,
+				queue: false,
+				ariaCloseLabel: this.$t('Close'),
+				message: [
+					h('p', this.$t('ReCasaOS sends anonymous statistics (versions, hardware, country).')),
+					h('div', { class: 'buttons mt-3' }, [
+						h('button', {
+							type: 'button',
+							class: 'button is-small is-rounded is-light',
+							onClick: () => {
+								this.showTelemetryPreview()
+								notice.close()
+							},
+						}, this.$t('See what is sent')),
+						h('button', {
+							type: 'button',
+							class: 'button is-small is-rounded is-light is-outlined',
+							onClick: () => {
+								change.enabled = false
+								notice.close()
+							},
+						}, this.$t('Turn off')),
+					]),
+				],
+				// The Settings switch in TopBar then shows what the core now has.
+				onClose: () => {
+					this.$api.sys.setTelemetry(change)
+						.then(res => this.$EventBus.$emit(events.TELEMETRY_CHANGED, res.data.data.enabled))
+						.catch(() => {})
+				},
+			})
+		},
+
+		showTelemetryPreview() {
+			this.$buefy.modal.open({
+				component: TelemetryPreviewModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape', 'outside'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 		_isValidDiskEvent(evt) {
 			let p = {}

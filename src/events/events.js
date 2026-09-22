@@ -30,5 +30,7 @@ const events = {
 	OPEN_APP_IFRAME: 'openAppIframe',
 	OPEN_APP_LAUNCHER: 'openAppLauncher',
 	CLOSE_APP_IFRAME: 'closeAppIframe',
+	// CoreService -> TopBar: the core's `enabled` after the notice's PUT
+	TELEMETRY_CHANGED: 'telemetryChanged',
 }
 export default events

@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
+import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import CoreService from '@/components/CoreService.vue'
+import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
+import events from '@/events/events'
 
 // An update emits app:update-begin, then app:install-progress while the images
 // pull, then app:update-end. All three name the app the same way, in `app:name`.
@@ -96,5 +99,112 @@ describe('an app the catalogue knows nothing about', () => {
 		fire('app:install-begin', { 'app:name': 'gluetun-stack' })
 
 		expect(vm.noticesData['gluetun-stack'].prelude.title).toBe('Installing gluetun-stack')
+	})
+})
+
+// Statistics are on by default, and this notice is how the owner of a box learns
+// it: once, after login, with the two ways out right in it.
+describe('the anonymous statistics notice', () => {
+	function box(state) {
+		let params
+		const vm = {
+			$t: key => key,
+			$api: {
+				sys: {
+					getTelemetry: vi.fn(() => Promise.resolve({ data: { success: 200, data: state } })),
+					// The core answers the state after the change.
+					setTelemetry: vi.fn(change => Promise.resolve({ data: { success: 200, data: { enabled: true, ...change } } })),
+				},
+			},
+			$EventBus: { $emit: vi.fn() },
+			$buefy: {
+				modal: { open: vi.fn() },
+				// Buefy calls onClose whenever the notice closes: its cross, or close().
+				notification: {
+					open: vi.fn((p) => {
+						params = p
+						return { close: () => p.onClose() }
+					}),
+				},
+			},
+		}
+		vm.showTelemetryPreview = CoreService.methods.showTelemetryPreview.bind(vm)
+		const announce = CoreService.methods.announceTelemetry.bind(vm)
+		// The message is [sentence, row of buttons]; a button is found by its words.
+		const click = label => params.message[1].children.find(b => b.children === label).props.onClick()
+		const close = () => params.onClose()
+
+		return { vm, announce, click, close }
+	}
+
+	it('is asked for when the dashboard opens', () => {
+		const vm = { announceBackupFailures: vi.fn(), announceTelemetry: vi.fn() }
+
+		CoreService.mounted.call(vm)
+
+		expect(vm.announceTelemetry).toHaveBeenCalledTimes(1)
+	})
+
+	it('is shown when statistics are on and it was never seen', async () => {
+		const { vm, announce } = box({ enabled: true, notice_seen: false })
+
+		await announce()
+
+		expect(vm.$buefy.notification.open).toHaveBeenCalledTimes(1)
+		const [sentence] = vm.$buefy.notification.open.mock.calls[0][0].message
+		expect(sentence.children).toBe('ReCasaOS sends anonymous statistics (versions, hardware, country).')
+	})
+
+	it.each([
+		['statistics are off', { enabled: false, notice_seen: false }],
+		['it was seen', { enabled: true, notice_seen: true }],
+	])('is not shown when %s', async (_, state) => {
+		const { vm, announce } = box(state)
+
+		await announce()
+
+		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
+	})
+
+	it('is not shown when the core cannot be asked', async () => {
+		const { vm, announce } = box()
+		vm.$api.sys.getTelemetry.mockRejectedValue(new Error('offline'))
+
+		await announce()
+
+		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
+	})
+
+	it('closed, is marked seen and changes nothing else', async () => {
+		const { vm, announce, close } = box({ enabled: true, notice_seen: false })
+
+		await announce()
+		close()
+
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledTimes(1)
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledWith({ notice_seen: true })
+	})
+
+	it('opens the preview from See what is sent, and is marked seen', async () => {
+		const { vm, announce, click } = box({ enabled: true, notice_seen: false })
+
+		await announce()
+		click('See what is sent')
+
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: TelemetryPreviewModal }))
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledTimes(1)
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledWith({ notice_seen: true })
+	})
+
+	it('turns statistics off from Turn off, in the request that marks it seen, and moves the Settings switch', async () => {
+		const { vm, announce, click } = box({ enabled: true, notice_seen: false })
+
+		await announce()
+		click('Turn off')
+		await flushPromises()
+
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledTimes(1)
+		expect(vm.$api.sys.setTelemetry).toHaveBeenCalledWith({ notice_seen: true, enabled: false })
+		expect(vm.$EventBus.$emit).toHaveBeenCalledWith(events.TELEMETRY_CHANGED, false)
 	})
 })

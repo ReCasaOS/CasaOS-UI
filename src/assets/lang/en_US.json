@@ -787,5 +787,8 @@
   "Cloning the repository…": "Cloning the repository…",
   "What is sent": "What is sent",
   "When statistics are on, these properties go to PostHog (EU) once a day and after each install or update.": "When statistics are on, these properties go to PostHog (EU) once a day and after each install or update.",
-  "The preview could not be loaded.": "The preview could not be loaded."
+  "The preview could not be loaded.": "The preview could not be loaded.",
+  "ReCasaOS sends anonymous statistics (versions, hardware, country).": "ReCasaOS sends anonymous statistics (versions, hardware, country).",
+  "See what is sent": "See what is sent",
+  "Turn off": "Turn off"
 }
