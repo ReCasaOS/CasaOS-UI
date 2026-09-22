@@ -224,6 +224,20 @@ describe('the anonymous statistics notice', () => {
 		expect(vm.$EventBus.$emit).not.toHaveBeenCalled()
 	})
 
+	it('goes away unseen when the dashboard unmounts: it comes back next time', async () => {
+		const { vm, announce } = box({ enabled: true, notice_seen: false })
+		vm.destroyUIEventBus = vi.fn()
+
+		await announce()
+		const notice = vm.$buefy.notification.open.mock.results[0].value
+		const close = vi.spyOn(notice, 'close')
+		CoreService.beforeUnmount.call(vm)
+		await flushPromises()
+
+		expect(close).toHaveBeenCalledTimes(1)
+		expect(vm.$api.sys.setTelemetry).not.toHaveBeenCalled()
+	})
+
 	it('stays quiet when only marking it seen fails: it comes back next time', async () => {
 		const { vm, announce, close } = box({ enabled: true, notice_seen: false })
 		vm.$api.sys.setTelemetry.mockRejectedValue(new Error('500'))

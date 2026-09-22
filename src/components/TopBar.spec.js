@@ -94,6 +94,21 @@ describe('the anonymous statistics switch', () => {
 		expect(vm.telemetryEnabled).toBe(false)
 	})
 
+	it('cannot be flipped again while the core is answering', async () => {
+		let answer
+		const vm = bar({ setTelemetry: vi.fn(() => new Promise((resolve) => {
+			answer = resolve
+		})) })
+
+		const saving = vm.setTelemetry(false)
+		expect(vm.telemetrySaving).toBe(true)
+		answer({ data: { success: 200, data: { enabled: false, notice_seen: true } } })
+		await saving
+
+		expect(vm.telemetrySaving).toBe(false)
+		expect(source).toMatch(/<b-switch :model-value="telemetryEnabled"\s+:disabled="telemetrySaving"/)
+	})
+
 	it('goes back where it was when the core refuses', async () => {
 		const vm = bar({ setTelemetry: vi.fn(() => Promise.reject(new Error('offline'))) })
 

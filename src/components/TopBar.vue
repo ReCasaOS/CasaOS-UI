@@ -267,6 +267,7 @@
 							<div>
 								<b-field>
 									<b-switch :model-value="telemetryEnabled"
+										:disabled="telemetrySaving"
 										class="is-flex-direction-row-reverse mr-0 _small"
 										type="is-dark"
 										@update:model-value="setTelemetry" />
@@ -470,6 +471,8 @@ export default {
 			// null until the core answers GET /v1/sys/telemetry: a core without the
 			// route shows no switch that could not work
 			telemetryEnabled: null,
+			// While a PUT is in flight: two answers could come back in the wrong order.
+			telemetrySaving: false,
 			deviceModel: '',
 			// Language Sets
 			languages: Object.entries(messages).map(([key, value]) => ({
@@ -748,6 +751,7 @@ export default {
 		// The switch ends where the core says it is: a refused PUT puts it back.
 		async setTelemetry(enabled) {
 			this.telemetryEnabled = enabled
+			this.telemetrySaving = true
 			try {
 				const res = await this.$api.sys.setTelemetry({ enabled, notice_seen: true })
 				this.telemetryEnabled = res.data.data.enabled
@@ -757,6 +761,8 @@ export default {
 					message: this.$t('The setting could not be saved.'),
 					type: 'is-danger',
 				})
+			} finally {
+				this.telemetrySaving = false
 			}
 		},
 

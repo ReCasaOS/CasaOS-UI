@@ -113,6 +113,7 @@ export default {
 	},
 	beforeUnmount() {
 		this.destroyUIEventBus()
+		this.dropTelemetryNotice?.()
 	},
 	methods: {
 		// Kept off data(): a Swiper instance behind a reactive proxy is not one
@@ -167,6 +168,7 @@ export default {
 				return
 
 			const change = { notice_seen: true }
+			let dropped = false
 			const notice = this.$buefy.notification.open({
 				position: 'is-bottom-right',
 				indefinite: true,
@@ -195,6 +197,8 @@ export default {
 				],
 				// The Settings switch in TopBar then shows what the core now has.
 				onClose: () => {
+					if (dropped)
+						return
 					this.$api.sys.setTelemetry(change)
 						.then(res => this.$EventBus.$emit(events.TELEMETRY_CHANGED, res.data.data.enabled))
 						.catch(() => {
@@ -203,6 +207,12 @@ export default {
 						})
 				},
 			})
+			// Logging out unmounts the dashboard: the notice goes with it, unseen, and
+			// comes back at the next login instead of stacking on a leftover copy.
+			this.dropTelemetryNotice = () => {
+				dropped = true
+				notice.close()
+			}
 		},
 
 		showTelemetryPreview() {
