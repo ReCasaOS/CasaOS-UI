@@ -165,14 +165,14 @@
 			</div>
 		</template>
 
-		<div class="is-flex mt-4">
-			<b-button :disabled="!canAct" :loading="busy === 'check'" class="mr-2" rounded size="is-small" @click="check('check')">
+		<div class="is-flex is-flex-wrap-wrap mt-4">
+			<b-button :disabled="!canAct" :loading="busy === 'check'" class="mr-2 mb-1" rounded size="is-small" @click="check('check')">
 				{{ $t('Check now') }}
 			</b-button>
-			<b-button :disabled="!canAct" :loading="busy === 'deploy'" rounded size="is-small" type="is-primary" @click="deploy">
+			<b-button :disabled="!canAct" :loading="busy === 'deploy'" class="mr-2 mb-1" rounded size="is-small" type="is-primary" @click="deploy">
 				{{ $t('Fetch and rebuild') }}
 			</b-button>
-			<b-button v-if="tagMode" :disabled="!canAct" :loading="busy === 'tags'" class="ml-2" rounded size="is-small" @click="listTags">
+			<b-button v-if="tagMode" :disabled="!canAct" :loading="busy === 'tags'" class="mb-1" rounded size="is-small" @click="listTags">
 				{{ $t('Deploy a tag…') }}
 			</b-button>
 		</div>
@@ -532,10 +532,15 @@ export default {
 				this.branch = ''
 		},
 
+		// For tags, the server pauses only on the way down; a version that is no older
+		// lifts the pause, as any tag deployed by hand does.
 		confirmRevert(entry) {
+			const pauses = !this.tagMode || isOlderTag(entry.tag, this.gitApp.deployed && this.gitApp.deployed.tag)
 			this.$buefy.dialog.confirm({
 				title: this.$t('Revert to this version'),
-				message: this.$t('The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.', { commit: shortCommit(entry.commit) }),
+				message: pauses
+					? this.$t('The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.', { commit: shortCommit(entry.commit) })
+					: this.$t('The app goes back to {commit}.', { commit: shortCommit(entry.commit) }),
 				confirmText: this.$t('Revert to this version'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-warning',

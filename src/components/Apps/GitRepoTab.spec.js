@@ -180,6 +180,7 @@ describe('gitRepoTab', () => {
 
 		await wrapper.findAll('button').find(b => b.text() === 'Revert to this version').trigger('click')
 		expect(gitApps.deploy).not.toHaveBeenCalled()
+		expect(confirm.mock.calls[0][0].message).toBe('The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.')
 		confirm.mock.calls[0][0].onConfirm()
 		await flushPromises()
 		expect(gitApps.deploy).toHaveBeenCalledWith('jarvis', { commit: B })
@@ -487,6 +488,38 @@ describe('a git app that follows tags', () => {
 		await flushPromises()
 		// JSON leaves out a branch left empty: the server takes the remote's default
 		expect(JSON.stringify(gitApps.update.mock.lastCall[1])).toBe('{"follow":"branch"}')
+		wrapper.unmount()
+	})
+
+	it('reads the check as not made yet once the mode changed, the server having dropped it', async () => {
+		const lastCheck = wrapper => wrapper.findAll('tr').find(row => row.find('th').exists() && row.find('th').text() === 'Last check').find('td').text()
+		const cases = [
+			// a newer tag's commit is not a new commit on the branch
+			{ from: tagApp(), to: 'branch', answer: gitApp({ ...tagApp(), follow: 'branch', branch: 'main', check: null, new_commits: false }) },
+			{ from: { follow: 'branch', new_commits: true, check: { at: AT, remote_commit: B, error: '' } }, to: 'tags', answer: gitApp({ ...tagApp(), check: null, new_commits: false }) },
+		]
+		for (const { from, to, answer } of cases) {
+			const { wrapper } = setup(from, { update: vi.fn().mockResolvedValue({ data: { data: answer } }) })
+			await followRow(wrapper).find('select').setValue(to)
+			await saveFollow(wrapper).trigger('click')
+			await flushPromises()
+			await wrapper.setProps({ gitApp: wrapper.emitted('change').at(-1)[0] })
+			// no time of a check that was made in the other mode
+			expect(lastCheck(wrapper)).toBe('Not checked yet.')
+			wrapper.unmount()
+		}
+	})
+
+	it('says a revert pauses automatic deployment only when it goes to an older tag', async () => {
+		// v1.4.1 runs; v1.4.2 ran before it, and v1.4.0 before that
+		const history = [release(A, 'v1.4.1'), release(B, 'v1.4.2'), release(C, 'v1.4.0')]
+		const { wrapper, confirm } = setup(tagApp({ history }))
+		for (const button of wrapper.findAll('button').filter(b => b.text() === 'Revert to this version'))
+			await button.trigger('click')
+		expect(confirm.mock.calls.map(call => call[0].message)).toEqual([
+			'The app goes back to {commit}.',
+			'The app goes back to {commit}, and automatic rebuild is paused until you turn it on again or deploy by hand.',
+		])
 		wrapper.unmount()
 	})
 
