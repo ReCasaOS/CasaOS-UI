@@ -123,3 +123,15 @@ export function appendLog(log, lines) {
 	const next = log + (lines.endsWith('\n') ? lines : `${lines}\n`)
 	return next.length > LOG_LIMIT ? next.slice(-LOG_LIMIT) : next
 }
+
+// Seconds in each unit timeAgo words a time in, largest first.
+const UNITS = [['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]]
+
+// How long ago `at` (RFC 3339) was, in the words of `locale`, a vue-i18n locale
+// such as en_us: "3 minutes ago", "il y a 3 minutes". A time in the future is a
+// clock that disagrees with this one, and reads "now".
+export function timeAgo(at, locale, now = Date.now()) {
+	const seconds = Math.max(0, Math.round((now - new Date(at).getTime()) / 1000))
+	const [unit, size] = UNITS.find(entry => seconds >= entry[1]) || UNITS.at(-1)
+	return new Intl.RelativeTimeFormat(locale.replace('_', '-'), { numeric: 'auto' }).format(-Math.floor(seconds / size), unit)
+}

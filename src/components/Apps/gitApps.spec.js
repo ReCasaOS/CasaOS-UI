@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, projectName, sensitiveLabel, sensitiveServices, shortCommit, withoutContainer } from './gitApps'
+import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, projectName, sensitiveLabel, sensitiveServices, shortCommit, timeAgo, withoutContainer } from './gitApps'
 
 const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
@@ -179,5 +179,25 @@ describe('a build log as it arrives', () => {
 		const log = appendLog('x'.repeat(64 * 1024), 'last')
 		expect(log).toHaveLength(64 * 1024)
 		expect(log.endsWith('xlast\n')).toBe(true)
+	})
+})
+
+describe('how long ago a webhook delivery came', () => {
+	const now = Date.UTC(2026, 8, 23, 12, 0, 0)
+	const before = seconds => new Date(now - seconds * 1000).toISOString()
+
+	it.each([
+		[0, 'en_us', 'now'],
+		[45, 'en_us', '45 seconds ago'],
+		[180, 'en_us', '3 minutes ago'],
+		[180, 'fr_fr', 'il y a 3 minutes'],
+		[5400, 'en_us', '1 hour ago'],
+		[3 * 86400, 'fr_fr', 'il y a 3 jours'],
+	])('%i seconds before, in %s, is %s', (seconds, locale, words) => {
+		expect(timeAgo(before(seconds), locale, now)).toBe(words)
+	})
+
+	it('reads a time in the future as now: the clocks disagree, nothing came later', () => {
+		expect(timeAgo(before(-30), 'en_us', now)).toBe('now')
 	})
 })
