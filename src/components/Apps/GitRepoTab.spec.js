@@ -6,8 +6,19 @@ import GitRepoTab from './GitRepoTab.vue'
 import i18n from '@/plugins/i18n'
 
 // require.context has no Vite equivalent; a table this small makes $t return its
-// key, except for the one message the last delivery needs filled in.
-vi.mock('@/assets/lang', () => ({ default: { en_us: { 'Received {when}': 'Received {when}' } } }))
+// key, except for the messages below, which the specs need filled in.
+vi.mock('@/assets/lang', () => ({
+	default: {
+		en_us: Object.fromEntries([
+			'Received {when}',
+			'The check failed: {error}',
+			'Newest tag {tag} · deployed {deployed}',
+			'Up to date ({tag})',
+			'The tag {tag} now points at another commit: it is not redeployed automatically.',
+			'Redeploy {tag}',
+		].map(key => [key, key])),
+	},
+}))
 
 const copy = vi.hoisted(() => vi.fn())
 vi.mock('clipboard-copy', () => ({ default: copy }))
@@ -376,6 +387,106 @@ describe('the webhook of a git app', () => {
 		await flushPromises()
 		expect(wrapper.findAll('.tabs li').map(li => li.text())).toEqual(['GitHub', 'Gitea/Forgejo', 'GitLab'])
 		expect(wrapper.text()).toContain('Which events: “Just the push event”.')
+		// GitLab sends a tag apart from a push, and only when asked
+		expect(wrapper.text()).toContain('Trigger: Push events and Tag push events.')
+		wrapper.unmount()
+	})
+})
+
+describe('a git app that follows tags', () => {
+	const release = (commit, tag, fields = {}) => ({ commit, tag, subject: `release ${tag}`, at: AT, outcome: 'deployed', reason: '', revertable: true, ...fields })
+	const tagApp = (fields = {}) => ({
+		follow: 'tags',
+		branch: '',
+		tag_pattern: '',
+		prereleases: false,
+		deployed: { commit: A, tag: 'v1.4.1', subject: 'release v1.4.1', at: AT },
+		check: { at: AT, remote_commit: B, remote_tag: 'v1.4.2', tag_moved: false, error: '' },
+		new_commits: true,
+		history: [release(A, 'v1.4.1')],
+		...fields,
+	})
+	const followRow = wrapper => wrapper.find('.git-repo-tab__follow')
+	const saveFollow = wrapper => followRow(wrapper).findAll('button').find(b => b.text() === 'Save')
+
+	it('says which tag is newest and which one runs, and names versions by their tags', () => {
+		const behind = setup(tagApp())
+		const text = behind.wrapper.text()
+		expect(text).toContain('Newest tag v1.4.2 · deployed v1.4.1')
+		expect(behind.wrapper.find('.git-repo-tab__deployment').text()).toContain('v1.4.1 (aaaaaaa) release v1.4.1')
+		expect(text).toContain('Deploy a newer tag as soon as a check finds it')
+		expect(text).toContain('It runs whatever is tagged with a higher version.')
+		expect(text).not.toContain('It runs whatever is pushed to the branch.')
+		behind.wrapper.unmount()
+
+		const current = setup(tagApp({ check: { at: AT, remote_commit: A, remote_tag: 'v1.4.1', tag_moved: false, error: '' }, new_commits: false }))
+		expect(current.wrapper.text()).toContain('Up to date (v1.4.1)')
+		current.wrapper.unmount()
+	})
+
+	it('gives the check\'s words when no tag is eligible, and nothing of the tag it found before', () => {
+		const error = 'no tag matches (pattern `v2.*`, pre-releases excluded)'
+		// as the server answers it: the check keeps the tag and the commit it found
+		// last, the view still compares them, and the app is at rest (Global Constraints)
+		const stale = { at: AT, remote_commit: B, remote_tag: 'v1.4.1', tag_moved: true, error }
+		const { wrapper } = setup(tagApp({ tag_pattern: 'v2.*', check: stale, new_commits: false, state: 'idle' }))
+		expect(wrapper.text()).toContain(`The check failed: ${error}`)
+		expect(wrapper.text()).not.toContain('Newest tag')
+		expect(wrapper.text()).not.toContain('Up to date')
+		wrapper.unmount()
+	})
+
+	it('shows the branch, and nothing of tags, to a server that knows none', () => {
+		// the fixture of the specs above has no `follow`, as an older AppManagement answers
+		const { wrapper } = setup()
+		expect(followRow(wrapper).exists()).toBe(false)
+		expect(wrapper.text()).toContain('Branch')
+		expect(wrapper.text()).not.toContain('Deploy a tag…')
+		expect(wrapper.findAll('select')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('switches a branch app to tags with the filter it kept, and says the first deployment is by hand', async () => {
+		const { wrapper, gitApps } = setup({ follow: 'branch', tag_pattern: 'v2.*', prereleases: false })
+		expect(followRow(wrapper).text()).toContain('main')
+		expect(saveFollow(wrapper)).toBeUndefined()
+		expect(wrapper.text()).not.toContain('The first deployment in this mode is manual')
+
+		await followRow(wrapper).find('select').setValue('tags')
+		expect(followRow(wrapper).find('input.input').element.value).toBe('v2.*')
+		await followRow(wrapper).find('input[type="checkbox"]').setValue(true)
+		expect(wrapper.text()).toContain('The first deployment in this mode is manual; automatic deployment resumes after it.')
+
+		await saveFollow(wrapper).trigger('click')
+		await flushPromises()
+		expect(gitApps.update).toHaveBeenCalledWith('jarvis', { follow: 'tags', tag_pattern: 'v2.*', prereleases: true })
+		wrapper.unmount()
+	})
+
+	it('changes the pattern, and says so until a tag is deployed by hand', async () => {
+		const { wrapper, gitApps } = setup(tagApp({ deployed: { commit: A, tag: '', subject: 'feat: voice wake word', at: AT } }))
+		expect(wrapper.text()).toContain('The first deployment in this mode is manual')
+
+		await followRow(wrapper).find('input.input').setValue(' v2.* ')
+		await saveFollow(wrapper).trigger('click')
+		await flushPromises()
+		expect(gitApps.update).toHaveBeenCalledWith('jarvis', { follow: 'tags', tag_pattern: 'v2.*', prereleases: false })
+		wrapper.unmount()
+	})
+
+	it('goes back to a branch, the one typed or the default', async () => {
+		const { wrapper, gitApps } = setup(tagApp())
+		await followRow(wrapper).find('select').setValue('branch')
+		await followRow(wrapper).find('input.input').setValue('dev')
+		await saveFollow(wrapper).trigger('click')
+		await flushPromises()
+		expect(gitApps.update).toHaveBeenLastCalledWith('jarvis', { follow: 'branch', branch: 'dev' })
+
+		await followRow(wrapper).find('select').setValue('branch')
+		await saveFollow(wrapper).trigger('click')
+		await flushPromises()
+		// JSON leaves out a branch left empty: the server takes the remote's default
+		expect(JSON.stringify(gitApps.update.mock.lastCall[1])).toBe('{"follow":"branch"}')
 		wrapper.unmount()
 	})
 })

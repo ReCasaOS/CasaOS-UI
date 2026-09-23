@@ -20,15 +20,40 @@
 					<th>{{ $t('Remote') }}</th>
 					<td class="git-repo-tab__mono">{{ gitApp.remote || '-' }}</td>
 				</tr>
-				<tr>
+				<!-- an AppManagement older than tags sends no `follow`: the branch, as it was -->
+				<tr v-if="!gitApp.follow">
 					<th>{{ $t('Branch') }}</th>
 					<td>{{ gitApp.branch || '-' }}</td>
+				</tr>
+				<tr v-else class="git-repo-tab__follow">
+					<th>{{ $t('Mode') }}</th>
+					<td>
+						<div class="is-flex is-align-items-center is-flex-wrap-wrap">
+							<b-select v-model="follow" :disabled="!canAct" class="mr-2 mb-1" size="is-small">
+								<option value="branch">{{ $t('Follow a branch') }}</option>
+								<option value="tags">{{ $t('Follow tags') }}</option>
+							</b-select>
+							<template v-if="follow === 'tags'">
+								<b-input v-model="tagPattern" :disabled="!canAct" :placeholder="$t('Every version tag')" class="mr-2 mb-1" size="is-small"></b-input>
+								<b-checkbox v-model="prereleases" :disabled="!canAct" class="mr-2 mb-1" size="is-small">
+									{{ $t('Include pre-releases (-rc, -beta)') }}
+								</b-checkbox>
+							</template>
+							<!-- the branch of a cloned app is the one its folder is on -->
+							<span v-else-if="gitApp.follow === 'branch'" class="mr-2 mb-1">{{ gitApp.branch || '-' }}</span>
+							<b-input v-else v-model="branch" :disabled="!canAct" :placeholder="$t('Default branch')" class="mr-2 mb-1" size="is-small"></b-input>
+							<b-button v-if="followChanged" :disabled="!canAct" :loading="busy === 'follow'" class="mb-1" rounded size="is-small" @click="saveFollow">
+								{{ $t('Save') }}
+							</b-button>
+						</div>
+						<p v-if="firstInMode" class="has-text-full-03">{{ $t('The first deployment in this mode is manual; automatic deployment resumes after it.') }}</p>
+					</td>
 				</tr>
 				<tr>
 					<th>{{ $t('Deployed') }}</th>
 					<td>
 						<template v-if="gitApp.deployed">
-							<span class="git-repo-tab__mono">{{ short(gitApp.deployed.commit) }}</span>
+							<span class="git-repo-tab__mono">{{ version(gitApp.deployed) }}</span>
 							{{ gitApp.deployed.subject }} · {{ when(gitApp.deployed.at) }}
 						</template>
 						<span v-else class="has-text-full-03">{{ $t('Not deployed yet.') }}</span>
@@ -82,9 +107,11 @@
 
 		<p class="has-text-weight-bold is-size-7 mt-3 mb-2">{{ $t('Automatic rebuild') }}</p>
 		<b-switch :disabled="!canAct" :model-value="autoDeploy" size="is-small" @update:model-value="setAutoDeploy">
-			{{ $t('Deploy a new commit as soon as a check finds it') }}
+			{{ tagMode ? $t('Deploy a newer tag as soon as a check finds it') : $t('Deploy a new commit as soon as a check finds it') }}
 		</b-switch>
-		<p class="is-size-7 has-text-danger mt-1">{{ $t('It runs whatever is pushed to the branch.') }}</p>
+		<p class="is-size-7 has-text-danger mt-1">
+			{{ tagMode ? $t('It runs whatever is tagged with a higher version.') : $t('It runs whatever is pushed to the branch.') }}
+		</p>
 
 		<!-- an AppManagement older than webhooks sends no `webhook`: nothing to show -->
 		<template v-if="webhook">
@@ -148,7 +175,7 @@
 			<tbody>
 				<tr v-for="entry in history" :key="`${entry.commit}-${entry.at}`" class="git-repo-tab__deployment">
 					<td>
-						<span class="git-repo-tab__mono">{{ short(entry.commit) }}</span> {{ entry.subject }}
+						<span class="git-repo-tab__mono">{{ version(entry) }}</span> {{ entry.subject }}
 						<p class="has-text-full-03">{{ when(entry.at) }}</p>
 					</td>
 					<td>
@@ -169,7 +196,7 @@
 
 <script>
 import copy from 'clipboard-copy'
-import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, shortCommit, timeAgo } from './gitApps'
+import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, shortCommit, timeAgo, versionName } from './gitApps'
 
 const appOf = res => res.data.data
 
@@ -205,7 +232,7 @@ const HOW_TO = [
 			'In the project: Settings › Webhooks › Add new webhook.',
 			'URL: the URL above.',
 			'Secret token: the secret above.',
-			'Trigger: Push events.',
+			'Trigger: Push events and Tag push events.',
 		],
 	},
 ]
@@ -231,11 +258,17 @@ export default {
 			access: this.gitApp.access,
 			token: '',
 			autoDeploy: this.gitApp.auto_deploy,
+			// what the Mode row shows until it is saved: the mode, the branch to
+			// switch to, the tag filter
+			follow: this.gitApp.follow || 'branch',
+			branch: '',
+			tagPattern: this.gitApp.tag_pattern || '',
+			prereleases: Boolean(this.gitApp.prereleases),
 			webhookOn: Boolean(this.gitApp.webhook && this.gitApp.webhook.enabled),
 			showSecret: false,
 			howTo: HOW_TO[0].forge,
 			howTos: HOW_TO,
-			// '' or what runs: access, auto, webhook, secret, test, check, deploy, or the commit of a revert
+			// '' or what runs: access, auto, follow, webhook, secret, test, check, deploy, or the commit of a revert
 			busy: '',
 			error: '',
 			// null until a build is followed live, then the log as its events bring it
@@ -254,6 +287,22 @@ export default {
 		},
 		checkLine() {
 			return checkSummary(this.gitApp)
+		},
+		// the mode the server has, not the one being chosen
+		tagMode() {
+			return this.gitApp.follow === 'tags'
+		},
+		followChanged() {
+			if (this.follow !== this.gitApp.follow)
+				return true
+			return this.follow === 'tags' && (this.tagPattern.trim() !== (this.gitApp.tag_pattern || '') || this.prereleases !== Boolean(this.gitApp.prereleases))
+		},
+		// A mode chosen, or saved and not deployed in yet: the server deploys
+		// automatically in tags only after a tag was deployed, in a branch only after
+		// a commit was deployed from it, so the first one is by hand.
+		firstInMode() {
+			const deployed = this.gitApp.deployed
+			return this.follow !== this.gitApp.follow || Boolean(deployed && this.tagMode !== Boolean(deployed.tag))
 		},
 		stateTag() {
 			return gitBadge({ state: this.gitApp.state })
@@ -292,6 +341,15 @@ export default {
 		'gitApp.auto_deploy': function (value) {
 			this.autoDeploy = value
 		},
+		'gitApp.follow': function (value) {
+			this.follow = value || 'branch'
+		},
+		'gitApp.tag_pattern': function (value) {
+			this.tagPattern = value || ''
+		},
+		'gitApp.prereleases': function (value) {
+			this.prereleases = Boolean(value)
+		},
 		'gitApp.webhook.enabled': function (value) {
 			this.webhookOn = Boolean(value)
 			this.showSecret = false
@@ -316,6 +374,7 @@ export default {
 		canRevert,
 		outcomeTag,
 		short: shortCommit,
+		version: versionName,
 
 		when(at) {
 			return new Date(at).toLocaleString()
@@ -367,6 +426,16 @@ export default {
 			this.autoDeploy = value
 			if (!await this.run('auto', () => this.$api.gitApps.update(this.appId, { auto_deploy: value }).then(appOf)))
 				this.autoDeploy = this.gitApp.auto_deploy
+		},
+
+		// A pattern and pre-releases for tags; a branch left empty is the remote's
+		// default. The server keeps the tag filter while the app follows a branch.
+		async saveFollow() {
+			const body = this.follow === 'tags'
+				? { follow: 'tags', tag_pattern: this.tagPattern.trim(), prereleases: this.prereleases }
+				: { follow: 'branch', branch: this.branch.trim() || undefined }
+			if (await this.run('follow', () => this.$api.gitApps.update(this.appId, body).then(appOf)))
+				this.branch = ''
 		},
 
 		confirmRevert(entry) {
