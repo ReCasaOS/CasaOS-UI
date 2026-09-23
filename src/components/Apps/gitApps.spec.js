@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, projectName, sensitiveLabel, sensitiveServices, shortCommit, timeAgo, withoutContainer } from './gitApps'
+import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, isOlderTag, outcomeTag, projectName, sensitiveLabel, sensitiveServices, shortCommit, tagLabels, timeAgo, versionName, withoutContainer } from './gitApps'
 
 const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
@@ -199,5 +199,77 @@ describe('how long ago a webhook delivery came', () => {
 
 	it('reads a time in the future as now: the clocks disagree, nothing came later', () => {
 		expect(timeAgo(before(-30), 'en_us', now)).toBe('now')
+	})
+})
+
+describe('an app that follows tags', () => {
+	const at = '2026-09-23T10:05:00Z'
+	const tagApp = (check, deployed = { commit: A, tag: 'v1.4.1' }) => ({ follow: 'tags', check: { at, error: '', tag_moved: false, ...check }, deployed })
+
+	it('names the newest tag and the deployed one, or says it is up to date', () => {
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.2', remote_commit: B })))
+			.toEqual({ message: 'Newest tag {tag} · deployed {deployed}', params: { tag: 'v1.4.2', deployed: 'v1.4.1' } })
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.1', remote_commit: A })))
+			.toEqual({ message: 'Up to date ({tag})', params: { tag: 'v1.4.1' } })
+	})
+
+	it('says a tag moved rather than up to date, and names a version deployed from a branch by its commit', () => {
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.1', remote_commit: B, tag_moved: true })))
+			.toEqual({ message: 'The tag {tag} moved.', params: { tag: 'v1.4.1' } })
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.2', remote_commit: B }, { commit: A, tag: '' })).params.deployed).toBe('aaaaaaa')
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.2', remote_commit: B }, null)).params.deployed).toBe('-')
+	})
+
+	it('gives the check\'s own words when no tag is eligible, and waits for a check made in tags', () => {
+		const error = 'no tag matches (pattern `v2.*`, pre-releases excluded)'
+		// the check keeps the tag it found before, moved or not: the error wins
+		expect(checkSummary(tagApp({ remote_tag: 'v1.4.1', remote_commit: B, tag_moved: true, error })))
+			.toEqual({ message: 'The check failed: {error}', params: { error } })
+		expect(checkSummary(tagApp({ remote_tag: '', remote_commit: B })).message).toBe('Not checked yet.')
+	})
+
+	it('names a version by its tag and its commit, or by its commit alone', () => {
+		expect(versionName({ commit: A, tag: 'v1.4.1' })).toBe('v1.4.1 (aaaaaaa)')
+		expect(versionName({ commit: A, tag: '' })).toBe('aaaaaaa')
+		expect(versionName({ commit: A })).toBe('aaaaaaa')
+	})
+
+	it.each([
+		['v1.4.1', 'v1.4.2', true],
+		['v1.4.2', 'v1.4.1', false],
+		['v1.9.0', 'v1.10.0', true],
+		['1.2.3', 'v1.2.3', false],
+		['v2.0.0-rc.1', 'v2.0.0', true],
+		['v2.0.0', 'v2.0.0-rc.1', false],
+		['v2.0.0-rc.2', 'v2.0.0-rc.10', true],
+		['v2.0.0-alpha', 'v2.0.0-alpha.1', true],
+		['v2.0.0-1', 'v2.0.0-alpha', true],
+		['v2.0.0-beta', 'v2.0.0-alpha', false],
+		['v1.2.3+build.9', 'v1.2.3', false],
+		['latest', 'v1.0.0', false],
+		['v1.0.0', '', false],
+	])('%s is older than %s: %s', (tag, than, older) => {
+		expect(isOlderTag(tag, than)).toBe(older)
+	})
+
+	it('labels the deployed tag, the newest one and the ones the history keeps', () => {
+		const C = 'c'.repeat(40)
+		const D = 'd'.repeat(40)
+		const app = {
+			deployed: { commit: A, tag: 'v1.4.1' },
+			history: [
+				{ commit: A, tag: 'v1.4.1', outcome: 'deployed' },
+				{ commit: D, tag: 'v1.3.9', outcome: 'build_failed' },
+				{ commit: C, tag: 'v1.4.0', outcome: 'adopted' },
+			],
+		}
+		expect(tagLabels(app, { name: 'v1.4.2', commit: B }, 0)).toEqual(['newest'])
+		expect(tagLabels(app, { name: 'v1.4.1', commit: A }, 1)).toEqual(['deployed'])
+		expect(tagLabels(app, { name: 'v1.4.0', commit: C }, 2)).toEqual(['in history'])
+		// a build that failed never ran: nothing of it is kept
+		expect(tagLabels(app, { name: 'v1.3.9', commit: D }, 3)).toEqual([])
+		// the deployed tag, moved to another commit, is that commit
+		expect(tagLabels(app, { name: 'v1.4.1', commit: B }, 0)).toEqual(['newest'])
+		expect(tagLabels({ deployed: null }, { name: 'v1.0.0', commit: A }, 0)).toEqual(['newest'])
 	})
 })

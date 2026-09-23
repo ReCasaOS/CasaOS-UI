@@ -67,15 +67,86 @@ export function shortCommit(commit) {
 }
 
 // The last check, in words. `new_commits` is the server's: the branch has a
-// commit that is not the deployed one.
+// commit that is not the deployed one. An app that follows tags is worded by the
+// tag the server chose; the dashboard compares none. With no eligible tag, the
+// check's error says so, naming the filter, and the tag it keeps from an earlier
+// check is not read.
 export function checkSummary(app) {
 	if (!app.check)
 		return { message: 'Not checked yet.', params: {} }
 	if (app.check.error)
 		return { message: 'The check failed: {error}', params: { error: app.check.error } }
+	if (app.follow === 'tags') {
+		const tag = app.check.remote_tag
+		// a check made before the app followed tags
+		if (!tag)
+			return { message: 'Not checked yet.', params: {} }
+		// the deployed tag on another commit: the tab's warning says the rest
+		if (app.check.tag_moved)
+			return { message: 'The tag {tag} moved.', params: { tag } }
+		if (app.deployed && app.deployed.tag === tag)
+			return { message: 'Up to date ({tag})', params: { tag } }
+		const deployed = app.deployed ? (app.deployed.tag || shortCommit(app.deployed.commit)) : '-'
+		return { message: 'Newest tag {tag} · deployed {deployed}', params: { tag, deployed } }
+	}
 	if (app.new_commits)
 		return { message: 'Commit {commit} is new on the branch.', params: { commit: shortCommit(app.check.remote_commit) } }
 	return { message: 'The branch is at {commit}: up to date.', params: { commit: shortCommit(app.check.remote_commit) } }
+}
+
+// A deployed version as the owner knows it: `v1.4.1 (abc1234)`, or the commit
+// alone when it was deployed from a branch.
+export function versionName(version) {
+	return version.tag ? `${version.tag} (${shortCommit(version.commit)})` : shortCommit(version.commit)
+}
+
+// A version tag as the server reads one: strict semver after one leading `v`.
+const VERSION = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/
+
+// Semver precedence of two pre-release identifiers: numbers below words,
+// numbers by value, words in ASCII order.
+function compareIdentifiers(a, b) {
+	const numeric = [/^\d+$/.test(a), /^\d+$/.test(b)]
+	if (numeric[0] && numeric[1])
+		return Number(a) - Number(b)
+	if (numeric[0] !== numeric[1])
+		return numeric[0] ? -1 : 1
+	if (a === b)
+		return 0
+	return a < b ? -1 : 1
+}
+
+// Whether tag `tag` is a lower version than tag `than`, by semver precedence;
+// false when either is not a version. Only the confirmation of an older tag asks:
+// the order of the tags and the choice of the newest are the server's.
+export function isOlderTag(tag, than) {
+	const [a, b] = [VERSION.exec(tag || ''), VERSION.exec(than || '')]
+	if (!a || !b)
+		return false
+	for (const part of [1, 2, 3]) {
+		if (a[part] !== b[part])
+			return Number(a[part]) < Number(b[part])
+	}
+	// a pre-release comes before its release
+	if (!a[4] || !b[4])
+		return Boolean(a[4]) && !b[4]
+	const [x, y] = [a[4].split('.'), b[4].split('.')]
+	for (let i = 0; i < Math.min(x.length, y.length); i++) {
+		const order = compareIdentifiers(x[i], y[i])
+		if (order)
+			return order < 0
+	}
+	return x.length < y.length
+}
+
+// What a tag of the list is, the list coming highest first: the version that
+// runs (the same name on the same commit), the newest, a version the history
+// keeps (one that ran: the server keeps no failed build). The words are
+// language keys.
+export function tagLabels(app, tag, index) {
+	const deployed = Boolean(app.deployed) && app.deployed.tag === tag.name && app.deployed.commit === tag.commit
+	const kept = (app.history || []).some(entry => entry.commit === tag.commit && ['deployed', 'adopted'].includes(entry.outcome))
+	return [deployed && 'deployed', index === 0 && 'newest', !deployed && kept && 'in history'].filter(Boolean)
 }
 
 // A kept version can be switched back to, except the one already deployed.
