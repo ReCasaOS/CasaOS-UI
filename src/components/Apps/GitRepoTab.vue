@@ -13,6 +13,14 @@
 		<b-message v-else-if="gitApp.auto_paused" size="is-small" type="is-warning">
 			{{ $t('Automatic rebuild is paused since a revert. Turn it on again, or deploy by hand, to resume it.') }}
 		</b-message>
+		<!-- the same name on another commit: never redeployed automatically -->
+		<b-message v-if="tagMoved" size="is-small" type="is-warning">
+			<p>{{ $t('The tag {tag} now points at another commit: it is not redeployed automatically.', { tag: gitApp.check.remote_tag }) }}</p>
+			<b-button :disabled="!canAct" :loading="busy === 'redeploy'" class="mt-2" rounded size="is-small"
+				@click="deployTag(gitApp.check.remote_tag, 'redeploy')">
+				{{ $t('Redeploy {tag}', { tag: gitApp.check.remote_tag }) }}
+			</b-button>
+		</b-message>
 
 		<table class="table is-narrow is-fullwidth is-size-7">
 			<tbody>
@@ -164,7 +172,33 @@
 			<b-button :disabled="!canAct" :loading="busy === 'deploy'" rounded size="is-small" type="is-primary" @click="deploy">
 				{{ $t('Fetch and rebuild') }}
 			</b-button>
+			<b-button v-if="tagMode" :disabled="!canAct" :loading="busy === 'tags'" class="ml-2" rounded size="is-small" @click="listTags">
+				{{ $t('Deploy a tag…') }}
+			</b-button>
 		</div>
+
+		<!-- the remote's eligible tags, highest first, as the server answered them -->
+		<template v-if="tags && tagMode">
+			<p v-if="!tags.length" class="is-size-7 has-text-full-03 mt-2">{{ $t('No tag to deploy.') }}</p>
+			<table v-else class="table is-narrow is-fullwidth is-size-7 mt-2">
+				<tbody>
+					<tr v-for="(tag, index) in tags" :key="tag.name" class="git-repo-tab__tag">
+						<td>
+							<span class="git-repo-tab__mono">{{ tag.name }}</span> <span class="git-repo-tab__mono has-text-full-03">{{ short(tag.commit) }}</span>
+						</td>
+						<td>
+							<b-tag v-for="label in labelsOf(tag, index)" :key="label" class="mr-1">{{ $t(label) }}</b-tag>
+						</td>
+						<td class="has-text-right">
+							<b-button v-if="!labelsOf(tag, index).includes('deployed')" :disabled="!canAct" :loading="busy === `tag:${tag.name}`"
+								rounded size="is-small" @click="pickTag(tag)">
+								{{ $t('Deploy') }}
+							</b-button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</template>
 
 		<p class="has-text-weight-bold is-size-7 mt-4 mb-2">{{ $t('Last build') }}</p>
 		<pre ref="log" class="git-repo-tab__text git-repo-tab__log">{{ log || $t('No build yet.') }}</pre>
@@ -196,7 +230,7 @@
 
 <script>
 import copy from 'clipboard-copy'
-import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, shortCommit, timeAgo, versionName } from './gitApps'
+import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, isOlderTag, outcomeTag, shortCommit, tagLabels, timeAgo, versionName } from './gitApps'
 
 const appOf = res => res.data.data
 
@@ -264,11 +298,14 @@ export default {
 			branch: '',
 			tagPattern: this.gitApp.tag_pattern || '',
 			prereleases: Boolean(this.gitApp.prereleases),
+			// null until "Deploy a tag…" lists them, then [{ name, commit }]
+			tags: null,
 			webhookOn: Boolean(this.gitApp.webhook && this.gitApp.webhook.enabled),
 			showSecret: false,
 			howTo: HOW_TO[0].forge,
 			howTos: HOW_TO,
-			// '' or what runs: access, auto, follow, webhook, secret, test, check, deploy, or the commit of a revert
+			// '' or what runs: access, auto, follow, webhook, secret, test, check, deploy,
+			// tags, redeploy, tag:<name> of a listed tag, or the commit of a revert
 			busy: '',
 			error: '',
 			// null until a build is followed live, then the log as its events bring it
@@ -291,6 +328,12 @@ export default {
 		// the mode the server has, not the one being chosen
 		tagMode() {
 			return this.gitApp.follow === 'tags'
+		},
+		// a check that found no eligible tag keeps the tag it found before, and the
+		// view still compares it: nothing to warn of then
+		tagMoved() {
+			const check = this.gitApp.check
+			return this.tagMode && Boolean(check && !check.error && check.tag_moved)
 		},
 		followChanged() {
 			if (this.follow !== this.gitApp.follow)
@@ -376,6 +419,10 @@ export default {
 		short: shortCommit,
 		version: versionName,
 
+		labelsOf(tag, index) {
+			return tagLabels(this.gitApp, tag, index)
+		},
+
 		when(at) {
 			return new Date(at).toLocaleString()
 		},
@@ -411,8 +458,55 @@ export default {
 			})
 		},
 
+		// With no tag named, an app that follows tags gets the newest one there is,
+		// which is older than the deployed one once that tag is gone: say so first.
+		// ponytail: best-effort, from the last check; the server decides at the request
+		// and a lower tag by hand is allowed, so a tag deleted since goes unasked.
 		deploy() {
-			return this.run('deploy', () => this.$api.gitApps.deploy(this.appId).then(appOf))
+			const check = this.gitApp.check
+			const newest = this.tagMode && check && !check.error ? check.remote_tag : ''
+			return this.confirmOlder(newest, () => this.run('deploy', () => this.$api.gitApps.deploy(this.appId).then(appOf)))
+		},
+
+		// At once, or once confirmed when `tag` is an older version than the one
+		// deployed; the server then pauses automatic deployment, as after a revert.
+		// The title carries the tag: Buefy renders the message as HTML, the title as
+		// text.
+		confirmOlder(tag, action) {
+			if (!isOlderTag(tag, this.gitApp.deployed && this.gitApp.deployed.tag))
+				return action()
+			this.$buefy.dialog.confirm({
+				title: tag,
+				message: this.$t('This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.'),
+				confirmText: this.$t('Deploy'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-warning',
+				onConfirm: action,
+			})
+		},
+
+		// The remote's eligible tags: it asks the remote, as a check does.
+		async listTags() {
+			this.busy = 'tags'
+			this.error = ''
+			try {
+				this.tags = (await this.$api.gitApps.tags(this.appId)).data.data
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		pickTag(tag) {
+			return this.confirmOlder(tag.name, () => this.deployTag(tag.name, `tag:${tag.name}`))
+		},
+
+		// Any eligible tag by hand, a moved one included; the list is done with once
+		// the server took it.
+		async deployTag(tag, kind) {
+			if (await this.run(kind, () => this.$api.gitApps.deploy(this.appId, { tag }).then(appOf)))
+				this.tags = null
 		},
 
 		async saveAccess() {

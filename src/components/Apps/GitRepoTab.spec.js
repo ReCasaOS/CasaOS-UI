@@ -489,4 +489,101 @@ describe('a git app that follows tags', () => {
 		expect(JSON.stringify(gitApps.update.mock.lastCall[1])).toBe('{"follow":"branch"}')
 		wrapper.unmount()
 	})
+
+	it('warns of a tag that moved, and redeploys it only by hand', async () => {
+		const moved = { at: AT, remote_commit: B, remote_tag: 'v1.4.1', tag_moved: true, error: '' }
+		const { wrapper, gitApps, click } = setup(tagApp({ check: moved, new_commits: false }))
+		expect(wrapper.text()).toContain('The tag v1.4.1 now points at another commit: it is not redeployed automatically.')
+		expect(wrapper.text()).not.toContain('Up to date')
+		expect(gitApps.deploy).not.toHaveBeenCalled()
+
+		await click('Redeploy v1.4.1')
+		expect(gitApps.deploy).toHaveBeenCalledWith('jarvis', { tag: 'v1.4.1' })
+		wrapper.unmount()
+	})
+
+	it('neither warns nor asks on the tag a check kept from before it found none eligible', async () => {
+		const error = 'no tag matches (pattern `v2.*`, pre-releases excluded)'
+		// the view still compares the tag the check kept: it moved, or it is older
+		const moved = setup(tagApp({ check: { at: AT, remote_commit: B, remote_tag: 'v1.4.1', tag_moved: true, error }, new_commits: false }))
+		expect(moved.wrapper.text()).not.toContain('now points at another commit')
+		expect(moved.button('Redeploy v1.4.1')).toBeUndefined()
+		moved.wrapper.unmount()
+
+		const older = setup(tagApp({ check: { at: AT, remote_commit: C, remote_tag: 'v1.4.0', tag_moved: false, error }, new_commits: false }))
+		await older.click('Fetch and rebuild')
+		expect(older.confirm).not.toHaveBeenCalled()
+		expect(older.gitApps.deploy).toHaveBeenCalledWith('jarvis')
+		older.wrapper.unmount()
+	})
+
+	describe('deploy a tag', () => {
+		const LIST = [
+			{ name: 'v1.4.2', commit: B },
+			{ name: 'v1.4.1', commit: A },
+			{ name: 'v1.4.0', commit: C },
+		]
+		const history = [release(A, 'v1.4.1'), release(C, 'v1.4.0')]
+		const listed = () => {
+			const tags = vi.fn().mockResolvedValue({ data: { data: LIST } })
+			return { tags, ...setup(tagApp({ history }), { tags }) }
+		}
+		const rows = wrapper => wrapper.findAll('.git-repo-tab__tag')
+
+		it('lists the tags the remote has, with what each one is', async () => {
+			const { wrapper, tags, click } = listed()
+			await click('Deploy a tag…')
+			expect(tags).toHaveBeenCalledWith('jarvis')
+			expect(rows(wrapper).map(row => row.findAll('.tag').map(tag => tag.text()))).toEqual([['newest'], ['deployed'], ['in history']])
+			expect(rows(wrapper)[0].text()).toContain('v1.4.2 bbbbbbb')
+			// nothing to deploy where it already runs
+			expect(rows(wrapper).map(row => row.findAll('button').length)).toEqual([1, 0, 1])
+			wrapper.unmount()
+		})
+
+		it('deploys a newer tag at once, and an older one once confirmed', async () => {
+			const { wrapper, gitApps, confirm, click } = listed()
+			await click('Deploy a tag…')
+			await rows(wrapper)[0].find('button').trigger('click')
+			await flushPromises()
+			expect(confirm).not.toHaveBeenCalled()
+			expect(gitApps.deploy).toHaveBeenLastCalledWith('jarvis', { tag: 'v1.4.2' })
+			// the server took it: the list is done with
+			expect(rows(wrapper)).toHaveLength(0)
+
+			await click('Deploy a tag…')
+			await rows(wrapper)[2].find('button').trigger('click')
+			expect(gitApps.deploy).toHaveBeenCalledTimes(1)
+			// the server pauses automatic deployment after an older tag: the owner is told first
+			expect(confirm.mock.calls[0][0].title).toBe('v1.4.0')
+			expect(confirm.mock.calls[0][0].message).toBe('This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.')
+			confirm.mock.calls[0][0].onConfirm()
+			await flushPromises()
+			expect(gitApps.deploy).toHaveBeenLastCalledWith('jarvis', { tag: 'v1.4.0' })
+			wrapper.unmount()
+		})
+
+		it('says when there is no tag to deploy, and what the server said when it could not list them', async () => {
+			const empty = setup(tagApp(), { tags: vi.fn().mockResolvedValue({ data: { data: [] } }) })
+			await empty.click('Deploy a tag…')
+			expect(empty.wrapper.text()).toContain('No tag to deploy.')
+			empty.wrapper.unmount()
+
+			const refused = setup(tagApp(), { tags: vi.fn().mockRejectedValue({ response: { status: 400, data: { message: 'the app follows a branch' } } }) })
+			await refused.click('Deploy a tag…')
+			expect(refused.wrapper.text()).toContain('the app follows a branch')
+			refused.wrapper.unmount()
+		})
+
+		it('asks before Fetch and rebuild goes back to the older newest tag of the last check', async () => {
+			const gone = { at: AT, remote_commit: C, remote_tag: 'v1.4.0', tag_moved: false, error: '' }
+			const { wrapper, gitApps, confirm, click } = setup(tagApp({ check: gone, new_commits: false }))
+			await click('Fetch and rebuild')
+			expect(gitApps.deploy).not.toHaveBeenCalled()
+			confirm.mock.calls[0][0].onConfirm()
+			await flushPromises()
+			expect(gitApps.deploy).toHaveBeenCalledWith('jarvis')
+			wrapper.unmount()
+		})
+	})
 })
