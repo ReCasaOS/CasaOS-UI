@@ -109,7 +109,7 @@ describe('gitAppModal repository step', () => {
 		const { wrapper, gitApps, click, inputs } = setup()
 		await inputs()[0].setValue(REPO_URL)
 		await inputs()[1].setValue('dev')
-		await wrapper.find('select').setValue('token')
+		await wrapper.findAll('select')[1].setValue('token')
 		await inputs()[3].setValue('s3cret')
 		await click('Next')
 
@@ -122,7 +122,7 @@ describe('gitAppModal repository step', () => {
 			create: vi.fn().mockResolvedValue({ data: { data: gitApp({ access: 'key', public_key: 'ssh-ed25519 AAAA casaos-jarvis' }) } }),
 		})
 		await inputs()[0].setValue(REPO_URL)
-		await wrapper.find('select').setValue('key')
+		await wrapper.findAll('select')[1].setValue('key')
 		await click('Next')
 
 		expect(wrapper.text()).toContain('ssh-ed25519 AAAA casaos-jarvis')
@@ -130,6 +130,39 @@ describe('gitAppModal repository step', () => {
 
 		await click('Continue')
 		expect(gitApps.check).toHaveBeenCalledWith('jarvis')
+		wrapper.unmount()
+	})
+
+	it('registers an app that follows tags, with its pattern and its pre-releases', async () => {
+		const { wrapper, gitApps, click, inputs } = setup({
+			create: vi.fn().mockResolvedValue({ data: { data: gitApp({ branch: '', follow: 'tags', tag_pattern: 'v2.*', prereleases: true }) } }),
+		})
+		await inputs()[0].setValue(REPO_URL)
+		await inputs()[1].setValue('dev')
+		await wrapper.findAll('select')[0].setValue('tags')
+		expect(wrapper.text()).toContain('For example v2.* to stay on version 2; empty for every version tag.')
+		expect(wrapper.text()).not.toContain('Empty: the branch the repository names as its default.')
+
+		// the branch field is gone: the pattern comes first, then the checkbox
+		await inputs()[1].setValue('v2.*')
+		await wrapper.find('input[type="checkbox"]').setValue(true)
+		await click('Next')
+		expect(gitApps.create).toHaveBeenCalledWith({ name: 'jarvis', url: REPO_URL, follow: 'tags', tag_pattern: 'v2.*', prereleases: true, access: 'none' })
+		expect(gitApps.check).toHaveBeenCalledWith('jarvis')
+		wrapper.unmount()
+	})
+
+	it('takes back an app a server older than tags registered on a branch, and says why', async () => {
+		const { wrapper, gitApps, click, inputs } = setup()
+		await inputs()[0].setValue(REPO_URL)
+		await wrapper.findAll('select')[0].setValue('tags')
+		await click('Next')
+
+		expect(gitApps.remove).toHaveBeenCalledWith('jarvis')
+		expect(gitApps.check).not.toHaveBeenCalled()
+		expect(wrapper.text()).toContain('This CasaOS cannot follow tags yet: update it, or follow a branch.')
+		// nothing is registered: the form can be changed and sent again
+		expect(inputs()[0].attributes('disabled')).toBeUndefined()
 		wrapper.unmount()
 	})
 
@@ -193,7 +226,7 @@ describe('gitAppModal repository step', () => {
 			create: vi.fn().mockResolvedValue({ data: { data: gitApp({ access: 'key', public_key: 'ssh-ed25519 AAAA' }) } }),
 		})
 		await second.inputs()[0].setValue(REPO_URL)
-		await second.wrapper.find('select').setValue('key')
+		await second.wrapper.findAll('select')[1].setValue('key')
 		await second.click('Next')
 		await second.click('Cancel')
 		expect(second.gitApps.remove).toHaveBeenCalledWith('jarvis')

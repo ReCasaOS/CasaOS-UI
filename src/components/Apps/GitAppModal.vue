@@ -16,9 +16,23 @@
 				<b-field :label="$t('Repository URL')">
 					<b-input v-model="url" :disabled="!!app" placeholder="https://github.com/owner/app.git"></b-input>
 				</b-field>
-				<b-field :label="$t('Branch')" :message="$t('Empty: the branch the repository names as its default.')">
+				<b-field :label="$t('Mode')">
+					<b-select v-model="follow" :disabled="!!app" expanded>
+						<option value="branch">{{ $t('Follow a branch') }}</option>
+						<option value="tags">{{ $t('Follow tags') }}</option>
+					</b-select>
+				</b-field>
+				<b-field v-if="follow === 'branch'" :label="$t('Branch')" :message="$t('Empty: the branch the repository names as its default.')">
 					<b-input v-model="branch" :disabled="!!app"></b-input>
 				</b-field>
+				<template v-else>
+					<b-field :label="$t('Tag pattern')" :message="$t('For example v2.* to stay on version 2; empty for every version tag.')">
+						<b-input v-model="tagPattern" :disabled="!!app"></b-input>
+					</b-field>
+					<b-field>
+						<b-checkbox v-model="prereleases" :disabled="!!app">{{ $t('Include pre-releases (-rc, -beta)') }}</b-checkbox>
+					</b-field>
+				</template>
 				<b-field :label="$t('App name')">
 					<b-input v-model="name" :disabled="!!app"></b-input>
 				</b-field>
@@ -131,7 +145,11 @@ export default {
 		return {
 			step: 'repository',
 			url: '',
+			// "branch" or "tags"
+			follow: 'branch',
 			branch: '',
+			tagPattern: '',
+			prereleases: false,
 			name: '',
 			access: 'none',
 			token: '',
@@ -195,17 +213,30 @@ export default {
 		sensitiveLabel,
 
 		async register() {
+			const tags = this.follow === 'tags'
 			this.busy = true
 			this.error = ''
 			try {
+				// a branch app is registered with the body it always had
 				const res = await this.$api.gitApps.create({
 					name: this.name.trim(),
 					url: this.url.trim(),
-					branch: this.branch.trim() || undefined,
+					branch: tags ? undefined : this.branch.trim() || undefined,
+					follow: tags ? 'tags' : undefined,
+					tag_pattern: tags ? this.tagPattern.trim() || undefined : undefined,
+					prereleases: tags ? this.prereleases : undefined,
 					access: this.access,
 					token: this.access === 'token' ? this.token : undefined,
 				})
 				this.app = res.data.data
+				// An AppManagement older than tags ignores them and registers a branch
+				// app, which would deploy every push: take it back.
+				if (tags && this.app.follow !== 'tags') {
+					await this.$api.gitApps.remove(this.app.app)
+					this.app = null
+					this.error = this.$t('This CasaOS cannot follow tags yet: update it, or follow a branch.')
+					return
+				}
 			} catch (error) {
 				this.fail(error)
 				return
