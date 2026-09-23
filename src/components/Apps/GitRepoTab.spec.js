@@ -267,6 +267,27 @@ describe('the webhook of a git app', () => {
 		wrapper.unmount()
 	})
 
+	it('shows a delivery made while it was open once the owner comes back to the window', async () => {
+		const { wrapper, gitApps } = setup(on())
+		window.dispatchEvent(new Event('focus'))
+		await flushPromises()
+		expect(gitApps.get).toHaveBeenCalledWith('jarvis')
+
+		wrapper.unmount()
+		gitApps.get.mockClear()
+		window.dispatchEvent(new Event('focus'))
+		expect(gitApps.get).not.toHaveBeenCalled()
+	})
+
+	it('says so when the browser refuses the clipboard', async () => {
+		copy.mockRejectedValueOnce(new Error('denied'))
+		const { wrapper } = setup(on())
+		await copyButtons(wrapper)[0].trigger('click')
+		await flushPromises()
+		expect(wrapper.vm.$buefy.toast.open).toHaveBeenCalledWith(expect.objectContaining({ message: 'The text could not be copied.', type: 'is-danger' }))
+		wrapper.unmount()
+	})
+
 	it('builds the URL from the address the dashboard is open at, and copies it', async () => {
 		vi.stubGlobal('location', { origin: 'https://casa.example.com' })
 		const { wrapper } = setup(on())

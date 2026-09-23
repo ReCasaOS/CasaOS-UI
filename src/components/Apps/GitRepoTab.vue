@@ -77,7 +77,7 @@
 		</div>
 		<div v-if="gitApp.access === 'key' && gitApp.public_key" class="is-flex is-align-items-flex-start mb-2">
 			<pre class="git-repo-tab__text is-flex-grow-1 mr-2">{{ gitApp.public_key }}</pre>
-			<b-button :label="$t('Copy')" rounded size="is-small" @click="copyText(gitApp.public_key)"></b-button>
+			<b-button :aria-label="$t('Copy the public key')" :label="$t('Copy')" rounded size="is-small" @click="copyText(gitApp.public_key)"></b-button>
 		</div>
 
 		<p class="has-text-weight-bold is-size-7 mt-3 mb-2">{{ $t('Automatic rebuild') }}</p>
@@ -93,22 +93,23 @@
 				{{ $t('Check on every push') }}
 			</b-switch>
 			<p v-if="!webhook.enabled" class="is-size-7 has-text-full-03 mt-1">
-				{{ $t('A restored app comes back with its webhook off: turn it on again, and give the forge its new secret.') }}
+				{{ $t('Off: new commits wait for the five-minute check. A restored app comes back with its webhook off; turning it on makes a new secret to give the forge.') }}
 			</p>
 			<div v-else class="is-size-7 mt-2">
 				<p class="has-text-weight-bold mb-1">{{ $t('URL') }}</p>
 				<div class="is-flex is-align-items-center mb-1">
-					<code class="git-repo-tab__mono is-flex-grow-1 mr-2">{{ webhookUrl }}</code>
-					<b-button :label="$t('Copy')" rounded size="is-small" @click="copyText(webhookUrl)"></b-button>
+					<span class="git-repo-tab__mono is-flex-grow-1 mr-2">{{ webhookUrl }}</span>
+					<b-button :aria-label="$t('Copy the URL')" :label="$t('Copy')" rounded size="is-small" @click="copyText(webhookUrl)"></b-button>
 				</div>
-				<p class="has-text-full-03 mb-2">{{ $t('If your forge reaches the box by another address (a domain, a tunnel), use that one instead.') }}</p>
+				<p class="is-size-7 has-text-full-03 mb-2">{{ $t('If your forge reaches the box by another address (a domain, a tunnel), use that one instead.') }}</p>
 
 				<p class="has-text-weight-bold mb-1">{{ $t('Secret') }}</p>
 				<div class="is-flex is-align-items-center is-flex-wrap-wrap mb-2">
 					<!-- hidden until asked: the screen may be shared -->
-					<code class="git-repo-tab__mono is-flex-grow-1 mr-2 mb-1">{{ showSecret ? webhook.secret : '••••••••••••••••' }}</code>
+					<span v-if="showSecret" class="git-repo-tab__mono is-flex-grow-1 mr-2 mb-1">{{ webhook.secret }}</span>
+					<span v-else :aria-label="$t('Hidden')" class="git-repo-tab__mono is-flex-grow-1 mr-2 mb-1" role="img">••••••••••••••••</span>
 					<b-button :label="showSecret ? $t('Hide') : $t('Show')" class="mr-2 mb-1" rounded size="is-small" @click="showSecret = !showSecret"></b-button>
-					<b-button :label="$t('Copy')" class="mr-2 mb-1" rounded size="is-small" @click="copyText(webhook.secret)"></b-button>
+					<b-button :aria-label="$t('Copy the secret')" :label="$t('Copy')" class="mr-2 mb-1" rounded size="is-small" @click="copyText(webhook.secret)"></b-button>
 					<b-button :disabled="!canAct" :label="$t('Regenerate')" :loading="busy === 'secret'" class="mb-1" rounded size="is-small" @click="confirmRegenerate"></b-button>
 				</div>
 
@@ -123,7 +124,7 @@
 
 				<p class="has-text-weight-bold mb-1">{{ $t('Last delivery') }}</p>
 				<p v-if="webhook.last_delivery">{{ deliveryLine }}</p>
-				<p v-else class="has-text-full-03">
+				<p v-else class="is-size-7 has-text-full-03">
 					{{ $t('No delivery yet.') }} {{ $t('The forge must be able to reach the box. GitHub sends a ping as the webhook is saved: that is enough to check.') }}
 				</p>
 			</div>
@@ -302,8 +303,14 @@ export default {
 			})
 		},
 	},
+	// Back from the forge's settings, where saving the webhook sends a ping: the last
+	// delivery shows it without closing the panel.
+	mounted() {
+		window.addEventListener('focus', this.onFocus)
+	},
 	beforeUnmount() {
 		this.closed = true
+		window.removeEventListener('focus', this.onFocus)
 	},
 	methods: {
 		canRevert,
@@ -373,9 +380,17 @@ export default {
 			})
 		},
 
+		// A browser may refuse the clipboard (a box served over plain http): say so.
 		copyText(text) {
-			copy(text)
-			this.$buefy.toast.open({ message: this.$t('Copied to clipboard'), type: 'is-success' })
+			Promise.resolve(copy(text)).then(
+				() => this.$buefy.toast.open({ message: this.$t('Copied to clipboard'), type: 'is-success' }),
+				() => this.$buefy.toast.open({ message: this.$t('The text could not be copied.'), type: 'is-danger' }),
+			)
+		},
+
+		onFocus() {
+			if (this.webhook && this.webhook.enabled && !this.busy)
+				this.reload()
 		},
 
 		// On at once; off only once confirmed, since the secret goes with it.
