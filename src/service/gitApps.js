@@ -7,8 +7,10 @@ const PREFIX = '/v2/app_management/git'
 // and regenerating it rewrites thousands of lines. Every answer that carries an
 // app is `{ data: GitApp }`; every error is `{ message }`.
 const gitApps = {
-	// `{ name, url, branch?, access, token? }`. Registers the app without cloning
-	// it; in key mode the answer carries the public key to add to the repository.
+	// `{ name, url, branch?, follow?, tag_pattern?, prereleases?, access, token? }`.
+	// Registers the app without cloning it; in key mode the answer carries the
+	// public key to add to the repository. `follow` is "branch" (absent) or "tags";
+	// an AppManagement older than tags ignores the three tag fields.
 	create(body) {
 		return api.post(PREFIX, body)
 	},
@@ -18,9 +20,9 @@ const gitApps = {
 		return api.get(`${PREFIX}/${encodeURIComponent(app)}`)
 	},
 
-	// Any of `{ branch, auto_deploy, access, token, webhook_enabled,
-	// regenerate_webhook_secret }`. Adopts an adoptable app. Regenerating the
-	// secret of a webhook that is off answers 400.
+	// Any of `{ branch, follow, tag_pattern, prereleases, auto_deploy, access,
+	// token, webhook_enabled, regenerate_webhook_secret }`. Adopts an adoptable
+	// app. Regenerating the secret of a webhook that is off answers 400.
 	update(app, body) {
 		return api.put(`${PREFIX}/${encodeURIComponent(app)}`, body)
 	},
@@ -33,10 +35,19 @@ const gitApps = {
 	},
 
 	// Answers 202 as the deployment starts, and adopts an adoptable app.
-	// `{ commit?, env? }`: no commit is the remote's latest, a commit from the
-	// history is a revert; `env` only while no deployment has succeeded.
+	// `{ commit?, tag?, env? }`: neither commit nor tag is the remote's latest (the
+	// highest eligible tag for an app that follows tags), a commit from the history
+	// is a revert, a tag is that tag, lower ones included; both at once is a 400.
+	// `env` only while no deployment has succeeded.
 	deploy(app, body = {}) {
 		return api.post(`${PREFIX}/${encodeURIComponent(app)}/deploy`, body)
+	},
+
+	// `{ data: [{ name, commit }] }`: the eligible tags of the remote, highest
+	// first, at most 50. Asks the remote like a check does; 400 for an app that
+	// follows a branch.
+	tags(app) {
+		return api.get(`${PREFIX}/${encodeURIComponent(app)}/tags`)
 	},
 
 	// Removes an app no deployment has succeeded for, with whatever a failed one

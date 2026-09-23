@@ -25,6 +25,7 @@ describe('gitApps client', () => {
 		[() => gitApps.update('jarvis', { auto_deploy: true }), 'put', '/v2/app_management/git/jarvis'],
 		[() => gitApps.check('jarvis'), 'post', '/v2/app_management/git/jarvis/check'],
 		[() => gitApps.deploy('jarvis'), 'post', '/v2/app_management/git/jarvis/deploy'],
+		[() => gitApps.tags('jarvis'), 'get', '/v2/app_management/git/jarvis/tags'],
 		[() => gitApps.remove('jarvis'), 'delete', '/v2/app_management/git/jarvis'],
 	])('%# sends the method and the URL of the contract', async (call, method, url) => {
 		await call()
