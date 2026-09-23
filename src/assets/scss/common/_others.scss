@@ -320,3 +320,22 @@ button.dropdown-item.is-active {
 html[data-theme="dark"] .switch input[type="checkbox"] + .check::before {
 	background: hsl(0, 0%, 96%);
 }
+
+// Bulma's dark theme keeps `is-dark` dark and the resting track grey, so on a
+// dark panel a switch that is on drew the dim track and one that is off the
+// bright one: read the other way round. There, off is a dim track under the light
+// knob, and on is the light track under a dark knob, as on is the strong one in
+// the light theme. Through Buefy's variables, and the knob under :where(), so a
+// component that styles its own switches (the widget settings' outlined ones)
+// still wins.
+html[data-theme="dark"] .switch {
+	--bulma-switch-background-color: hsl(0, 0%, 32%);
+}
+
+html[data-theme="dark"] .switch input[type="checkbox"]:checked + .check.is-dark {
+	--bulma-switch-active-background-color: hsl(0, 0%, 96%);
+}
+
+:where(html[data-theme="dark"]) .switch input[type="checkbox"]:checked + .check.is-dark::before {
+	background: hsl(0, 0%, 14%);
+}
