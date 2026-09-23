@@ -166,6 +166,29 @@ describe('gitAppModal repository step', () => {
 		wrapper.unmount()
 	})
 
+	it('offers only Cancel when the branch app a server older than tags registered cannot be taken back', async () => {
+		const remove = vi.fn()
+			.mockRejectedValueOnce({ response: { status: 500, data: { message: 'remove failed' } } })
+			.mockResolvedValueOnce({ data: {} })
+		const { wrapper, gitApps, button, click, inputs } = setup({ remove })
+		await inputs()[0].setValue(REPO_URL)
+		await wrapper.findAll('select')[0].setValue('tags')
+		await click('Next')
+
+		expect(remove).toHaveBeenCalledWith('jarvis')
+		expect(wrapper.text()).toContain('This CasaOS cannot follow tags yet: update it, or follow a branch.')
+		expect(button('Continue')).toBeUndefined()
+		expect(button('Retry')).toBeUndefined()
+		expect(button('Next')).toBeUndefined()
+		expect(gitApps.check).not.toHaveBeenCalled()
+
+		// the app is still registered: Cancel deletes it
+		await click('Cancel')
+		expect(remove).toHaveBeenCalledTimes(2)
+		expect(wrapper.emitted('close')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
 	it('shows what to add when the repository has no compose file, and retries', async () => {
 		const example = 'services:\n  app:\n    build: .\n'
 		const noCompose = gitApp({ check: { at: '2026-09-16T10:05:00Z', remote_commit: COMMIT, error: 'no compose file at the root' }, compose_example: example })

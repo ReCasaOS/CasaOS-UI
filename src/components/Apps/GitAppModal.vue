@@ -103,13 +103,13 @@
 			<b-button v-if="step === 'repository' && !app" :disabled="!canRegister" :loading="busy" rounded type="is-primary" @click="register">
 				{{ $t('Next') }}
 			</b-button>
-			<b-button v-else-if="step === 'repository'" :loading="busy" rounded type="is-primary" @click="clone">
+			<b-button v-else-if="step === 'repository' && !tagsRefused" :loading="busy" rounded type="is-primary" @click="clone">
 				{{ error ? $t('Retry') : $t('Continue') }}
 			</b-button>
 			<b-button v-else-if="step === 'review'" :loading="busy" rounded type="is-primary" @click="deploy">
 				{{ $t('Deploy') }}
 			</b-button>
-			<template v-else>
+			<template v-else-if="step === 'deploy'">
 				<!-- a first deployment that failed leaves an app on no card: it is retried
 					or deleted here, or it holds its name for nothing -->
 				<template v-if="outcome && outcome !== 'deployed'">
@@ -176,6 +176,10 @@ export default {
 		sensitive() {
 			return sensitiveServices(this.app && this.app.compose)
 		},
+		// tags asked for, and a branch app registered: a server older than tags
+		tagsRefused() {
+			return this.follow === 'tags' && Boolean(this.app) && this.app.follow !== 'tags'
+		},
 		// read once, as the editor mounts on the review step
 		envOptions() {
 			return { mode: 'text/x-sh', theme: 'monokai', lineNumbers: true, lineWrapping: true, readOnly: Boolean(this.app && this.app.env_tracked) }
@@ -231,10 +235,14 @@ export default {
 				this.app = res.data.data
 				// An AppManagement older than tags ignores them and registers a branch
 				// app, which would deploy every push: take it back.
-				if (tags && this.app.follow !== 'tags') {
-					await this.$api.gitApps.remove(this.app.app)
-					this.app = null
+				if (this.tagsRefused) {
 					this.error = this.$t('This CasaOS cannot follow tags yet: update it, or follow a branch.')
+					try {
+						await this.$api.gitApps.remove(this.app.app)
+						this.app = null
+					} catch {
+						// kept, so that Cancel deletes it; the footer offers nothing else
+					}
 					return
 				}
 			} catch (error) {
