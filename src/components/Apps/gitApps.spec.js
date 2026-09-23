@@ -228,6 +228,14 @@ describe('an app that follows tags', () => {
 		expect(checkSummary(tagApp({ remote_tag: '', remote_commit: B })).message).toBe('Not checked yet.')
 	})
 
+	it('words a branch app as today on a server that knows tags', () => {
+		const check = { at, error: '', remote_commit: B, remote_tag: '', tag_moved: false }
+		expect(checkSummary({ follow: 'branch', check, new_commits: true, deployed: { commit: A, tag: '' } }))
+			.toEqual({ message: 'Commit {commit} is new on the branch.', params: { commit: 'bbbbbbb' } })
+		expect(checkSummary({ follow: 'branch', check, new_commits: false, deployed: { commit: B, tag: '' } }))
+			.toEqual({ message: 'The branch is at {commit}: up to date.', params: { commit: 'bbbbbbb' } })
+	})
+
 	it('names a version by its tag and its commit, or by its commit alone', () => {
 		expect(versionName({ commit: A, tag: 'v1.4.1' })).toBe('v1.4.1 (aaaaaaa)')
 		expect(versionName({ commit: A, tag: '' })).toBe('aaaaaaa')
