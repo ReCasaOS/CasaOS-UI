@@ -77,7 +77,7 @@
 		</div>
 		<div v-if="gitApp.access === 'key' && gitApp.public_key" class="is-flex is-align-items-flex-start mb-2">
 			<pre class="git-repo-tab__text is-flex-grow-1 mr-2">{{ gitApp.public_key }}</pre>
-			<b-button :label="$t('Copy')" rounded size="is-small" @click="copyKey"></b-button>
+			<b-button :label="$t('Copy')" rounded size="is-small" @click="copyText(gitApp.public_key)"></b-button>
 		</div>
 
 		<p class="has-text-weight-bold is-size-7 mt-3 mb-2">{{ $t('Automatic rebuild') }}</p>
@@ -85,6 +85,49 @@
 			{{ $t('Deploy a new commit as soon as a check finds it') }}
 		</b-switch>
 		<p class="is-size-7 has-text-danger mt-1">{{ $t('It runs whatever is pushed to the branch.') }}</p>
+
+		<!-- an AppManagement older than webhooks sends no `webhook`: nothing to show -->
+		<template v-if="webhook">
+			<p class="has-text-weight-bold is-size-7 mt-3 mb-2">{{ $t('Webhook') }}</p>
+			<b-switch :disabled="!canAct" :model-value="webhookOn" size="is-small" @update:model-value="setWebhook">
+				{{ $t('Check on every push') }}
+			</b-switch>
+			<p v-if="!webhook.enabled" class="is-size-7 has-text-full-03 mt-1">
+				{{ $t('A restored app comes back with its webhook off: turn it on again, and give the forge its new secret.') }}
+			</p>
+			<div v-else class="is-size-7 mt-2">
+				<p class="has-text-weight-bold mb-1">{{ $t('URL') }}</p>
+				<div class="is-flex is-align-items-center mb-1">
+					<code class="git-repo-tab__mono is-flex-grow-1 mr-2">{{ webhookUrl }}</code>
+					<b-button :label="$t('Copy')" rounded size="is-small" @click="copyText(webhookUrl)"></b-button>
+				</div>
+				<p class="has-text-full-03 mb-2">{{ $t('If your forge reaches the box by another address (a domain, a tunnel), use that one instead.') }}</p>
+
+				<p class="has-text-weight-bold mb-1">{{ $t('Secret') }}</p>
+				<div class="is-flex is-align-items-center is-flex-wrap-wrap mb-2">
+					<!-- hidden until asked: the screen may be shared -->
+					<code class="git-repo-tab__mono is-flex-grow-1 mr-2 mb-1">{{ showSecret ? webhook.secret : '••••••••••••••••' }}</code>
+					<b-button :label="showSecret ? $t('Hide') : $t('Show')" class="mr-2 mb-1" rounded size="is-small" @click="showSecret = !showSecret"></b-button>
+					<b-button :label="$t('Copy')" class="mr-2 mb-1" rounded size="is-small" @click="copyText(webhook.secret)"></b-button>
+					<b-button :disabled="!canAct" :label="$t('Regenerate')" :loading="busy === 'secret'" class="mb-1" rounded size="is-small" @click="confirmRegenerate"></b-button>
+				</div>
+
+				<p class="has-text-weight-bold mb-1">{{ $t('How to set it up') }}</p>
+				<b-tabs v-model="howTo" :animated="false" size="is-small">
+					<b-tab-item v-for="guide in howTos" :key="guide.forge" :label="guide.forge" :value="guide.forge">
+						<ol class="git-repo-tab__steps">
+							<li v-for="step in guide.steps" :key="step">{{ $t(step) }}</li>
+						</ol>
+					</b-tab-item>
+				</b-tabs>
+
+				<p class="has-text-weight-bold mb-1">{{ $t('Last delivery') }}</p>
+				<p v-if="webhook.last_delivery">{{ deliveryLine }}</p>
+				<p v-else class="has-text-full-03">
+					{{ $t('No delivery yet.') }} {{ $t('The forge must be able to reach the box. GitHub sends a ping as the webhook is saved: that is enough to check.') }}
+				</p>
+			</div>
+		</template>
 
 		<div class="is-flex mt-4">
 			<b-button :disabled="!canAct" :loading="busy === 'check'" class="mr-2" rounded size="is-small" @click="check('check')">
@@ -125,9 +168,46 @@
 
 <script>
 import copy from 'clipboard-copy'
-import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, shortCommit } from './gitApps'
+import { appendLog, canFollow, canRevert, checkEnded, checkSummary, gitBadge, outcomeTag, shortCommit, timeAgo } from './gitApps'
 
 const appOf = res => res.data.data
+
+// The forge of a webhook delivery, as the server names it, as it is written.
+const FORGES = { github: 'GitHub', gitea: 'Gitea', forgejo: 'Forgejo', gogs: 'Gogs', gitlab: 'GitLab' }
+
+// Where each forge takes a webhook, and what to fill in. The field names are the
+// forges' own English labels.
+const HOW_TO = [
+	{
+		forge: 'GitHub',
+		steps: [
+			'In the repository: Settings › Webhooks › Add webhook.',
+			'Payload URL: the URL above.',
+			'Content type: application/json.',
+			'Secret: the secret above.',
+			'Which events: “Just the push event”.',
+		],
+	},
+	{
+		forge: 'Gitea/Forgejo',
+		steps: [
+			'In the repository: Settings › Webhooks › Add webhook › Gitea (or Forgejo).',
+			'Target URL: the URL above.',
+			'HTTP method: POST. POST content type: application/json.',
+			'Secret: the secret above.',
+			'Trigger on: Push events.',
+		],
+	},
+	{
+		forge: 'GitLab',
+		steps: [
+			'In the project: Settings › Webhooks › Add new webhook.',
+			'URL: the URL above.',
+			'Secret token: the secret above.',
+			'Trigger: Push events.',
+		],
+	},
+]
 
 // A build or a deployment of this app moved on: read the app again.
 function reloadMine(res) {
@@ -150,7 +230,11 @@ export default {
 			access: this.gitApp.access,
 			token: '',
 			autoDeploy: this.gitApp.auto_deploy,
-			// '' or what runs: access, auto, test, check, deploy, or the commit of a revert
+			webhookOn: Boolean(this.gitApp.webhook && this.gitApp.webhook.enabled),
+			showSecret: false,
+			howTo: HOW_TO[0].forge,
+			howTos: HOW_TO,
+			// '' or what runs: access, auto, webhook, secret, test, check, deploy, or the commit of a revert
 			busy: '',
 			error: '',
 			// null until a build is followed live, then the log as its events bring it
@@ -179,6 +263,26 @@ export default {
 		log() {
 			return this.liveLog === null ? (this.gitApp.build_log || '') : this.liveLog
 		},
+		webhook() {
+			return this.gitApp.webhook || null
+		},
+		// the forge reaches the box where the owner does, unless told otherwise
+		webhookUrl() {
+			return window.location.origin + this.webhook.path
+		},
+		// ponytail: worded when the app is read, not redrawn while the tab stays open; add a minute timer if owners watch it
+		deliveryLine() {
+			const delivery = this.webhook.last_delivery
+			// the time in the language of the message: a language without it falls
+			// back to English, and a free-text locale never reaches Intl
+			const locale = this.$te('Received {when}') ? this.$i18n.locale : 'en_us'
+			return [
+				this.$t('Received {when}', { when: timeAgo(delivery.at, locale) }),
+				FORGES[delivery.forge] || this.$t('Unknown forge'),
+				delivery.event,
+				this.$t(delivery.result),
+			].filter(Boolean).join(' · ')
+		},
 	},
 	watch: {
 		'gitApp.access': function (value) {
@@ -186,6 +290,10 @@ export default {
 		},
 		'gitApp.auto_deploy': function (value) {
 			this.autoDeploy = value
+		},
+		'gitApp.webhook.enabled': function (value) {
+			this.webhookOn = Boolean(value)
+			this.showSecret = false
 		},
 		log() {
 			this.$nextTick(() => {
@@ -265,9 +373,44 @@ export default {
 			})
 		},
 
-		copyKey() {
-			copy(this.gitApp.public_key)
+		copyText(text) {
+			copy(text)
 			this.$buefy.toast.open({ message: this.$t('Copied to clipboard'), type: 'is-success' })
+		},
+
+		// On at once; off only once confirmed, since the secret goes with it.
+		setWebhook(value) {
+			this.webhookOn = value
+			if (value)
+				return this.saveWebhook({ webhook_enabled: true })
+			this.$buefy.dialog.confirm({
+				title: this.$t('Turn the webhook off'),
+				message: this.$t('The secret is forgotten. Turning the webhook on again makes a new one, to give the forge again.'),
+				confirmText: this.$t('Turn off'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-warning',
+				onConfirm: () => this.saveWebhook({ webhook_enabled: false }),
+				onCancel: () => {
+					this.webhookOn = true
+				},
+			})
+		},
+
+		// The switch goes back to what the server has when it refuses.
+		async saveWebhook(body) {
+			if (!await this.run('webhook', () => this.$api.gitApps.update(this.appId, body).then(appOf)))
+				this.webhookOn = Boolean(this.webhook.enabled)
+		},
+
+		confirmRegenerate() {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Regenerate the secret'),
+				message: this.$t('The forge is refused from this moment until it is given the new secret.'),
+				confirmText: this.$t('Regenerate'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-warning',
+				onConfirm: () => this.run('secret', () => this.$api.gitApps.update(this.appId, { regenerate_webhook_secret: true }).then(appOf)),
+			})
 		},
 
 		async reload() {
@@ -316,5 +459,10 @@ export default {
 .git-repo-tab__log {
 	max-height: 16rem;
 	overflow-y: auto;
+}
+
+.git-repo-tab__steps {
+	list-style: decimal;
+	padding-left: 1.5rem;
 }
 </style>

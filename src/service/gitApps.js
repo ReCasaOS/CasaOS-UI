@@ -18,7 +18,9 @@ const gitApps = {
 		return api.get(`${PREFIX}/${encodeURIComponent(app)}`)
 	},
 
-	// Any of `{ branch, auto_deploy, access, token }`. Adopts an adoptable app.
+	// Any of `{ branch, auto_deploy, access, token, webhook_enabled,
+	// regenerate_webhook_secret }`. Adopts an adoptable app. Regenerating the
+	// secret of a webhook that is off answers 400.
 	update(app, body) {
 		return api.put(`${PREFIX}/${encodeURIComponent(app)}`, body)
 	},

@@ -5,8 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import GitRepoTab from './GitRepoTab.vue'
 import i18n from '@/plugins/i18n'
 
-// require.context has no Vite equivalent; an empty table makes $t return its key.
-vi.mock('@/assets/lang', () => ({ default: { en_us: {} } }))
+// require.context has no Vite equivalent; a table this small makes $t return its
+// key, except for the one message the last delivery needs filled in.
+vi.mock('@/assets/lang', () => ({ default: { en_us: { 'Received {when}': 'Received {when}' } } }))
+
+const copy = vi.hoisted(() => vi.fn())
+vi.mock('clipboard-copy', () => ({ default: copy }))
 
 const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
@@ -38,6 +42,7 @@ function gitApp(fields = {}) {
 		env_template: null,
 		compose_example: null,
 		build_log: 'old build\n',
+		webhook: { enabled: false, path: '/v2/app_management/git/jarvis/webhook', last_delivery: null },
 		...fields,
 	}
 }
@@ -214,6 +219,142 @@ describe('gitRepoTab', () => {
 		const { wrapper } = setup({ blocked: true, auto_paused: true })
 		expect(wrapper.text()).toContain('A rollback failed')
 		expect(wrapper.text()).not.toContain('Automatic rebuild is paused')
+		wrapper.unmount()
+	})
+})
+
+describe('the webhook of a git app', () => {
+	const PATH = '/v2/app_management/git/jarvis/webhook'
+	const SECRET = '0123456789abcdef'.repeat(4)
+	const on = (fields = {}) => ({ webhook: { enabled: true, path: PATH, secret: SECRET, last_delivery: null, ...fields } })
+	const off = { webhook: { enabled: false, path: PATH, last_delivery: null } }
+	// the first switch of the tab is automatic rebuild's
+	const webhookSwitch = wrapper => wrapper.findAll('input[type="checkbox"]')[1]
+	const copyButtons = wrapper => wrapper.findAll('button').filter(b => b.text() === 'Copy')
+
+	afterEach(() => {
+		vi.unstubAllGlobals()
+		copy.mockClear()
+		i18n.global.locale = 'en_us'
+	})
+
+	it('turns on at once, and the switch goes back when the server refuses', async () => {
+		const { wrapper, gitApps, confirm } = setup()
+		expect(wrapper.text()).toContain('A restored app comes back with its webhook off')
+		expect(wrapper.text()).not.toContain('How to set it up')
+
+		await webhookSwitch(wrapper).setValue(true)
+		await flushPromises()
+		expect(confirm).not.toHaveBeenCalled()
+		expect(gitApps.update).toHaveBeenCalledWith('jarvis', { webhook_enabled: true })
+		expect(wrapper.emitted('change')).toHaveLength(1)
+		wrapper.unmount()
+
+		const update = vi.fn().mockRejectedValue({ response: { status: 409, data: { message: 'deploy is running' } } })
+		const refused = setup({}, { update })
+		await webhookSwitch(refused.wrapper).setValue(true)
+		await flushPromises()
+		expect(update).toHaveBeenCalledWith('jarvis', { webhook_enabled: true })
+		expect(webhookSwitch(refused.wrapper).element.checked).toBe(false)
+		expect(refused.wrapper.text()).toContain('deploy is running')
+		refused.wrapper.unmount()
+	})
+
+	it('shows nothing of a webhook to a server that has none', () => {
+		const { wrapper } = setup({ webhook: undefined })
+		expect(wrapper.text()).not.toContain('Check on every push')
+		expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('builds the URL from the address the dashboard is open at, and copies it', async () => {
+		vi.stubGlobal('location', { origin: 'https://casa.example.com' })
+		const { wrapper } = setup(on())
+		const url = `https://casa.example.com${PATH}`
+		expect(wrapper.text()).toContain(url)
+		expect(wrapper.text()).toContain('If your forge reaches the box by another address')
+
+		await copyButtons(wrapper)[0].trigger('click')
+		expect(copy).toHaveBeenCalledWith(url)
+		wrapper.unmount()
+	})
+
+	it('keeps the secret hidden until asked, and copies it either way', async () => {
+		const { wrapper, click } = setup(on())
+		expect(wrapper.text()).not.toContain(SECRET)
+		await copyButtons(wrapper)[1].trigger('click')
+		expect(copy).toHaveBeenCalledWith(SECRET)
+
+		await click('Show')
+		expect(wrapper.text()).toContain(SECRET)
+		await click('Hide')
+		expect(wrapper.text()).not.toContain(SECRET)
+		wrapper.unmount()
+	})
+
+	it('regenerates the secret only once confirmed', async () => {
+		const { wrapper, gitApps, confirm, click } = setup(on())
+		await click('Regenerate')
+		expect(gitApps.update).not.toHaveBeenCalled()
+		expect(confirm.mock.calls[0][0].message).toBe('The forge is refused from this moment until it is given the new secret.')
+
+		confirm.mock.calls[0][0].onConfirm()
+		await flushPromises()
+		expect(gitApps.update).toHaveBeenCalledWith('jarvis', { regenerate_webhook_secret: true })
+		wrapper.unmount()
+	})
+
+	it('turns off only once confirmed, then folds the section', async () => {
+		const update = vi.fn().mockResolvedValue({ data: { data: gitApp(off) } })
+		const { wrapper, confirm } = setup(on(), { update })
+
+		await webhookSwitch(wrapper).setValue(false)
+		expect(update).not.toHaveBeenCalled()
+		expect(confirm.mock.calls[0][0].confirmText).toBe('Turn off')
+		confirm.mock.calls[0][0].onCancel()
+		await flushPromises()
+		expect(webhookSwitch(wrapper).element.checked).toBe(true)
+
+		await webhookSwitch(wrapper).setValue(false)
+		confirm.mock.calls[1][0].onConfirm()
+		await flushPromises()
+		expect(update).toHaveBeenCalledWith('jarvis', { webhook_enabled: false })
+
+		// the panel hands the answer back down
+		await wrapper.setProps({ gitApp: wrapper.emitted('change').at(-1)[0] })
+		expect(wrapper.text()).not.toContain('How to set it up')
+		expect(webhookSwitch(wrapper).element.checked).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('says what the last delivery was, and how long ago', () => {
+		const at = new Date(Date.now() - 3 * 60 * 1000).toISOString()
+		const github = setup(on({ last_delivery: { at, forge: 'github', event: 'push', result: 'checked' } }))
+		expect(github.wrapper.text()).toContain('Received 3 minutes ago · GitHub · push · checked')
+		github.wrapper.unmount()
+
+		// a signed request with no event header the server knows
+		const unknown = setup(on({ last_delivery: { at, forge: 'unknown', event: '', result: 'queued' } }))
+		expect(unknown.wrapper.text()).toContain('Received 3 minutes ago · Unknown forge · queued')
+		unknown.wrapper.unmount()
+
+		const none = setup(on())
+		expect(none.wrapper.text()).toContain('No delivery yet.')
+		expect(none.wrapper.text()).toContain('GitHub sends a ping as the webhook is saved')
+		none.wrapper.unmount()
+
+		// a language without the message falls back to English, and so does the time
+		i18n.global.locale = 'de_de'
+		const german = setup(on({ last_delivery: { at, forge: 'github', event: 'push', result: 'checked' } }))
+		expect(german.wrapper.text()).toContain('Received 3 minutes ago · GitHub · push · checked')
+		german.wrapper.unmount()
+	})
+
+	it('shows how to set it up on GitHub, on Gitea or Forgejo, and on GitLab', async () => {
+		const { wrapper } = setup(on())
+		await flushPromises()
+		expect(wrapper.findAll('.tabs li').map(li => li.text())).toEqual(['GitHub', 'Gitea/Forgejo', 'GitLab'])
+		expect(wrapper.text()).toContain('Which events: “Just the push event”.')
 		wrapper.unmount()
 	})
 })
