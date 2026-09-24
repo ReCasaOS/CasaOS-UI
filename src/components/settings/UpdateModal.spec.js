@@ -82,3 +82,29 @@ describe('the update dialog leaves nothing running', () => {
 			expect(cleared).toContain(id)
 	})
 })
+
+// "See the log" on a paused automatic update opens this same view, on the log the
+// night's attempts wrote. It only reads: no update starts from it, nothing polls.
+describe('the update dialog opened on the log', () => {
+	it('shows the upgrade log once, and offers no upgrade', async () => {
+		vi.useFakeTimers()
+		const getContent = vi.fn(() => Promise.resolve({ data: { data: 'CasaOS upgrade failed' } }))
+		const updateCasaOS = vi.fn()
+		const wrapper = mount(UpdateModal, {
+			props: { logOnly: true },
+			global: {
+				mocks: { $t: k => k, $api: { file: { getContent }, sys: { updateCasaOS } }, $buefy: { toast: { open: vi.fn() } } },
+				stubs: { 'b-button': true, 'b-icon': true },
+			},
+		})
+		await vi.advanceTimersByTimeAsync(5000)
+		vi.useRealTimers()
+
+		expect(getContent).toHaveBeenCalledTimes(1)
+		expect(getContent).toHaveBeenCalledWith('/var/log/casaos/upgrade.log')
+		expect(wrapper.find('pre').text()).toBe('CasaOS upgrade failed')
+		expect(wrapper.find('b-button-stub').exists()).toBe(false)
+		expect(updateCasaOS).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})

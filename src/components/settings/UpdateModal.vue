@@ -11,13 +11,13 @@
 		<!-- Modal-Card Body Start -->
 		<section class="modal-card-body ">
 			<div ref="log" class="node-card fixed-height">
-				<div v-if="!isUpdating" v-dompurify-html="markdownToHtml" class="update-info-container  is-size-14px"></div>
+				<div v-if="!isUpdating && !logOnly" v-dompurify-html="markdownToHtml" class="update-info-container  is-size-14px"></div>
 				<pre v-else class="update-log is-size-14px">{{ updateLogText }}</pre>
 			</div>
 		</section>
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
-		<footer class="modal-card-foot is-flex is-align-items-center">
+		<footer v-if="!logOnly" class="modal-card-foot is-flex is-align-items-center">
 			<div class="is-flex-grow-1"></div>
 			<div>
 				<b-button :label="$t('Upgrade Now')" :loading="isUpdating" expaned rounded type="is-primary"
@@ -37,6 +37,12 @@ export default {
 			type: String,
 			default: '',
 		},
+		// The last update's log, read once, and no Upgrade Now: "See the log" on a
+		// paused automatic update opens this.
+		logOnly: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	data() {
 		return {
@@ -46,6 +52,13 @@ export default {
 			isUpdating: false,
 			markdown: ``,
 			updateLogs: ``,
+		}
+	},
+	mounted() {
+		if (this.logOnly) {
+			this.$api.file.getContent(`/var/log/casaos/upgrade.log`).then((res) => {
+				this.updateLogs = res.data.data
+			}).catch(() => {})
 		}
 	},
 	// This modal is opened programmatically, outside the router view, so closing it
