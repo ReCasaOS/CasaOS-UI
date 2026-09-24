@@ -859,5 +859,17 @@
   "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.": "C'est une version plus ancienne que celle qui est déployée ; la reconstruction automatique est mise en pause jusqu'à ce que vous la réactiviez ou déployiez à la main.",
   "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.": "Une box n'a pas de navigateur pour se connecter. Sur un ordinateur qui en a un, ajoutez un remote OneDrive avec rclone config, puis lancez rclone config show avec son nom et copiez ici son token, son drive_id et son drive_type.",
   "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"drive\", sign in, and paste the token it prints.": "Une box n'a pas de navigateur pour se connecter. Sur un ordinateur qui en a un, lancez rclone authorize \"drive\", connectez-vous, et collez ici le token affiché.",
-  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "Une box n'a pas de navigateur pour se connecter. Sur un ordinateur qui en a un, lancez rclone authorize \"dropbox\", connectez-vous, et collez ici le token affiché."
+  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "Une box n'a pas de navigateur pour se connecter. Sur un ordinateur qui en a un, lancez rclone authorize \"dropbox\", connectez-vous, et collez ici le token affiché.",
+  "Update automatically": "Mettre à jour automatiquement",
+  "Between": "Entre",
+  "and": "et",
+  "A new release is installed at night, two days after it comes out. Nothing starts while a backup or an app operation runs.": "Une nouvelle version est installée la nuit, deux jours après sa sortie. Rien ne démarre pendant une sauvegarde ou une opération sur une application.",
+  "Up to date": "À jour",
+  "{version} will be installed after {date}": "{version} sera installée après le {date}",
+  "Updating…": "Mise à jour en cours…",
+  "Paused: {version} failed twice": "En pause : {version} a échoué deux fois",
+  "See the log": "Voir le journal",
+  "Try again": "Réessayer",
+  "ReCasaOS updated itself to {version} last night": "ReCasaOS s'est mis à jour vers {version} cette nuit",
+  "Release notes": "Notes de version"
 }

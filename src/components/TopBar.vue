@@ -309,6 +309,67 @@
 					</div>
 					<!-- Update End -->
 
+					<!-- Automatic update Start -->
+					<div v-if="autoUpdate" class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="autorenew" />
+								{{ $t("Update automatically") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch :model-value="autoUpdate.enabled"
+										:disabled="autoUpdateSaving"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="setAutoUpdate({ enabled: $event })" />
+								</b-field>
+							</div>
+						</div>
+						<template v-if="autoUpdate.enabled">
+							<div class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
+								{{ $t("Between") }}
+								<b-select :model-value="autoUpdate.window.start"
+									:disabled="autoUpdateSaving"
+									class="set-select mx-1"
+									size="is-small"
+									@update:model-value="setAutoUpdate({ window_start: $event })">
+									<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.end" :value="hour">
+										{{ hour }}
+									</option>
+								</b-select>
+								{{ $t("and") }}
+								<b-select :model-value="autoUpdate.window.end"
+									:disabled="autoUpdateSaving"
+									class="set-select mx-1"
+									size="is-small"
+									@update:model-value="setAutoUpdate({ window_end: $event })">
+									<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.start" :value="hour">
+										{{ hour }}
+									</option>
+								</b-select>
+							</div>
+							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
+								{{ $t("A new release is installed at night, two days after it comes out. Nothing starts while a backup or an app operation runs.") }}
+							</div>
+							<div class="pl-55 ml-1 mt-1 is-size-7">
+								{{ autoUpdateStateText }}
+							</div>
+							<div v-if="autoUpdate.state === 'paused'" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
+								<a href="#" @click.prevent="showUpgradeLog">{{ $t("See the log") }}</a>
+								<b-button :disabled="autoUpdateSaving"
+									class="ml-2"
+									rounded
+									size="is-small"
+									type="is-dark"
+									@click="setAutoUpdate({ resume: true })">
+									{{ $t("Try again") }}
+								</b-button>
+							</div>
+						</template>
+					</div>
+					<!-- Automatic update End -->
+
 					<!-- System Package Update Start -->
 					<div class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
@@ -473,6 +534,13 @@ export default {
 			telemetryEnabled: null,
 			// While a PUT is in flight: two answers could come back in the wrong order.
 			telemetrySaving: false,
+			// The view of GET /v1/sys/autoupdate: { enabled, window: { start, end },
+			// state, next, last }. null until the core answers: a core older than the
+			// feature shows no row.
+			autoUpdate: null,
+			autoUpdateSaving: false,
+			// The window's two selects: whole hours, 00:00 to 23:00.
+			hours: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`),
 			deviceModel: '',
 			// Language Sets
 			languages: Object.entries(messages).map(([key, value]) => ({
@@ -511,6 +579,25 @@ export default {
 		},
 		isRaspberryPi() {
 			return this.deviceModel.toLowerCase().includes('raspberry')
+		},
+		// The automatic update's state line. Paused is always the last attempt's
+		// version: its second failure is what paused it.
+		autoUpdateStateText() {
+			const { state, next, last } = this.autoUpdate
+			switch (state) {
+				case 'up_to_date':
+					return this.$t('Up to date')
+				case 'waiting':
+					return next
+						? this.$t('{version} will be installed after {date}', { version: next.version, date: new Date(next.not_before).toLocaleString() })
+						: ''
+				case 'updating':
+					return this.$t('Updating…')
+				case 'paused':
+					return this.$t('Paused: {version} failed twice', { version: last?.version })
+				default:
+					return ''
+			}
 		},
 	},
 	watch: {
@@ -566,6 +653,7 @@ export default {
 		this.getUserInfo()
 		this.getUsbStatus()
 		this.getTelemetry()
+		this.getAutoUpdate()
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
@@ -599,6 +687,8 @@ export default {
 			if (isOpen) {
 				this.$store.commit('SET_SIDEBAR_CLOSE')
 				this.checkVersion()
+				// the night may have moved it: waiting, updating, up to date
+				this.getAutoUpdate()
 			} else {
 				// Reset the text when the Settings layer closes
 				// this.resetPower(true)
@@ -825,6 +915,60 @@ export default {
 				animation: 'zoom-in',
 				props: {
 					changeLog: this.updateInfo.version.change_log,
+				},
+			})
+		},
+
+		/*************************************************
+		 * PART 1-5b  Dashboard Setting - Automatic update
+		 **************************************************/
+		// Kept as it was when the core cannot be asked: an older core never shows
+		// the row, and a blip once it is shown does not take it away.
+		getAutoUpdate() {
+			this.$api.sys.getAutoUpdate().then((res) => {
+				this.autoUpdate = res.data.data
+			}).catch(() => {})
+		},
+
+		// change: any of { enabled, window_start, window_end, resume }. The row moves
+		// at once and ends where the core says it is: a refused PUT puts it back.
+		async setAutoUpdate(change) {
+			const before = this.autoUpdate
+			this.autoUpdate = {
+				...before,
+				enabled: change.enabled ?? before.enabled,
+				window: {
+					start: change.window_start ?? before.window.start,
+					end: change.window_end ?? before.window.end,
+				},
+			}
+			this.autoUpdateSaving = true
+			try {
+				const res = await this.$api.sys.setAutoUpdate(change)
+				this.autoUpdate = res.data.data
+			} catch {
+				this.autoUpdate = before
+				this.$buefy.toast.open({
+					message: this.$t('The setting could not be saved.'),
+					type: 'is-danger',
+				})
+			} finally {
+				this.autoUpdateSaving = false
+			}
+		},
+
+		// The upgrade log the night's attempts wrote, in the update dialog's own view.
+		showUpgradeLog() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: UpdateModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				props: {
+					logOnly: true,
 				},
 			})
 		},

@@ -859,5 +859,17 @@
   "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.": "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.",
   "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.": "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.",
   "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"drive\", sign in, and paste the token it prints.": "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"drive\", sign in, and paste the token it prints.",
-  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints."
+  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.",
+  "Update automatically": "Update automatically",
+  "Between": "Between",
+  "and": "and",
+  "A new release is installed at night, two days after it comes out. Nothing starts while a backup or an app operation runs.": "A new release is installed at night, two days after it comes out. Nothing starts while a backup or an app operation runs.",
+  "Up to date": "Up to date",
+  "{version} will be installed after {date}": "{version} will be installed after {date}",
+  "Updating…": "Updating…",
+  "Paused: {version} failed twice": "Paused: {version} failed twice",
+  "See the log": "See the log",
+  "Try again": "Try again",
+  "ReCasaOS updated itself to {version} last night": "ReCasaOS updated itself to {version} last night",
+  "Release notes": "Release notes"
 }
