@@ -35,6 +35,9 @@ import DiskLearnMore from '@/components/Storage/DiskLearnMore.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
+// The last automatic update this browser was told about: its version.
+const AUTO_UPDATE_SEEN = 'casaos-autoupdate-announced'
+
 export default {
 	name: 'CoreService',
 	components: { SmartBlock, SyncBlock, NoticeBlock: noticeBlock, Swiper, SwiperSlide },
@@ -110,6 +113,7 @@ export default {
 	mounted() {
 		this.announceBackupFailures()
 		this.announceTelemetry()
+		this.announceAutoUpdate()
 	},
 	beforeUnmount() {
 		this.destroyUIEventBus()
@@ -213,6 +217,44 @@ export default {
 				dropped = true
 				notice.close()
 			}
+		},
+
+		// An update the box installed by itself happened at night, with nobody
+		// watching. Said once per browser, here where the dashboard opens, and
+		// remembered by version so the next one is said too. A browser with storage
+		// off hears it every time, which is no worse than never.
+		async announceAutoUpdate() {
+			let last
+			try {
+				const res = await this.$api.sys.getAutoUpdate()
+				last = res.data.data.last
+			} catch {
+				return // a core older than the feature
+			}
+			if (last?.result !== 'succeeded')
+				return
+			try {
+				if (localStorage.getItem(AUTO_UPDATE_SEEN) === last.version)
+					return
+				localStorage.setItem(AUTO_UPDATE_SEEN, last.version)
+			} catch {
+				// said anyway
+			}
+
+			this.$buefy.notification.open({
+				position: 'is-bottom-right',
+				indefinite: true,
+				queue: false,
+				ariaCloseLabel: this.$t('Close'),
+				message: [
+					h('p', this.$t('ReCasaOS updated itself to {version} last night', { version: last.version })),
+					h('a', {
+						href: `https://github.com/ReCasaOS/CasaOS-Install/releases/tag/${encodeURIComponent(last.version)}`,
+						target: '_blank',
+						rel: 'noopener noreferrer',
+					}, this.$t('Release notes')),
+				],
+			})
 		},
 
 		showTelemetryPreview() {

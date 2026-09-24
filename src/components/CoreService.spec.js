@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CoreService from '@/components/CoreService.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import events from '@/events/events'
@@ -139,7 +139,7 @@ describe('the anonymous statistics notice', () => {
 	}
 
 	it('is asked for when the dashboard opens', () => {
-		const vm = { announceBackupFailures: vi.fn(), announceTelemetry: vi.fn() }
+		const vm = { announceBackupFailures: vi.fn(), announceTelemetry: vi.fn(), announceAutoUpdate: vi.fn() }
 
 		CoreService.mounted.call(vm)
 
@@ -248,5 +248,84 @@ describe('the anonymous statistics notice', () => {
 
 		expect(vm.$buefy.toast.open).not.toHaveBeenCalled()
 		expect(vm.$EventBus.$emit).not.toHaveBeenCalled()
+	})
+})
+
+// An update the box installed by itself happened while nobody watched. The owner
+// is told once per browser, where the dashboard opens, with the release notes.
+describe('the automatic update notice', () => {
+	beforeEach(() => localStorage.clear())
+
+	function box(last) {
+		const vm = {
+			$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
+			$api: {
+				sys: {
+					getAutoUpdate: vi.fn(() => Promise.resolve({
+						data: { success: 200, data: { enabled: true, window: { start: '03:00', end: '05:00' }, state: 'up_to_date', next: null, last } },
+					})),
+				},
+			},
+			$buefy: { notification: { open: vi.fn() } },
+		}
+		const announce = CoreService.methods.announceAutoUpdate.bind(vm)
+		const shown = () => vm.$buefy.notification.open.mock.calls.map(([p]) => p.message)
+
+		return { vm, announce, shown }
+	}
+	const succeeded = version => ({ version, started_at: '2026-09-24T03:12:00+02:00', result: 'succeeded' })
+
+	it('is asked for when the dashboard opens', () => {
+		const vm = { announceBackupFailures: vi.fn(), announceTelemetry: vi.fn(), announceAutoUpdate: vi.fn() }
+
+		CoreService.mounted.call(vm)
+
+		expect(vm.announceAutoUpdate).toHaveBeenCalledTimes(1)
+	})
+
+	it('says the version it updated to, with the release notes', async () => {
+		const { announce, shown } = box(succeeded('v0.5.8'))
+
+		await announce()
+
+		expect(shown()).toHaveLength(1)
+		const [sentence, link] = shown()[0]
+		expect(sentence.children).toBe('ReCasaOS updated itself to v0.5.8 last night')
+		expect(link.children).toBe('Release notes')
+		expect(link.props.href).toBe('https://github.com/ReCasaOS/CasaOS-Install/releases/tag/v0.5.8')
+		expect(link.props.target).toBe('_blank')
+	})
+
+	it('is said once per browser for a version, and again for the next one', async () => {
+		await box(succeeded('v0.5.8')).announce()
+
+		const again = box(succeeded('v0.5.8'))
+		await again.announce()
+		expect(again.shown()).toHaveLength(0)
+
+		const next = box(succeeded('v0.5.9'))
+		await next.announce()
+		expect(next.shown()).toHaveLength(1)
+	})
+
+	it.each([
+		['nothing was ever attempted', null],
+		['the update is still running', { version: 'v0.5.8', started_at: '2026-09-24T03:12:00+02:00', result: 'running' }],
+		['the update failed', { version: 'v0.5.8', started_at: '2026-09-24T03:12:00+02:00', result: 'failed' }],
+	])('is not said when %s', async (_, last) => {
+		const { announce, shown } = box(last)
+
+		await announce()
+
+		expect(shown()).toHaveLength(0)
+	})
+
+	it('is not said by a core older than the feature', async () => {
+		const { vm, announce, shown } = box()
+		vm.$api.sys.getAutoUpdate.mockRejectedValue(new Error('404'))
+
+		await announce()
+
+		expect(shown()).toHaveLength(0)
 	})
 })
