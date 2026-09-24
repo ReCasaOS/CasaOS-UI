@@ -856,5 +856,8 @@
   "deployed": "deployed",
   "newest": "newest",
   "in history": "in history",
-  "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.": "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand."
+  "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.": "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.",
+  "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.": "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.",
+  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"drive\", sign in, and paste the token it prints.": "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"drive\", sign in, and paste the token it prints.",
+  "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "A box has no browser to sign in with. On a computer that has one, run rclone authorize \"dropbox\", sign in, and paste the token it prints."
 }

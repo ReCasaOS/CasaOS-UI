@@ -34,7 +34,38 @@ export const BACKUP_BACKENDS = [
 		label: 'WebDAV',
 		fields: ['url', 'vendor', 'user', 'pass'],
 	},
+	// Signing in to these three takes a browser, which a box does not have: rclone
+	// does it on a computer that has one, with its own app registration, and the
+	// token it gives is pasted here. `help` says how, and is a language-file key.
+	{
+		id: 'onedrive',
+		label: 'OneDrive',
+		fields: ['token', 'drive_id', 'drive_type'],
+		help: 'A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.',
+	},
+	{
+		id: 'drive',
+		label: 'Google Drive',
+		fields: ['token'],
+		help: 'A box has no browser to sign in with. On a computer that has one, run rclone authorize "drive", sign in, and paste the token it prints.',
+	},
+	{
+		id: 'dropbox',
+		label: 'Dropbox',
+		fields: ['token'],
+		help: 'A box has no browser to sign in with. On a computer that has one, run rclone authorize "dropbox", sign in, and paste the token it prints.',
+	},
 ]
+
+/**
+ * @param {string} id an rclone backend name
+ * @returns {string} how to fill that backend in, a language-file key, or '' when the
+ *   suggested fields say enough
+ */
+export function backendHelp(id) {
+	const backend = BACKUP_BACKENDS.find(candidate => candidate.id === id)
+	return (backend && backend.help) || ''
+}
 
 /**
  * @param {string} id an rclone backend name

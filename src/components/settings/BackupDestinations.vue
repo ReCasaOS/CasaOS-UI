@@ -71,6 +71,9 @@
 						</b-select>
 					</b-field>
 
+					<p v-if="backendHelp(draft.backend)" class="has-text-full-03 is-size-7 mb-2">
+						{{ $t(backendHelp(draft.backend)) }}
+					</p>
 					<p class="has-text-full-03 is-size-7 mb-2">
 						{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}
 					</p>
@@ -129,7 +132,7 @@
 import BackupHistory from './BackupHistory.vue'
 import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import BackupSchedules from './BackupSchedules.vue'
-import { BACKUP_BACKENDS, parametersFrom, suggestedFields } from './backupBackends'
+import { BACKUP_BACKENDS, backendHelp, parametersFrom, suggestedFields } from './backupBackends'
 import { renderSize } from '@/mixins/file_utils'
 
 export default {
@@ -194,6 +197,8 @@ export default {
 
 		// A value that looks like a credential is not shown while it is typed. The
 		// field names are rclone's, and its secrets are consistently named.
+		backendHelp,
+
 		isSecret(key) {
 			return /pass|secret|key|token/i.test(key || '') && !/key_file|public/i.test(key || '')
 		},
