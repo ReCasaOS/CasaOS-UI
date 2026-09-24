@@ -30,3 +30,20 @@ describe('anonymous statistics client', () => {
 		expect(JSON.parse(sent().data)).toEqual({ notice_seen: true })
 	})
 })
+
+describe('automatic update client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads the view from the core\'s v1 sys group', async () => {
+		await sys.getAutoUpdate()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/autoupdate')
+	})
+
+	it('sends only the fields it is given', async () => {
+		await sys.setAutoUpdate({ resume: true })
+		expect(sent().method).toBe('put')
+		expect(sent().url).toBe('/v1/sys/autoupdate')
+		expect(JSON.parse(sent().data)).toEqual({ resume: true })
+	})
+})

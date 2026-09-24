@@ -135,6 +135,17 @@ const sys = {
 		return api.put(`${PREFIX}/telemetry`, data)
 	},
 
+	// Automatic updates: { enabled, window: { start, end }, state, next, last }.
+	// A core older than the feature answers 404.
+	getAutoUpdate() {
+		return api.get(`${PREFIX}/autoupdate`)
+	},
+
+	// data: any of { enabled, window_start, window_end, resume }; answers the same view as getAutoUpdate.
+	setAutoUpdate(data) {
+		return api.put(`${PREFIX}/autoupdate`, data)
+	},
+
 	// power -- data:shutdown
 	// power -- data:restart
 	power(data) {
