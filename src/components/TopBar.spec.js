@@ -267,6 +267,13 @@ describe('the automatic update row', () => {
 		expect(stateText(vm)).toBe(`v0.5.8 will be installed after ${new Date(notBefore).toLocaleString()}`)
 	})
 
+	// a release without a publication date is never installed by itself
+	it('says a waiting release with no date is left to the owner', () => {
+		const vm = bar({}, view({ state: 'waiting', next: null }))
+
+		expect(stateText(vm)).toBe('A newer release is out: install it by hand')
+	})
+
 	it('offers See the log and Try again when paused', () => {
 		expect(source).toMatch(/v-if="autoUpdate.state === 'paused'"[\s\S]*?showUpgradeLog[\s\S]*?See the log[\s\S]*?setAutoUpdate\(\{ resume: true \}\)[\s\S]*?Try again/)
 	})

@@ -240,6 +240,10 @@ export default {
 			} catch {
 				// said anyway
 			}
+			// "last night" only when it was: a browser that first opens the dashboard
+			// days later is not told about an old update as if it were news
+			if (!(Date.now() - Date.parse(last.started_at) < 36 * 60 * 60 * 1000))
+				return
 
 			this.$buefy.notification.open({
 				position: 'is-bottom-right',

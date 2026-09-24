@@ -587,10 +587,11 @@ export default {
 			switch (state) {
 				case 'up_to_date':
 					return this.$t('Up to date')
+				// without a date for the release, the core never installs it by itself
 				case 'waiting':
 					return next
 						? this.$t('{version} will be installed after {date}', { version: next.version, date: new Date(next.not_before).toLocaleString() })
-						: ''
+						: this.$t('A newer release is out: install it by hand')
 				case 'updating':
 					return this.$t('Updating…')
 				case 'paused':

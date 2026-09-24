@@ -871,5 +871,6 @@
   "See the log": "Voir le journal",
   "Try again": "Réessayer",
   "ReCasaOS updated itself to {version} last night": "ReCasaOS s'est mis à jour vers {version} cette nuit",
-  "Release notes": "Notes de version"
+  "Release notes": "Notes de version",
+  "A newer release is out: install it by hand": "Une release plus récente est sortie : installez-la à la main"
 }

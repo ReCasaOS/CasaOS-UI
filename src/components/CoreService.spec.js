@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { flushPromises } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoreService from '@/components/CoreService.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import events from '@/events/events'
@@ -254,7 +254,13 @@ describe('the anonymous statistics notice', () => {
 // An update the box installed by itself happened while nobody watched. The owner
 // is told once per browser, where the dashboard opens, with the release notes.
 describe('the automatic update notice', () => {
-	beforeEach(() => localStorage.clear())
+	beforeEach(() => {
+		localStorage.clear()
+		// the morning after the updates below, which started at 03:12
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date('2026-09-24T09:00:00+02:00'))
+	})
+	afterEach(() => vi.useRealTimers())
 
 	function box(last) {
 		const vm = {
@@ -318,6 +324,13 @@ describe('the automatic update notice', () => {
 		await announce()
 
 		expect(shown()).toHaveLength(0)
+	})
+
+	it('is not said days later as if it were last night, and not later either', async () => {
+		const old = box({ version: 'v0.5.8', started_at: '2026-09-20T03:12:00+02:00', result: 'succeeded' })
+		await old.announce()
+		expect(old.shown()).toHaveLength(0)
+		expect(localStorage.getItem('casaos-autoupdate-announced')).toBe('v0.5.8')
 	})
 
 	it('is not said by a core older than the feature', async () => {
