@@ -38,16 +38,17 @@ export default [
 			showBackground: true,
 		},
 	},
-	// {
-	// 	path: '/files',
-	// 	name: 'Files',
-	// 	hidden: true,
-	// 	component: () => import('@/components/filebrowser/FilePanel.vue'),
-	// 	meta: {
-	// 		requireAuth: true,
-	// 		showBackground: true
-	// 	}
-	// },
+	// Files on a tab of its own, when apps are set to open in a new tab
+	{
+		path: '/files',
+		name: 'Files',
+		hidden: true,
+		component: () => import('@/views/FilesTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
 	{
 		path: '/launch',
 		name: 'AppLauncherCheck',
