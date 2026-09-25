@@ -13,12 +13,18 @@
     // secondary text colour, the current one in the text colour over its
     // accent underline. All in link blue, they read below AA on the dark card.
     .b-tabs > .tabs:not(.is-toggle) {
+        // the colour only: _tabs.scss gives every tab bar its 1px border, and a
+        // bar that removes it (the service tabs of an app's settings) keeps its own
         ul {
-            border-bottom: 1px solid var(--casa-divider);
+            border-bottom-color: var(--casa-divider);
         }
 
         li a {
             color: var(--casa-text-secondary);
+        }
+
+        li:not(.is-active) a:hover {
+            color: var(--casa-text);
         }
 
         li.is-active a {
@@ -174,8 +180,6 @@
 
     // Tabs
     .tabs {
-        width: 14rem !important;
-
         &.is-toggle {
             ul {
                 background: rgba(60, 60, 67, .05);
