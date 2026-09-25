@@ -5,14 +5,15 @@
 		</header>
 
 		<section class="modal-card-body">
-			<p class="has-text-full-03 is-size-7 mb-3">
+			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
+
+			<p class="_has-text-gray is-size-7 mb-3">
 				{{ $t('What this destination holds. An app this box does not run is installed first, from the compose file its backup kept.') }}
 			</p>
 
-			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
-			<b-loading :active="isLoading" :is-full-page="false" />
+			<b-loading v-model="isLoading" :is-full-page="false" />
 
-			<p v-if="!isLoading && !error && !held.length" class="has-text-full-03 is-size-7">
+			<p v-if="!isLoading && !error && !held.length" class="_has-text-gray is-size-7">
 				{{ $t('This destination holds no backup.') }}
 			</p>
 
@@ -35,15 +36,14 @@
 						</b-button>
 					</p>
 					<p class="control">
-						<b-button :loading="deleting === entry.app" icon-left="close-outline" icon-pack="casa" rounded
-							size="is-small" @click="confirmDelete(entry)" />
+						<b-button :aria-label="$t('Delete')" :loading="deleting === entry.app" :title="$t('Delete')"
+							icon-left="trash-outline" icon-pack="casa" rounded size="is-small" @click="confirmDelete(entry)" />
 					</p>
 				</b-field>
 			</div>
 		</section>
 
-		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
+		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
 			<b-button rounded @click="$emit('close')">{{ $t('Close') }}</b-button>
 		</footer>
 	</div>
@@ -74,7 +74,7 @@ export default {
 					this.chosen[entry.app] = entry.stamps[0]
 			} catch (error) {
 				const data = error.response && error.response.data
-				this.error = (data && data.message) || error.message
+				this.error = this.$t('The backups on {name} could not be listed: {error}', { name: this.destination, error: (data && data.message) || error.message })
 			} finally {
 				this.isLoading = false
 			}

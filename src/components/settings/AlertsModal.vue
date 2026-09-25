@@ -30,28 +30,32 @@
 				<p v-if="!view.channels.length" class="is-size-7 mb-3">
 					{{ $t('No channel yet: nothing is sent. Add one below.') }}
 				</p>
-				<div v-for="channel in view.channels" :key="channel.id" class="channel is-flex is-align-items-center mb-2">
+				<div v-for="channel in view.channels" :key="channel.id" class="channel is-flex is-flex-wrap-wrap is-align-items-center is-gap-1 mb-2">
 					<div class="is-flex-grow-1">
 						<div class="has-text-weight-medium">
 							{{ channel.name }}
 						</div>
-						<div class="is-size-7 has-text-full-03">
-							{{ [channel.service, channel.host].filter(Boolean).join(' · ') }}
+						<div class="is-size-7 _has-text-gray">
+							{{ channelDetail(channel) }}
+						</div>
+						<div v-if="tested[channel.id]" class="is-size-7">
+							{{ tested[channel.id] }}
 						</div>
 					</div>
-					<span v-if="tested[channel.id]" class="is-size-7 mr-3">{{ tested[channel.id] }}</span>
-					<!-- a channel not saved yet has no id: a test without one would go to every channel -->
-					<b-button :disabled="!channel.id || saving" :loading="busy === channel.id" class="mr-1" rounded size="is-small" @click="test(channel)">
-						{{ $t('Test') }}
-					</b-button>
-					<b-button :disabled="saving" class="mr-1" rounded size="is-small" @click="rename(channel)">
-						{{ $t('Rename') }}
-					</b-button>
-					<b-button :disabled="saving" rounded size="is-small" type="is-danger" @click="remove(channel)">
-						{{ $t('Remove') }}
-					</b-button>
+					<div class="is-flex">
+						<!-- a channel not saved yet has no id: a test without one would go to every channel -->
+						<b-button :disabled="!channel.id || saving" :loading="busy === channel.id" class="mr-1" rounded size="is-small" @click="test(channel)">
+							{{ $t('Test') }}
+						</b-button>
+						<b-button :disabled="saving" class="mr-1" rounded size="is-small" @click="rename(channel)">
+							{{ $t('Rename') }}
+						</b-button>
+						<b-button :disabled="saving" rounded size="is-small" type="is-danger" @click="remove(channel)">
+							{{ $t('Remove') }}
+						</b-button>
+					</div>
 				</div>
-				<p class="is-size-7 has-text-full-03 mb-3">
+				<p class="is-size-7 _has-text-gray mb-3">
 					{{ $t('A channel\'s address and its secrets stay on this box and are never shown again: to change them, remove the channel and add it again.') }}
 				</p>
 
@@ -70,7 +74,7 @@
 						</option>
 					</b-select>
 				</b-field>
-				<p class="is-size-7 has-text-full-03 mb-3">
+				<p class="is-size-7 _has-text-gray mb-3">
 					{{ $t(kind.help) }}
 				</p>
 				<b-field v-for="field in kind.fields" :key="field.key" :label="$t(field.label)" label-position="on-border">
@@ -119,6 +123,7 @@
 					</b-select>
 				</div>
 			</template>
+			<b-loading :is-full-page="false" :model-value="!view && !error" />
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -129,6 +134,9 @@
 
 <script>
 import { ALERT_KINDS, blankValues, channelURL } from './alertChannels'
+
+// The core names a channel's service by its URL's scheme: the two the forms build read as the forms name them.
+const SERVICE_LABELS = { smtp: 'E-mail', telegram: 'Telegram' }
 
 const blankDraft = kind => ({ name: '', kind, values: blankValues(kind) })
 
@@ -176,7 +184,7 @@ export default {
 				// Go writes an empty list as null
 				this.view = { ...res.data.data, channels: res.data.data.channels || [] }
 			} catch (error) {
-				this.error = this.messageOf(error)
+				this.error = this.$t('Alerts could not be loaded: {error}', { error: this.messageOf(error) })
 			}
 		},
 
@@ -251,6 +259,12 @@ export default {
 				this.busy = ''
 			}
 			this.tested = { ...this.tested, [channel.id]: said }
+		},
+
+		// "E-mail · smtp.example.com"; telegram's host is "telegram", said once
+		channelDetail({ service, host }) {
+			const label = SERVICE_LABELS[service] ? this.$t(SERVICE_LABELS[service]) : service
+			return [label, host !== service && host].filter(Boolean).join(' · ')
 		},
 
 		// the last failure names its channel (by name, or by id for an older core);

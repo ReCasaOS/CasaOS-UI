@@ -10,7 +10,7 @@
 		<!-- Modal-Card Header End -->
 		<!-- Modal-Card Body Start -->
 		<section class="modal-card-body ">
-			<div class="node-card  mt-5 mb-5">
+			<div class="node-card mt-5">
 				<div class="update-info-container  is-size-14px " v-dompurify-html="markdownToHtml"></div>
 				<div class="mt-2rem">
 					<h3 class="title is-5 mb-2">{{ $t('Let more friends know') }}</h3>
@@ -18,18 +18,19 @@
 					</div>
 				</div>
 
-				<div class="buttons is-justify-content-center mb-6 mt-4">
-					<a v-for="site in shareSites" :class="`share-network-${site}`" :key="site"
-						href="javascript:void(0)" @click="share(site)">
-						<b-button icon-pack="casa" :icon-left="site" :type="`is-${site}`" class="ml-3 mr-3">
-							Share
-						</b-button>
-					</a>
+				<div class="buttons is-justify-content-center mt-4">
+					<b-button v-for="site in shareSites" :key="site" :aria-label="$t('Share on {network}', { network: site[0].toUpperCase() + site.slice(1) })"
+						:icon-left="site" :type="`is-${site}`" class="ml-3 mr-3" icon-pack="casa" @click="share(site)">
+						{{ $t('Share') }}
+					</b-button>
 				</div>
 
 			</div>
 		</section>
 		<!-- Modal-Card Body End -->
+		<footer class="modal-card-foot is-justify-content-flex-end">
+			<b-button :label="$t('Close')" rounded @click="$emit('close')" />
+		</footer>
 	</div>
 </template>
 

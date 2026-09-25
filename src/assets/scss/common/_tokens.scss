@@ -42,6 +42,10 @@
 	--casa-active: #{$grey-200}; // #edf0f2
 	--casa-selected: #deebfd;
 	--casa-danger-tint: hsla(18, 98%, 94%, 1);
+	// Shutdown in the settings. Darker than the literal it replaced, hsla(18, 98%,
+	// 55%), which read 3.1:1 on white: AA wins over the exact tint.
+	--casa-text-attention: hsl(18, 98%, 38%);
+	--casa-control-border: #000; // the settings selects, their chevron
 	--casa-danger-tint-strong: hsla(18, 100%, 80%, 1);
 	--casa-danger-soft: hsla(348, 100%, 95%, 1);
 	--casa-warning-tint: #fff7e6;
@@ -121,6 +125,8 @@ html[data-theme='dark'] {
 	--casa-active: rgba(255, 255, 255, 0.12);
 	--casa-selected: rgba(34, 118, 243, 0.28);
 	--casa-danger-tint: hsla(18, 98%, 55%, 0.18);
+	--casa-text-attention: hsl(18, 98%, 55%);
+	--casa-control-border: #8b95a1; // white was the brightest thing in the panel
 	--casa-danger-tint-strong: hsla(18, 98%, 55%, 0.32);
 	--casa-danger-soft: hsla(348, 86%, 61%, 0.18);
 	--casa-warning-tint: hsla(40, 100%, 43%, 0.18);

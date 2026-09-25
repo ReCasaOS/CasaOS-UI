@@ -3,7 +3,7 @@
 		<!-- Modal-Card Header Start -->
 		<header class="modal-card-head">
 			<div class="is-flex-grow-1">
-				<h3 class="title is-header">{{ $t('Update') }}</h3>
+				<h3 class="title is-header">{{ $t('ReCasaOS update') }}</h3>
 			</div>
 			<b-icon class="close-button" icon="close-outline" pack="casa" @click="$emit('close');" />
 		</header>
@@ -17,12 +17,10 @@
 		</section>
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
-		<footer v-if="!logOnly" class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
-			<div>
-				<b-button :label="$t('Upgrade Now')" :loading="isUpdating" expaned rounded type="is-primary"
-					@click="updateSystem" />
-			</div>
+		<footer class="modal-card-foot is-justify-content-flex-end">
+			<!-- read-only, on the log: one neutral way out -->
+			<b-button v-if="logOnly" :label="$t('Close')" rounded @click="$emit('close')" />
+			<b-button v-else :label="$t('Upgrade Now')" :loading="isUpdating" rounded type="is-primary" @click="updateSystem" />
 		</footer>
 		<!-- Modal-Card Footer End -->
 	</div>

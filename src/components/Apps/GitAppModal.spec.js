@@ -323,7 +323,7 @@ describe('gitAppModal deploy step', () => {
 
 		fire('app:git-deploy-end', { 'app:name': 'jarvis' })
 		await flushPromises()
-		expect(wrapper.find('.has-text-success').text()).toBe('Deployed')
+		expect(wrapper.find('.has-text-success-on-scheme').text()).toBe('Deployed')
 		expect(reload).toHaveBeenCalledWith('reloadAppList')
 		wrapper.unmount()
 	})
@@ -342,7 +342,10 @@ describe('gitAppModal deploy step', () => {
 		await tools.click('Deploy')
 
 		expect(modal.text()).toContain('The build failed: {reason}')
-		expect(tools.button('Deploy again')).toBeTruthy()
+		// deploying again is the primary action, and Close is never one
+		expect(tools.button('Deploy again').classes()).toContain('is-primary')
+		expect(tools.button('Close').classes()).not.toContain('is-primary')
+		expect(modal.findAll('footer button').map(b => b.text())).toEqual(['Delete this app', 'Close', 'Deploy again'])
 
 		await tools.click('Delete this app')
 		expect(tools.gitApps.remove).toHaveBeenCalledWith('jarvis')

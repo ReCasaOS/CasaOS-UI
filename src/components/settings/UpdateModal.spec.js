@@ -103,7 +103,8 @@ describe('the update dialog opened on the log', () => {
 		expect(getContent).toHaveBeenCalledTimes(1)
 		expect(getContent).toHaveBeenCalledWith('/var/log/casaos/upgrade.log')
 		expect(wrapper.find('pre').text()).toBe('CasaOS upgrade failed')
-		expect(wrapper.find('b-button-stub').exists()).toBe(false)
+		// read-only: a neutral Close, and nothing that starts an update
+		expect(wrapper.findAll('b-button-stub').map(b => b.attributes('label'))).toEqual(['Close'])
 		expect(updateCasaOS).not.toHaveBeenCalled()
 		wrapper.unmount()
 	})

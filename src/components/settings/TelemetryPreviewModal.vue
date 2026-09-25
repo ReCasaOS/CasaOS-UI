@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card">
+	<div class="modal-card telemetry-preview-modal">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('What is sent') }}
@@ -11,6 +11,8 @@
 				{{ $t('When statistics are on, these properties go to PostHog (EU) once a day and after each install or update.') }}
 				<a href="https://github.com/ReCasaOS/CasaOS-Install#anonymous-statistics" rel="noopener noreferrer" target="_blank">{{ $t('Learn more') }}</a>
 			</p>
+
+			<b-loading v-model="isLoading" :is-full-page="false" />
 
 			<b-message v-if="loadError" size="is-small" type="is-warning">
 				{{ loadError }}
@@ -31,6 +33,7 @@ export default {
 	data() {
 		return {
 			properties: null,
+			isLoading: true,
 			loadError: '',
 		}
 	},
@@ -47,7 +50,17 @@ export default {
 			this.properties = res.data.data.preview.properties
 		} catch {
 			this.loadError = this.$t('The preview could not be loaded.')
+		} finally {
+			this.isLoading = false
 		}
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+// room for the spinner before the preview arrives, as in AppLaunchModal
+.telemetry-preview-modal .modal-card-body {
+  position: relative;
+  min-height: 8rem;
+}
+</style>
