@@ -26,6 +26,7 @@
 </template>
 
 <script>
+import { findSyncthing } from './syncthingApp'
 import events from '@/events/events'
 
 export default {
@@ -59,39 +60,19 @@ export default {
 
 	methods: {
 		async checkSyncStatus() {
-			// const res = await this.$api.sys.getSystemApps()
-			const listRes = await this.$api.container.getMyAppList()
-			const systemApps = listRes.data ? listRes.data.data.casaos_apps : []
-			const is8384SyncInstalled = systemApps.some((app) => {
-				return app.image.includes('syncthing') && app.port === 8384
-			})
-			if (is8384SyncInstalled) {
-				this.isSyncInstalled = true
-				this.syncBaseURL = `http://${this.$baseIp}:8384`
-				this.syncPort = 8384
-				this.syncId = systemApps.find((app) => {
-					return app.image.includes('syncthing') && app.port === 8384
-				}).port
-				this.isSyncRunning = systemApps.some((app) => {
-					return app.image.includes('syncthing') && app.port === 8384 && app.state === 'running'
-				})
-			} else {
-				this.isSyncInstalled = systemApps.some((app) => {
-					return app.image.includes('syncthing')
-				})
-				if (this.isSyncInstalled) {
-					this.isSyncRunning = systemApps.some((app) => {
-						return app.image.includes('syncthing') && app.state === 'running'
-					})
-					this.syncPort = systemApps.find((app) => {
-						return app.image.includes('syncthing')
-					}).port
-					this.syncId = systemApps.find((app) => {
-						return app.image.includes('syncthing')
-					}).id
-					this.syncBaseURL = `http://${this.$baseIp}:${this.syncPort}`
-				}
+			let app = null
+			try {
+				const res = await this.$openAPI.appGrid.getAppGrid()
+				app = findSyncthing(res.data.data)
+			} catch {
+				// not knowing is not being installed: the button offers Install
 			}
+
+			this.isSyncInstalled = Boolean(app)
+			this.isSyncRunning = Boolean(app && app.running)
+			this.syncId = app ? app.name : ''
+			this.syncPort = app ? app.port : ''
+			this.syncBaseURL = app ? `http://${this.$baseIp}:${app.port}` : ''
 		},
 		async openSyncPanel() {
 			await this.checkSyncStatus()
@@ -113,20 +94,19 @@ export default {
 								message: this.$t(`Starting Syncthing...`),
 								type: 'is-white',
 							})
-							this.$api.container.updateState(this.syncId, 'start').then((res) => {
+							this.$openAPI.appManagement.compose.setComposeAppStatus(this.syncId, 'start').then(() => {
 								this.isStarting = false
-								if (res.data.success == 200) {
-									this.$EventBus.$emit(events.RELOAD_APP_LIST)
-									setTimeout(() => {
-										close()
-										window.open(this.syncBaseURL, '_blank')
-									}, 2000)
-								} else {
-									this.$buefy.toast.open({
-										message: this.$t(`Failed to start, please try again.`),
-										type: 'is-danger',
-									})
-								}
+								this.$EventBus.$emit(events.RELOAD_APP_LIST)
+								setTimeout(() => {
+									close()
+									window.open(this.syncBaseURL, '_blank')
+								}, 2000)
+							}).catch(() => {
+								this.isStarting = false
+								this.$buefy.toast.open({
+									message: this.$t(`Failed to start, please try again.`),
+									type: 'is-danger',
+								})
 							})
 						},
 					})

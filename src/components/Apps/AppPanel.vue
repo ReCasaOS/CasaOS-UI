@@ -722,8 +722,9 @@ export default {
 	props: {
 		id: String,
 		state: String,
+		// a store app to show at once, by its id in the store ('syncthing')
 		storeId: {
-			type: Number,
+			type: [Number, String],
 			default: 0,
 		},
 		isCasa: {
