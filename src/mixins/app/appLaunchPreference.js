@@ -6,6 +6,12 @@ export const APP_LAUNCH_EXCEPTIONS_KEY = 'appLaunchExceptions'
 // instead of quietly regressing the one app the exception existed for.
 export const DEFAULT_APP_LAUNCH_EXCEPTIONS = ['qbittorrent', 'org.icewhale.qbittorrent']
 
+// The dashboard's own apps, under ids no compose app can have (a compose app is
+// named by its project, which has no colon), so that the same setting and the
+// same exception list send them to a tab of their own too.
+export const FILES_LAUNCH_ID = 'casaos:files'
+export const APP_STORE_LAUNCH_ID = 'casaos:app-store'
+
 function identifiersOf(appInfo) {
 	return [appInfo && appInfo.id, appInfo && appInfo.name]
 		.filter(Boolean)
@@ -35,6 +41,20 @@ export function shouldOpenInNewWindow(appInfo, preference) {
 	)
 
 	return identifiersOf(appInfo).some(identifier => exceptions.has(identifier))
+}
+
+/**
+ * Whether one of the dashboard's own apps, by its launch id, opens in a new tab.
+ *
+ * @param {string} launchId the app's launch id, such as FILES_LAUNCH_ID
+ * @param {object} state the store's state, holding the current setting
+ * @returns {boolean} true when it should open in a new tab
+ */
+export function builtinOpensInNewTab(launchId, state) {
+	return shouldOpenInNewWindow({ id: launchId }, {
+		inIframe: state.appLaunchInIframe,
+		exceptions: state.appLaunchExceptions,
+	})
 }
 
 /**

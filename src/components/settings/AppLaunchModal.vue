@@ -22,6 +22,13 @@
 					{{ $t('Always open these apps in a new tab:') }}
 				</p>
 
+				<!-- the dashboard's own apps first: they are always there -->
+				<div v-for="app in builtins" :key="app.id" class="app-launch-modal__row">
+					<b-checkbox :model-value="isExcepted(app.id)" @update:model-value="toggleException(app.id)">
+						{{ app.title }}
+					</b-checkbox>
+				</div>
+
 				<b-message v-if="loadError" size="is-small" type="is-warning">
 					{{ loadError }}
 				</b-message>
@@ -51,6 +58,8 @@
 </template>
 
 <script>
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+
 export default {
 	name: 'AppLaunchModal',
 	data() {
@@ -61,6 +70,14 @@ export default {
 			isLoading: true,
 			loadError: '',
 		}
+	},
+	computed: {
+		builtins() {
+			return [
+				{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') },
+				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
+			]
+		},
 	},
 	async mounted() {
 		try {
