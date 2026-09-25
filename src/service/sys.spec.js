@@ -47,3 +47,27 @@ describe('automatic update client', () => {
 		expect(JSON.parse(sent().data)).toEqual({ resume: true })
 	})
 })
+
+describe('push alerts client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads the masked view from the core\'s v1 sys group', async () => {
+		await sys.getAlerts()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/alerts')
+	})
+
+	it('sends only the fields it is given', async () => {
+		await sys.setAlerts({ disk_threshold: 85 })
+		expect(sent().method).toBe('put')
+		expect(sent().url).toBe('/v1/sys/alerts')
+		expect(JSON.parse(sent().data)).toEqual({ disk_threshold: 85 })
+	})
+
+	it('tests one channel', async () => {
+		await sys.testAlerts({ channel_id: 'a1' })
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/alerts/test')
+		expect(JSON.parse(sent().data)).toEqual({ channel_id: 'a1' })
+	})
+})

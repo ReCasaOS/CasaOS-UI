@@ -146,6 +146,23 @@ const sys = {
 		return api.put(`${PREFIX}/autoupdate`, data)
 	},
 
+	// Push alerts: { channels: [{ id, name, service, host }], categories, disk_threshold,
+	// last_failure }. A channel's URL is never sent back. A core older than the feature answers 404.
+	getAlerts() {
+		return api.get(`${PREFIX}/alerts`)
+	},
+
+	// data: any of { channels, categories, disk_threshold }. `channels` replaces the list:
+	// an entry with an id and no url keeps its stored URL, a new entry brings its url.
+	setAlerts(data) {
+		return api.put(`${PREFIX}/alerts`, data)
+	},
+
+	// data: { channel_id? }, one channel or all of them; answers [{ id, ok, error }].
+	testAlerts(data) {
+		return api.post(`${PREFIX}/alerts/test`, data)
+	},
+
 	// power -- data:shutdown
 	// power -- data:restart
 	power(data) {
