@@ -1,7 +1,7 @@
 <template>
 	<div>
 		<div class="is-flex is-align-items-center mb-2">
-			<p class="has-text-full-03 is-size-7 is-flex-grow-1">
+			<p class="_has-text-gray is-size-7 is-flex-grow-1">
 				{{ $t('The last few hundred runs, newest first. Failures are kept too — a record that only showed successes would hide a box backing nothing up.') }}
 			</p>
 			<b-button :loading="isLoading" rounded size="is-small" @click="load">{{ $t('Refresh') }}</b-button>
@@ -38,7 +38,7 @@
 				<!-- a copy taken from a running app may not restore, which is worth
 					knowing about a backup before trying to restore it -->
 				<span v-if="row.containers_stopped">{{ $t('Yes') }}</span>
-				<span v-else class="has-text-warning">{{ $t('No') }}</span>
+				<span v-else class="has-text-warning-on-scheme">{{ $t('No') }}</span>
 			</b-table-column>
 
 			<b-table-column v-slot="{ row }" label="" field="stamp">
@@ -51,7 +51,7 @@
 			</b-table-column>
 
 			<template #empty>
-				<p class="has-text-centered has-text-full-03 is-size-7 py-4">
+				<p class="has-text-centered _has-text-gray is-size-7 py-4">
 					{{ $t('No backup has run yet.') }}
 				</p>
 			</template>
@@ -111,7 +111,7 @@ export default {
 				this.runs = res.data.data || []
 			} catch (error) {
 				const data = error.response && error.response.data
-				this.error = (data && data.message) || error.message
+				this.error = this.$t('History could not be loaded: {error}', { error: (data && data.message) || error.message })
 			} finally {
 				this.isLoading = false
 			}

@@ -43,6 +43,7 @@ async function open(sys) {
 				'b-checkbox': true,
 				'b-input': true,
 				'b-select': true,
+				'b-loading': true,
 				'b-message': { render() { return h('div', this.$slots.default()) } },
 			},
 		},
@@ -58,7 +59,34 @@ describe('the alerts dialog', () => {
 		expect(wrapper.text()).toContain('Phone')
 		expect(wrapper.text()).toContain('ntfy · ntfy.sh')
 		expect(wrapper.text()).toContain('Mail')
-		expect(wrapper.text()).toContain('smtp · smtp.example.com')
+		// the service by the form's name, not the URL's scheme
+		expect(wrapper.text()).toContain('E-mail · smtp.example.com')
+		expect(wrapper.text()).not.toContain('smtp ·')
+	})
+
+	it('names telegram once: its host is the service itself', async () => {
+		const wrapper = await open({ getAlerts: answer(view({ channels: [{ id: 'c', name: 'Family', service: 'telegram', host: 'telegram' }] })) })
+
+		expect(wrapper.text()).toContain('Telegram')
+		expect(wrapper.text()).not.toContain('·')
+	})
+
+	it('shows a spinner until the core answers, and a translated failure without the empty state', async () => {
+		let fail
+		const wrapper = await open({
+			getAlerts: vi.fn(() => new Promise((_, reject) => {
+				fail = reject
+			})),
+		})
+
+		expect(wrapper.find('b-loading-stub').attributes('model-value')).toBe('true')
+
+		fail(new Error('Request failed with status code 502'))
+		await flushPromises()
+
+		expect(wrapper.text()).toContain('Alerts could not be loaded: Request failed with status code 502')
+		expect(wrapper.text()).not.toContain('No channel yet')
+		expect(wrapper.find('b-loading-stub').attributes('model-value')).toBe('false')
 	})
 
 	it('says nothing is sent without a channel', async () => {
@@ -195,6 +223,7 @@ describe('the alerts dialog\'s words', () => {
 		'Remove {name}? Alerts are no longer sent there.',
 		'Sent',
 		'Not sent: {error}',
+		'Alerts could not be loaded: {error}',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()

@@ -17,7 +17,7 @@
 				</div>
 			</div>
 
-			<div class="columns mt-5 mb-5 is-variable is-2">
+			<div class="columns is-mobile mt-5 mb-5 is-variable is-2">
 				<div v-for="(item, index) in wallpaperItems" :key="`wallpaper${index}`" class="column">
 					<div :class="{ active: checkActive(item.path) }" class="image-list-item is-clickable"
 						@click="changeWallpaper(item.path)">
@@ -40,12 +40,9 @@
 		</section>
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
-		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
-			<div>
-				<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
-				<b-button :label="$t('Apply')" :loading="isLoading" expaned rounded type="is-primary" @click="saveChange" />
-			</div>
+		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
+			<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
+			<b-button :label="$t('Apply')" :loading="isLoading" rounded type="is-primary" @click="saveChange" />
 		</footer>
 		<!-- Modal-Card Footer End -->
 	</div>
@@ -186,7 +183,7 @@ export default {
 	border-radius: 16px;
 	background-clip: padding-box, border-box;
 	background-origin: padding-box, border-box;
-	background-image: linear-gradient(to right, #fff, #fff),
+	background-image: linear-gradient(to right, var(--casa-surface), var(--casa-surface)),
 		linear-gradient(108.27deg,
 			rgba(57, 60, 64, 1) 1.44%,
 			rgba(92, 96, 102, 1) 55.8%,

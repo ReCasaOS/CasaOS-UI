@@ -13,7 +13,7 @@
 				</b-switch>
 			</b-field>
 
-			<p class="has-text-full-03 is-size-7 mb-4">
+			<p class="is-size-7 _has-text-gray mb-4">
 				{{ $t('When this is off, every app opens in a new browser tab.') }}
 			</p>
 
@@ -28,7 +28,7 @@
 
 				<b-loading v-model="isLoading" :is-full-page="false" />
 
-				<div v-if="!isLoading && !loadError && apps.length === 0" class="has-text-full-03 is-size-7">
+				<div v-if="!isLoading && !loadError && apps.length === 0" class="is-size-7 _has-text-gray">
 					{{ $t('No app is installed yet.') }}
 				</div>
 
@@ -40,12 +40,9 @@
 			</template>
 		</section>
 
-		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
-			<div>
-				<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
-				<b-button :label="$t('Save')" rounded type="is-primary" @click="save" />
-			</div>
+		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
+			<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
+			<b-button :label="$t('Save')" rounded type="is-primary" @click="save" />
 		</footer>
 	</div>
 </template>

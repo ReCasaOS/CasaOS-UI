@@ -9,6 +9,23 @@
     background: var(--casa-surface);
     border-radius: $backDropBorderRadius;
 
+    // Tabs in a dialog: a baseline under the bar, the other tabs in the
+    // secondary text colour, the current one in the text colour over its
+    // accent underline. All in link blue, they read below AA on the dark card.
+    .b-tabs > .tabs:not(.is-toggle) {
+        ul {
+            border-bottom: 1px solid var(--casa-divider);
+        }
+
+        li a {
+            color: var(--casa-text-secondary);
+        }
+
+        li.is-active a {
+            color: var(--casa-text);
+        }
+    }
+
     .close-container {
         position: absolute;
         right: 2rem;
@@ -127,6 +144,14 @@
     .modal-card-foot {
         padding: .75rem 1.5rem 1.5rem 1.5rem;
         border-top: 1px solid var(--casa-divider-soft);
+        // on a phone the buttons go to a second line rather than off the card
+        flex-wrap: wrap;
+        row-gap: .5rem;
+
+        // Bulma 1 no longer spaces a footer's buttons: side by side, they touched
+        > .button + .button {
+            margin-inline-start: .5rem;
+        }
 
         .button {
             border-radius: 9999px;
@@ -229,10 +254,6 @@
             .media-content {
                 font-size: .875rem;
             }
-        }
-
-        .modal-card-foot {
-            gap: .5rem;
         }
     }
 }

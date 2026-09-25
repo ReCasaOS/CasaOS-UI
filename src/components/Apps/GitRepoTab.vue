@@ -54,7 +54,7 @@
 								{{ $t('Save') }}
 							</b-button>
 						</div>
-						<p v-if="firstInMode" class="has-text-full-03">{{ $t('The first deployment in this mode is manual; automatic deployment resumes after it.') }}</p>
+						<p v-if="firstInMode" class="_has-text-gray">{{ $t('The first deployment in this mode is manual; automatic deployment resumes after it.') }}</p>
 					</td>
 				</tr>
 				<tr>
@@ -64,7 +64,7 @@
 							<span class="git-repo-tab__mono">{{ version(gitApp.deployed) }}</span>
 							{{ gitApp.deployed.subject }} · {{ when(gitApp.deployed.at) }}
 						</template>
-						<span v-else class="has-text-full-03">{{ $t('Not deployed yet.') }}</span>
+						<span v-else class="_has-text-gray">{{ $t('Not deployed yet.') }}</span>
 					</td>
 				</tr>
 				<tr v-if="gitApp.head">
@@ -72,7 +72,7 @@
 					<td>
 						<span class="git-repo-tab__mono">{{ short(gitApp.head.commit) }}</span>
 						{{ gitApp.head.subject }}
-						<p v-if="!gitApp.head.tracked_files_clean" class="has-text-danger">
+						<p v-if="!gitApp.head.tracked_files_clean" class="has-text-danger-on-scheme">
 							{{ $t('Tracked files were modified in the folder. Every deployment is refused until they are restored.') }}
 						</p>
 					</td>
@@ -117,7 +117,7 @@
 		<b-switch :disabled="!canAct" :model-value="autoDeploy" size="is-small" @update:model-value="setAutoDeploy">
 			{{ tagMode ? $t('Deploy a newer tag as soon as a check finds it') : $t('Deploy a new commit as soon as a check finds it') }}
 		</b-switch>
-		<p class="is-size-7 has-text-danger mt-1">
+		<p class="is-size-7 has-text-danger-on-scheme mt-1">
 			{{ tagMode ? $t('It runs whatever is tagged with a higher version.') : $t('It runs whatever is pushed to the branch.') }}
 		</p>
 
@@ -127,7 +127,7 @@
 			<b-switch :disabled="!canAct" :model-value="webhookOn" size="is-small" @update:model-value="setWebhook">
 				{{ $t('Check on every push') }}
 			</b-switch>
-			<p v-if="!webhook.enabled" class="is-size-7 has-text-full-03 mt-1">
+			<p v-if="!webhook.enabled" class="is-size-7 _has-text-gray mt-1">
 				{{ $t('Off: new commits wait for the five-minute check. A restored app comes back with its webhook off; turning it on makes a new secret to give the forge.') }}
 			</p>
 			<div v-else class="is-size-7 mt-2">
@@ -136,7 +136,7 @@
 					<span class="git-repo-tab__mono is-flex-grow-1 mr-2">{{ webhookUrl }}</span>
 					<b-button :aria-label="$t('Copy the URL')" :label="$t('Copy')" rounded size="is-small" @click="copyText(webhookUrl)"></b-button>
 				</div>
-				<p class="is-size-7 has-text-full-03 mb-2">{{ $t('If your forge reaches the box by another address (a domain, a tunnel), use that one instead.') }}</p>
+				<p class="is-size-7 _has-text-gray mb-2">{{ $t('If your forge reaches the box by another address (a domain, a tunnel), use that one instead.') }}</p>
 
 				<p class="has-text-weight-bold mb-1">{{ $t('Secret') }}</p>
 				<div class="is-flex is-align-items-center is-flex-wrap-wrap mb-2">
@@ -159,7 +159,7 @@
 
 				<p class="has-text-weight-bold mb-1">{{ $t('Last delivery') }}</p>
 				<p v-if="webhook.last_delivery">{{ deliveryLine }}</p>
-				<p v-else class="is-size-7 has-text-full-03">
+				<p v-else class="is-size-7 _has-text-gray">
 					{{ $t('No delivery yet.') }} {{ $t('The forge must be able to reach the box. GitHub sends a ping as the webhook is saved: that is enough to check.') }}
 				</p>
 			</div>
@@ -179,12 +179,12 @@
 
 		<!-- the remote's eligible tags, highest first, as the server answered them -->
 		<template v-if="tags && tagMode">
-			<p v-if="!tags.length" class="is-size-7 has-text-full-03 mt-2">{{ $t('No tag to deploy.') }}</p>
+			<p v-if="!tags.length" class="is-size-7 _has-text-gray mt-2">{{ $t('No tag to deploy.') }}</p>
 			<table v-else class="table is-narrow is-fullwidth is-size-7 mt-2">
 				<tbody>
 					<tr v-for="(tag, index) in tags" :key="tag.name" class="git-repo-tab__tag">
 						<td>
-							<span class="git-repo-tab__mono">{{ tag.name }}</span> <span class="git-repo-tab__mono has-text-full-03">{{ short(tag.commit) }}</span>
+							<span class="git-repo-tab__mono">{{ tag.name }}</span> <span class="git-repo-tab__mono _has-text-gray">{{ short(tag.commit) }}</span>
 						</td>
 						<td>
 							<b-tag v-for="label in labelsOf(tag, index)" :key="label" class="mr-1">{{ $t(label) }}</b-tag>
@@ -204,17 +204,17 @@
 		<pre ref="log" class="git-repo-tab__text git-repo-tab__log">{{ log || $t('No build yet.') }}</pre>
 
 		<p class="has-text-weight-bold is-size-7 mt-4 mb-2">{{ $t('Last deployments') }}</p>
-		<p v-if="!history.length" class="is-size-7 has-text-full-03">{{ $t('No deployment yet.') }}</p>
+		<p v-if="!history.length" class="is-size-7 _has-text-gray">{{ $t('No deployment yet.') }}</p>
 		<table v-else class="table is-narrow is-fullwidth is-size-7">
 			<tbody>
 				<tr v-for="entry in history" :key="`${entry.commit}-${entry.at}`" class="git-repo-tab__deployment">
 					<td>
 						<span class="git-repo-tab__mono">{{ version(entry) }}</span> {{ entry.subject }}
-						<p class="has-text-full-03">{{ when(entry.at) }}</p>
+						<p class="_has-text-gray">{{ when(entry.at) }}</p>
 					</td>
 					<td>
 						<b-tag :type="outcomeTag(entry.outcome).type">{{ $t(outcomeTag(entry.outcome).label) }}</b-tag>
-						<p v-if="entry.reason" class="has-text-full-03">{{ entry.reason }}</p>
+						<p v-if="entry.reason" class="_has-text-gray">{{ entry.reason }}</p>
 					</td>
 					<td class="has-text-right">
 						<b-button v-if="canRevert(gitApp, entry)" :disabled="!canAct" :loading="busy === entry.commit" rounded

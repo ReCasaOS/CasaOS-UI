@@ -1,13 +1,13 @@
 <template>
 	<div class="modal-card backup-destinations">
-		<header class="modal-card-head b-line">
-			<h3 class="title is-5 has-text-black">{{ $t('Backups') }}</h3>
+		<header class="modal-card-head">
+			<h3 class="title is-header">{{ $t('Backups') }}</h3>
 		</header>
 		<section class="modal-card-body">
-			<b-tabs v-model="tab" size="is-small" type="is-boxed">
+			<b-tabs v-model="tab">
 				<b-tab-item :label="$t('Destinations')">
 					<div class="is-flex is-align-items-center mb-2">
-						<p class="has-text-full-03 is-size-7 is-flex-grow-1">
+						<p class="_has-text-gray is-size-7 is-flex-grow-1">
 							{{ $t('Where backups are sent. Credentials are kept by rclone, alongside the cloud drives this box already mounts.') }}
 						</p>
 						<b-button :loading="isLoading" rounded size="is-small" @click="load">
@@ -19,33 +19,40 @@
 						{{ error }}
 					</b-message>
 
-					<p v-if="!isLoading && !destinations.length" class="has-text-full-03 is-size-7 mb-4">
+					<p v-if="!isLoading && !error && !destinations.length" class="_has-text-gray is-size-7 mb-4">
 						{{ $t('No destination yet. Add one below.') }}
 					</p>
 
-					<div v-for="name in destinations" :key="name" class="destination is-flex is-align-items-center mb-2">
-						<span class="is-flex-grow-1 has-text-weight-medium">{{ name }}</span>
+					<!-- the check result sits under the name: an rclone error is a paragraph,
+						and beside the buttons it pushed them off a phone -->
+					<div v-for="name in destinations" :key="name"
+						class="destination is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center mb-2">
+						<div class="_text mr-3">
+							<p class="has-text-weight-medium">{{ name }}</p>
+							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
+						</div>
 
-						<span v-if="checked[name]" class="has-text-full-03 is-size-7 mr-3">{{ checked[name] }}</span>
-
-						<b-button :loading="busy === `check:${name}`" class="mr-1" rounded size="is-small"
-							@click="check(name)">
-							{{ $t('Check') }}
-						</b-button>
-						<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
-							{{ $t('Restore\u2026') }}
-						</b-button>
-						<b-button :loading="busy === `delete:${name}`" rounded size="is-small" type="is-danger"
-							@click="confirmForget(name)">
-							{{ $t('Forget') }}
-						</b-button>
+						<!-- ml-auto: on a line of their own, the buttons stay on the right -->
+						<div class="is-flex ml-auto">
+							<b-button :loading="busy === `check:${name}`" class="mr-1" rounded size="is-small"
+								@click="check(name)">
+								{{ $t('Check') }}
+							</b-button>
+							<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
+								{{ $t('Restore\u2026') }}
+							</b-button>
+							<b-button :loading="busy === `delete:${name}`" rounded size="is-small" type="is-danger"
+								@click="confirmForget(name)">
+								{{ $t('Forget') }}
+							</b-button>
+						</div>
 					</div>
 
 					<!-- The box itself: users, shares and their accounts, schedules, the
 						destinations above. Restored from the destination browser like an app,
 						under "This box". -->
-					<div v-if="destinations.length" class="is-flex is-align-items-center mt-3 mb-2">
-						<p class="has-text-full-03 is-size-7 is-flex-grow-1">
+					<div v-if="destinations.length" class="is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center mt-3 mb-2">
+						<p class="_text _has-text-gray is-size-7 mr-2">
 							{{ $t('Back up this box itself: its users, its shares and their accounts, its schedules, these destinations.') }}
 						</p>
 						<b-select v-model="systemDestination" class="mr-2" size="is-small">
@@ -71,16 +78,19 @@
 						</b-select>
 					</b-field>
 
-					<p v-if="backendHelp(draft.backend)" class="has-text-full-03 is-size-7 mb-2">
+					<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
 						{{ $t(backendHelp(draft.backend)) }}
 					</p>
-					<p class="has-text-full-03 is-size-7 mb-2">
+					<p class="_has-text-gray is-size-7 mb-2">
 						{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}
 					</p>
 
+					<!-- new-password on anything typed as a password: otherwise the browser
+						fills the dashboard's own login in, and it is sent to rclone -->
 					<div v-for="(row, index) in draft.rows" :key="index" class="is-flex mb-1">
 						<b-input v-model="row.key" :placeholder="$t('Option')" class="mr-1" expanded size="is-small" />
-						<b-input v-model="row.value" :placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
+						<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
+							:placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
 							expanded password-reveal size="is-small" />
 						<b-button class="ml-1" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
 							@click="draft.rows.splice(index, 1)" />
@@ -91,12 +101,13 @@
 					</b-field>
 					<template v-if="draft.encrypt">
 						<b-field :label="$t('Encryption password')" label-position="on-border">
-							<b-input v-model="draft.password" expanded password-reveal size="is-small" type="password" />
+							<b-input v-model="draft.password" autocomplete="new-password" expanded password-reveal size="is-small"
+								type="password" />
 						</b-field>
 						<!-- said here rather than in a dialog later: the password is kept by
 							rclone and never comes back, and a destination without it is a
 							bucket of ciphertext -->
-						<p class="has-text-full-03 is-size-7 mb-2">
+						<p class="_has-text-gray is-size-7 mb-2">
 							{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}
 						</p>
 					</template>
@@ -214,7 +225,7 @@ export default {
 				const res = await this.$api.backup.getDestinations()
 				this.destinations = res.data.data || []
 			} catch (error) {
-				this.error = this.messageOf(error)
+				this.error = this.$t('Destinations could not be loaded: {error}', { error: this.messageOf(error) })
 			} finally {
 				this.isLoading = false
 			}
@@ -323,6 +334,12 @@ export default {
 .backup-destinations {
   .destination {
     min-height: 2rem;
+  }
+
+  // a basis rather than flex-grow alone: the text shares its line with the
+  // controls on a wide card and takes its own line on a phone
+  ._text {
+    flex: 1 1 14rem;
   }
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
 	<div>
 		<div class="is-flex is-align-items-center mb-2">
-			<p class="has-text-full-03 is-size-7 is-flex-grow-1">
+			<p class="_has-text-gray is-size-7 is-flex-grow-1">
 				{{ $t('Backups that run on their own. A missed slot catches up at the next check rather than waiting for the next day.') }}
 			</p>
 			<b-button :loading="isLoading" rounded size="is-small" @click="load">{{ $t('Refresh') }}</b-button>
@@ -9,7 +9,7 @@
 
 		<b-message v-if="error" class="mb-2" size="is-small" type="is-danger">{{ error }}</b-message>
 
-		<p v-if="!isLoading && !schedules.length" class="has-text-full-03 is-size-7 mb-3">
+		<p v-if="!isLoading && !error && !schedules.length" class="_has-text-gray is-size-7 mb-3">
 			{{ $t('Nothing is scheduled.') }}
 		</p>
 
@@ -18,7 +18,7 @@
 				<b-select v-model="schedule.app" class="mr-1" expanded size="is-small">
 					<option v-for="app in apps" :key="app" :value="app">{{ app }}</option>
 				</b-select>
-				<span class="mr-1 has-text-full-03 is-size-7">{{ $t('to') }}</span>
+				<span class="mr-1 _has-text-gray is-size-7">{{ $t('to') }}</span>
 				<b-select v-model="schedule.destination" class="mr-1" expanded size="is-small">
 					<option v-for="name in destinations" :key="name" :value="name">{{ name }}</option>
 				</b-select>
@@ -26,7 +26,7 @@
 					@click="schedules.splice(index, 1)" />
 			</div>
 
-			<div class="is-flex is-align-items-center">
+			<div class="is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
 				<b-select v-model="schedule.every" class="mr-1" size="is-small">
 					<option value="daily">{{ $t('Every day') }}</option>
 					<option value="weekly">{{ $t('Every week') }}</option>
@@ -36,10 +36,10 @@
 					<option v-for="(day, number) in weekdays" :key="number" :value="number">{{ $t(day) }}</option>
 				</b-select>
 
-				<span class="mr-1 has-text-full-03 is-size-7">{{ $t('at') }}</span>
+				<span class="mr-1 _has-text-gray is-size-7">{{ $t('at') }}</span>
 				<b-input v-model="schedule.at" class="mr-2 _time" placeholder="03:00" size="is-small" />
 
-				<span class="mr-1 has-text-full-03 is-size-7">{{ $t('keep') }}</span>
+				<span class="mr-1 _has-text-gray is-size-7">{{ $t('keep') }}</span>
 				<b-input v-model.number="schedule.keep" class="mr-2 _keep" min="0" size="is-small" type="number" />
 
 				<b-switch v-model="schedule.hold_still" class="mr-2" size="is-small">{{ $t('Stop app') }}</b-switch>
@@ -47,7 +47,7 @@
 			</div>
 		</div>
 
-		<p class="has-text-full-03 is-size-7 mb-2">
+		<p class="_has-text-gray is-size-7 mb-2">
 			{{ $t('Keep 0 means every backup is kept. Nothing here deletes a backup unless a number says to.') }}
 		</p>
 
@@ -99,7 +99,7 @@ export default {
 					.map(item => item.name)
 					.sort()
 			} catch (error) {
-				this.error = this.messageOf(error)
+				this.error = this.$t('Schedules could not be loaded: {error}', { error: this.messageOf(error) })
 			} finally {
 				this.isLoading = false
 			}
