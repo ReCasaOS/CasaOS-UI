@@ -10,6 +10,7 @@ export const DEFAULT_APP_LAUNCH_EXCEPTIONS = ['qbittorrent', 'org.icewhale.qbitt
 // named by its project, which has no colon), so that the same setting and the
 // same exception list send them to a tab of their own too.
 export const FILES_LAUNCH_ID = 'casaos:files'
+export const APP_STORE_LAUNCH_ID = 'casaos:app-store'
 
 function identifiersOf(appInfo) {
 	return [appInfo && appInfo.id, appInfo && appInfo.name]

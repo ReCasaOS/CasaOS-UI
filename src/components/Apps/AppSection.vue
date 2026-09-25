@@ -106,6 +106,7 @@ import AppSectionTitleTip from './AppSectionTitleTip.vue'
 import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
+import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -431,6 +432,12 @@ export default {
 		async showInstall(storeId = 0, mode = '') {
 			if (mode === 'custom') {
 				this.$messageBus('apps_custominstall')
+			} else if (builtinOpensInNewTab(APP_STORE_LAUNCH_ID, this.$store.state)) {
+				// the store follows the App launching setting; a custom install is a
+				// form, and stays here
+				const query = storeId ? `?store=${storeId}` : ''
+				window.open(`${window.location.pathname}#/appstore${query}`, '_blank')
+				return
 			}
 			this.isShowing = true
 

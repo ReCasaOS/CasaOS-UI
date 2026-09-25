@@ -58,7 +58,7 @@
 </template>
 
 <script>
-import { FILES_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
 
 export default {
 	name: 'AppLaunchModal',
@@ -73,7 +73,10 @@ export default {
 	},
 	computed: {
 		builtins() {
-			return [{ id: FILES_LAUNCH_ID, title: this.$t('Files') }]
+			return [
+				{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') },
+				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
+			]
 		},
 	},
 	async mounted() {
