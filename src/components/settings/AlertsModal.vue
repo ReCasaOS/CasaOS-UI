@@ -40,7 +40,8 @@
 						</div>
 					</div>
 					<span v-if="tested[channel.id]" class="is-size-7 mr-3">{{ tested[channel.id] }}</span>
-					<b-button :loading="busy === channel.id" class="mr-1" rounded size="is-small" @click="test(channel)">
+					<!-- a channel not saved yet has no id: a test without one would go to every channel -->
+					<b-button :disabled="!channel.id || saving" :loading="busy === channel.id" class="mr-1" rounded size="is-small" @click="test(channel)">
 						{{ $t('Test') }}
 					</b-button>
 					<b-button :disabled="saving" class="mr-1" rounded size="is-small" @click="rename(channel)">
@@ -64,8 +65,8 @@
 				</b-field>
 				<b-field :label="$t('Service')" label-position="on-border">
 					<b-select :model-value="draft.kind" expanded size="is-small" @update:model-value="pick">
-						<option v-for="kind in kinds" :key="kind.id" :value="kind.id">
-							{{ $t(kind.label) }}
+						<option v-for="option in kinds" :key="option.id" :value="option.id">
+							{{ $t(option.label) }}
 						</option>
 					</b-select>
 				</b-field>
@@ -73,7 +74,9 @@
 					{{ $t(kind.help) }}
 				</p>
 				<b-field v-for="field in kind.fields" :key="field.key" :label="$t(field.label)" label-position="on-border">
+					<!-- new-password: the browser must not fill the dashboard's own login in here -->
 					<b-input v-model="draft.values[field.key]"
+						:autocomplete="field.secret ? 'new-password' : 'off'"
 						:password-reveal="field.secret"
 						:placeholder="field.placeholder"
 						:type="field.secret ? 'password' : 'text'"
@@ -250,7 +253,8 @@ export default {
 			this.tested = { ...this.tested, [channel.id]: said }
 		},
 
-		// the last failure names its channel by id; one removed since is named as is
+		// the last failure names its channel (by name, or by id for an older core);
+		// one that no longer matches is shown as the core wrote it
 		channelName(id) {
 			const channel = this.view.channels.find(one => one.id === id)
 			return channel ? channel.name : id

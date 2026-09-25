@@ -90,7 +90,9 @@ export function channelURL(kind, values) {
 			return `telegram://${v.token.split(':').map(e).join(':')}@telegram?chats=${e(v.chat)}`
 		case 'email': {
 			const credentials = v.user ? `${e(v.user)}:${e(v.password)}@` : ''
-			return `smtp://${credentials}${e(v.host)}:${e(v.port)}/?from=${e(v.from)}&to=${e(v.to)}`
+			// "a@x.com, b@x.com" is two recipients, not one with a leading space
+			const to = String(v.to || '').split(',').map(address => address.trim()).filter(Boolean).join(',')
+			return `smtp://${credentials}${e(v.host)}:${e(v.port)}/?from=${e(v.from)}&to=${e(to)}`
 		}
 		default:
 			return v.url

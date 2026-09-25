@@ -64,6 +64,11 @@ describe('e-mail', () => {
 		}))).toBe('smtp://me%40example.com:p%40ss%3Aw%2Frd%3F%26%23%25@mail.example.com:465/?from=box%40example.com&to=a%40example.com%2Cb%40example.com')
 	})
 
+	it('reads recipients typed with spaces after the commas', () => {
+		expect(channelURL('email', form('email', { host: 'relay.lan', port: '25', from: 'box@lan', to: ' a@lan, b@lan ,' })))
+			.toBe('smtp://relay.lan:25/?from=box%40lan&to=a%40lan%2Cb%40lan')
+	})
+
 	it('leaves the credentials out for a relay that takes none', () => {
 		expect(channelURL('email', form('email', { host: 'relay.lan', port: '25', from: 'box@lan', to: 'me@lan' })))
 			.toBe('smtp://relay.lan:25/?from=box%40lan&to=me%40lan')
