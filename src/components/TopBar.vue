@@ -175,6 +175,21 @@
 					</div>
 					<!-- Backup destinations End -->
 
+					<!-- Alerts Start -->
+					<div v-if="alertsAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="bell-outline" />
+							{{ $t("Alerts") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showAlerts">
+								{{ $t("Change") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Alerts End -->
+
 					<!-- Background Start -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -484,6 +499,7 @@ import UpdateModal from './settings/UpdateModal.vue'
 import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
+import AlertsModal from './settings/AlertsModal.vue'
 import { mixin } from '@/mixins/mixin'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
@@ -539,6 +555,9 @@ export default {
 			// feature shows no row.
 			autoUpdate: null,
 			autoUpdateSaving: false,
+			// true once the core answers GET /v1/sys/alerts: a core older than the
+			// feature shows no row.
+			alertsAvailable: false,
 			// The window's two selects: whole hours, 00:00 to 23:00.
 			hours: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`),
 			deviceModel: '',
@@ -655,6 +674,7 @@ export default {
 		this.getUsbStatus()
 		this.getTelemetry()
 		this.getAutoUpdate()
+		this.getAlerts()
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
@@ -751,6 +771,25 @@ export default {
 				component: BackupDestinations,
 				hasModalCard: true,
 				customClass: 'backup-modal',
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(): the dialog reads the channels itself.
+		getAlerts() {
+			this.$api.sys.getAlerts().then(() => {
+				this.alertsAvailable = true
+			}).catch(() => {})
+		},
+
+		showAlerts() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: AlertsModal,
+				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
 				scroll: 'keep',

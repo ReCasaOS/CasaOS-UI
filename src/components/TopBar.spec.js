@@ -4,6 +4,7 @@ import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
+import AlertsModal from './settings/AlertsModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
@@ -45,6 +46,7 @@ describe('the anonymous statistics switch', () => {
 			getUsbStatus: vi.fn(),
 			getHardwareInfo: vi.fn(),
 			getAutoUpdate: vi.fn(),
+			getAlerts: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
 			vm[name] = TopBar.methods[name].bind(vm)
@@ -156,6 +158,7 @@ describe('the automatic update row', () => {
 			getTelemetry: vi.fn(),
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
+			getAlerts: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
 			vm[name] = TopBar.methods[name].bind(vm)
@@ -317,5 +320,74 @@ describe('the automatic update row', () => {
 		expect(fr[key]).not.toBe(key)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
+	})
+})
+
+describe('the alerts row', () => {
+	function bar(sys) {
+		const vm = {
+			alertsAvailable: false,
+			$api: { sys },
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getAlerts', 'showAlerts'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('shows once the core answers', async () => {
+		const vm = bar({ getAlerts: vi.fn(() => Promise.resolve({ data: { success: 200, data: { channels: [] } } })) })
+
+		vm.getAlerts()
+		await flushPromises()
+
+		expect(vm.alertsAvailable).toBe(true)
+	})
+
+	// A core older than the feature answers 404: no row that could not work.
+	it('shows no row against an older core', async () => {
+		const vm = bar({ getAlerts: vi.fn(() => Promise.reject(new Error('404'))) })
+
+		vm.getAlerts()
+		await flushPromises()
+
+		expect(vm.alertsAvailable).toBe(false)
+		expect(source).toMatch(/<div v-if="alertsAvailable"/)
+	})
+
+	it('asks the core when the bar mounts', () => {
+		const vm = {
+			$EventBus: createEventBus(),
+			getAlerts: vi.fn(),
+			// The rest of mounted(), which this test does not look at.
+			checkVersion: vi.fn(),
+			getUserInfo: vi.fn(),
+			getUsbStatus: vi.fn(),
+			getTelemetry: vi.fn(),
+			getAutoUpdate: vi.fn(),
+			getHardwareInfo: vi.fn(),
+			onTelemetryChanged: vi.fn(),
+		}
+
+		TopBar.mounted.call(vm)
+
+		expect(vm.getAlerts).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens the dialog from Change', () => {
+		const vm = bar({})
+
+		vm.showAlerts()
+
+		expect(source).toMatch(/<!-- Alerts Start -->[\s\S]*?@click="showAlerts"[\s\S]*?<!-- Alerts End -->/)
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: AlertsModal }))
+	})
+
+	it('says "Alerts" in English and French', () => {
+		expect(en.Alerts).toBe('Alerts')
+		expect(fr.Alerts).toBe('Alertes')
 	})
 })
