@@ -11,7 +11,7 @@
 		<!-- Modal-Card Body Start -->
 		<section class="modal-card-body ">
 			<!-- which wallpaper: the dashboard's, or the login screen's -->
-			<b-field class="is-flex is-justify-content-center mb-0">
+			<b-field class="mb-0" position="is-centered">
 				<b-radio-button :model-value="target" native-value="desktop" size="is-small" @update:model-value="switchTarget">
 					{{ $t('Dashboard') }}
 				</b-radio-button>
