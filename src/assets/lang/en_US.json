@@ -2924,5 +2924,9 @@
   "Update {name}": "Update {name}",
   "No container matches this filter": "No container matches this filter",
   "on {box}": "on {box}",
-  "No virtual machine matches this filter": "No virtual machine matches this filter"
+  "No virtual machine matches this filter": "No virtual machine matches this filter",
+  "Dashboard": "Dashboard",
+  "Login screen": "Login screen",
+  "Shown behind the login box. The first wallpaper is the default one.": "Shown behind the login box. The first wallpaper is the default one.",
+  "Login screen wallpaper saved.": "Login screen wallpaper saved."
 }

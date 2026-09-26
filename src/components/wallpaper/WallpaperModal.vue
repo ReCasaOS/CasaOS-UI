@@ -10,12 +10,26 @@
 		<!-- Modal-Card Header End -->
 		<!-- Modal-Card Body Start -->
 		<section class="modal-card-body ">
+			<!-- which wallpaper: the dashboard's, or the login screen's -->
+			<b-field class="is-flex is-justify-content-center mb-0">
+				<b-radio-button :model-value="target" native-value="desktop" size="is-small" @update:model-value="switchTarget">
+					{{ $t('Dashboard') }}
+				</b-radio-button>
+				<b-radio-button :model-value="target" native-value="login" size="is-small" @update:model-value="switchTarget">
+					{{ $t('Login screen') }}
+				</b-radio-button>
+			</b-field>
+
 			<div class="preview-card">
 				<div :style="backgroundStyleObj" class="preview-image">
-					<b-image :src="require('@/assets/background/preview-widget.svg')" class="preview-widget"></b-image>
+					<b-image v-if="target === 'desktop'" :src="require('@/assets/background/preview-widget.svg')" class="preview-widget"></b-image>
+					<div v-else class="preview-login"></div>
 					<b-image :src="require('@/assets/background/blank.png')"></b-image>
 				</div>
 			</div>
+			<p v-if="target === 'login'" class="is-size-7 has-text-centered login-note">
+				{{ $t('Shown behind the login box. The first wallpaper is the default one.') }}
+			</p>
 
 			<div class="columns is-mobile mt-5 mb-5 is-variable is-2">
 				<div v-for="(item, index) in wallpaperItems" :key="`wallpaper${index}`" class="column">
@@ -50,10 +64,15 @@
 
 <script>
 import Uploader from 'simple-uploader.js'
+import { LOGIN_WALLPAPER_KEY, LOGIN_WALLPAPER_NAME, findLoginWallpaper, loginWallpaperPath, toJPEG } from './loginWallpaper'
 
 const wallpaperConfig = 'wallpaper'
+// where an image uploaded for the login screen goes before it is converted:
+// not over the dashboard's own upload
+const loginUploadKey = `${LOGIN_WALLPAPER_KEY}-upload`
 
 export default {
+	components: {},
 	data() {
 		return {
 			isLoading: false,
@@ -77,12 +96,18 @@ export default {
 			},
 			path: this.$store.state.wallpaperObject.path,
 			from: this.$store.state.wallpaperObject.from,
+			target: 'desktop',
+			// each wallpaper's choice, kept while the other one is shown; the
+			// login screen's is the built-in one until a file is found
+			choices: {
+				desktop: { path: this.$store.state.wallpaperObject.path, from: this.$store.state.wallpaperObject.from },
+				login: { path: require('@/assets/background/wallpaper01.jpg'), from: 'Built-in' },
+			},
 		}
 	},
-	components: {},
 	created() {
 		this.uploader = new Uploader({
-			target: this.getTargetUrl(),
+			target: this.getTargetUrl(wallpaperConfig),
 			singleFile: true,
 			testChunks: false,
 			uploadMethod: 'POST',
@@ -91,6 +116,11 @@ export default {
 		})
 	},
 	mounted() {
+		findLoginWallpaper().then((url) => {
+			if (url) {
+				this.choices.login = { path: url, from: 'Login' }
+			}
+		})
 		this.uploader.assignBrowse(document.getElementById('upload-wallpaper'), false, true, this.attributes)
 		this.uploader.on('filesSubmitted', () => {
 			this.isUpLoading = true
@@ -124,7 +154,19 @@ export default {
 		})
 	},
 	methods: {
+		switchTarget(target) {
+			this.choices[this.target] = { path: this.path, from: this.from }
+			this.target = target
+			const { path, from } = this.choices[target]
+			this.path = path
+			this.from = from
+			this.backgroundStyleObj.backgroundImage = `url(${this.parseUrl(path)})`
+			this.uploader.opts.target = this.getTargetUrl(target === 'login' ? loginUploadKey : wallpaperConfig)
+		},
 		saveChange() {
+			if (this.target === 'login') {
+				return this.saveLogin()
+			}
 			const data = {
 				path: this.path,
 				from: this.from,
@@ -149,6 +191,32 @@ export default {
 				}
 			})
 		},
+		// The login screen's wallpaper is a file: converted and uploaded, or
+		// deleted for the built-in one.
+		async saveLogin() {
+			if (this.from === 'Login') {
+				this.$emit('close')
+				return
+			}
+			this.isLoading = true
+			try {
+				if (this.path === this.wallpaperItems[0].path) {
+					await this.$api.users.removeUserImage(loginWallpaperPath(this.$store.state.user.id || 1)).catch(() => {})
+				} else {
+					const blob = await toJPEG(this.parseUrl(this.path))
+					const res = await this.$api.users.uploadUserImage(LOGIN_WALLPAPER_KEY, blob, LOGIN_WALLPAPER_NAME)
+					if (res.data.success !== 200) {
+						throw new Error(res.data.message)
+					}
+				}
+				this.$buefy.toast.open({ message: this.$t('Login screen wallpaper saved.'), type: 'is-success' })
+				this.$emit('close')
+			} catch {
+				this.$buefy.toast.open({ message: this.$t('Save failed, please try again!'), type: 'is-danger' })
+			} finally {
+				this.isLoading = false
+			}
+		},
 		changeWallpaper(path) {
 			this.backgroundStyleObj.backgroundImage = `url(${this.parseUrl(path)})`
 			this.path = path
@@ -161,9 +229,9 @@ export default {
 		checkActiveFrom(from) {
 			return this.from == from
 		},
-		getTargetUrl() {
+		getTargetUrl(key) {
 			const accessToken = localStorage.getItem('access_token')
-			return `${this.$protocol}//${this.$baseURL}/v1/users/current/image/${wallpaperConfig}?token=${accessToken}&type=wallpaper`
+			return `${this.$protocol}//${this.$baseURL}/v1/users/current/image/${key}?token=${accessToken}&type=wallpaper`
 		},
 		parseUrl(serverUrl) {
 			const newUrl = serverUrl.replace('SERVER_URL', `${this.$protocol}//${this.$baseURL}`)
@@ -177,7 +245,7 @@ export default {
 .preview-card {
 	margin-left: 2.625rem;
 	margin-right: 2.625rem;
-	margin-top: 3rem;
+	margin-top: 1.5rem;
 	margin-bottom: 3rem;
 	border: 6px solid transparent;
 	border-radius: 16px;
@@ -194,6 +262,20 @@ export default {
 	.preview-image {
 		position: relative;
 		overflow: hidden;
+
+		// the login box, where the dashboard preview shows its widgets
+		.preview-login {
+			position: absolute;
+			left: 50%;
+			top: 50%;
+			z-index: 1;
+			width: 22%;
+			height: 46%;
+			transform: translate(-50%, -50%);
+			border-radius: 8px;
+			background: rgba(255, 255, 255, 0.72);
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+		}
 
 		.preview-widget {
 			position: absolute;
@@ -239,6 +321,12 @@ export default {
 		overflow: hidden;
 		background-color: var(--casa-surface-tile);
 	}
+}
+
+.login-note {
+	margin-top: -2rem;
+	margin-bottom: 1rem;
+	color: var(--casa-text-hint);
 }
 
 .preview-image {
