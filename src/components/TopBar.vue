@@ -222,6 +222,24 @@
 					</div>
 					<!-- Beta dashboard Switch End -->
 
+					<!-- Terminal full screen Switch Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" icon="terminal-outline" pack="casa" size="is-20" />
+							{{ $t("Open the Terminal full screen") }}
+						</div>
+						<div>
+							<b-field>
+								<b-switch v-model="terminalFullScreen"
+									class="is-flex-direction-row-reverse mr-0 _small"
+									type="is-dark"
+									@update:model-value="setTerminalFullScreen" />
+							</b-field>
+						</div>
+					</div>
+					<!-- Terminal full screen Switch End -->
+
 					<!-- App Launching Start -->
 					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
@@ -594,6 +612,7 @@ import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
 import { powerRefusal } from './settings/osUpgrade'
+import { opensFullScreen, setOpensFullScreen } from './logsAndTerminal/terminalLogin'
 import { mixin } from '@/mixins/mixin'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
@@ -691,6 +710,7 @@ export default {
 			],
 			restart: 'Restart',
 			shutdown: 'Shutdown',
+			terminalFullScreen: opensFullScreen(),
 			showPower: false,
 			showPowerTitle: '',
 			showPowerMessage: '',
@@ -822,6 +842,10 @@ export default {
 		 * @param {boolean} isOpen
 		 * @return {*}
 		 */
+		setTerminalFullScreen(on) {
+			setOpensFullScreen(on)
+		},
+
 		onOpen(isOpen) {
 			if (isOpen) {
 				this.$store.commit('SET_SIDEBAR_CLOSE')

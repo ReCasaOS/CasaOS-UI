@@ -1,42 +1,12 @@
 <template>
-	<fullscreen :class="[{ 'mt-4': !fullscreen }, isVaild ? 'fdark-bg' : 'flight-bg']" v-model:fullscreen="fullscreen"
-		:page-only="true" :teleport="true" class="fullScreen  pl-2 pt-2 pb-2" @change="onWindowResize">
-		<a v-if="isVaild" class="fullscreen-button" @click="toggleFullScreen">
+	<fullscreen v-model:fullscreen="fullscreen" :class="{ 'mt-4': !fullscreen }" :page-only="true" :teleport="true"
+		class="fullScreen fdark-bg pl-2 pt-2 pb-2" @change="onWindowResize">
+		<a class="fullscreen-button" @click="toggleFullScreen">
 			<b-icon :icon="buttonIcon"></b-icon>
 		</a>
-		<div id="terminal" class="is-flex is-align-items-center is-justify-content-center">
-			<div v-if="!isVaild" class="card card-shadow mb-6">
-				<div class="card-content">
-					<div class="content">
-						<b-notification v-model="notificationShow" :closable="false" aria-close-label="Close notification"
-							auto-close role="alert" type="is-danger">
-							{{ $t(message) }}
-						</b-notification>
-						<b-field :label="$t('Username')">
-							<b-input v-model="sshUser" name="username" @keyup.enter="checkLogin"></b-input>
-						</b-field>
-
-						<b-field :label="$t('Password')">
-							<b-input v-model="sshPassword" name="password" password-reveal type="password"
-								@keyup.enter="checkLogin">
-							</b-input>
-						</b-field>
-
-						<b-field :label="$t('Port')">
-							<b-input v-model="sshPort" name="port" type="number"
-								@keyup.enter="checkLogin"></b-input>
-						</b-field>
-						<div class="buttons mt-5">
-							<b-button :loading="isConnecting" expanded rounded type="is-primary" @click="checkLogin">{{
-								$t('Connect')
-							}}
-							</b-button>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div v-else id="xterm" :class="[fullscreen ? 'fullheight' : 'sheight']" class="xterm"></div>
+		<!-- As a console, and as ZimaOS: the terminal at once, its login inside -->
+		<div id="terminal">
+			<div id="xterm" :class="[fullscreen ? 'fullheight' : 'sheight']" class="xterm"></div>
 		</div>
 	</fullscreen>
 </template>
@@ -47,6 +17,7 @@ import 'xterm/css/xterm.css'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { AttachAddon } from 'xterm-addon-attach'
+import { LOGIN_PORT_KEY, LOGIN_USER_KEY, opensFullScreen, parseLogin } from './terminalLogin'
 
 const fitAddon = new FitAddon()
 export default {
@@ -58,7 +29,8 @@ export default {
 	},
 	data() {
 		return {
-			fullscreen: false,
+			// the Settings switch says how it opens
+			fullscreen: opensFullScreen(),
 			isConnecting: false,
 			term: '',
 			rows: 40,
@@ -66,11 +38,13 @@ export default {
 			state: true,
 			isVaild: false,
 			wsUrl: '',
+			// the login typed at the prompt: step user, then password
+			step: 'user',
+			line: '',
 			sshUser: '',
 			sshPassword: '',
 			sshPort: 22,
-			message: '',
-			notificationShow: false,
+			inputHandler: null,
 		}
 	},
 	computed: {
@@ -85,14 +59,22 @@ export default {
 		this.rows = document.getElementById('terminal').offsetHeight / 16 - 6
 		this.cols = document.getElementById('terminal').offsetWidth / 14
 
-		if (this.initWsUrl != '') {
-			this.isVaild = true
-			this.wsUrl = this.initWsUrl
-			this.initSocket()
-		}
+		// once the dialog has opened: a terminal made while it still animates
+		// measures nothing, and draws nothing of what is written to it
+		this.startTimer = setTimeout(() => {
+			this.createTerm()
+			if (this.initWsUrl) {
+				this.isVaild = true
+				this.wsUrl = this.initWsUrl
+				this.initSocket()
+			} else {
+				this.promptLogin()
+			}
+		}, 350)
 	},
 	beforeUnmount() {
-		if (this.isVaild) {
+		clearTimeout(this.startTimer)
+		if (this.socket) {
 			this.socket.close()
 		}
 		if (this.term != '')
@@ -101,6 +83,65 @@ export default {
 	},
 
 	methods: {
+		// The prompt a console shows; the last user is offered, Enter takes it.
+		promptLogin() {
+			const last = localStorage.getItem(LOGIN_USER_KEY) || ''
+			this.step = 'user'
+			this.line = ''
+			this.term.write(`\r\n${this.$t('recasos login')}${last ? ` (${last})` : ''}: `)
+			this.inputHandler?.dispose()
+			this.inputHandler = this.term.onData(data => this.onLoginInput(data, last))
+		},
+		// Typing at the login prompt: the user is echoed, the password is not.
+		onLoginInput(data, last) {
+			for (const ch of data) {
+				if (ch === '\r') {
+					this.term.write('\r\n')
+					this.submitLine(last)
+					return
+				}
+				if (ch === '\u0003') { // Ctrl+C starts over
+					this.term.write('^C')
+					this.promptLogin()
+					return
+				}
+				if (ch === '\u007F' || ch === '\b') {
+					if (this.line) {
+						this.line = this.line.slice(0, -1)
+						if (this.step === 'user') {
+							this.term.write('\b \b')
+						}
+					}
+					continue
+				}
+				if (ch >= ' ') {
+					this.line += ch
+					if (this.step === 'user') {
+						this.term.write(ch)
+					}
+				}
+			}
+		},
+		submitLine(last) {
+			if (this.step === 'user') {
+				const { user, port } = parseLogin(this.line || last, localStorage.getItem(LOGIN_PORT_KEY))
+				if (!user) {
+					this.promptLogin()
+					return
+				}
+				this.sshUser = user
+				this.sshPort = port
+				this.step = 'password'
+				this.line = ''
+				this.term.write(`${this.$t('Password')}: `)
+				return
+			}
+			this.sshPassword = this.line
+			this.line = ''
+			this.inputHandler?.dispose()
+			this.inputHandler = null
+			this.checkLogin()
+		},
 		async checkLogin() {
 			this.$messageBus('terminallogs_connect')
 			this.isConnecting = true
@@ -111,41 +152,46 @@ export default {
 			}
 			try {
 				await this.$api.sys.checkSshLogin(postData)
-				this.isConnecting = false
+				localStorage.setItem(LOGIN_USER_KEY, this.sshUser)
+				localStorage.setItem(LOGIN_PORT_KEY, String(this.sshPort))
 				this.isVaild = true
 				postData.token = this.$store.state.access_token
 				this.wsUrl = `${this.$wsProtocol}//${this.$baseURL}/v1/sys/wsssh?${qs.stringify(postData)}`
 				this.initSocket()
 			} catch (error) {
-				this.notificationShow = true
+				const why = error.response?.data?.data || error.message
+				this.term.write(`\r\n${this.$t('Login incorrect')}${why ? ` (${why})` : ''}\r\n`)
+				this.promptLogin()
+			} finally {
+				this.sshPassword = ''
 				this.isConnecting = false
-				this.message = error.response.data.data
 			}
 		},
 		toggleFullScreen() {
 			this.fullscreen = !this.fullscreen
 		},
-		initTerm() {
+		createTerm() {
 			const term = new Terminal({
-				// rendererType: 'canvas',
 				fontSize: 13,
-				cursorStyle: 'underline', // 光标样式
-				cursorBlink: true, // 光标闪烁
+				cursorStyle: 'underline',
+				cursorBlink: true,
 				theme: { background: '#1E1E1E' },
-				rows: Number.parseInt(this.rows), // 行数
-				cols: Number.parseInt(this.cols), // 不指定行数，自动回车后光标从下一行开始
+				rows: Number.parseInt(this.rows),
+				cols: Number.parseInt(this.cols),
 				fontFamily: 'Consolas, Monaco, monospace',
 			})
-			const attachAddon = new AttachAddon(this.socket)
-
-			term.loadAddon(attachAddon)
 			term.loadAddon(fitAddon)
 			term.open(document.getElementById('xterm'))
 			fitAddon.fit()
 			term.focus()
 			this.term = term
 			window.addEventListener('resize', this.onWindowResize)
-
+		},
+		// the session: the terminal talks to the socket from now on
+		initTerm() {
+			this.attach = new AttachAddon(this.socket)
+			this.term.loadAddon(this.attach)
+			this.term.focus()
 			this.socket.send(JSON.stringify({
 				type: 'resize',
 				cols: this.term.cols,
@@ -160,11 +206,7 @@ export default {
 
 			this.socket.onmessage = (event) => {
 				if (event.data == '\r\n\u001B[?2004l\rlogout\r\n') {
-					this.socket.close()
-					if (this.term != '')
-						this.term.dispose()
-					window.removeEventListener('resize', this.onWindowResize)
-					this.isVaild = false
+					this.endSession()
 				}
 			}
 		},
@@ -175,7 +217,20 @@ export default {
 		},
 		socketOnClose() {
 			this.socket.onclose = () => {
-				console.log('close socket')
+				if (this.isVaild && !this.initWsUrl) {
+					this.endSession()
+				}
+			}
+		},
+		// the session ended: a console shows its login again
+		endSession() {
+			this.attach?.dispose()
+			this.attach = null
+			this.socket?.close()
+			this.socket = null
+			this.isVaild = false
+			if (!this.initWsUrl) {
+				this.promptLogin()
 			}
 		},
 		socketOnError() {
@@ -184,12 +239,16 @@ export default {
 			}
 		},
 		onWindowResize() {
-			if (!this.isVaild) {
+			if (!this.term) {
 				return false
 			}
 			this.$nextTick(() => {
 				try {
 					fitAddon.fit()
+					// the login prompt has no session to tell yet
+					if (!this.isVaild || !this.socket) {
+						return
+					}
 					this.socket.send(JSON.stringify({
 						type: 'resize',
 						cols: this.term.cols,
@@ -222,18 +281,6 @@ export default {
 	height: 100%;
 	min-height: 35rem;
 	font-size: 0.75rem;
-
-	.card {
-		.card-content {
-			padding: 2.5rem;
-			width: 25rem;
-		}
-
-		&.card-shadow {
-			box-shadow: 0px 40px 80px rgba(115, 120, 128, 0.25) !important;
-			border-radius: 8px;
-		}
-	}
 }
 
 .xterm {
