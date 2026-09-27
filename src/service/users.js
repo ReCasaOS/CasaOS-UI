@@ -72,7 +72,8 @@ const users = {
 
 	// delete one of the user's images, by its path [login wallpaper]
 	removeUserImage(path) {
-		return api.delete(`${PREFIX}/current/image`, { params: { path } })
+		// the path goes in the query: api.delete sends its second argument as a body
+		return api.delete(`${PREFIX}/current/image?path=${encodeURIComponent(path)}`)
 	},
 
 	// delete user image [NOT USE]
