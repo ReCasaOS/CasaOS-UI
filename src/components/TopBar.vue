@@ -315,6 +315,21 @@
 					</div>
 					<!-- Backup destinations End -->
 
+					<!-- Docker data Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="database-outline" size="is-20" />
+							{{ $t("Docker data") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showDockerLocation">
+								{{ $t("Change") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Docker data End -->
+
 					<!-- Alerts Start -->
 					<div v-if="alertsAvailable"
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -618,6 +633,7 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import AccountPanel from './account/AccountPanel.vue'
 import TerminalPanel from './logsAndTerminal/TerminalPanel.vue'
 import BackupDestinations from './settings/BackupDestinations.vue'
@@ -949,6 +965,21 @@ export default {
 
 		toggleSettings() {
 			this.$refs.settingsDrop.toggle()
+		},
+
+		// Where Docker keeps images, containers and volumes, and moving them.
+		showDockerLocation() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				// loaded when first opened: it brings the folder picker along
+				component: defineAsyncComponent(() => import('./settings/DockerLocationModal.vue')),
+				hasModalCard: true,
+				trapFocus: true,
+				// a move under way cannot be walked away from by accident
+				canCancel: [],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 
 		showBackupDestinations() {
