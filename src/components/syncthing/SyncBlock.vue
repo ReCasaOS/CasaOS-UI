@@ -66,7 +66,7 @@ export default {
 			let app = null
 			try {
 				const res = await this.$openAPI.appGrid.getAppGrid()
-				app = findSyncthing(res.data.data)
+				app = findSyncthing(res.data.data, this.$baseIp)
 			} catch {
 				// not knowing is not being installed: the button offers Install
 			}
