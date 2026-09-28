@@ -36,7 +36,7 @@
 				<b-loading v-model="isLoading" :is-full-page="false" />
 
 				<div v-if="!isLoading && !loadError && apps.length === 0" class="is-size-7 _has-text-gray">
-					{{ $t('No app is installed yet.') }}
+					{{ $t('No other app is installed yet.') }}
 				</div>
 
 				<div v-for="app in apps" :key="app.id" class="app-launch-modal__row">
