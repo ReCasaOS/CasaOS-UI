@@ -8,7 +8,7 @@
 
 		<section class="modal-card-body">
 			<p class="is-size-7 mb-3">
-				{{ $t('When statistics are on, these properties go to PostHog (EU) once a day and after each install or update.') }}
+				{{ $t('When statistics are on, these properties go to PostHog (EU) every three hours and after each install or update.') }}
 				<a href="https://github.com/ReCasaOS/CasaOS-Install#anonymous-statistics" rel="noopener noreferrer" target="_blank">{{ $t('Learn more') }}</a>
 			</p>
 
