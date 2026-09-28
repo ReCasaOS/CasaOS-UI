@@ -272,7 +272,7 @@ export default {
 					hasModalCard: true,
 					customClass: 'network-storage-modal',
 					trapFocus: true,
-					canCancel: [],
+					canCancel: ['escape'],
 					scroll: 'keep',
 					animation: 'zoom-in',
 					props: {

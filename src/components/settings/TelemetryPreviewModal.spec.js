@@ -26,7 +26,7 @@ function open(getTelemetry) {
 		global: {
 			mocks: { $t: key => key, $api: { sys: { getTelemetry } } },
 			// The warning's words are what is checked, so its stub keeps them.
-			stubs: { 'b-button': true, 'b-message': { render() { return h('div', this.$slots.default()) } } },
+			stubs: { 'b-button': true, 'b-loading': true, 'b-message': { render() { return h('div', this.$slots.default()) } } },
 		},
 	})
 }
@@ -43,6 +43,18 @@ describe('what is sent', () => {
 		expect(JSON.parse(wrapper.find('pre').text())).toEqual(PROPERTIES)
 	})
 
+	it('shows a spinner until the core answers', async () => {
+		let resolve
+		const wrapper = open(vi.fn(() => new Promise((r) => {
+			resolve = r
+		})))
+		expect(wrapper.find('b-loading-stub').attributes('modelvalue')).toBe('true')
+
+		resolve({ data: { success: 200, data: { preview: { properties: PROPERTIES } } } })
+		await flushPromises()
+		expect(wrapper.find('b-loading-stub').attributes('modelvalue')).toBe('false')
+	})
+
 	it('names PostHog (EU) and links the README section', async () => {
 		const wrapper = open(vi.fn(() => new Promise(() => {})))
 
@@ -56,5 +68,6 @@ describe('what is sent', () => {
 
 		expect(wrapper.find('pre').exists()).toBe(false)
 		expect(wrapper.text()).toContain('The preview could not be loaded.')
+		expect(wrapper.find('b-loading-stub').attributes('modelvalue')).toBe('false')
 	})
 })

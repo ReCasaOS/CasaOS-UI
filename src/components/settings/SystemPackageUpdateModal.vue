@@ -8,21 +8,27 @@
 		</header>
 
 		<section class="modal-card-body">
-			<div v-if="isChecking" class="package-loading is-flex is-align-items-center is-justify-content-center">
-				<b-loading :active="true" :is-full-page="false" />
+			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">
+				{{ error.message }}
+				<span v-if="error.detail" class="is-block is-size-7 mt-1">{{ error.detail }}</span>
+			</b-message>
+
+			<div v-if="isChecking" class="package-loading is-flex is-align-items-center is-justify-content-center _has-text-gray">
+				<b-icon class="mr-2" custom-class="mdi-spin" custom-size="is-size-5" icon="loading" size="is-20" />
 				<span>{{ $t('Checking for system package updates...') }}</span>
 			</div>
 
-			<b-notification v-if="error" :closable="false" type="is-danger">
-				{{ error }}
-			</b-notification>
-
 			<div v-if="!isChecking && info.supported === false" class="package-empty">
-				{{ info.reason || $t('System package updates are not supported on this host.') }}
+				<p>{{ $t('System package updates are not supported on this host.') }}</p>
+				<p v-if="info.reason" class="is-size-7 _has-text-gray mt-1">{{ info.reason }}</p>
 			</div>
 
 			<template v-if="!isChecking && info.supported !== false">
-				<div v-if="info.count === 0 && !isRunning && status.state === 'idle'" class="package-empty">
+				<b-message v-if="status.reboot_required" class="mb-3" size="is-small" type="is-warning">
+					{{ $t('A reboot is required to finish applying these updates. Use the existing Restart action when convenient.') }}
+				</b-message>
+
+				<div v-if="info.count === 0 && !isRunning && status.state === 'idle' && !error" class="package-empty">
 					{{ $t('No system package updates are available.') }}
 				</div>
 
@@ -51,23 +57,19 @@
 				</div>
 
 				<div v-if="isRunning" class="mt-4">
-					<p class="has-text-info">
+					<p class="has-text-info-on-scheme">
 						{{ $t(isReconciliationPending ? 'Finishing system package update...' : 'Applying system package updates...') }}
 					</p>
 				</div>
-				<div v-else-if="status.state === 'succeeded'" class="mt-4 has-text-success">
+				<div v-else-if="status.state === 'succeeded'" class="mt-4 has-text-success-on-scheme">
 					{{ $t('System package update completed.') }}
 				</div>
-				<div v-else-if="status.state === 'failed'" class="mt-4 has-text-danger">
+				<div v-else-if="status.state === 'failed'" class="mt-4 has-text-danger-on-scheme">
 					{{ $t('System package update failed.') }}
 				</div>
-				<p v-if="status.error && !isReconciliationPending" class="mt-2 has-text-danger">
+				<p v-if="status.error && !isReconciliationPending" class="mt-1 is-size-7 _has-text-gray">
 					{{ status.error }}
 				</p>
-
-				<b-notification v-if="status.reboot_required" :closable="false" class="mt-4" type="is-warning">
-					{{ $t('A reboot is required to finish applying these updates. Use the existing Restart action when convenient.') }}
-				</b-notification>
 
 				<div v-if="status.log" class="package-log mt-4">
 					<pre>{{ status.log }}</pre>
@@ -75,24 +77,13 @@
 			</template>
 		</section>
 
-		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
-			<b-button v-if="!isRunning && info.supported !== false"
-				:loading="isChecking"
-				rounded
-				type="is-light"
-				@click="checkPackages">
+		<!-- empty while apt runs or on a host without it: × and Escape still close -->
+		<footer v-if="!isRunning && info.supported !== false" class="modal-card-foot is-justify-content-flex-end">
+			<b-button :loading="isChecking" rounded @click="checkPackages">
 				{{ $t('Check for updates') }}
 			</b-button>
-			<b-button v-if="hasUpdates && !isRunning && status.state !== 'succeeded'"
-				:loading="isStarting"
-				rounded
-				type="is-primary"
-				@click="confirmUpdate">
+			<b-button v-if="hasUpdates && status.state !== 'succeeded'" rounded type="is-primary" @click="confirmUpdate">
 				{{ $t('Update packages') }}
-			</b-button>
-			<b-button v-if="status.state === 'failed' && !isRunning" rounded type="is-primary" @click="checkPackages">
-				{{ $t('Retry') }}
 			</b-button>
 		</footer>
 	</div>
@@ -128,7 +119,7 @@ export default {
 			status: emptyStatus(),
 			isChecking: false,
 			isStarting: false,
-			error: '',
+			error: null,
 			pollTimer: null,
 		}
 	},
@@ -174,7 +165,7 @@ export default {
 		async checkPackages(preserveStatus = false) {
 			this.stopPolling()
 			this.isChecking = true
-			this.error = ''
+			this.error = null
 			if (preserveStatus !== true) {
 				this.status = emptyStatus()
 			}
@@ -183,7 +174,7 @@ export default {
 				this.info = response.data.data || emptyInfo()
 			} catch (error) {
 				this.info = emptyInfo()
-				this.error = this.errorMessage(error)
+				this.fail('Could not check for system package updates.', error)
 			} finally {
 				this.isChecking = false
 			}
@@ -201,7 +192,7 @@ export default {
 		},
 		async startUpdate() {
 			this.isStarting = true
-			this.error = ''
+			this.error = null
 			try {
 				const response = await this.$api.sys.startSystemPackageUpdate()
 				this.status = response.data.data || emptyStatus()
@@ -213,7 +204,7 @@ export default {
 						this.startPolling()
 					}
 				}
-				this.error = this.errorMessage(error)
+				this.fail('Could not start the system package update.', error)
 			} finally {
 				this.isStarting = false
 			}
@@ -237,12 +228,15 @@ export default {
 					this.stopPolling()
 				}
 			} catch (error) {
-				this.error = this.errorMessage(error)
+				this.fail('Could not load the system package update status.', error)
 				this.stopPolling()
 			}
 		},
-		errorMessage(error) {
-			return error?.response?.data?.message || error?.response?.data?.data || error?.message || this.$t('System package update failed.')
+		// A translated sentence first; the core's own words, when it sent some, as the detail.
+		// axios's "Request failed with status code 500" is never shown.
+		fail(message, error) {
+			const detail = error?.response?.data?.message || error?.response?.data?.data
+			this.error = { message: this.$t(message), detail: typeof detail === 'string' ? detail : '' }
 		},
 	},
 }
@@ -277,10 +271,6 @@ export default {
 .package-log {
 	max-height: 14rem;
 	overflow: auto;
-	padding: 0.75rem;
-	border-radius: 0.5rem;
-	background: #1e1e1e;
-	color: #f4f4f4;
 
 	pre {
 		margin: 0;

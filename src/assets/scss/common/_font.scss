@@ -270,3 +270,9 @@
 
 	font-feature-settings: "pnum" on, "lnum" on;
 }
+
+// Secondary text: a line under a title, a value, a hint. AA in both themes,
+// which --casa-text-muted is not on white.
+._has-text-gray {
+	color: var(--casa-text-hint);
+}
