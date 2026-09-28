@@ -26,10 +26,13 @@
 </template>
 
 <script>
+import { findSyncthing } from './syncthingApp'
 import events from '@/events/events'
+import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 
 export default {
 	name: 'sync-block',
+	mixins: [business_OpenThirdApp],
 	data() {
 		return {
 			isLoading: false,
@@ -37,6 +40,7 @@ export default {
 			syncBaseURL: '',
 			isSyncInstalled: false,
 			isSyncRunning: false,
+			isSyncStartable: false,
 			syncPort: '',
 			syncId: '',
 		}
@@ -59,39 +63,27 @@ export default {
 
 	methods: {
 		async checkSyncStatus() {
-			// const res = await this.$api.sys.getSystemApps()
-			const listRes = await this.$api.container.getMyAppList()
-			const systemApps = listRes.data ? listRes.data.data.casaos_apps : []
-			const is8384SyncInstalled = systemApps.some((app) => {
-				return app.image.includes('syncthing') && app.port === 8384
-			})
-			if (is8384SyncInstalled) {
-				this.isSyncInstalled = true
-				this.syncBaseURL = `http://${this.$baseIp}:8384`
-				this.syncPort = 8384
-				this.syncId = systemApps.find((app) => {
-					return app.image.includes('syncthing') && app.port === 8384
-				}).port
-				this.isSyncRunning = systemApps.some((app) => {
-					return app.image.includes('syncthing') && app.port === 8384 && app.state === 'running'
-				})
-			} else {
-				this.isSyncInstalled = systemApps.some((app) => {
-					return app.image.includes('syncthing')
-				})
-				if (this.isSyncInstalled) {
-					this.isSyncRunning = systemApps.some((app) => {
-						return app.image.includes('syncthing') && app.state === 'running'
-					})
-					this.syncPort = systemApps.find((app) => {
-						return app.image.includes('syncthing')
-					}).port
-					this.syncId = systemApps.find((app) => {
-						return app.image.includes('syncthing')
-					}).id
-					this.syncBaseURL = `http://${this.$baseIp}:${this.syncPort}`
-				}
+			let app = null
+			try {
+				const res = await this.$openAPI.appGrid.getAppGrid()
+				app = findSyncthing(res.data.data, this.$baseIp)
+			} catch {
+				// not knowing is not being installed: the button offers Install
 			}
+
+			this.isSyncInstalled = Boolean(app)
+			this.isSyncRunning = Boolean(app && app.running)
+			this.isSyncStartable = Boolean(app && app.startable)
+			this.syncId = app ? app.name : ''
+			this.syncPort = app ? app.port : ''
+			this.syncBaseURL = app ? app.url : ''
+		},
+		openSyncWebUI() {
+			if (!this.syncBaseURL) {
+				this.warnNothingToOpen({ name: 'Syncthing' })
+				return
+			}
+			window.open(this.syncBaseURL, '_blank')
 		},
 		async openSyncPanel() {
 			await this.checkSyncStatus()
@@ -99,7 +91,16 @@ export default {
 				this.$EventBus.$emit(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
 			} else {
 				if (this.isSyncRunning) {
-					window.open(this.syncBaseURL, '_blank')
+					this.openSyncWebUI()
+				} else if (!this.isSyncStartable) {
+					// A v1 app or a plain container: the compose API does not know it,
+					// so the start dialog could only fail, every time.
+					this.$buefy.toast.open({
+						message: this.$t('Syncthing is not running and cannot be started from here. Start it where it is managed.'),
+						type: 'is-warning',
+						position: 'is-top',
+						duration: 4000,
+					})
 				} else {
 					this.$buefy.dialog.confirm({
 						title: ' ',
@@ -113,20 +114,19 @@ export default {
 								message: this.$t(`Starting Syncthing...`),
 								type: 'is-white',
 							})
-							this.$api.container.updateState(this.syncId, 'start').then((res) => {
+							this.$openAPI.appManagement.compose.setComposeAppStatus(this.syncId, 'start').then(() => {
 								this.isStarting = false
-								if (res.data.success == 200) {
-									this.$EventBus.$emit(events.RELOAD_APP_LIST)
-									setTimeout(() => {
-										close()
-										window.open(this.syncBaseURL, '_blank')
-									}, 2000)
-								} else {
-									this.$buefy.toast.open({
-										message: this.$t(`Failed to start, please try again.`),
-										type: 'is-danger',
-									})
-								}
+								this.$EventBus.$emit(events.RELOAD_APP_LIST)
+								setTimeout(() => {
+									close()
+									this.openSyncWebUI()
+								}, 2000)
+							}).catch(() => {
+								this.isStarting = false
+								this.$buefy.toast.open({
+									message: this.$t(`Failed to start, please try again.`),
+									type: 'is-danger',
+								})
 							})
 						},
 					})

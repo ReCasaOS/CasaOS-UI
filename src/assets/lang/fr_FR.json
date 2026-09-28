@@ -101,6 +101,7 @@
   "Failed to start, please try again.": "Impossible de démarrer Syncthing, veuillez réessayer.",
   "Syncthing is not running, start it?": "Syncthing n'est pas en cours d'exécution. Voulez-vous le démarrer ?",
   "Starting Syncthing...": "Démarrage de Syncthing...",
+  "Syncthing is not running and cannot be started from here. Start it where it is managed.": "Syncthing n'est pas en cours d'exécution et ne peut pas être démarré d'ici. Démarrez-le là où il est géré.",
   "Have an idea? Open an issue!": "Une idée ? Ouvrez un ticket !",
   "Smarten up your home": "Rendez votre maison intelligente",
   "We want to give you a smart home experience with privacy, high speed, and localized storage.": "Nous voulons vous proposer une expérience de maison intelligente offrant confidentialité, haut débit et stockage localisé.",

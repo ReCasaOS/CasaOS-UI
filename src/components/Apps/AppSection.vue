@@ -113,7 +113,9 @@ import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
-const SYNCTHING_STORE_ID = 74
+// Syncthing in the app store: the old store numbered its apps, the v2 one names
+// them, and asking it for 74 is a 404
+const SYNCTHING_STORE_ID = 'syncthing'
 
 // meta_data :: build-in app
 const builtInApplications = [

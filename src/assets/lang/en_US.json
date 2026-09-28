@@ -113,6 +113,7 @@
   "Failed to start, please try again.": "Failed to start Syncthing. Please try again.",
   "Syncthing is not running, start it?": "Syncthing isn't running. Do you want to start it?",
   "Starting Syncthing...": "Starting Syncthing...",
+  "Syncthing is not running and cannot be started from here. Start it where it is managed.": "Syncthing is not running and cannot be started from here. Start it where it is managed.",
   "Have an idea? Open an issue!": "Have an idea? Open an issue!",
   "Smarten up your home": "Smarten up your home",
   "We want to give you a smart home experience with privacy, high speed, and localized storage.": "We want to give you a smart home experience with privacy, high speed, and localized storage.",
