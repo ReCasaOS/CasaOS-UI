@@ -128,3 +128,31 @@ describe('appPanel of a git app', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('appPanel and the installs on the message bus', () => {
+	// Every panel open, in any tab, hears every install: the sockets plugin binds
+	// the handlers of each instance.
+	const begin = (wrapper, name) => AppPanel.sockets['app:install-begin'].call(wrapper.vm, { Properties: { 'app:name': name } })
+
+	it('follows only the install it asked for, and only once', async () => {
+		const { wrapper } = await panel(Object.assign(new Error('404'), { response: { status: 404 } }))
+		const compose = { installComposeApp: vi.fn().mockRejectedValue({ response: { status: 500, data: 'down' } }) }
+		wrapper.vm.$openAPI.appManagement.compose = compose
+
+		begin(wrapper, 'syncthing')
+		expect(wrapper.vm.currentInstallAppName).toBeNull()
+
+		// a refused request starts no install of its own
+		await wrapper.vm.installComposeApp(COMPOSE)
+		begin(wrapper, 'syncthing')
+		expect(wrapper.vm.currentInstallAppName).toBeNull()
+
+		compose.installComposeApp = vi.fn().mockResolvedValue({ status: 200 })
+		await wrapper.vm.installComposeApp(COMPOSE)
+		begin(wrapper, 'jarvis')
+		begin(wrapper, 'syncthing')
+		expect(wrapper.vm.currentInstallAppName).toBe('jarvis')
+		expect(wrapper.vm.currentSlide).toBe(2)
+		wrapper.unmount()
+	})
+})
