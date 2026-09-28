@@ -60,7 +60,7 @@ export default {
 				hasModalCard: true,
 				customClass: '',
 				trapFocus: true,
-				canCancel: [''],
+				canCancel: ['escape'],
 				scroll: 'keep',
 				animation: 'zoom-in',
 				events: {},

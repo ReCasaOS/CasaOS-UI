@@ -1,41 +1,42 @@
 <template>
 	<div class="modal-card update-all">
-		<header class="modal-card-head b-line">
-			<h3 class="title is-5 has-text-black">{{ $t('Update every app') }}</h3>
+		<header class="modal-card-head">
+			<h3 class="title is-header">{{ $t('App updates') }}</h3>
 		</header>
 
 		<section class="modal-card-body">
 			<b-message v-if="error" class="mb-2" size="is-small" type="is-danger">
 				{{ error }}
+				<p v-if="detail" class="is-size-7">{{ detail }}</p>
 			</b-message>
 
-			<p v-if="isPlanning" class="has-text-full-03 is-size-7">
+			<p v-if="isPlanning" class="_has-text-gray is-size-7">
 				<b-icon custom-class="mdi-spin" icon="loading" size="is-small"></b-icon>
 				{{ $t('Asking every image’s registry what its tag points at now…') }}
 			</p>
 
 			<!-- the run: what became of each app, as it goes -->
 			<template v-else-if="run">
-				<p class="is-size-7 has-text-full-03 mb-3">{{ $t(summary.message, summary.params) }}</p>
+				<p class="is-size-7 _has-text-gray mb-3">{{ $t(summary.message, summary.params) }}</p>
 				<div v-for="app in run.apps" :key="app.id" class="is-flex is-align-items-flex-start mb-2">
 					<b-icon :class="stateClass(app.state)" :custom-class="app.state === 'updating' ? 'mdi-spin' : ''" :icon="stateIcon(app.state)" class="mr-2 mt-1" size="is-small"></b-icon>
 					<div class="is-flex-grow-1">
 						<p class="is-size-7">
 							<span class="has-text-weight-bold">{{ titleOf(app.id) }}</span>
-							<span class="has-text-full-03"> · {{ $t(stateLabels[app.state] || app.state) }}</span>
+							<span class="_has-text-gray"> · {{ $t(stateLabels[app.state] || app.state) }}</span>
 						</p>
-						<p v-if="app.message" class="is-size-7 has-text-full-03">{{ app.message }}</p>
+						<p v-if="app.message" class="is-size-7 _has-text-gray">{{ app.message }}</p>
 					</div>
 				</div>
 			</template>
 
 			<!-- the plan: what an update would do, to confirm as a list and not a word -->
 			<template v-else>
-				<p v-if="!plan.length" class="has-text-full-03 is-size-7">
+				<p v-if="!plan.length && !error" class="_has-text-gray is-size-7">
 					{{ $t('Every app is current, as far as the catalogue and the registries say.') }}
 				</p>
-				<template v-else>
-					<p class="is-size-7 has-text-full-03 mb-3">
+				<template v-else-if="plan.length">
+					<p class="is-size-7 _has-text-gray mb-3">
 						{{ $t('Each app is pulled and restarted with what is listed, one after another, on this box: closing this page does not stop it.') }}
 					</p>
 					<div v-for="app in plan" :key="app.id" class="is-flex is-align-items-flex-start mb-3">
@@ -43,7 +44,7 @@
 						<img :src="app.icon || defaultIcon" alt="" class="app-icon mr-2" />
 						<div class="is-flex-grow-1">
 							<p class="is-size-7 has-text-weight-bold">{{ app.title }}</p>
-							<p v-for="service in app.services" :key="service.name" class="is-size-7 has-text-full-03 service-line">
+							<p v-for="service in app.services" :key="service.name" class="is-size-7 _has-text-gray service-line">
 								{{ $t(describe(app, service).message, describe(app, service).params) }}
 							</p>
 						</div>
@@ -53,7 +54,7 @@
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
-			<b-button class="mr-2" rounded @click="$emit('close')">{{ run ? $t('Close') : $t('Cancel') }}</b-button>
+			<b-button rounded @click="$emit('close')">{{ run || !plan.length ? $t('Close') : $t('Cancel') }}</b-button>
 			<b-button v-if="!run && plan.length" :disabled="!selected.length || busy" :loading="busy" rounded type="is-primary" @click="start">
 				{{ confirmLabel }}
 			</b-button>
@@ -80,6 +81,7 @@ export default {
 			isPlanning: false,
 			busy: false,
 			error: '',
+			detail: '',
 			timer: null,
 			defaultIcon: require('@/assets/img/app/default.svg'),
 			stateLabels: STATE_LABELS,
@@ -122,7 +124,7 @@ export default {
 				this.plan = (res.data.data && res.data.data.apps) || []
 				this.selected = this.plan.map(app => app.id)
 			} catch (error) {
-				this.error = this.messageOf(error) || this.$t('Could not load what an update would do.')
+				this.fail('Could not load what an update would do.', error)
 			} finally {
 				this.isPlanning = false
 			}
@@ -135,7 +137,7 @@ export default {
 				this.run = res.data.data
 				this.poll()
 			} catch (error) {
-				this.error = this.messageOf(error)
+				this.fail('The update could not be started.', error)
 			} finally {
 				this.busy = false
 			}
@@ -148,7 +150,7 @@ export default {
 					const res = await this.$api.updates.run()
 					this.run = res.data.data
 				} catch (error) {
-					this.error = this.messageOf(error)
+					this.fail('The progress of the update could not be loaded.', error)
 				}
 				if (this.run && this.run.finished_at) {
 					this.$EventBus.$emit(events.RELOAD_APP_LIST)
@@ -173,7 +175,13 @@ export default {
 		},
 
 		stateClass(state) {
-			return { updated: 'has-text-success', current: 'has-text-full-03', failed: 'has-text-danger' }[state] || 'has-text-full-03'
+			return { updated: 'has-text-success-on-scheme', current: '_has-text-gray', failed: 'has-text-danger-on-scheme' }[state] || '_has-text-gray'
+		},
+
+		// A translated sentence says what failed; what the box answered goes under it.
+		fail(message, error) {
+			this.error = this.$t(message)
+			this.detail = this.messageOf(error)
 		},
 
 		messageOf(error) {
@@ -187,7 +195,7 @@ export default {
 
 <style lang="scss" scoped>
 .modal-card {
-	width: 34rem;
+	max-width: 34rem;
 }
 
 .app-icon {

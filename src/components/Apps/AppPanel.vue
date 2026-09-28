@@ -411,23 +411,20 @@
 			<!-- App Install Form Start -->
 			<template v-if="currentSlide == 1">
 				<!-- Settings / raw Compose switch, on installed CasaOS apps only -->
-				<div v-if="isCasa && state == 'update' && !repositoryOnly" class="is-flex px-4 pt-3 compose-mode-switch">
+				<div v-if="isCasa && state == 'update' && !repositoryOnly" class="is-flex is-flex-wrap-wrap is-gap-1 px-4 pt-3 compose-mode-switch">
 					<b-button :type="editorTab === 'settings' ? 'is-primary' : 'is-text'"
-						class="mr-2"
 						rounded
 						size="is-small"
 						@click="setEditorTab('settings')">
 						{{ $t('Settings') }}
 					</b-button>
 					<b-button :type="editorTab === 'compose' ? 'is-primary' : 'is-text'"
-						class="mr-2"
 						rounded
 						size="is-small"
 						@click="setEditorTab('compose')">
 						{{ $t('Compose') }}
 					</b-button>
 					<b-button :type="editorTab === 'env' ? 'is-primary' : 'is-text'"
-						class="mr-2"
 						rounded
 						size="is-small"
 						@click="setEditorTab('env')">
@@ -442,7 +439,6 @@
 					<!-- a git app, or a compose app whose folder is a git work tree -->
 					<b-button v-if="gitApp"
 						:type="editorTab === 'repository' ? 'is-primary' : 'is-text'"
-						class="ml-2"
 						rounded
 						size="is-small"
 						@click="setEditorTab('repository')">

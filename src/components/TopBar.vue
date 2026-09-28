@@ -61,9 +61,17 @@
 				</template>
 
 				<b-dropdown-item :focusable="false" aria-role="menu-item" class="p-0" custom>
-					<h2 class="_title mb-4 has-text-weight-bold">
+					<h2 class="_title mb-2 has-text-weight-bold">
 						{{ $t("Settings") }}
 					</h2>
+
+					<!-- Rows: one line (_box) or a title line with lines under it. The
+					icon, the label, then the value and the control on the right; the
+					lines under the title start where the label does (pl-55 ml-1). -->
+					<p class="_settings-group">
+						{{ $t("Display") }}
+					</p>
+
 					<!-- Search Engine Switch Start  -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -127,7 +135,7 @@
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="theme-light-dark" />
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="theme-light-dark" size="is-20" />
 							{{ $t("Appearance") }}
 						</div>
 						<div>
@@ -141,39 +149,6 @@
 						</div>
 					</div>
 					<!-- Appearance End -->
-
-					<!-- WebUI Port Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="port-outline" pack="casa" size="is-20" />
-							{{ $t("WebUI Port") }}
-						</div>
-						<div>
-							{{ port }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showPortPanel">
-								{{ $t("Change") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- WebUI Port End -->
-
-					<!-- Backup destinations Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="cloud-outline" pack="casa" size="is-20" />
-							{{ $t("Backup destinations") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showBackupDestinations">
-								{{ $t("Change") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Backup destinations End -->
 
 					<!-- Background Start -->
 					<div
@@ -229,6 +204,77 @@
 					</div>
 					<!-- Recommended modules Switch End  -->
 
+					<!-- App Launching Start -->
+					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="open-in-app" size="is-20" />
+								{{ $t("App launching") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click.stop="showAppLaunchModal">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+							{{ $t($store.state.appLaunchInIframe ? "Apps open inside CasaOS" : "Apps open in a new tab") }}
+						</div>
+					</div>
+					<!-- App Launching End -->
+
+					<p class="_settings-group">
+						{{ $t("System") }}
+					</p>
+
+					<!-- WebUI Port Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" icon="port-outline" pack="casa" size="is-20" />
+							{{ $t("WebUI Port") }}
+						</div>
+						<div class="_has-text-gray">
+							{{ port }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showPortPanel">
+								{{ $t("Change") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- WebUI Port End -->
+
+					<!-- Backup destinations Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" icon="cloud-outline" pack="casa" size="is-20" />
+							{{ $t("Backup destinations") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showBackupDestinations">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Backup destinations End -->
+
+					<!-- Alerts Start -->
+					<div v-if="alertsAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="bell-outline" size="is-20" />
+							{{ $t("Alerts") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showAlerts">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Alerts End -->
+
 					<!-- Automount USB Drive Start  -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -258,10 +304,10 @@
 					<!-- Automount USB Drive End  -->
 
 					<!-- Anonymous statistics Start -->
-					<div v-if="telemetryEnabled !== null" class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+					<div v-if="telemetryEnabled !== null" class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
 							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="chart-box-outline" />
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="chart-box-outline" size="is-20" />
 								{{ $t("Anonymous usage statistics") }}
 							</div>
 							<div>
@@ -274,46 +320,50 @@
 								</b-field>
 							</div>
 						</div>
-						<div class="pl-55 ml-1 is-size-7">
+						<div class="pl-55 ml-1 mt-1 is-size-7">
 							<a href="#" @click.prevent="showTelemetryPreview">{{ $t("See what is sent") }}</a>
 						</div>
 					</div>
 					<!-- Anonymous statistics End -->
 
+					<p class="_settings-group">
+						{{ $t("Updates") }}
+					</p>
+
 					<!-- Update Start -->
-					<div class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
 							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 								<b-icon class="mr-1 ml-2" icon="update-outline" pack="casa" size="is-20" />
 								<div :class="{ 'update-text-dot': updateInfo.need_update }">
-									{{ $t("Update") }}
+									{{ $t("Current version") }}
 								</div>
 							</div>
 							<div class="_has-text-gray">
 								v{{ updateInfo.current_version }}
 							</div>
+							<div v-if="updateInfo.need_update" class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showUpdateModal">
+									{{ $t("Update") }}
+								</b-button>
+							</div>
 						</div>
 
-						<div v-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 is-size-7">
+						<div v-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
 							{{ $t(latestText) }}
 							<b-icon class="ml-1" custom-size="mdi-18px" icon="check" type="is-success" />
 						</div>
-						<div v-else class="is-flex is-align-items-center is-justify-content-end update-container pl-5">
-							<div class="is-flex-grow-1 is-size-7">
-								{{ $t(updateText) }}
-							</div>
-							<b-button class="ml-2" rounded size="is-small" type="is-dark" @click="showUpdateModal">
-								{{ $t("Update") }}
-							</b-button>
+						<div v-else class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+							{{ $t(updateText) }}
 						</div>
 					</div>
 					<!-- Update End -->
 
 					<!-- Automatic update Start -->
-					<div v-if="autoUpdate" class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
+					<div v-if="autoUpdate" class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
 							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" custom-size="mdi-20px" icon="autorenew" />
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="autorenew" size="is-20" />
 								{{ $t("Update automatically") }}
 							</div>
 							<div>
@@ -349,10 +399,10 @@
 									</option>
 								</b-select>
 							</div>
-							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
-								{{ $t("A new release is installed at night, two days after it comes out. Nothing starts while a backup or an app operation runs.") }}
+							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+								{{ $t("New releases install at night, two days after they come out, never during a backup or an app operation.") }}
 							</div>
-							<div class="pl-55 ml-1 mt-1 is-size-7">
+							<div :class="{ '_has-text-gray': autoUpdate.state !== 'paused' }" class="pl-55 ml-1 mt-1 is-size-7 _is-wrap">
 								{{ autoUpdateStateText }}
 							</div>
 							<div v-if="autoUpdate.state === 'paused'" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
@@ -371,42 +421,19 @@
 					<!-- Automatic update End -->
 
 					<!-- System Package Update Start -->
-					<div class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
-							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" icon="update-outline" pack="casa" size="is-20" />
-								{{ $t("System packages") }}
-							</div>
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="package-variant-closed" size="is-20" />
+							{{ $t("System packages") }}
 						</div>
-						<div class="is-flex is-align-items-center is-justify-content-end update-container pl-5">
-							<div class="is-flex-grow-1 is-size-7">
-								{{ $t("Check for updates") }}
-							</div>
-							<b-button class="ml-2" rounded size="is-small" type="is-dark" @click.stop="showSystemPackageUpdateModal">
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click.stop="showSystemPackageUpdateModal">
 								{{ $t("Check") }}
 							</b-button>
 						</div>
 					</div>
 					<!-- System Package Update End -->
-
-					<!-- App Launching Start -->
-					<div class="_is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
-							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" icon="display-applications-outline" pack="casa" size="is-20" />
-								{{ $t("App launching") }}
-							</div>
-						</div>
-						<div class="is-flex is-align-items-center is-justify-content-end update-container pl-5">
-							<div class="is-flex-grow-1 is-size-7">
-								{{ $t($store.state.appLaunchInIframe ? "Apps open inside CasaOS" : "Apps open in a new tab") }}
-							</div>
-							<b-button class="ml-2" rounded size="is-small" type="is-dark" @click.stop="showAppLaunchModal">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- App Launching End -->
 
 					<!-- Restart or Shutdown Start -->
 					<div
@@ -416,7 +443,7 @@
 							<b-icon class="mr-1" icon="restart-outline" pack="casa" />
 							{{ $t(restart) }}
 						</div>
-						<div class="ml-1 column is-half is-flex is-align-items-center is-justify-content-center is-clickable hover-effect-attention _has-text-attention _is-radius"
+						<div class="ml-1 column is-half is-flex is-align-items-center is-justify-content-center is-clickable hover-effect-attention _has-text-attention _is-radius _is-normal"
 							@click="power('Shutdown')">
 							<b-icon class="mr-1"
 								custom-class="_has-text-attention"
@@ -484,6 +511,7 @@ import UpdateModal from './settings/UpdateModal.vue'
 import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
+import AlertsModal from './settings/AlertsModal.vue'
 import { mixin } from '@/mixins/mixin'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
@@ -539,6 +567,9 @@ export default {
 			// feature shows no row.
 			autoUpdate: null,
 			autoUpdateSaving: false,
+			// true once the core answers GET /v1/sys/alerts: a core older than the
+			// feature shows no row.
+			alertsAvailable: false,
 			// The window's two selects: whole hours, 00:00 to 23:00.
 			hours: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`),
 			deviceModel: '',
@@ -655,6 +686,7 @@ export default {
 		this.getUsbStatus()
 		this.getTelemetry()
 		this.getAutoUpdate()
+		this.getAlerts()
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
@@ -751,6 +783,25 @@ export default {
 				component: BackupDestinations,
 				hasModalCard: true,
 				customClass: 'backup-modal',
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(): the dialog reads the channels itself.
+		getAlerts() {
+			this.$api.sys.getAlerts().then(() => {
+				this.alertsAvailable = true
+			}).catch(() => {})
+		},
+
+		showAlerts() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: AlertsModal,
+				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
 				scroll: 'keep',
@@ -1145,11 +1196,23 @@ export default {
 }
 
 ._has-text-attention {
-	color: hsla(18, 98%, 55%, 1);
+	color: var(--casa-text-attention);
 }
 
-._has-text-gray {
-	color: var(--casa-text-muted);
+// A line under a row's title that may be long: it wraps at the panel's width
+// instead of setting it, the panel being as wide as its widest line.
+._is-wrap {
+	white-space: normal;
+	contain: inline-size;
+}
+
+// the heading of a group of rows, in line with the rows' icons
+._settings-group {
+	margin: 0.75rem 1.5rem 0.25rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1rem;
+	color: var(--casa-text-hint);
 }
 
 ._fixed-height {
@@ -1193,11 +1256,18 @@ export default {
 
 		.dropdown-menu {
 			margin-top: 0.5rem;
-			min-width: 22.5rem;
+			// on a phone, the width Buefy leaves the panel, with its margins
+			min-width: min(22.5rem, calc(100vw - 2rem));
 
 			.dropdown-content {
 				background: var(--casa-surface);
 				border-radius: 10px;
+				// Taller than the window, the settings scroll down to Shutdown. On a
+				// desktop only: below 1024px Buefy's mobile modal scrolls the menu
+				// itself, and a second cap here scrolled inside it.
+				@media screen and (min-width: 1024px) {
+					max-height: calc(100vh - 4rem);
+				}
 
 				.dropdown-item {
 					padding: 0.875rem 1.25rem;
@@ -1214,13 +1284,13 @@ export default {
 	.set-select {
 		.select {
 			&::after {
-				border-color: var(--casa-text-strong) !important;
+				border-color: var(--casa-control-border) !important;
 			}
 		}
 
 		select {
 			background-color: transparent !important;
-			border-color: var(--casa-text-strong) !important;
+			border-color: var(--casa-control-border) !important;
 
 			// Chromium paints the native list on the select's own background, which
 			// is transparent here: white, under dark's light text. Give the options
@@ -1229,6 +1299,32 @@ export default {
 				background-color: var(--casa-surface);
 				color: var(--casa-text);
 			}
+		}
+	}
+
+	// the selects of the rows, one width: Language and Appearance line up
+	._box .set-select select {
+		min-width: 9.5rem;
+	}
+
+	// a label keeps its distance from its control: the widest row sets the
+	// panel's width, and would otherwise run into its switch
+	.dropdown-item ._is-normal.is-flex-grow-1 {
+		padding-right: 1rem;
+	}
+
+	// In Buefy's mobile modal the panel has the phone's width, not its widest
+	// row's: a long label wraps and its row grows, instead of pushing its
+	// control off the panel.
+	@media screen and (max-width: 1023px) {
+		.dropdown-item ._is-normal.is-flex-grow-1 {
+			min-width: 0;
+			white-space: normal;
+		}
+
+		._box {
+			height: auto;
+			min-height: 2.5rem;
 		}
 	}
 
@@ -1264,14 +1360,6 @@ export default {
 					transform: translate3d(80%, 0, 0);
 				}
 			}
-		}
-	}
-
-	.update-container {
-		.button.is-rounded {
-			padding-left: calc(1em + 0.25em);
-			padding-right: calc(1em + 0.25em);
-			border-radius: 9999px !important;
 		}
 	}
 

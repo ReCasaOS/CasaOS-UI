@@ -16,12 +16,9 @@
 		</section>
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
-		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1"></div>
-			<div>
-				<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
-				<b-button :label="$t('Submit')" expaned rounded type="is-primary" @click="savePort" />
-			</div>
+		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
+			<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
+			<b-button :label="$t('Save')" rounded type="is-primary" @click="savePort" />
 		</footer>
 		<!-- Modal-Card Footer End -->
 		<b-loading v-model="isLoading" :is-full-page="false"></b-loading>
@@ -39,7 +36,7 @@ export default {
 			message: '',
 			notificationShow: false,
 			port: this.initPort,
-			errorType: 'is-success',
+			errorType: '',
 			errors: '',
 		}
 	},
@@ -63,7 +60,7 @@ export default {
 				this.errors = this.$t('Port range is 80-65535')
 				return false
 			}
-			this.errorType = 'is-success'
+			this.errorType = ''
 			this.errors = ''
 			return true
 		},
@@ -76,19 +73,19 @@ export default {
 			this.$messageBus('dashboardsetting_webuiport', this.port.toString())
 			this.$api.sys.editServerPort({ port: this.port }).then((res) => {
 				if (res.data.success == 200) {
-					this.errorType = 'is-success'
+					this.errorType = ''
 					this.errors = ''
 					// this.$api.sys.stopCasaOS();
 					this.checkUpdate()
 				} else {
 					this.isLoading = false
 					this.errorType = 'is-danger'
-					this.errors = res.data.message
+					this.errors = res.data.message || this.$t('The setting could not be saved.')
 				}
 			}).catch((err) => {
 				this.isLoading = false
 				this.errorType = 'is-danger'
-				this.errors = err.response.data.message
+				this.errors = err.response?.data?.message || this.$t('The setting could not be saved.')
 			})
 		},
 		checkUpdate() {

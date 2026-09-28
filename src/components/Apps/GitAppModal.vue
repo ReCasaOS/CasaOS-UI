@@ -1,7 +1,7 @@
 <template>
 	<div class="modal-card git-app">
-		<header class="modal-card-head b-line">
-			<h3 class="title is-5 has-text-black">{{ $t('An app from a git repository') }}</h3>
+		<header class="modal-card-head">
+			<h3 class="title is-header">{{ $t('An app from a git repository') }}</h3>
 		</header>
 
 		<section class="modal-card-body">
@@ -58,21 +58,21 @@
 				</template>
 
 				<!-- the check runs on the server, and Cancel waits for it: say what takes the time -->
-				<p v-if="cloning" class="is-size-7 has-text-full-03 mt-2">{{ $t('Cloning the repository…') }}</p>
+				<p v-if="cloning" class="is-size-7 _has-text-gray mt-2">{{ $t('Cloning the repository…') }}</p>
 			</template>
 
 			<!-- 2. what the repository will run, before anything runs -->
 			<template v-else-if="step === 'review'">
-				<p class="is-size-7 has-text-full-03 mb-3">{{ $t('Read from {files}.', { files: app.compose.files.join(', ') }) }}</p>
+				<p class="is-size-7 _has-text-gray mb-3">{{ $t('Read from {files}.', { files: app.compose.files.join(', ') }) }}</p>
 				<div v-for="service in app.compose.services" :key="service.name" class="mb-3 git-app__service">
 					<p class="is-size-7">
 						<span class="has-text-weight-bold">{{ service.name }}</span>
-						<span class="has-text-full-03"> · {{ service.build ? $t('built from the repository') : service.image }}</span>
+						<span class="_has-text-gray"> · {{ service.build ? $t('built from the repository') : service.image }}</span>
 					</p>
-					<p v-if="service.ports && service.ports.length" class="is-size-7 has-text-full-03">
+					<p v-if="service.ports && service.ports.length" class="is-size-7 _has-text-gray">
 						{{ $t('Published ports: {ports}', { ports: service.ports.join(', ') }) }}
 					</p>
-					<p v-if="service.volumes && service.volumes.length" class="is-size-7 has-text-full-03">
+					<p v-if="service.volumes && service.volumes.length" class="is-size-7 _has-text-gray">
 						{{ $t('Volumes: {volumes}', { volumes: service.volumes.join(', ') }) }}
 					</p>
 				</div>
@@ -85,7 +85,7 @@
 				</b-message>
 
 				<p class="has-text-weight-bold is-size-7 mt-4 mb-2">.env</p>
-				<p v-if="app.env_tracked" class="is-size-7 has-text-full-03 mb-2">
+				<p v-if="app.env_tracked" class="is-size-7 _has-text-gray mb-2">
 					{{ $t('The repository tracks its .env file, so it cannot be edited here: an edit would modify a tracked file and block every later deployment.') }}
 				</p>
 				<Codemirror :options="envOptions" :value="env" class="git-app__env" @input="env = $event"></Codemirror>
@@ -99,7 +99,7 @@
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
-			<b-button v-if="step !== 'deploy'" :disabled="busy" class="mr-2" rounded @click="cancel">{{ $t('Cancel') }}</b-button>
+			<b-button v-if="step !== 'deploy'" :disabled="busy" rounded @click="cancel">{{ $t('Cancel') }}</b-button>
 			<b-button v-if="step === 'repository' && !app" :disabled="!canRegister" :loading="busy" rounded type="is-primary" @click="register">
 				{{ $t('Next') }}
 			</b-button>
@@ -111,14 +111,13 @@
 			</b-button>
 			<template v-else-if="step === 'deploy'">
 				<!-- a first deployment that failed leaves an app on no card: it is retried
-					or deleted here, or it holds its name for nothing -->
-				<template v-if="outcome && outcome !== 'deployed'">
-					<b-button :disabled="busy" class="mr-2" rounded type="is-danger" @click="cancel">{{ $t('Delete this app') }}</b-button>
-					<b-button :loading="busy" class="mr-2" rounded @click="deploy">{{ $t('Deploy again') }}</b-button>
-				</template>
-				<b-button rounded type="is-primary" @click="$emit('close')">
+					or deleted here, or it holds its name for nothing. Close is never the
+					primary button. -->
+				<b-button v-if="failed" :disabled="busy" rounded type="is-danger" @click="cancel">{{ $t('Delete this app') }}</b-button>
+				<b-button rounded @click="$emit('close')">
 					{{ outcome ? $t('Close') : $t('Continue in background') }}
 				</b-button>
+				<b-button v-if="failed" :loading="busy" rounded type="is-primary" @click="deploy">{{ $t('Deploy again') }}</b-button>
 			</template>
 		</footer>
 	</div>
@@ -193,8 +192,11 @@ export default {
 				return this.$t('The deployment failed: {reason}', { reason: this.reason })
 			return this.built ? this.$t('Built. Starting the app…') : this.$t('Building…')
 		},
+		failed() {
+			return Boolean(this.outcome) && this.outcome !== 'deployed'
+		},
 		statusClass() {
-			return { 'has-text-success': this.outcome === 'deployed', 'has-text-danger': Boolean(this.outcome) && this.outcome !== 'deployed' }
+			return { 'has-text-success-on-scheme': this.outcome === 'deployed', 'has-text-danger-on-scheme': this.failed }
 		},
 	},
 	watch: {
@@ -383,6 +385,12 @@ export default {
 <style lang="scss" scoped>
 .modal-card {
 	width: 40rem;
+	max-width: 100%;
+}
+
+// a field's help line is secondary text
+:deep(.help) {
+	color: var(--casa-text-hint);
 }
 
 .git-app__text {
