@@ -28,9 +28,11 @@
 <script>
 import { findSyncthing } from './syncthingApp'
 import events from '@/events/events'
+import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 
 export default {
 	name: 'sync-block',
+	mixins: [business_OpenThirdApp],
 	data() {
 		return {
 			isLoading: false,
@@ -38,6 +40,7 @@ export default {
 			syncBaseURL: '',
 			isSyncInstalled: false,
 			isSyncRunning: false,
+			isSyncStartable: false,
 			syncPort: '',
 			syncId: '',
 		}
@@ -70,9 +73,17 @@ export default {
 
 			this.isSyncInstalled = Boolean(app)
 			this.isSyncRunning = Boolean(app && app.running)
+			this.isSyncStartable = Boolean(app && app.startable)
 			this.syncId = app ? app.name : ''
 			this.syncPort = app ? app.port : ''
-			this.syncBaseURL = app ? `http://${this.$baseIp}:${app.port}` : ''
+			this.syncBaseURL = app ? app.url : ''
+		},
+		openSyncWebUI() {
+			if (!this.syncBaseURL) {
+				this.warnNothingToOpen({ name: 'Syncthing' })
+				return
+			}
+			window.open(this.syncBaseURL, '_blank')
 		},
 		async openSyncPanel() {
 			await this.checkSyncStatus()
@@ -80,7 +91,16 @@ export default {
 				this.$EventBus.$emit(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
 			} else {
 				if (this.isSyncRunning) {
-					window.open(this.syncBaseURL, '_blank')
+					this.openSyncWebUI()
+				} else if (!this.isSyncStartable) {
+					// A v1 app or a plain container: the compose API does not know it,
+					// so the start dialog could only fail, every time.
+					this.$buefy.toast.open({
+						message: this.$t('Syncthing is not running and cannot be started from here. Start it where it is managed.'),
+						type: 'is-warning',
+						position: 'is-top',
+						duration: 4000,
+					})
 				} else {
 					this.$buefy.dialog.confirm({
 						title: ' ',
@@ -99,7 +119,7 @@ export default {
 								this.$EventBus.$emit(events.RELOAD_APP_LIST)
 								setTimeout(() => {
 									close()
-									window.open(this.syncBaseURL, '_blank')
+									this.openSyncWebUI()
 								}, 2000)
 							}).catch(() => {
 								this.isStarting = false
