@@ -17,7 +17,7 @@
   "When this is off, every app opens in a new browser tab.": "Désactivé, chaque app s'ouvre dans un nouvel onglet du navigateur.",
   "Always open these apps in a new tab:": "Toujours ouvrir ces apps dans un nouvel onglet :",
   "The list of installed apps could not be loaded.": "La liste des apps installées n'a pas pu être chargée.",
-  "No app is installed yet.": "Aucune app n'est installée pour l'instant.",
+  "No other app is installed yet.": "Aucune autre app n'est installée pour l'instant.",
   "Create": "Créer",
   "Next": "Suivant",
   "Close": "Fermer",

@@ -73,6 +73,7 @@ import AppSection from '@/components/Apps/AppSection.vue'
 import FilePanel from '@/components/filebrowser/FilePanel.vue'
 import UpdateCompleteModal from '@/components/settings/UpdateCompleteModal.vue'
 import { mixin } from '@/mixins/mixin'
+import { FILES_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import events from '@/events/events'
 
 const wallpaperConfig = 'wallpaper'
@@ -211,6 +212,13 @@ export default {
 		 * @return {*} void
 		 */
 		showFiles(path) {
+			// the App launching setting covers Files as it covers the apps
+			if (builtinOpensInNewTab(FILES_LAUNCH_ID, this.$store.state)) {
+				const query = path ? `?path=${encodeURIComponent(path)}` : ''
+				window.open(`${window.location.pathname}#/files${query}`, '_blank')
+				return
+			}
+
 			this.isFileActive = true
 			this.$nextTick(() => {
 				this.$refs.filePanel.init(path)

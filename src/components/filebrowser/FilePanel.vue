@@ -453,9 +453,10 @@ export default {
 
 	mounted() {
 		this.init()
+		// on a tab of its own nobody calls init(path): the folder comes in the
+		// address (#/files?path=/DATA/...)
 		if (this.$route.path == '/files') {
-			this.init()
-			// this.isLoading = false;
+			this.init(this.$route.query.path)
 		}
 
 		if (this.pageType == 'file') {
@@ -1181,9 +1182,12 @@ export default {
 	z-index: 20;
 	display: flex;
 
+	// on a tab of its own (#/files) the panel is the whole window
 	.modal-card {
+		width: 100% !important;
 		height: 100% !important;
 		max-height: 100% !important;
+		border-radius: 0;
 		overflow: hidden;
 	}
 }

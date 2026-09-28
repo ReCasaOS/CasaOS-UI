@@ -756,6 +756,9 @@ export default {
 			isFirst: true,
 			errorType: 1,
 			currentInstallAppName: null,
+			// Every panel open, in any tab, hears every install on the message bus:
+			// this one follows only the install it asked for.
+			installStarted: false,
 			currentInstallAppError: false,
 			currentInstallAppType: null,
 			currentInstallAppText: '',
@@ -1383,10 +1386,14 @@ export default {
 		 * @return {*} void
 		 */
 		installComposeApp(dockerComposeCommands) {
+			// Set before the request: the bus may announce the install before the
+			// request answers.
+			this.installStarted = true
 			return this.$openAPI.appManagement.compose
 				.installComposeApp(dockerComposeCommands, false, true)
 				.then((res) => {
 					if (res.status !== 200) {
+						this.installStarted = false
 						this.dockerComposeConfig = dockerComposeCommands
 						this.currentSlide = 1
 						this.errInfo = res.data
@@ -1398,6 +1405,7 @@ export default {
 					}
 				})
 				.catch((e) => {
+					this.installStarted = false
 					if (e.response.status === 400) {
 						this.dockerComposeConfig = dockerComposeCommands
 						this.currentSlide = 1
@@ -1875,6 +1883,14 @@ export default {
 
 	sockets: {
 		'app:install-begin': function (res) {
+			// Another tab's install, or the dashboard's, is left alone, and with it
+			// its progress and its end: installAppProgress follows only the app named
+			// here. The flag is taken once, so an install started elsewhere later on
+			// does not take this one over.
+			if (!this.installStarted) {
+				return
+			}
+			this.installStarted = false
 			this.currentInstallAppName = res.Properties['app:name']
 			this.currentSlide = 2
 			this.currentInstallAppText = 'Start Installation...'

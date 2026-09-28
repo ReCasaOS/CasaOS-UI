@@ -489,7 +489,7 @@
   "When this is off, every app opens in a new browser tab.": "When this is off, every app opens in a new browser tab.",
   "Always open these apps in a new tab:": "Always open these apps in a new tab:",
   "The list of installed apps could not be loaded.": "The list of installed apps could not be loaded.",
-  "No app is installed yet.": "No app is installed yet.",
+  "No other app is installed yet.": "No other app is installed yet.",
   "Require an account": "Require an account",
   "Anyone on the network can read and write these folders.": "Anyone on the network can read and write these folders.",
   "Choose an account": "Choose an account",

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
 	DEFAULT_APP_LAUNCH_EXCEPTIONS,
+	FILES_LAUNCH_ID,
+	builtinOpensInNewTab,
 	readAppLaunchPreference,
 	shouldOpenInNewWindow,
 } from './appLaunchPreference'
@@ -51,6 +53,21 @@ describe('shouldOpenInNewWindow', () => {
 
 	it('does not throw on an app with neither id nor name', () => {
 		expect(shouldOpenInNewWindow({}, inIframe)).toBe(false)
+	})
+})
+
+describe('builtinOpensInNewTab', () => {
+	it('keeps Files in the dialog while apps open inside CasaOS', () => {
+		expect(builtinOpensInNewTab(FILES_LAUNCH_ID, { appLaunchInIframe: true, appLaunchExceptions: DEFAULT_APP_LAUNCH_EXCEPTIONS })).toBe(false)
+	})
+
+	it('opens Files in a new tab when the setting is off, or when it is excepted', () => {
+		expect(builtinOpensInNewTab(FILES_LAUNCH_ID, { appLaunchInIframe: false, appLaunchExceptions: [] })).toBe(true)
+		expect(builtinOpensInNewTab(FILES_LAUNCH_ID, { appLaunchInIframe: true, appLaunchExceptions: [FILES_LAUNCH_ID] })).toBe(true)
+	})
+
+	it('is not matched by a compose app named files', () => {
+		expect(builtinOpensInNewTab(FILES_LAUNCH_ID, { appLaunchInIframe: true, appLaunchExceptions: ['files'] })).toBe(false)
 	})
 })
 
