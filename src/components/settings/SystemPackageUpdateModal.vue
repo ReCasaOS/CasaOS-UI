@@ -56,6 +56,30 @@
 					</div>
 				</div>
 
+				<div v-if="info.docker" class="docker-line mt-4">
+					<h4 class="docker-title">
+						{{ $t('Docker') }}<span v-if="info.docker.version" class="ml-2 _has-text-gray">{{ info.docker.version }}</span>
+					</h4>
+					<p class="is-size-7 _has-text-gray">{{ dockerOrigin }}</p>
+					<template v-if="dockerHasUpdates">
+						<p class="mt-2 is-size-7">{{ $t('Docker has updates. This update leaves it alone.') }}</p>
+						<ul class="docker-updates is-size-7 _has-text-gray">
+							<li v-for="item in info.docker.updates" :key="item.name">
+								{{ item.name }} {{ item.current_version || '—' }} → {{ item.candidate_version }}
+							</li>
+						</ul>
+						<p class="mt-2 is-size-7">
+							{{ $t('Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.') }}
+						</p>
+						<template v-if="info.docker.manual_command">
+							<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
+							<pre class="docker-command">{{ info.docker.manual_command }}</pre>
+						</template>
+						<p v-else class="mt-2 is-size-7">{{ $t('ReCasaOS does not know how Docker was installed here, so it shows no command.') }}</p>
+					</template>
+					<p v-else class="is-size-7">{{ $t('Docker is up to date.') }}</p>
+				</div>
+
 				<div v-if="isRunning" class="mt-4">
 					<p class="has-text-info-on-scheme">
 						{{ $t(isReconciliationPending ? 'Finishing system package update...' : 'Applying system package updates...') }}
@@ -138,6 +162,25 @@ export default {
 		hasUpdates() {
 			return Array.isArray(this.info.updates) && this.info.updates.length > 0
 		},
+		dockerHasUpdates() {
+			return Array.isArray(this.info.docker?.updates) && this.info.docker.updates.length > 0
+		},
+		dockerOrigin() {
+			const docker = this.info.docker
+			if (!docker?.installed) {
+				return this.$t('Docker is not installed from a package here.')
+			}
+			switch (docker.origin) {
+			case 'docker-repository':
+				return this.$t('Installed from Docker\'s own repository.')
+			case 'distribution':
+				return this.$t('Installed from your distribution\'s docker.io package.')
+			case 'snap':
+				return this.$t('Installed as a snap.')
+			default:
+				return this.$t('Installed from a source ReCasaOS does not recognise.')
+			}
+		},
 	},
 	mounted() {
 		this.loadInitialState()
@@ -182,7 +225,7 @@ export default {
 		confirmUpdate() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Update system packages'),
-				message: `${this.$t('Are you sure you want to update all available system packages?')}<br><br>${this.$t('The package list may change before the update starts.')}`,
+				message: `${this.$t('Are you sure you want to update the system packages listed? Docker is not part of this update.')}<br><br>${this.$t('The package list may change before the update starts.')}`,
 				type: 'is-warning',
 				hasIcon: true,
 				confirmText: this.$t('Update packages'),
@@ -266,6 +309,31 @@ export default {
 		padding: 0.35rem 0.5rem;
 		line-height: 1.35;
 	}
+}
+
+.docker-line {
+	padding-top: 1rem;
+	border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.docker-title {
+	font-weight: 600;
+}
+
+.docker-updates {
+	margin: 0.25rem 0 0 1rem;
+	list-style: disc;
+}
+
+.docker-command {
+	margin: 0.25rem 0 0;
+	padding: 0.5rem 0.75rem;
+	border-radius: 0.5rem;
+	background: rgba(128, 128, 128, 0.12);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	user-select: all;
+	font-size: 0.75rem;
 }
 
 .package-log {

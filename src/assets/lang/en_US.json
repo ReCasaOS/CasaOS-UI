@@ -928,5 +928,17 @@
   "ReCasaOS update": "ReCasaOS update",
   "Share on {network}": "Share on {network}",
   "The update could not be started.": "The update could not be started.",
-  "The progress of the update could not be loaded.": "The progress of the update could not be loaded."
+  "The progress of the update could not be loaded.": "The progress of the update could not be loaded.",
+  "Docker": "Docker",
+  "Docker has updates. This update leaves it alone.": "Docker has updates. This update leaves it alone.",
+  "Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.": "Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.",
+  "In a terminal on this machine:": "In a terminal on this machine:",
+  "ReCasaOS does not know how Docker was installed here, so it shows no command.": "ReCasaOS does not know how Docker was installed here, so it shows no command.",
+  "Docker is up to date.": "Docker is up to date.",
+  "Docker is not installed from a package here.": "Docker is not installed from a package here.",
+  "Installed from Docker's own repository.": "Installed from Docker's own repository.",
+  "Installed from your distribution's docker.io package.": "Installed from your distribution's docker.io package.",
+  "Installed as a snap.": "Installed as a snap.",
+  "Installed from a source ReCasaOS does not recognise.": "Installed from a source ReCasaOS does not recognise.",
+  "Are you sure you want to update the system packages listed? Docker is not part of this update.": "Are you sure you want to update the system packages listed? Docker is not part of this update."
 }

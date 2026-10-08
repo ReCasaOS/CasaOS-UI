@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import SystemPackageUpdateModal from './SystemPackageUpdateModal.vue'
 
 const answer = data => () => Promise.resolve({ data: { success: 200, data } })
@@ -17,10 +17,10 @@ const withSlot = {
 let wrapper
 afterEach(() => wrapper?.unmount())
 
-async function open(sys) {
+async function open(sys, mocks = {}) {
 	wrapper = mount(SystemPackageUpdateModal, {
 		global: {
-			mocks: { $t: key => key, $api: { sys: { getSystemPackageUpdateStatus: answer(idle), ...sys } } },
+			mocks: { $t: key => key, $api: { sys: { getSystemPackageUpdateStatus: answer(idle), ...sys } }, ...mocks },
 			stubs: { 'b-button': withSlot, 'b-message': withSlot, 'b-icon': true },
 		},
 	})
@@ -55,5 +55,79 @@ describe('system packages', () => {
 
 		expect(w.find('footer').exists()).toBe(false)
 		expect(w.find('pre').text()).toBe('Reading package lists...')
+	})
+})
+
+describe('docker on a line of its own', () => {
+	const docker = {
+		installed: true,
+		origin: 'docker-repository',
+		version: '29.8.1',
+		updates: [{ name: 'docker-ce', current_version: '5:29.8.1-1', candidate_version: '5:29.8.2-1' }],
+		manual_command: 'sudo apt-get update && sudo apt-get install --only-upgrade docker-ce docker-ce-cli containerd.io',
+	}
+	const check = extra => answer({
+		supported: true,
+		manager: 'apt',
+		updates: [{ name: 'libc6', current_version: '2.35-1', candidate_version: '2.35-2' }],
+		count: 1,
+		...extra,
+	})
+
+	it('shows its version and where it came from, what it has, the warning and the command to type', async () => {
+		const w = await open({ getSystemPackages: check({ docker }) })
+
+		const line = w.find('.docker-line')
+		expect(line.exists()).toBe(true)
+		expect(line.text()).toContain('Docker')
+		expect(line.text()).toContain('29.8.1')
+		expect(line.text()).toContain('Installed from Docker\'s own repository.')
+		expect(line.text()).toContain('Docker has updates. This update leaves it alone.')
+		expect(line.text()).toContain('docker-ce')
+		expect(line.text()).toContain('every container stops until it is back')
+		expect(line.find('pre.docker-command').text()).toBe(docker.manual_command)
+		// and Docker's package is not among the ones the button installs
+		expect(w.find('.package-list').text()).toContain('libc6')
+		expect(w.find('.package-list').text()).not.toContain('docker-ce')
+	})
+
+	it('says it is up to date, with no command, when nothing is on offer', async () => {
+		const w = await open({ getSystemPackages: check({ docker: { ...docker, updates: [] } }) })
+
+		expect(w.find('.docker-line').text()).toContain('Docker is up to date.')
+		expect(w.find('.docker-line pre').exists()).toBe(false)
+	})
+
+	it('shows no command for a Docker whose origin it does not know, and says so', async () => {
+		const w = await open({ getSystemPackages: check({ docker: { ...docker, origin: 'unknown', manual_command: '' } }) })
+
+		expect(w.find('.docker-line').text()).toContain('Installed from a source ReCasaOS does not recognise.')
+		expect(w.find('.docker-line').text()).toContain('ReCasaOS does not know how Docker was installed here, so it shows no command.')
+		expect(w.find('.docker-line pre').exists()).toBe(false)
+	})
+
+	it('has no Docker line when the host reports none', async () => {
+		const w = await open({ getSystemPackages: check({}) })
+
+		expect(w.find('.docker-line').exists()).toBe(false)
+	})
+
+	it('shows Docker even when nothing else is to update, next to the "no updates" sentence', async () => {
+		const w = await open({ getSystemPackages: check({ updates: [], count: 0, docker }) })
+
+		expect(w.text()).toContain('No system package updates are available.')
+		expect(w.find('.docker-line').text()).toContain('docker-ce')
+		expect(w.text()).not.toContain('Update packages')
+	})
+
+	it('asks for confirmation of the listed packages and says Docker is not part of it', async () => {
+		const confirm = vi.fn()
+		const w = await open({ getSystemPackages: check({ docker }) }, { $buefy: { dialog: { confirm } } })
+
+		w.vm.confirmUpdate()
+
+		expect(confirm).toHaveBeenCalledTimes(1)
+		expect(confirm.mock.calls[0][0].message).toContain('Docker is not part of this update.')
+		expect(confirm.mock.calls[0][0].message).not.toContain('all available')
 	})
 })
