@@ -109,3 +109,34 @@ describe('the update dialog opened on the log', () => {
 		wrapper.unmount()
 	})
 })
+
+// A refusal is a normal answer now: the core says 409 while a package update or a package
+// manager is working. The button used to spin for ever.
+describe('a refused update', () => {
+	it('gives the button back, says why, and does not follow a log that is not there', async () => {
+		const getContent = vi.fn(() => Promise.resolve({ data: { data: '' } }))
+		const toast = vi.fn()
+		const refusal = Object.assign(new Error('Request failed with status code 409'), {
+			response: { status: 409, data: { message: 'another update or package operation is running on this box: casaos-package-update is running' } },
+		})
+		const wrapper = mount(UpdateModal, {
+			global: {
+				mocks: {
+					$t: k => k,
+					$api: { file: { getContent }, sys: { updateCasaOS: vi.fn(() => Promise.reject(refusal)) } },
+					$buefy: { toast: { open: toast } },
+				},
+				stubs: { 'b-button': true, 'b-loading': true },
+			},
+		})
+
+		await wrapper.vm.updateSystem()
+
+		expect(wrapper.vm.isUpdating).toBe(false)
+		expect(toast).toHaveBeenCalledTimes(1)
+		expect(toast.mock.calls[0][0].message).toContain('The update could not be started.')
+		expect(toast.mock.calls[0][0].message).toContain('casaos-package-update is running')
+		expect(getContent).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})
