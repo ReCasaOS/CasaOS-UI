@@ -29,7 +29,7 @@
 				</b-message>
 
 				<div v-if="info.count === 0 && !isRunning && status.state === 'idle' && !error" class="package-empty">
-					{{ $t('No system package updates are available.') }}
+					{{ $t(dockerHasUpdates ? 'No other system package updates are available.' : 'No system package updates are available.') }}
 				</div>
 
 				<div v-else-if="info.count > 0" class="package-summary">
@@ -58,7 +58,8 @@
 
 				<div v-if="info.docker" class="docker-line mt-4">
 					<h4 class="docker-title">
-						{{ $t('Docker') }}<span v-if="info.docker.version" class="ml-2 _has-text-gray">{{ info.docker.version }}</span>
+						{{ $t('Docker') }}
+						<span v-if="info.docker.version" class="ml-1 _has-text-gray">{{ info.docker.version }}</span>
 					</h4>
 					<p class="is-size-7 _has-text-gray">{{ dockerOrigin }}</p>
 					<template v-if="dockerHasUpdates">
@@ -68,16 +69,17 @@
 								{{ item.name }} {{ item.current_version || '—' }} → {{ item.candidate_version }}
 							</li>
 						</ul>
-						<p class="mt-2 is-size-7">
+						<p v-if="info.docker.restarts_docker" class="mt-2 is-size-7">
 							{{ $t('Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.') }}
 						</p>
-						<template v-if="info.docker.manual_command">
-							<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
-							<pre class="docker-command">{{ info.docker.manual_command }}</pre>
-						</template>
-						<p v-else class="mt-2 is-size-7">{{ $t('ReCasaOS does not know how Docker was installed here, so it shows no command.') }}</p>
 					</template>
-					<p v-else class="is-size-7">{{ $t('Docker is up to date.') }}</p>
+					<p v-else-if="dockerCanSeeUpdates" class="is-size-7">{{ $t('Docker is up to date.') }}</p>
+					<p v-else class="is-size-7">{{ dockerUnseen }}</p>
+					<template v-if="info.docker.manual_command && (dockerHasUpdates || !dockerCanSeeUpdates)">
+						<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
+						<pre class="docker-command" tabindex="0" :aria-label="$t('Command to update Docker')">{{ info.docker.manual_command }}</pre>
+					</template>
+					<p v-else-if="dockerHasUpdates" class="mt-2 is-size-7">{{ $t('ReCasaOS does not know how Docker was installed here, so it shows no command.') }}</p>
 				</div>
 
 				<div v-if="isRunning" class="mt-4">
@@ -91,7 +93,7 @@
 				<div v-else-if="status.state === 'failed'" class="mt-4 has-text-danger-on-scheme">
 					{{ $t('System package update failed.') }}
 				</div>
-				<p v-if="status.error && !isReconciliationPending" class="mt-1 is-size-7 _has-text-gray">
+				<p v-if="status.error && !isReconciliationPending && status.error !== error?.detail" class="mt-1 is-size-7 _has-text-gray">
 					{{ status.error }}
 				</p>
 
@@ -165,21 +167,28 @@ export default {
 		dockerHasUpdates() {
 			return Array.isArray(this.info.docker?.updates) && this.info.docker.updates.length > 0
 		},
+		// apt tells of an update for Docker's own repository and for the distribution's package;
+		// of a snap, or of a Docker whose source it does not know, it tells nothing, and "up to
+		// date" would be a claim nobody checked
+		dockerCanSeeUpdates() {
+			return ['docker-repository', 'distribution'].includes(this.info.docker?.origin)
+		},
 		dockerOrigin() {
 			const docker = this.info.docker
 			if (!docker?.installed) {
 				return this.$t('Docker is not installed from a package here.')
 			}
-			switch (docker.origin) {
-			case 'docker-repository':
-				return this.$t('Installed from Docker\'s own repository.')
-			case 'distribution':
-				return this.$t('Installed from your distribution\'s docker.io package.')
-			case 'snap':
-				return this.$t('Installed as a snap.')
-			default:
-				return this.$t('Installed from a source ReCasaOS does not recognise.')
+			const words = {
+				'docker-repository': 'Installed from Docker\'s own repository.',
+				'distribution': 'Installed from your distribution\'s docker.io package.',
+				'snap': 'Installed as a snap.',
 			}
+			return this.$t(words[docker.origin] || 'Installed from a source ReCasaOS does not recognise.')
+		},
+		dockerUnseen() {
+			return this.$t(this.info.docker?.origin === 'snap'
+				? 'ReCasaOS cannot see updates of a snap. Update it with the command below.'
+				: 'This machine\'s package sources offer no update for it, and ReCasaOS cannot tell more.')
 		},
 	},
 	mounted() {
@@ -225,7 +234,7 @@ export default {
 		confirmUpdate() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Update system packages'),
-				message: `${this.$t('Are you sure you want to update the system packages listed? Docker is not part of this update.')}<br><br>${this.$t('The package list may change before the update starts.')}`,
+				message: `${this.$t(this.info.docker ? 'Are you sure you want to update the system packages listed? Docker is not part of this update.' : 'Are you sure you want to update the system packages listed?')}<br><br>${this.$t('The package list may change before the update starts.')}`,
 				type: 'is-warning',
 				hasIcon: true,
 				confirmText: this.$t('Update packages'),
@@ -248,6 +257,10 @@ export default {
 					}
 				}
 				this.fail('Could not start the system package update.', error)
+				// refused (409) for a reason other than "already running": what was on screen may no longer be so
+				if (error?.response?.status === 409 && this.status.state !== 'running' && !this.isReconciliationPending) {
+					this.checkPackages(true)
+				}
 			} finally {
 				this.isStarting = false
 			}

@@ -97,7 +97,19 @@ export default {
 		 */
 		async updateSystem() {
 			this.isUpdating = true
-			await this.$api.sys.updateCasaOS()
+			try {
+				await this.$api.sys.updateCasaOS()
+			} catch (error) {
+				// refused (409: a package update or a package manager is working) or not started:
+				// the button comes back, with the core's reason when it gave one
+				this.isUpdating = false
+				const detail = error?.response?.data?.message
+				this.$buefy.toast.open({
+					message: this.$t('The update could not be started.') + (typeof detail === 'string' && detail ? ` ${detail}` : ''),
+					type: 'is-danger',
+				})
+				return
+			}
 			// this.checkUpdateState();
 			this.getUpdateLogs()
 		},

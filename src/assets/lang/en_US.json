@@ -88,7 +88,6 @@
   "Checking for system package updates...": "Checking for system package updates...",
   "Applying system package updates...": "Applying system package updates...",
   "Finishing system package update...": "Finishing system package update...",
-  "Are you sure you want to update all available system packages?": "Are you sure you want to update all available system packages?",
   "The package list may change before the update starts.": "The package list may change before the update starts.",
   "Retry": "Retry",
   "Let more friends know": "Let more friends know",
@@ -940,5 +939,10 @@
   "Installed from your distribution's docker.io package.": "Installed from your distribution's docker.io package.",
   "Installed as a snap.": "Installed as a snap.",
   "Installed from a source ReCasaOS does not recognise.": "Installed from a source ReCasaOS does not recognise.",
-  "Are you sure you want to update the system packages listed? Docker is not part of this update.": "Are you sure you want to update the system packages listed? Docker is not part of this update."
+  "Are you sure you want to update the system packages listed? Docker is not part of this update.": "Are you sure you want to update the system packages listed? Docker is not part of this update.",
+  "No other system package updates are available.": "No other system package updates are available.",
+  "Command to update Docker": "Command to update Docker",
+  "ReCasaOS cannot see updates of a snap. Update it with the command below.": "ReCasaOS cannot see updates of a snap. Update it with the command below.",
+  "This machine's package sources offer no update for it, and ReCasaOS cannot tell more.": "This machine's package sources offer no update for it, and ReCasaOS cannot tell more.",
+  "Are you sure you want to update the system packages listed?": "Are you sure you want to update the system packages listed?"
 }
