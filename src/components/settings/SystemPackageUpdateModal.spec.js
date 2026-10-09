@@ -20,7 +20,7 @@ afterEach(() => wrapper?.unmount())
 async function open(sys, mocks = {}) {
 	wrapper = mount(SystemPackageUpdateModal, {
 		global: {
-			mocks: { $t: key => key, $api: { sys: { getSystemPackageUpdateStatus: answer(idle), ...sys } }, ...mocks },
+			mocks: { $t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key), $api: { sys: { getSystemPackageUpdateStatus: answer(idle), ...sys } }, ...mocks },
 			stubs: { 'b-button': withSlot, 'b-message': withSlot, 'b-icon': true },
 		},
 	})
@@ -90,14 +90,33 @@ describe('docker on a line of its own', () => {
 		expect(w.find('.package-list').text()).toContain('libc6')
 	})
 
-	it('says it is up to date, with no command, when apt has nothing on offer for a source it can see', async () => {
+	it('says that no newer Docker is offered, with no command, when apt has nothing for a source it can see', async () => {
 		for (const origin of ['docker-repository', 'distribution']) {
 			const w = await open({ getSystemPackages: check({ docker: { ...docker, origin, updates: [] } }) })
 
-			expect(w.find('.docker-line').text()).toContain('Docker is up to date.')
+			expect(w.find('.docker-line').text()).toContain('No newer Docker is offered by this machine\'s package sources.')
+			expect(w.find('.docker-line').text()).not.toContain('up to date')
 			expect(w.find('.docker-line pre').exists()).toBe(false)
 			w.unmount()
 		}
+	})
+
+	it('says a newer Docker exists when it is on hold, and gives the command', async () => {
+		const held = { ...docker, updates: [], candidate: '29.8.2', held: true, version: '28.0.4', manual_command: 'sudo apt-get update && sudo apt-get install --only-upgrade --allow-change-held-packages docker-ce' }
+		const w = await open({ getSystemPackages: check({ docker: held }) })
+
+		const line = w.find('.docker-line').text()
+		expect(line).toContain('A newer Docker, 29.8.2, exists in this machine\'s package sources, but the package is on hold, so no update offers it.')
+		expect(line).not.toContain('No newer Docker is offered')
+		expect(w.find('pre.docker-command').text()).toContain('--allow-change-held-packages')
+	})
+
+	it('says a newer Docker exists when apt keeps it back without a hold', async () => {
+		const w = await open({ getSystemPackages: check({ docker: { ...docker, updates: [], candidate: '29.8.2', held: false, version: '28.0.4' } }) })
+
+		const line = w.find('.docker-line').text()
+		expect(line).toContain('A newer Docker, 29.8.2, exists in this machine\'s package sources, but apt does not offer it for an update (a hold, or a dependency).')
+		expect(line).not.toContain('on hold')
 	})
 
 	it('does not say "up to date" of a snap, which apt cannot see, and gives the command', async () => {
@@ -138,7 +157,7 @@ describe('docker on a line of its own', () => {
 	it('copes with a Docker object whose updates are null', async () => {
 		const w = await open({ getSystemPackages: check({ docker: { ...docker, updates: null } }) })
 
-		expect(w.find('.docker-line').text()).toContain('Docker is up to date.')
+		expect(w.find('.docker-line').text()).toContain('No newer Docker is offered by this machine\'s package sources.')
 	})
 
 	it('has no Docker line when the host reports none', async () => {

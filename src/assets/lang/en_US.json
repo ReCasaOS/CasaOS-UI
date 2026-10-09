@@ -933,7 +933,6 @@
   "Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.": "Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.",
   "In a terminal on this machine:": "In a terminal on this machine:",
   "ReCasaOS does not know how Docker was installed here, so it shows no command.": "ReCasaOS does not know how Docker was installed here, so it shows no command.",
-  "Docker is up to date.": "Docker is up to date.",
   "Docker is not installed from a package here.": "Docker is not installed from a package here.",
   "Installed from Docker's own repository.": "Installed from Docker's own repository.",
   "Installed from your distribution's docker.io package.": "Installed from your distribution's docker.io package.",
@@ -944,5 +943,8 @@
   "Command to update Docker": "Command to update Docker",
   "ReCasaOS cannot see updates of a snap. Update it with the command below.": "ReCasaOS cannot see updates of a snap. Update it with the command below.",
   "This machine's package sources offer no update for it, and ReCasaOS cannot tell more.": "This machine's package sources offer no update for it, and ReCasaOS cannot tell more.",
-  "Are you sure you want to update the system packages listed?": "Are you sure you want to update the system packages listed?"
+  "Are you sure you want to update the system packages listed?": "Are you sure you want to update the system packages listed?",
+  "No newer Docker is offered by this machine's package sources.": "No newer Docker is offered by this machine's package sources.",
+  "A newer Docker, {version}, exists in this machine's package sources, but the package is on hold, so no update offers it.": "A newer Docker, {version}, exists in this machine's package sources, but the package is on hold, so no update offers it.",
+  "A newer Docker, {version}, exists in this machine's package sources, but apt does not offer it for an update (a hold, or a dependency).": "A newer Docker, {version}, exists in this machine's package sources, but apt does not offer it for an update (a hold, or a dependency)."
 }
