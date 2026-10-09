@@ -104,6 +104,24 @@ const sys = {
 		return api.get(`${PREFIX}/packages/update/status`)
 	},
 
+	// The containers running now, for the confirmation before a Docker update:
+	// { running, containers: [{ name, image, restart_policy, host_network, ports: [{ port, protocol, host_port }] }] }.
+	// Answers fast and never waits for apt.
+	getDockerContainers() {
+		return api.get(`${PREFIX}/docker/containers`)
+	},
+
+	// Update Docker's packages. data: { plan_id } from `docker.update` of getSystemPackages: the
+	// core refuses (409, the code in data.error_code) when it is no longer the plan it computes.
+	startDockerUpdate(data) {
+		return api.post(`${PREFIX}/docker/update`, data)
+	},
+
+	// The Docker update's status, read from its log and its unit: it answers while Docker is down.
+	getDockerUpdateStatus() {
+		return api.get(`${PREFIX}/docker/update/status`)
+	},
+
 	// stop casaos
 	stopCasaOS() {
 		return api.post(`${PREFIX}/stop`)
