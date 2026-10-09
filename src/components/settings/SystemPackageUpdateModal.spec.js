@@ -264,6 +264,8 @@ function dockerPackages(update = {}, docker = {}) {
 
 async function openDocker(sys = {}, mocks = {}) {
 	wrapper = mount(SystemPackageUpdateModal, {
+		// in the document, so that the focus and the scroll offset mean something
+		attachTo: document.body,
 		global: {
 			mocks: {
 				$t: translate,
@@ -1031,6 +1033,184 @@ describe('what the Docker update ended with', () => {
 
 		expect(w.find('.docker-job').exists()).toBe(false)
 		expect(w.find('.docker-update-button').exists()).toBe(true)
+	})
+})
+
+describe('moving from one view of the Docker update to the next', () => {
+	const bodyOf = w => w.find('.modal-card-body').element
+	const focused = w => document.activeElement === w.find('.docker-job .docker-title').element
+
+	it('opens the confirmation at its top, with the focus on its heading, even when the window was scrolled to the button', async () => {
+		const w = await openDocker()
+		bodyOf(w).scrollTop = 118
+
+		await openConfirmation(w)
+
+		expect(bodyOf(w).scrollTop).toBe(0)
+		expect(document.activeElement).toBe(w.find('.docker-confirm .docker-title').element)
+		expect(w.find('.docker-confirm .docker-title').attributes('tabindex')).toBe('-1')
+	})
+
+	it('keeps the scroll offset on Cancel and gives the focus back to the button that opened the confirmation', async () => {
+		const w = await openDocker()
+		await openConfirmation(w)
+		bodyOf(w).scrollTop = 118
+
+		await w.findAll('footer button')[0].trigger('click')
+		await flushPromises()
+
+		expect(bodyOf(w).scrollTop).toBe(118)
+		expect(document.activeElement).toBe(w.find('.docker-update-button').element)
+	})
+
+	it('puts the focus on the heading of the run when it starts', async () => {
+		const w = await openDocker({ startDockerUpdate: answer(dockerRun({ state: 'running' })), getDockerUpdateStatus: vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(running)) })
+		await openConfirmation(w)
+		bodyOf(w).scrollTop = 40
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(focused(w)).toBe(true)
+		expect(bodyOf(w).scrollTop).toBe(0)
+		expect(w.find('.docker-job .docker-title').attributes('tabindex')).toBe('-1')
+	})
+
+	it('keeps the log out of every live region, so a growing log is not read again and again', async () => {
+		const w = await openDocker({ getDockerUpdateStatus: answer({ ...running, log: 'Get:1 https://download.docker.com bullseye/stable docker-ce' }) })
+
+		expect(w.find('.docker-job .package-log').text()).toContain('Get:1')
+		expect(w.find('.docker-job').attributes('role')).toBeUndefined()
+		expect(w.find('.package-log').element.closest('[role="status"], [role="alert"], [aria-live]')).toBeNull()
+	})
+
+	it('has one live region from the start, which says the run, its trouble and its end', async () => {
+		vi.useFakeTimers()
+		try {
+			const getDockerUpdateStatus = vi.fn()
+				.mockResolvedValueOnce(reply(dockerIdle))
+				.mockResolvedValueOnce(reply(running))
+				.mockRejectedValueOnce(new Error('Network Error'))
+				.mockResolvedValue(reply(dockerRun({ ...succeeded, log: 'Setting up docker-ce' })))
+			const startDockerUpdate = answer(dockerRun({ state: 'running' }))
+			const w = await openDocker({ getDockerUpdateStatus, startDockerUpdate })
+			const live = () => w.find('[role="status"]')
+			expect(live().exists()).toBe(true)
+			expect(live().text()).toBe('')
+
+			await openConfirmation(w)
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+			expect(w.findAll('[role="status"]').length).toBe(1)
+			expect(live().text()).toContain('Updating Docker... apps are restarting')
+
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(live().text()).toContain('Connection lost, retrying...')
+
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(live().text()).toBe('Docker was updated to 29.8.0.')
+			expect(live().text()).not.toContain('Setting up docker-ce')
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('says a failure in the live region, with what it means', async () => {
+		const w = await openDocker({ getDockerUpdateStatus: answer(dockerRun({ ...succeeded, state: 'failed', outcome: 'failed', error_code: 'download' })) })
+
+		expect(w.find('[role="status"]').text()).toContain('The Docker update failed.')
+		expect(w.find('[role="status"]').text()).toContain('The new packages could not be downloaded')
+	})
+})
+
+describe('a window that has been closed', () => {
+	it('does not follow a run whose answer arrives after it closed, and checks nothing', async () => {
+		vi.useFakeTimers()
+		try {
+			let started
+			const startDockerUpdate = vi.fn(() => new Promise((resolve) => {
+				started = resolve
+			}))
+			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(succeeded))
+			const getSystemPackages = vi.fn(dockerPackages())
+			const w = await openDocker({ startDockerUpdate, getDockerUpdateStatus, getSystemPackages })
+			await openConfirmation(w)
+			await w.find('.docker-confirm-button').trigger('click')
+			const reads = getDockerUpdateStatus.mock.calls.length
+			const checks = getSystemPackages.mock.calls.length
+
+			w.unmount()
+			started(reply(dockerRun({ state: 'running' })))
+			await vi.advanceTimersByTimeAsync(30000)
+
+			expect(getDockerUpdateStatus.mock.calls.length).toBe(reads)
+			expect(getSystemPackages.mock.calls.length).toBe(checks)
+			expect(vi.getTimerCount()).toBe(0)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('does not follow, or check, after the first read of the status answers late', async () => {
+		vi.useFakeTimers()
+		try {
+			let answered
+			const getDockerUpdateStatus = vi.fn(() => new Promise((resolve) => {
+				answered = resolve
+			}))
+			const getSystemPackages = vi.fn(dockerPackages())
+			const w = await openDocker({ getDockerUpdateStatus, getSystemPackages })
+			expect(getDockerUpdateStatus).toHaveBeenCalledTimes(1)
+
+			w.unmount()
+			answered(reply(running))
+			await vi.advanceTimersByTimeAsync(30000)
+
+			expect(getDockerUpdateStatus).toHaveBeenCalledTimes(1)
+			expect(getSystemPackages).not.toHaveBeenCalled()
+			expect(vi.getTimerCount()).toBe(0)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('does not follow the other update either when its status answers late', async () => {
+		vi.useFakeTimers()
+		try {
+			let answered
+			const getSystemPackageUpdateStatus = vi.fn(() => new Promise((resolve) => {
+				answered = resolve
+			}))
+			const getDockerUpdateStatus = vi.fn(answer(dockerIdle))
+			const w = await openDocker({ getSystemPackageUpdateStatus, getDockerUpdateStatus })
+
+			w.unmount()
+			answered(reply({ ...idle, state: 'running' }))
+			await vi.advanceTimersByTimeAsync(30000)
+
+			expect(getSystemPackageUpdateStatus).toHaveBeenCalledTimes(1)
+			expect(getDockerUpdateStatus).not.toHaveBeenCalled()
+			expect(vi.getTimerCount()).toBe(0)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('does not check the packages when a refusal answers after it closed', async () => {
+		let refuse
+		const startDockerUpdate = vi.fn(() => new Promise((resolve, reject) => {
+			refuse = reject
+		}))
+		const getSystemPackages = vi.fn(dockerPackages())
+		const w = await openDocker({ startDockerUpdate, getSystemPackages })
+		await openConfirmation(w)
+		await w.find('.docker-confirm-button').trigger('click')
+
+		w.unmount()
+		refuse(refused(409, 'changed', 'a newer version appeared'))
+		await flushPromises()
+
+		expect(getSystemPackages).toHaveBeenCalledTimes(1)
 	})
 })
 

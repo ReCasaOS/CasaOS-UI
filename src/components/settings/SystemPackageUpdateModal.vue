@@ -8,6 +8,9 @@
 		</header>
 
 		<section class="modal-card-body">
+			<!-- the one place a screen reader hears of the Docker update: always there, so a change in it is announced -->
+			<div class="docker-announcer is-sr-only" role="status" aria-live="polite" aria-atomic="true">{{ dockerAnnouncement }}</div>
+
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">
 				{{ error.message }}
 				<span v-if="error.detail" class="is-block is-size-7 mt-1">{{ error.detail }}</span>
@@ -21,7 +24,7 @@
 
 			<!-- every value below is a text node: container names are third-party strings, never HTML -->
 			<div v-if="dockerConfirming" class="docker-confirm">
-				<h4 class="docker-title">{{ $t('Update Docker') }}</h4>
+				<h4 ref="dockerConfirmTitle" class="docker-title" tabindex="-1">{{ $t('Update Docker') }}</h4>
 				<p class="mt-1">{{ $t('Docker') }} {{ dockerPlan.from }} → {{ dockerPlan.to }}</p>
 
 				<b-message v-if="dockerPlan.major_jump" class="docker-major mt-3" size="is-small" type="is-danger">
@@ -97,13 +100,11 @@
 			</div>
 
 			<template v-else>
-				<div v-if="dockerShowsJob" class="docker-job mb-4" role="status">
-					<h4 class="docker-title">{{ $t('Docker update') }}</h4>
+				<div v-if="dockerShowsJob" class="docker-job mb-4">
+					<h4 ref="dockerJobTitle" class="docker-title" tabindex="-1">{{ $t('Docker update') }}</h4>
 
 					<template v-if="dockerRunning">
-						<p class="has-text-info-on-scheme">
-							{{ $t(dockerFinalizing ? 'Finishing the Docker update...' : 'Updating Docker... apps are restarting') }}
-						</p>
+						<p class="has-text-info-on-scheme">{{ dockerRunningText }}</p>
 						<p v-if="dockerStatus.from && dockerStatus.to" class="is-size-7 _has-text-gray">{{ dockerStatus.from }} → {{ dockerStatus.to }}</p>
 						<p v-if="dockerUnknown" class="docker-unknown mt-1 is-size-7 has-text-danger-on-scheme">{{ $t('Status unknown, reopen this window.') }}</p>
 						<p v-else-if="dockerLost" class="docker-lost mt-1 is-size-7 has-text-warning-on-scheme">{{ $t('Connection lost, retrying...') }}</p>
@@ -116,9 +117,7 @@
 							<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
 							<pre class="docker-command" tabindex="0" :aria-label="$t('Command to restart Docker')">{{ restartCommand }}</pre>
 						</template>
-						<p v-else-if="dockerStatus.state === 'succeeded'" class="has-text-success-on-scheme">
-							{{ dockerStatus.to ? $t('Docker was updated to {version}.', { version: dockerStatus.to }) : $t('Docker was updated.') }}
-						</p>
+						<p v-else-if="dockerStatus.state === 'succeeded'" class="has-text-success-on-scheme">{{ dockerSuccessText }}</p>
 						<template v-else-if="dockerStatus.state === 'failed'">
 							<p class="has-text-danger-on-scheme">{{ $t('The Docker update failed.') }}</p>
 							<p v-if="dockerFailureText" class="mt-1 is-size-7">{{ dockerFailureText }}</p>
@@ -234,7 +233,7 @@
 						<p v-else-if="dockerCanSeeUpdates" class="is-size-7">{{ $t('No newer Docker is offered by this machine\'s package sources.') }}</p>
 						<p v-else class="is-size-7">{{ dockerUnseen }}</p>
 						<template v-if="!dockerRunning">
-							<b-button v-if="dockerUpdate && dockerUpdate.available" class="docker-update-button mt-2" :disabled="isRunning" rounded size="is-small" type="is-primary" @click="openDockerConfirm">
+							<b-button v-if="dockerUpdate && dockerUpdate.available" ref="dockerUpdateButton" class="docker-update-button mt-2" :disabled="isRunning" rounded size="is-small" type="is-primary" @click="openDockerConfirm">
 								{{ $t('Update Docker') }}
 							</b-button>
 							<p v-else-if="dockerUpdate && dockerUpdate.refusal" class="docker-refusal mt-2 is-size-7">
@@ -411,6 +410,8 @@ export default {
 			dockerLost: false,
 			dockerLostSince: 0,
 			dockerUnknown: false,
+			// set when the window is closed: an answer that comes after must not start anything
+			gone: false,
 		}
 	},
 	computed: {
@@ -480,6 +481,32 @@ export default {
 		dockerShowsJob() {
 			return this.dockerRunning || this.dockerTerminal
 		},
+		dockerRunningText() {
+			return this.$t(this.dockerFinalizing ? 'Finishing the Docker update...' : 'Updating Docker... apps are restarting')
+		},
+		dockerSuccessText() {
+			return this.dockerStatus.to ? this.$t('Docker was updated to {version}.', { version: this.dockerStatus.to }) : this.$t('Docker was updated.')
+		},
+		// what the live region says: the line the person would read, never the log
+		dockerAnnouncement() {
+			if (this.dockerRefusal) {
+				return this.dockerRefusalText(this.dockerRefusal.code, this.dockerRefusal.names)
+			}
+			if (this.dockerConfirming || !this.dockerShowsJob) {
+				return ''
+			}
+			if (this.dockerRunning) {
+				const trouble = this.dockerUnknown ? 'Status unknown, reopen this window.' : (this.dockerLost ? 'Connection lost, retrying...' : '')
+				return [this.dockerRunningText, trouble && this.$t(trouble)].filter(Boolean).join(' ')
+			}
+			if (this.dockerRestartPending) {
+				return this.$t('Docker is updated, but the old version is still running. Restart it to finish the update.')
+			}
+			if (this.dockerStatus.state === 'failed') {
+				return [this.$t('The Docker update failed.'), this.dockerFailureText].filter(Boolean).join(' ')
+			}
+			return this.dockerSuccessText
+		},
 		// a clean success needs no log; everything else may
 		dockerShowsLog() {
 			return !!this.dockerStatus.log && !(this.dockerStatus.state === 'succeeded' && !this.dockerRestartPending)
@@ -527,6 +554,7 @@ export default {
 		this.loadInitialState()
 	},
 	beforeUnmount() {
+		this.gone = true
 		this.stopPolling()
 		this.stopDockerPolling()
 	},
@@ -535,6 +563,9 @@ export default {
 		async loadInitialState() {
 			try {
 				const response = await this.$api.sys.getSystemPackageUpdateStatus()
+				if (this.gone) {
+					return
+				}
 				const status = response.data.data
 				if (status) {
 					this.status = status
@@ -548,6 +579,9 @@ export default {
 			}
 			try {
 				const response = await this.$api.sys.getDockerUpdateStatus()
+				if (this.gone) {
+					return
+				}
 				const status = response.data.data
 				if (status) {
 					this.dockerStatus = { ...emptyDockerStatus(), ...status }
@@ -655,6 +689,7 @@ export default {
 			this.dockerPlan = JSON.parse(JSON.stringify(this.dockerUpdate))
 			this.dockerConfirming = true
 			this.loadDockerContainers()
+			this.showTop('dockerConfirmTitle')
 		},
 		closeDockerConfirm() {
 			if (this.dockerStarting) {
@@ -662,6 +697,20 @@ export default {
 			}
 			this.dockerConfirming = false
 			this.dockerContainersSeq++
+			// the scroll offset stays: the person is back where the button was
+			this.$nextTick(() => this.$refs.dockerUpdateButton?.$el?.focus?.())
+		},
+		// A new view replaces the old one inside the same scrolling body, so it would open wherever
+		// the old one was scrolled to, with its warning out of sight. It opens at its top, and the
+		// focus (which died with the button that was pressed) goes to its heading.
+		showTop(ref) {
+			this.$nextTick(() => {
+				const body = this.$el?.querySelector?.('.modal-card-body')
+				if (body) {
+					body.scrollTop = 0
+				}
+				this.$refs[ref]?.focus?.({ preventScroll: true })
+			})
 		},
 		async loadDockerContainers() {
 			const seq = ++this.dockerContainersSeq
@@ -690,10 +739,17 @@ export default {
 			this.error = null
 			try {
 				const response = await this.$api.sys.startDockerUpdate({ plan_id: this.dockerPlan.plan_id })
+				if (this.gone) {
+					return
+				}
 				this.dockerStatus = { ...emptyDockerStatus(), ...response.data.data }
 				this.dockerConfirming = false
 				this.startDockerPolling()
+				this.showTop('dockerJobTitle')
 			} catch (error) {
+				if (this.gone) {
+					return
+				}
 				const data = error?.response?.data?.data
 				const code = typeof data?.error_code === 'string' ? data.error_code : ''
 				const refused = error?.response && (code || [409, 501].includes(error.response.status))
@@ -851,6 +907,11 @@ export default {
 
 .docker-title {
 	font-weight: 600;
+
+	// it takes the focus when a view opens, to be read; nobody types into it
+	&:focus {
+		outline: none;
+	}
 }
 
 .docker-updates {
