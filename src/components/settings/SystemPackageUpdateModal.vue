@@ -148,7 +148,7 @@
 
 						<div v-if="dockerNotReturned.length" class="docker-not-returned mt-3">
 							<p class="is-size-7 has-text-warning-on-scheme">
-								{{ dockerNotReturned.length === 1 ? $t('One container did not come back.') : $t('{n} containers did not come back.', { n: dockerNotReturned.length }) }}
+								{{ dockerNotReturnedText }}
 							</p>
 							<div class="package-list mt-2">
 								<table class="table is-fullwidth is-hoverable">
@@ -456,6 +456,8 @@ export default {
 			dockerRunPlan: null,
 			dockerConfirming: false,
 			dockerStarting: false,
+			// the end of a run was seen by this window, as opposed to a result that was there when it opened
+			dockerWatched: false,
 			dockerRefusal: null,
 			dockerContainers: emptyContainers(),
 			dockerContainersSeq: 0,
@@ -570,25 +572,32 @@ export default {
 		dockerSuccessText() {
 			return this.dockerStatus.to ? this.$t('Docker was updated to {version}.', { version: this.dockerStatus.to }) : this.$t('Docker was updated.')
 		},
-		// what the live region says: the line the person would read, never the log
+		// what the live region says: the lines the person would read, never the log
 		dockerAnnouncement() {
+			const said = []
 			if (this.dockerRefusal) {
-				return this.dockerRefusalText(this.dockerRefusal.code, this.dockerRefusal.names)
+				said.push(this.dockerRefusalText(this.dockerRefusal.code, this.dockerRefusal.names))
+			} else if (!this.dockerConfirming && this.dockerShowsJob) {
+				said.push(...this.dockerJobSentences)
 			}
-			if (this.dockerConfirming || !this.dockerShowsJob) {
-				return ''
-			}
+			// the message that shows an error has no role of its own: nothing else would speak for it
+			said.push(this.error?.message)
+			return said.filter(Boolean).join(' ')
+		},
+		dockerJobSentences() {
 			if (this.dockerRunning) {
 				const trouble = this.dockerUnknown ? 'Status unknown, reopen this window.' : (this.dockerLost ? 'Connection lost, retrying...' : '')
-				return [this.dockerRunningText, trouble && this.$t(trouble)].filter(Boolean).join(' ')
+				return [this.dockerRunningText, trouble && this.$t(trouble)]
 			}
+			// a result found when the window opened can be old, and the page says when it finished before anything else; one seen to its end has just happened
+			const age = this.dockerFinishedAt && !this.dockerWatched ? `${this.$t('Finished {date}', { date: this.dockerFinishedAt })}.` : ''
+			let result = this.dockerSuccessText
 			if (this.dockerRestartPending) {
-				return this.$t('Docker is updated, but the old version is still running. Restart it to finish the update.')
+				result = this.$t('Docker is updated, but the old version is still running. Restart it to finish the update.')
+			} else if (this.dockerStatus.state === 'failed') {
+				result = [this.$t('The Docker update failed.'), this.dockerFailureText].filter(Boolean).join(' ')
 			}
-			if (this.dockerStatus.state === 'failed') {
-				return [this.$t('The Docker update failed.'), this.dockerFailureText].filter(Boolean).join(' ')
-			}
-			return this.dockerSuccessText
+			return [age, result, this.dockerNotReturnedText]
 		},
 		// a clean success needs no log; everything else may
 		dockerShowsLog() {
@@ -609,6 +618,14 @@ export default {
 		dockerNotReturned() {
 			const list = this.dockerStatus.not_returned
 			return Array.isArray(list) ? list.filter(item => item && typeof item.name === 'string') : []
+		},
+		// how many, not which: the names are in the table, and the live region is for short sentences
+		dockerNotReturnedText() {
+			const n = this.dockerNotReturned.length
+			if (!n) {
+				return ''
+			}
+			return n === 1 ? this.$t('One container did not come back.') : this.$t('{n} containers did not come back.', { n })
 		},
 		// the plan's packages that are not installed yet (Docker 29 needs nftables, Docker 28 did not)
 		dockerNewPackages() {
@@ -967,6 +984,7 @@ export default {
 					this.scheduleDockerPoll()
 					return
 				}
+				this.dockerWatched = true
 				this.stopDockerPolling()
 				this.dockerRefusal = null
 				this.dockerRunPlan = null

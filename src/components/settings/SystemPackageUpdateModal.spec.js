@@ -1663,6 +1663,123 @@ describe('moving from one view of the Docker update to the next', () => {
 		expect(w.find('[role="status"]').text()).toContain('The Docker update failed.')
 		expect(w.find('[role="status"]').text()).toContain('The new packages could not be downloaded')
 	})
+
+	// a run that this window saw end, as the person who started it did
+	async function watchedToItsEnd(end) {
+		const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValueOnce(reply(running)).mockResolvedValue(reply(end))
+		const w = await openDocker({ getDockerUpdateStatus, startDockerUpdate: answer(dockerRun({ state: 'running' })) })
+		await openConfirmation(w)
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+		await vi.advanceTimersByTimeAsync(2000)
+		return w
+	}
+
+	describe('the containers that did not come back', () => {
+		const one = [{ name: 'cron', restart_policy: 'no' }]
+		const two = [...one, { name: 'db', restart_policy: 'always' }]
+
+		it('are counted after the result, in the words of the page', async () => {
+			vi.useFakeTimers()
+			try {
+				const w = await watchedToItsEnd(dockerRun({ ...succeeded, not_returned: two }))
+				expect(w.find('[role="status"]').text()).toBe('Docker was updated to 29.8.0. 2 containers did not come back.')
+				w.unmount()
+
+				const single = await watchedToItsEnd(dockerRun({ ...succeeded, not_returned: one }))
+				expect(single.find('[role="status"]').text()).toBe('Docker was updated to 29.8.0. One container did not come back.')
+			} finally {
+				vi.useRealTimers()
+			}
+		})
+
+		it.each([
+			['a restart that is pending', { outcome: 'restart_pending', not_returned: two }, '2 containers did not come back.'],
+			['a failure', { state: 'failed', outcome: 'failed', error_code: 'daemon', not_returned: one }, 'One container did not come back.'],
+		])('are counted after %s as well', async (_, extra, sentence) => {
+			const w = await openDocker({ getDockerUpdateStatus: answer({ ...succeeded, ...extra }) })
+
+			expect(w.find('[role="status"]').text().endsWith(sentence)).toBe(true)
+		})
+
+		it('are not mentioned when all of them came back, and their names are not read out', async () => {
+			const none = await openDocker({ getDockerUpdateStatus: answer(succeeded) })
+			expect(none.find('[role="status"]').text()).not.toContain('did not come back')
+			none.unmount()
+
+			const some = await openDocker({ getDockerUpdateStatus: answer({ ...succeeded, not_returned: two }) })
+			expect(some.find('[role="status"]').text()).not.toContain('cron')
+		})
+	})
+
+	describe('an error', () => {
+		it('is said, since the message that shows it speaks for itself to nobody', async () => {
+			const w = await openDocker({ startDockerUpdate: () => Promise.reject(new Error('Network Error')) })
+			await openConfirmation(w)
+
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+
+			expect(w.find('[role="status"]').text()).toBe('Could not start the Docker update.')
+		})
+
+		it('is said when the check fails, and the core\'s words under it are not', async () => {
+			const failure = Object.assign(new Error('Request failed with status code 500'), { response: { status: 500, data: { message: 'apt exploded' } } })
+			const w = await openDocker({ getSystemPackages: () => Promise.reject(failure) })
+
+			expect(w.find('[role="status"]').text()).toBe('Could not check for system package updates.')
+		})
+
+		it('is said after the line of a result that is on screen', async () => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockRejectedValue(new Error('Network Error'))
+			const w = await openDocker({ getDockerUpdateStatus: answer(succeeded), getSystemPackages })
+			await w.vm.checkPackages()
+			await flushPromises()
+
+			expect(w.find('[role="status"]').text().endsWith('Docker was updated to 29.8.0. Could not check for system package updates.')).toBe(true)
+		})
+	})
+
+	describe('the age of a result', () => {
+		const finished = new Date(succeeded.completed_at).toLocaleString()
+
+		it('is said first when the result was there before the window was opened', async () => {
+			const done = await openDocker({ getDockerUpdateStatus: answer(succeeded) })
+			expect(done.find('[role="status"]').text()).toBe(`Finished ${finished}. Docker was updated to 29.8.0.`)
+			done.unmount()
+
+			const failed = await openDocker({ getDockerUpdateStatus: answer(dockerRun({ ...succeeded, state: 'failed', outcome: 'failed', error_code: 'download' })) })
+			expect(failed.find('[role="status"]').text().startsWith(`Finished ${finished}. The Docker update failed. The new packages could not be downloaded`)).toBe(true)
+			failed.unmount()
+
+			const pending = await openDocker({ getDockerUpdateStatus: answer({ ...succeeded, outcome: 'restart_pending' }) })
+			expect(pending.find('[role="status"]').text()).toBe(`Finished ${finished}. Docker is updated, but the old version is still running. Restart it to finish the update.`)
+		})
+
+		it('is not said of a run the window watched end, which has just finished', async () => {
+			vi.useFakeTimers()
+			try {
+				const w = await watchedToItsEnd(succeeded)
+
+				expect(w.find('[role="status"]').text()).toBe('Docker was updated to 29.8.0.')
+			} finally {
+				vi.useRealTimers()
+			}
+		})
+
+		it('is not said when the run never said when it finished', async () => {
+			const w = await openDocker({ getDockerUpdateStatus: answer({ ...succeeded, completed_at: '' }) })
+
+			expect(w.find('[role="status"]').text()).toBe('Docker was updated to 29.8.0.')
+		})
+
+		it('is gone with the result when the person dismisses it', async () => {
+			const w = await openDocker({ getDockerUpdateStatus: answer(succeeded) })
+			await w.find('.docker-job button').trigger('click')
+
+			expect(w.find('[role="status"]').text()).toBe('')
+		})
+	})
 })
 
 describe('a window that has been closed', () => {
