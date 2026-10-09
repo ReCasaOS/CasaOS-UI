@@ -73,9 +73,10 @@
 							{{ $t('Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.') }}
 						</p>
 					</template>
-					<p v-else-if="dockerCanSeeUpdates" class="is-size-7">{{ $t('Docker is up to date.') }}</p>
+					<p v-else-if="info.docker.candidate" class="mt-2 is-size-7">{{ dockerBehind }}</p>
+					<p v-else-if="dockerCanSeeUpdates" class="is-size-7">{{ $t('No newer Docker is offered by this machine\'s package sources.') }}</p>
 					<p v-else class="is-size-7">{{ dockerUnseen }}</p>
-					<template v-if="info.docker.manual_command && (dockerHasUpdates || !dockerCanSeeUpdates)">
+					<template v-if="info.docker.manual_command && (dockerHasUpdates || info.docker.candidate || !dockerCanSeeUpdates)">
 						<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
 						<pre class="docker-command" tabindex="0" :aria-label="$t('Command to update Docker')">{{ info.docker.manual_command }}</pre>
 					</template>
@@ -184,6 +185,13 @@ export default {
 				'snap': 'Installed as a snap.',
 			}
 			return this.$t(words[docker.origin] || 'Installed from a source ReCasaOS does not recognise.')
+		},
+		// a newer engine exists in the package sources and the update does not offer it
+		dockerBehind() {
+			const version = this.info.docker?.candidate
+			return this.$t(this.info.docker?.held
+				? 'A newer Docker, {version}, exists in this machine\'s package sources, but the package is on hold, so no update offers it.'
+				: 'A newer Docker, {version}, exists in this machine\'s package sources, but apt does not offer it for an update (a hold, or a dependency).', { version })
 		},
 		dockerUnseen() {
 			return this.$t(this.info.docker?.origin === 'snap'
