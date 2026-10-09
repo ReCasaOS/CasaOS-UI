@@ -25,12 +25,13 @@
 			<!-- every value below is a text node: container names are third-party strings, never HTML -->
 			<div v-if="dockerConfirming" class="docker-confirm">
 				<h4 ref="dockerConfirmTitle" class="docker-title" tabindex="-1">{{ $t('Update Docker') }}</h4>
-				<p class="mt-1">{{ $t('Docker') }} {{ dockerPlan.from }} → {{ dockerPlan.to }}</p>
+				<p class="mt-1">{{ dockerPlanLine }}</p>
 
 				<b-message v-if="dockerPlan.major_jump" class="docker-major mt-3" size="is-small" type="is-danger">
 					{{ $t('This is a new major version of Docker, from {from} to {to}. Apps that talk to Docker directly may need an update of their own, and not every setup has been tested with it.', { from: dockerPlan.from, to: dockerPlan.to }) }}
+					<span v-if="dockerSocketContainers.length" class="docker-socket is-block mt-2">{{ $t('These containers talk to Docker directly and may need their own update: {names}.', { names: dockerSocketContainers.join(', ') }) }}</span>
 				</b-message>
-				<b-message class="mt-3" size="is-small" type="is-warning">
+				<b-message v-if="dockerPlanRestarts" class="mt-3" size="is-small" type="is-warning">
 					{{ $t('Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.') }}
 				</b-message>
 
@@ -59,43 +60,50 @@
 					{{ $t(dockerNewPackages.length === 1 ? 'This Docker version also needs a package that is not installed yet: {names}.' : 'This Docker version also needs these packages that are not installed yet: {names}.', { names: dockerNewPackages.join(', ') }) }}
 				</p>
 
-				<h5 class="docker-subtitle mt-4">{{ $t('Running containers') }}</h5>
-				<div v-if="dockerContainers.loading" class="docker-containers-loading is-flex is-align-items-center _has-text-gray is-size-7">
-					<b-icon class="mr-2" custom-class="mdi-spin" icon="loading" size="is-small" />
-					<span>{{ $t('Listing the running containers...') }}</span>
-				</div>
-				<p v-else-if="dockerContainers.failed" class="is-size-7">
-					{{ $t('The running containers could not be listed. You can still update.') }}
-				</p>
-				<p v-else-if="dockerContainers.list.length === 0" class="is-size-7">
-					{{ $t('No container is running.') }}
-				</p>
-				<template v-else>
-					<p v-if="dockerWontReturn.length" class="docker-wont-return-count is-size-7 has-text-warning-on-scheme">
-						{{ dockerWontReturn.length === 1 ? $t('One running container will not start again by itself.') : $t('{n} running containers will not start again by themselves.', { n: dockerWontReturn.length }) }}
-					</p>
-					<p v-if="dockerExposed.length" class="docker-exposed mt-1 is-size-7 has-text-warning-on-scheme">
-						{{ $t('Containers that publish port 53, 80 or 443, or use the host network: {names}. That may be this machine\'s DNS or web server, and it will be down while Docker restarts.', { names: dockerExposed.map(item => item.name).join(', ') }) }}
-					</p>
-					<div class="docker-containers package-list mt-2">
-						<table class="table is-fullwidth is-hoverable">
-							<thead>
-								<tr>
-									<th>{{ $t('Container') }}</th>
-									<th>{{ $t('Restart Policy') }}</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr v-for="item in dockerContainerRows" :key="item.name" :class="{ 'docker-wont-return': !restartsByItself(item.restart_policy) }">
-									<td>{{ item.name }}</td>
-									<td>
-										{{ item.restart_policy || 'no' }}
-										<span v-if="!restartsByItself(item.restart_policy)" class="is-block">{{ $t('Stays stopped') }}</span>
-									</td>
-								</tr>
-							</tbody>
-						</table>
+				<!-- a plan that leaves Docker running (a plugin alone) stops nothing: there is nothing to list -->
+				<template v-if="dockerPlanRestarts">
+					<h5 class="docker-subtitle mt-4">{{ $t('Running containers') }}</h5>
+					<div v-if="dockerContainers.loading" class="docker-containers-loading is-flex is-align-items-center _has-text-gray is-size-7">
+						<b-icon class="mr-2" custom-class="mdi-spin" icon="loading" size="is-small" />
+						<span>{{ $t('Listing the running containers...') }}</span>
 					</div>
+					<p v-else-if="dockerContainers.failed" class="is-size-7">
+						{{ $t('The running containers could not be listed. You can still update.') }}
+					</p>
+					<p v-else-if="dockerContainers.list.length === 0" class="is-size-7">
+						{{ $t('No container is running.') }}
+					</p>
+					<template v-else>
+						<p v-if="dockerWontReturn.length" class="docker-wont-return-count is-size-7 has-text-warning-on-scheme">
+							{{ dockerWontReturn.length === 1 ? $t('One running container will not start again by itself.') : $t('{n} running containers will not start again by themselves.', { n: dockerWontReturn.length }) }}
+						</p>
+						<p v-if="dockerMayNotReturn.length" class="docker-may-not-return-count is-size-7 has-text-warning-on-scheme">
+							{{ dockerMayNotReturn.length === 1 ? $t('One running container restarts only when it fails, so it may stay stopped.') : $t('{n} running containers restart only when they fail, so they may stay stopped.', { n: dockerMayNotReturn.length }) }}
+						</p>
+						<p v-if="dockerExposed.length" class="docker-exposed mt-1 is-size-7 has-text-warning-on-scheme">
+							{{ $t('Containers that publish port 53, 80 or 443, or use the host network: {names}. That may be this machine\'s DNS or web server, and it will be down while Docker restarts.', { names: dockerExposed.map(item => item.name).join(', ') }) }}
+						</p>
+						<div class="docker-containers package-list mt-2">
+							<table class="table is-fullwidth is-hoverable">
+								<thead>
+									<tr>
+										<th>{{ $t('Container') }}</th>
+										<th>{{ $t('Restart Policy') }}</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr v-for="item in dockerContainerRows" :key="item.name" :class="{ 'docker-wont-return': neverRestarts(item.restart_policy), 'docker-may-not-return': restartsOnFailure(item.restart_policy) }">
+										<td>{{ item.name }}</td>
+										<td>
+											{{ item.restart_policy || 'no' }}
+											<span v-if="neverRestarts(item.restart_policy)" class="is-block">{{ $t('Stays stopped') }}</span>
+											<span v-else-if="restartsOnFailure(item.restart_policy)" class="is-block">{{ $t('May stay stopped') }}</span>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</template>
 				</template>
 			</div>
 
@@ -153,8 +161,11 @@
 									</tbody>
 								</table>
 							</div>
-							<p v-if="dockerNotReturned.some(item => !restartsByItself(item.restart_policy))" class="mt-2 is-size-7">
+							<p v-if="dockerNotReturned.some(item => neverRestarts(item.restart_policy))" class="mt-2 is-size-7">
 								{{ $t('A container with no restart policy never starts again by itself: start it from the dashboard.') }}
+							</p>
+							<p v-if="dockerNotReturned.some(item => restartsOnFailure(item.restart_policy))" class="mt-2 is-size-7">
+								{{ $t('A container that restarts only when it fails may stay stopped: start it from the dashboard.') }}
 							</p>
 							<p v-if="dockerNotReturned.some(item => restartsByItself(item.restart_policy))" class="mt-2 is-size-7">
 								{{ $t('A container with a restart policy was not running yet when the update ended. Give it a moment, then check it from the dashboard.') }}
@@ -278,7 +289,7 @@
 				{{ $t('Cancel') }}
 			</b-button>
 			<b-button class="docker-confirm-button" :disabled="dockerContainers.loading" :loading="dockerStarting" rounded type="is-primary" @click="startDockerUpdate">
-				{{ $t('Update Docker to {version}', { version: dockerPlan.to }) }}
+				{{ $t(dockerPlanMoves ? 'Update Docker to {version}' : 'Update Docker packages', { version: dockerPlan.to }) }}
 			</b-button>
 		</footer>
 		<!-- empty while apt runs or on a host without it: × and Escape still close -->
@@ -300,6 +311,8 @@ const DOCKER_LOST_MS = 10 * 60 * 1000
 // host ports a box's DNS and web server sit on
 const DOCKER_HOST_PORTS = [53, 80, 443]
 const DOCKER_RESTART_COMMAND = 'sudo systemctl restart docker'
+// the packages whose update restarts the daemon (the others, the plugins and the client, do not)
+const DOCKER_RESTARTING_PACKAGES = ['docker-ce', 'containerd.io']
 // what apt asks for, before anything else, when dpkg was stopped in the middle of an install
 const DOCKER_REPAIR_COMMAND = 'sudo dpkg --configure -a && sudo apt-get -f install'
 
@@ -400,8 +413,18 @@ function emptyContainers() {
 }
 
 // no policy and "no" are the same thing: Docker does not start the container again
+function neverRestarts(policy) {
+	return !policy || policy === 'no'
+}
+
+// Docker starts such a container after a restart of the daemon only if it had failed: one that stops
+// cleanly when Docker stops it (nginx, a shell with a trap) stays stopped
+function restartsOnFailure(policy) {
+	return policy === 'on-failure'
+}
+
 function restartsByItself(policy) {
-	return !!policy && policy !== 'no'
+	return !neverRestarts(policy) && !restartsOnFailure(policy)
 }
 
 export default {
@@ -569,11 +592,36 @@ export default {
 			return Array.isArray(list) ? list.filter(item => item && item.new === true && typeof item.name === 'string').map(item => item.name) : []
 		},
 		dockerWontReturn() {
-			return this.dockerContainers.list.filter(item => !restartsByItself(item.restart_policy))
+			return this.dockerContainers.list.filter(item => neverRestarts(item.restart_policy))
 		},
-		// the ones that will not come back first: they are what the person has to read
+		dockerMayNotReturn() {
+			return this.dockerContainers.list.filter(item => restartsOnFailure(item.restart_policy))
+		},
+		// the ones that will not come back first, then the ones that may not: they are what the person has to read
 		dockerContainerRows() {
-			return [...this.dockerWontReturn, ...this.dockerContainers.list.filter(item => restartsByItself(item.restart_policy))]
+			return [...this.dockerWontReturn, ...this.dockerMayNotReturn, ...this.dockerContainers.list.filter(item => restartsByItself(item.restart_policy))]
+		},
+		// only a true is believed: an older core does not say
+		dockerSocketContainers() {
+			return this.dockerContainers.list.filter(item => item.docker_socket === true).map(item => item.name)
+		},
+		// The version moves, or the plan is not known well enough to say it does not: then Docker restarts.
+		// It does not when only a plugin or the client moves.
+		dockerPlanRestarts() {
+			const plan = this.dockerPlan
+			const packages = plan?.packages
+			return plan?.from !== plan?.to
+				|| !Array.isArray(packages)
+				|| packages.length === 0
+				|| packages.some(item => DOCKER_RESTARTING_PACKAGES.includes(item?.name))
+		},
+		// "from → to" is for a version that changes; under the same one (a plugin, or a new build of it) there is nothing to point at
+		dockerPlanMoves() {
+			return this.dockerPlan?.from !== this.dockerPlan?.to
+		},
+		dockerPlanLine() {
+			const { from, to } = this.dockerPlan
+			return this.dockerPlanMoves ? `${this.$t('Docker')} ${from} → ${to}` : `${this.$t('Docker')} ${from}`
 		},
 		dockerExposed() {
 			return this.dockerContainers.list.filter(item => item.host_network === true
@@ -599,6 +647,8 @@ export default {
 	},
 	methods: {
 		restartsByItself,
+		neverRestarts,
+		restartsOnFailure,
 		async loadInitialState() {
 			try {
 				const response = await this.$api.sys.getSystemPackageUpdateStatus()
@@ -744,7 +794,13 @@ export default {
 			this.error = null
 			this.dockerPlan = JSON.parse(JSON.stringify(this.dockerUpdate))
 			this.dockerConfirming = true
-			this.loadDockerContainers()
+			if (this.dockerPlanRestarts) {
+				this.loadDockerContainers()
+			} else {
+				// nothing stops, so the person has nothing to wait for
+				this.dockerContainersSeq++
+				this.dockerContainers = emptyContainers()
+			}
 			this.showTop('dockerConfirmTitle')
 		},
 		closeDockerConfirm() {
@@ -964,6 +1020,10 @@ export default {
 .docker-wont-return td {
 	background: rgba(255, 159, 10, 0.18);
 	font-weight: 600;
+}
+
+.docker-may-not-return td {
+	background: rgba(255, 159, 10, 0.1);
 }
 
 .docker-subtitle {

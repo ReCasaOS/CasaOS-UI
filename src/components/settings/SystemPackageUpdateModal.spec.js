@@ -465,11 +465,161 @@ describe('the confirmation before Docker is updated', () => {
 
 		expect(w.find('.docker-wont-return-count').text()).toBe('2 running containers will not start again by themselves.')
 		const rows = w.findAll('.docker-containers tbody tr')
-		expect(rows.map(row => row.find('td').text())).toEqual(['cron', 'old', 'web', 'db', 'job'])
+		// the ones that never come back, then the ones that may not, then the rest
+		expect(rows.map(row => row.find('td').text())).toEqual(['cron', 'old', 'job', 'web', 'db'])
 		expect(rows.map(row => row.classes('docker-wont-return'))).toEqual([true, true, false, false, false])
+		expect(rows.map(row => row.classes('docker-may-not-return'))).toEqual([false, false, true, false, false])
 		expect(rows[0].text()).toContain('Stays stopped')
 		expect(rows[0].text()).toContain('no')
-		expect(rows[2].text()).not.toContain('Stays stopped')
+		expect(rows[3].text()).not.toContain('stopped')
+	})
+
+	// Docker starts such a container again after a restart of the daemon only if it had failed: one that
+	// stops cleanly when Docker stops it (nginx, a shell with a trap) stays stopped
+	it('says a container that restarts only on failure may stay stopped, and counts it apart', async () => {
+		const one = await openDocker({ getDockerContainers: containersOf([container('web', 'always'), container('job', 'on-failure')]) })
+		await openConfirmation(one)
+		expect(one.find('.docker-wont-return-count').exists()).toBe(false)
+		expect(one.find('.docker-may-not-return-count').text()).toBe('One running container restarts only when it fails, so it may stay stopped.')
+		expect(one.findAll('.docker-may-not-return').map(row => row.find('td').text())).toEqual(['job'])
+		expect(one.find('.docker-may-not-return').text()).toContain('on-failure')
+		expect(one.find('.docker-may-not-return').text()).toContain('May stay stopped')
+		expect(one.find('.docker-may-not-return').text()).not.toContain('Stays stopped')
+		one.unmount()
+
+		const many = await openDocker({ getDockerContainers: containersOf([container('a', 'on-failure'), container('b', 'on-failure'), container('c', 'no')]) })
+		await openConfirmation(many)
+		expect(many.find('.docker-may-not-return-count').text()).toBe('2 running containers restart only when they fail, so they may stay stopped.')
+		expect(many.find('.docker-wont-return-count').text()).toBe('One running container will not start again by itself.')
+		many.unmount()
+
+		const none = await openDocker({ getDockerContainers: containersOf([container('web', 'always')]) })
+		await openConfirmation(none)
+		expect(none.find('.docker-may-not-return-count').exists()).toBe(false)
+	})
+
+	it('names the containers that talk to Docker directly in the warning about a new major version', async () => {
+		const list = [container('web', 'always'), container('traefik', 'always', { docker_socket: true }), container('portainer', 'unless-stopped', { docker_socket: true })]
+		const w = await openDocker({ getDockerContainers: containersOf(list) })
+
+		await openConfirmation(w)
+
+		expect(w.find('.docker-major .docker-socket').text()).toBe('These containers talk to Docker directly and may need their own update: traefik, portainer.')
+		expect(w.find('.docker-major').text()).toContain('This is a new major version of Docker')
+	})
+
+	it('says nothing of them without a new major version, without any of them, or before the list is read', async () => {
+		const list = [container('traefik', 'always', { docker_socket: true })]
+		const minor = await openDocker({ getSystemPackages: dockerPackages({ from: '29.2.0', to: '29.8.0', major_jump: false }), getDockerContainers: containersOf(list) })
+		await openConfirmation(minor)
+		expect(minor.find('.docker-socket').exists()).toBe(false)
+		minor.unmount()
+
+		// an older core does not say, and only a true is believed
+		const older = await openDocker({ getDockerContainers: containersOf([container('web', 'always'), container('odd', 'always', { docker_socket: 'true' }), container('no', 'always', { docker_socket: false })]) })
+		await openConfirmation(older)
+		expect(older.find('.docker-socket').exists()).toBe(false)
+		expect(older.find('.docker-major').exists()).toBe(true)
+		older.unmount()
+
+		const loading = await openDocker({ getDockerContainers: pending })
+		await openConfirmation(loading)
+		expect(loading.find('.docker-socket').exists()).toBe(false)
+		loading.unmount()
+
+		const failed = await openDocker({ getDockerContainers: () => Promise.reject(new Error('Network Error')) })
+		await openConfirmation(failed)
+		expect(failed.find('.docker-socket').exists()).toBe(false)
+	})
+
+	it('shows the name of a container that talks to Docker as text, never as markup', async () => {
+		const evil = '<img src=x onerror=alert(1)>'
+		const w = await openDocker({ getDockerContainers: containersOf([container(evil, 'always', { docker_socket: true })]) })
+
+		await openConfirmation(w)
+
+		expect(w.find('.docker-major img').exists()).toBe(false)
+		expect(w.find('.docker-socket').text()).toContain(evil)
+	})
+
+	describe('when what is updated does not restart Docker', () => {
+		const compose = { name: 'docker-compose-plugin', current_version: '2.40.0-1', candidate_version: '2.40.1-1' }
+		const plugin = { packages: [compose], from: '28.0.4', to: '28.0.4', major_jump: false }
+
+		it('says so with no version arrow, no warning that every container stops, and no list of containers', async () => {
+			const getDockerContainers = vi.fn(containersOf([container('cron', 'no')]))
+			const w = await openDocker({ getSystemPackages: dockerPackages(plugin), getDockerContainers })
+
+			await openConfirmation(w)
+
+			const view = w.find('.docker-confirm')
+			expect(view.text()).toContain('Docker 28.0.4')
+			expect(view.text()).not.toContain('→ 28.0.4')
+			expect(view.text()).not.toContain('Docker 28.0.4 →')
+			expect(view.text()).not.toContain('every container stops')
+			expect(view.find('.docker-containers').exists()).toBe(false)
+			expect(view.text()).not.toContain('Running containers')
+			expect(view.text()).not.toContain('will not start again')
+			expect(view.text()).toContain('docker-compose-plugin')
+			expect(getDockerContainers).not.toHaveBeenCalled()
+			expect(w.findAll('footer button').map(button => button.text())).toEqual(['Cancel', 'Update Docker packages'])
+			expect(w.find('.docker-confirm-button').attributes('disabled')).toBeUndefined()
+		})
+
+		it('starts it with the plan it showed', async () => {
+			const startDockerUpdate = vi.fn(answer(dockerRun({ state: 'running' })))
+			const w = await openDocker({ getSystemPackages: dockerPackages(plugin), startDockerUpdate, getDockerUpdateStatus: vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(running)) })
+			await openConfirmation(w)
+
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+
+			expect(startDockerUpdate).toHaveBeenCalledWith({ plan_id: planId })
+			// the version does not change: no arrow in the running line either
+			expect(w.find('.docker-versions').exists()).toBe(false)
+		})
+
+		it.each([
+			['containerd.io', { name: 'containerd.io', current_version: '1.7.27-1', candidate_version: '1.7.28-1' }],
+			['docker-ce', { name: 'docker-ce', current_version: '5:29.8.0-1~debian.11~bullseye', candidate_version: '5:29.8.0-1~debian.12~bookworm' }],
+		])('still warns, and lists the containers, when %s moves under the same version of Docker', async (_, engine) => {
+			const getDockerContainers = vi.fn(containersOf([container('cron', 'no')]))
+			const w = await openDocker({ getSystemPackages: dockerPackages({ ...plugin, from: '29.8.0', to: '29.8.0', packages: [compose, engine] }), getDockerContainers })
+
+			await openConfirmation(w)
+
+			const view = w.find('.docker-confirm')
+			expect(view.text()).toContain('every container stops until it is back')
+			expect(view.text()).toContain('Running containers')
+			expect(view.text()).toContain('cron')
+			expect(view.text()).not.toContain('→ 29.8.0')
+			expect(getDockerContainers).toHaveBeenCalledTimes(1)
+			expect(w.findAll('footer button').map(button => button.text())).toEqual(['Cancel', 'Update Docker packages'])
+		})
+
+		it.each([
+			['the plan lists nothing', { ...plugin, packages: [] }],
+			['the plan lists no packages at all', { ...plugin, packages: undefined }],
+			['the version changes though only a plugin is listed', { ...plugin, to: '28.0.5' }],
+		])('warns all the same when %s: it cannot tell that nothing stops', async (_, update) => {
+			const getDockerContainers = vi.fn(containersOf([container('cron', 'no')]))
+			const w = await openDocker({ getSystemPackages: dockerPackages(update), getDockerContainers })
+
+			await openConfirmation(w)
+
+			expect(w.find('.docker-confirm').text()).toContain('every container stops until it is back')
+			expect(w.find('.docker-confirm').text()).toContain('cron')
+			expect(getDockerContainers).toHaveBeenCalledTimes(1)
+		})
+
+		it('keeps the version in the button and the warning when the engine moves to a new version', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ packages: [...enginePackages, compose] }) })
+
+			await openConfirmation(w)
+
+			expect(w.find('.docker-confirm').text()).toContain('every container stops until it is back')
+			expect(w.findAll('footer button')[1].text()).toBe('Update Docker to 29.8.0')
+		})
 	})
 
 	it('says "one container", not "1 running containers"', async () => {
@@ -1132,6 +1282,15 @@ describe('what the Docker update ended with', () => {
 		expect(job.text()).toContain('A container with a restart policy was not running yet when the update ended. Give it a moment, then check it from the dashboard.')
 	})
 
+	it('tells a container that restarts only on failure to be started by hand, not to be given a moment', async () => {
+		const w = await ended({ not_returned: [{ name: 'job', restart_policy: 'on-failure' }] })
+
+		const job = w.find('.docker-job')
+		expect(job.text()).toContain('A container that restarts only when it fails may stay stopped: start it from the dashboard.')
+		expect(job.text()).not.toContain('was not running yet')
+		expect(job.text()).not.toContain('never starts again by itself')
+	})
+
 	it('says one container, and gives only the hint that fits it', async () => {
 		const none = await ended({ not_returned: [{ name: 'cron', restart_policy: 'no' }] })
 		expect(none.find('.docker-job').text()).toContain('One container did not come back.')
@@ -1521,6 +1680,12 @@ describe('the Docker update\'s words', () => {
 		'Waiting for your apps to come back...',
 		'A half-finished install must be completed first. In a terminal on this machine:',
 		'Command to finish a half-finished install',
+		'These containers talk to Docker directly and may need their own update: {names}.',
+		'Update Docker packages',
+		'May stay stopped',
+		'One running container restarts only when it fails, so it may stay stopped.',
+		'{n} running containers restart only when they fail, so they may stay stopped.',
+		'A container that restarts only when it fails may stay stopped: start it from the dashboard.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()

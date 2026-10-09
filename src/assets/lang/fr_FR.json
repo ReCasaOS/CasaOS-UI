@@ -1010,5 +1010,11 @@
   "Waiting for Docker to come back...": "Attente du retour de Docker...",
   "Waiting for your apps to come back...": "Attente du retour de vos apps...",
   "A half-finished install must be completed first. In a terminal on this machine:": "Une installation à moitié faite doit d'abord être terminée. Dans un terminal sur cette machine :",
-  "Command to finish a half-finished install": "Commande pour terminer une installation à moitié faite"
+  "Command to finish a half-finished install": "Commande pour terminer une installation à moitié faite",
+  "These containers talk to Docker directly and may need their own update: {names}.": "Ces conteneurs parlent directement à Docker et peuvent avoir besoin de leur propre mise à jour : {names}.",
+  "Update Docker packages": "Mettre à jour les paquets Docker",
+  "May stay stopped": "Peut rester arrêté",
+  "One running container restarts only when it fails, so it may stay stopped.": "Un conteneur en cours d'exécution ne redémarre qu'après un échec : il peut donc rester arrêté.",
+  "{n} running containers restart only when they fail, so they may stay stopped.": "{n} conteneurs en cours d'exécution ne redémarrent qu'après un échec : ils peuvent donc rester arrêtés.",
+  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "Un conteneur qui ne redémarre qu'après un échec peut rester arrêté : démarrez-le depuis le tableau de bord."
 }

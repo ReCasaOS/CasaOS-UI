@@ -1010,5 +1010,11 @@
   "Waiting for Docker to come back...": "Waiting for Docker to come back...",
   "Waiting for your apps to come back...": "Waiting for your apps to come back...",
   "A half-finished install must be completed first. In a terminal on this machine:": "A half-finished install must be completed first. In a terminal on this machine:",
-  "Command to finish a half-finished install": "Command to finish a half-finished install"
+  "Command to finish a half-finished install": "Command to finish a half-finished install",
+  "These containers talk to Docker directly and may need their own update: {names}.": "These containers talk to Docker directly and may need their own update: {names}.",
+  "Update Docker packages": "Update Docker packages",
+  "May stay stopped": "May stay stopped",
+  "One running container restarts only when it fails, so it may stay stopped.": "One running container restarts only when it fails, so it may stay stopped.",
+  "{n} running containers restart only when they fail, so they may stay stopped.": "{n} running containers restart only when they fail, so they may stay stopped.",
+  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "A container that restarts only when it fails may stay stopped: start it from the dashboard."
 }
