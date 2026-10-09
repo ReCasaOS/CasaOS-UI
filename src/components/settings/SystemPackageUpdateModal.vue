@@ -258,6 +258,10 @@
 							<p v-else-if="dockerUpdate && dockerUpdate.refusal && dockerUpdate.refusal !== dockerRefusal?.code" class="docker-refusal mt-2 is-size-7">
 								{{ dockerRefusalText(dockerUpdate.refusal, dockerUpdate.refusal_detail) }}
 							</p>
+							<template v-if="dockerNeedsRepair">
+								<p class="mt-2 is-size-7">{{ $t('A half-finished install must be completed first. In a terminal on this machine:') }}</p>
+								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to finish a half-finished install')">{{ repairCommand }}</pre>
+							</template>
 						</template>
 						<template v-if="!dockerRunning && info.docker.manual_command && (dockerHasUpdates || info.docker.candidate || !dockerCanSeeUpdates)">
 							<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
@@ -326,6 +330,7 @@ const DOCKER_REFUSALS = {
 	unsupported: 'This machine cannot update Docker from here.',
 	origin: 'ReCasaOS only updates a Docker installed from Docker\'s own repository, and this one was not.',
 	held: 'The Docker packages are on hold, and a hold is deliberate: ReCasaOS does not override it. To update anyway, use the command below.',
+	dpkg: 'A previous package operation was left unfinished on this machine. Finish it first, then check again.',
 	daemon: 'ReCasaOS cannot reach Docker right now, so it will not update it. Check that Docker is running.',
 	swarm: 'This machine is part of a Docker swarm, which ReCasaOS does not update.',
 	plan: 'The update would go beyond Docker\'s own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.',
@@ -521,6 +526,10 @@ export default {
 		// what the packages check says of updating Docker from here; absent on a core without the button
 		dockerUpdate() {
 			return this.info.docker?.update || null
+		},
+		// dpkg was stopped in the middle of something: apt refuses to do anything else until it is finished
+		dockerNeedsRepair() {
+			return this.dockerUpdate?.refusal === 'dpkg'
 		},
 		dockerRunning() {
 			return this.dockerStarting || this.dockerStatus.state === 'running' || this.dockerStatus.state === 'finalizing'

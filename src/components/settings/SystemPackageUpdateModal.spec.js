@@ -342,6 +342,7 @@ describe('the button that updates Docker', () => {
 		['swarm', 'This machine is part of a Docker swarm, which ReCasaOS does not update.'],
 		['plan', planRefusal],
 		['disk', 'There is less than 1 GiB of free disk space where the update needs it, so ReCasaOS will not start it. Free some space and check again.'],
+		['dpkg', 'A previous package operation was left unfinished on this machine. Finish it first, then check again.'],
 		['something-new', 'ReCasaOS did not update Docker.'],
 	])('refused with the code "%s": no button, this sentence, and the command to type', async (refusal, sentence) => {
 		const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal }) })
@@ -383,6 +384,58 @@ describe('the button that updates Docker', () => {
 
 		expect(w.find('.docker-refusal').text()).toContain('a hold is deliberate')
 		expect(w.find('.docker-refusal').text()).not.toContain('Packages concerned')
+	})
+
+	// the check simulates without the dpkg lock and passes on a journal that the first real apt call refuses
+	describe('refused because a package operation was left unfinished', () => {
+		const sentence = 'A previous package operation was left unfinished on this machine. Finish it first, then check again.'
+		const repair = 'sudo dpkg --configure -a && sudo apt-get -f install'
+		const manual = 'sudo apt-get update && sudo apt-get install --only-upgrade docker-ce'
+
+		it('gives the sentence, then the command that finishes it, then the manual command', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'dpkg' }) })
+
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+			expect(w.find('.docker-refusal').text()).toBe(sentence)
+			const commands = w.findAll('.docker-line pre.docker-command')
+			expect(commands.map(pre => pre.text())).toEqual([repair, manual])
+			expect(commands[0].attributes('aria-label')).toBe('Command to finish a half-finished install')
+			expect(w.find('.docker-line').text()).toContain('A half-finished install must be completed first. In a terminal on this machine:')
+			const html = w.find('.docker-line').html()
+			expect(html.indexOf('docker-refusal')).toBeLessThan(html.indexOf('dpkg --configure'))
+			expect(html.indexOf('dpkg --configure')).toBeLessThan(html.indexOf('--only-upgrade'))
+		})
+
+		it('does the same when the start was refused for it, and says the sentence once', async () => {
+			const getSystemPackages = vi.fn()
+				.mockImplementationOnce(dockerPackages())
+				.mockImplementation(dockerPackages({ available: false, refusal: 'dpkg' }))
+			const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'dpkg', 'english reason')) })
+			await openConfirmation(w)
+
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+
+			const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+			expect(visible.split(sentence).length - 1).toBe(1)
+			expect(visible).not.toContain('english reason')
+			expect(getSystemPackages).toHaveBeenCalledTimes(2)
+			expect(w.find('.docker-line pre.docker-command').text()).toBe(repair)
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+		})
+
+		it.each(['held', 'origin', 'daemon', 'plan', 'something-new', ''])('shows no such command for "%s"', async (refusal) => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal }) })
+
+			expect(w.find('.docker-line').html()).not.toContain('dpkg --configure')
+		})
+
+		it('shows none when the update can be started', async () => {
+			const w = await openDocker()
+
+			expect(w.find('.docker-update-button').exists()).toBe(true)
+			expect(w.find('.docker-line').html()).not.toContain('dpkg --configure')
+		})
 	})
 })
 
@@ -1798,6 +1851,7 @@ describe('the Docker update\'s words', () => {
 		'A newer Docker, {version}, exists in this machine\'s package sources. The system update does not install it, but Update Docker below does.',
 		'If you have restarted Docker since, there is nothing left to do.',
 		'If Docker works again since, you do not need this.',
+		'A previous package operation was left unfinished on this machine. Finish it first, then check again.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
