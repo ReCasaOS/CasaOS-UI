@@ -1638,6 +1638,100 @@ describe('what the Docker update ended with', () => {
 	})
 })
 
+// the confirmation told the person that nothing stops: the run must not say that the apps restart
+describe('a run that restarts nothing', () => {
+	const compose = { name: 'docker-compose-plugin', current_version: '2.40.0-1', candidate_version: '2.40.1-1' }
+	const plugin = { packages: [compose], from: '28.0.4', to: '28.0.4', major_jump: false }
+	const quiet = 'Installing Docker packages... your apps keep running.'
+	const done = dockerRun({ state: 'succeeded', outcome: 'success', from: '28.0.4', to: '28.0.4', completed_at: '2026-10-09T10:02:00Z' })
+
+	// the person confirms the plan; the core then answers each poll with the next of these, the last one for good
+	async function started(update, ...polls) {
+		const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle))
+		for (const status of polls)
+			getDockerUpdateStatus.mockResolvedValueOnce(reply(status))
+		getDockerUpdateStatus.mockResolvedValue(reply(polls.at(-1)))
+		const w = await openDocker({ getSystemPackages: dockerPackages(update), startDockerUpdate: answer(dockerRun({ state: 'running' })), getDockerUpdateStatus })
+		await openConfirmation(w)
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+		return w
+	}
+
+	it.each(['installing', 'waiting_docker', 'waiting_containers', '', undefined])('says the phase "%s" as an install of packages, with no restart in it', async (phase) => {
+		const w = await started(plugin, { ...running, phase })
+
+		expect(w.find('.docker-job').text()).toContain(quiet)
+		expect(w.find('.docker-job').text()).not.toContain('restart')
+		expect(w.find('.docker-job').text()).not.toContain('Waiting for')
+		expect(w.find('[role="status"]').text()).toBe(quiet)
+	})
+
+	it.each([
+		['preparing', 'Preparing the Docker update... your apps keep running.'],
+		['downloading', 'Downloading Docker... your apps keep running.'],
+	])('keeps what it says of "%s", which was true already', async (phase, sentence) => {
+		const w = await started(plugin, { ...running, phase })
+
+		expect(w.find('.docker-job').text()).toContain(sentence)
+	})
+
+	it('says it at once when the run is found after a lost answer', async () => {
+		const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply({ ...running, phase: 'installing' }))
+		const w = await openDocker({ getSystemPackages: dockerPackages(plugin), startDockerUpdate: () => Promise.reject(new Error('Network Error')), getDockerUpdateStatus })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(w.find('.docker-job').text()).toContain(quiet)
+	})
+
+	it('does not say that Docker was updated to a version it was at already', async () => {
+		vi.useFakeTimers()
+		try {
+			const w = await started(plugin, running, done)
+			await vi.advanceTimersByTimeAsync(2000)
+
+			expect(w.find('.docker-job').text()).toContain('Docker packages were updated.')
+			expect(w.find('.docker-job').text()).not.toContain('Docker was updated')
+			expect(w.find('[role="status"]').text()).toBe('Docker packages were updated.')
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('says nothing of the plan once the result is dismissed, so a run found later is not taken for it', async () => {
+		vi.useFakeTimers()
+		try {
+			const w = await started(plugin, running, done)
+			await vi.advanceTimersByTimeAsync(2000)
+			await w.find('.docker-job button').trigger('click')
+
+			expect(w.find('.docker-job').exists()).toBe(false)
+			expect(w.vm.dockerStatus.plan_restarts).toBeNull()
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it.each([
+		['an engine package moves to a new version', {}, '29.8.0'],
+		['containerd.io moves under the same version', { from: '29.8.0', to: '29.8.0', packages: [compose, { name: 'containerd.io', current_version: '1.7.27-1', candidate_version: '1.7.28-1' }] }, '29.8.0'],
+	])('keeps the words of a restart when %s', async (_, update, version) => {
+		vi.useFakeTimers()
+		try {
+			const w = await started(update, { ...running, phase: 'installing' }, dockerRun({ ...succeeded, to: version }))
+			expect(w.find('.docker-job').text()).toContain('Installing Docker... apps restart briefly.')
+
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(w.find('.docker-job').text()).toContain(`Docker was updated to ${version}.`)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+})
+
 describe('moving from one view of the Docker update to the next', () => {
 	const bodyOf = w => w.find('.modal-card-body').element
 	const focused = w => document.activeElement === w.find('.docker-job .docker-title').element
@@ -2030,6 +2124,8 @@ describe('the Docker update\'s words', () => {
 		'If Docker works again since, you do not need this.',
 		'A previous package operation was left unfinished on this machine. Finish it first, then check again.',
 		'Checking whether the update started...',
+		'Installing Docker packages... your apps keep running.',
+		'Docker packages were updated.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()

@@ -366,6 +366,8 @@ const DOCKER_PHASES = {
 	waiting_docker: 'Waiting for Docker to come back...',
 	waiting_containers: 'Waiting for your apps to come back...',
 }
+// what a run says before it installs is true of any plan: the apps keep running
+const DOCKER_PHASES_BEFORE_INSTALL = ['preparing', 'downloading']
 // a failure that stops before the install changed nothing, and a way back would mean nothing
 const DOCKER_NOTHING_CHANGED = ['start', 'guard', 'plan', 'download']
 // dpkg may have been stopped in the middle of the install: apt refuses to do anything else until it is finished
@@ -417,6 +419,9 @@ function emptyDockerStatus() {
 		not_returned: [],
 		rollback_command: '',
 		log: '',
+		// Not the core's: whether the plan confirmed in this window restarts Docker. It lives with the status
+		// it describes, so a status read later (a run found when the window opens) does not inherit it. null: not known.
+		plan_restarts: null,
 	}
 }
 
@@ -563,7 +568,15 @@ export default {
 			if (this.dockerFinalizing) {
 				return this.$t('Finishing the Docker update...')
 			}
-			return this.$t(pick(DOCKER_PHASES, this.dockerStatus.phase) || 'Updating Docker... apps are restarting')
+			const phase = this.dockerStatus.phase
+			if (this.dockerQuiet && !DOCKER_PHASES_BEFORE_INSTALL.includes(phase)) {
+				return this.$t('Installing Docker packages... your apps keep running.')
+			}
+			return this.$t(pick(DOCKER_PHASES, phase) || 'Updating Docker... apps are restarting')
+		},
+		// The plan the person confirmed in this window leaves Docker running: the confirmation said so, and the run must not say the apps restart.
+		dockerQuiet() {
+			return this.dockerStatus.plan_restarts === false
 		},
 		// The core fills `to` only once the new Docker answers; the plan the person confirmed knows it from the start.
 		dockerVersions() {
@@ -575,6 +588,9 @@ export default {
 			return DOCKER_HALF_INSTALLED.includes(this.dockerStatus.error_code)
 		},
 		dockerSuccessText() {
+			if (this.dockerQuiet) {
+				return this.$t('Docker packages were updated.')
+			}
 			return this.dockerStatus.to ? this.$t('Docker was updated to {version}.', { version: this.dockerStatus.to }) : this.$t('Docker was updated.')
 		},
 		// what the live region says: the lines the person would read, never the log
@@ -896,12 +912,13 @@ export default {
 			this.dockerRefusal = null
 			this.error = null
 			const confirmed = { from: this.dockerPlan.from, to: this.dockerPlan.to }
+			const restarts = this.dockerPlanRestarts
 			try {
 				const response = await this.$api.sys.startDockerUpdate({ plan_id: this.dockerPlan.plan_id })
 				if (this.gone) {
 					return
 				}
-				this.dockerStatus = { ...emptyDockerStatus(), ...response.data.data }
+				this.dockerStatus = { ...emptyDockerStatus(), ...response.data.data, plan_restarts: restarts }
 				this.dockerRunPlan = confirmed
 				this.dockerConfirming = false
 				this.startDockerPolling()
@@ -925,7 +942,7 @@ export default {
 					}
 					if (['running', 'finalizing'].includes(status?.state)) {
 						this.dockerRunPlan = confirmed
-						this.followDockerStatus(status)
+						this.followDockerStatus({ ...status, plan_restarts: restarts })
 						this.showTop('dockerJobTitle')
 						return
 					}
@@ -984,7 +1001,7 @@ export default {
 				return
 			}
 			if (status) {
-				this.dockerStatus = { ...emptyDockerStatus(), ...status }
+				this.dockerStatus = { ...emptyDockerStatus(), ...status, plan_restarts: this.dockerStatus.plan_restarts ?? null }
 				this.dockerLost = false
 				this.dockerLostSince = 0
 				this.dockerUnknown = false

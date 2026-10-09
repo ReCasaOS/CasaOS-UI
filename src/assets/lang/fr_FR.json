@@ -1021,5 +1021,7 @@
   "If you have restarted Docker since, there is nothing left to do.": "Si vous avez redémarré Docker depuis, il n'y a plus rien à faire.",
   "If Docker works again since, you do not need this.": "Si Docker fonctionne de nouveau depuis, vous n'en avez pas besoin.",
   "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "Une opération précédente sur les paquets est restée inachevée sur cette machine. Terminez-la d'abord, puis vérifiez à nouveau.",
-  "Checking whether the update started...": "Vérification du démarrage de la mise à jour..."
+  "Checking whether the update started...": "Vérification du démarrage de la mise à jour...",
+  "Installing Docker packages... your apps keep running.": "Installation des paquets Docker... vos apps continuent de tourner.",
+  "Docker packages were updated.": "Les paquets Docker ont été mis à jour."
 }
