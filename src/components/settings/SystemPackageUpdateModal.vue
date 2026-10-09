@@ -43,12 +43,18 @@
 						<tbody>
 							<tr v-for="item in dockerPlan.packages" :key="item.name">
 								<td>{{ item.name }}</td>
-								<td>{{ item.current_version || '—' }}</td>
+								<td>
+									<b-tag v-if="item.new === true" class="docker-new-package" type="is-info">{{ $t('New package') }}</b-tag>
+									<template v-else>{{ item.current_version || '—' }}</template>
+								</td>
 								<td>{{ item.candidate_version }}</td>
 							</tr>
 						</tbody>
 					</table>
 				</div>
+				<p v-if="dockerNewPackages.length" class="docker-new-packages mt-2 is-size-7">
+					{{ $t(dockerNewPackages.length === 1 ? 'This Docker version also needs a package that is not installed yet: {names}.' : 'This Docker version also needs these packages that are not installed yet: {names}.', { names: dockerNewPackages.join(', ') }) }}
+				</p>
 
 				<h5 class="docker-subtitle mt-4">{{ $t('Running containers') }}</h5>
 				<div v-if="dockerContainers.loading" class="docker-containers-loading is-flex is-align-items-center _has-text-gray is-size-7">
@@ -300,7 +306,7 @@ const DOCKER_REFUSALS = {
 	held: 'The Docker packages are on hold, and a hold is deliberate: ReCasaOS does not override it. To update anyway, use the command below.',
 	daemon: 'ReCasaOS cannot reach Docker right now, so it will not update it. Check that Docker is running.',
 	swarm: 'This machine is part of a Docker swarm, which ReCasaOS does not update.',
-	plan: 'The update would change more than Docker\'s own packages, or could not be planned, so ReCasaOS will not run it.',
+	plan: 'The update would go beyond Docker\'s own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.',
 	disk: 'There is less than 1 GiB of free disk space where the update needs it, so ReCasaOS will not start it. Free some space and check again.',
 	running: 'An update is already running on this machine.',
 	maintenance: 'Another update or package operation is running on this machine. Try again when it is done.',
@@ -309,12 +315,12 @@ const DOCKER_REFUSALS = {
 	nothing: 'Docker has nothing to update.',
 }
 const DOCKER_REFUSAL_NAMES = {
-	plan: 'Packages concerned: {names}.',
+	plan: 'Blocked by: {names}.',
 	apps: 'Busy apps: {names}.',
 }
 const DOCKER_FAILURES = {
 	guard: 'The last check before the update failed, so nothing was changed.',
-	plan: 'The update would have changed more than Docker\'s own packages, so it was stopped before anything changed.',
+	plan: 'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.',
 	download: 'The new packages could not be downloaded, so nothing was changed. Check the internet connection and the free disk space, then try again.',
 	install: 'The new packages could not be installed. Docker may be half updated: read the log below.',
 	daemon: 'The new packages were installed, but Docker did not start again, so every container is stopped. Read the log below.',
@@ -493,6 +499,11 @@ export default {
 		dockerNotReturned() {
 			const list = this.dockerStatus.not_returned
 			return Array.isArray(list) ? list.filter(item => item && typeof item.name === 'string') : []
+		},
+		// the plan's packages that are not installed yet (Docker 29 needs nftables, Docker 28 did not)
+		dockerNewPackages() {
+			const list = this.dockerPlan?.packages
+			return Array.isArray(list) ? list.filter(item => item && item.new === true && typeof item.name === 'string').map(item => item.name) : []
 		},
 		dockerWontReturn() {
 			return this.dockerContainers.list.filter(item => !restartsByItself(item.restart_policy))

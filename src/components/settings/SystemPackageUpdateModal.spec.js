@@ -227,6 +227,10 @@ const enginePackages = [
 	{ name: 'docker-ce', current_version: '5:28.0.4-1~debian.11~bullseye', candidate_version: '5:29.8.0-1~debian.11~bullseye' },
 	{ name: 'containerd.io', current_version: '1.7.27-1', candidate_version: '2.3.6-1' },
 ]
+// packages that are not installed yet: Docker 29 needs nftables, Docker 28 did not
+const nftables = { name: 'nftables', current_version: '', candidate_version: '1.0.6-2+deb11u2', new: true }
+const libnftables = { name: 'libnftables1', current_version: '', candidate_version: '1.0.6-2+deb11u2', new: true }
+const planRefusal = 'The update would go beyond Docker\'s own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.'
 const dockerIdle = { supported: true, state: 'idle', outcome: '', error: '', error_code: '', exit_code: null, started_at: '', completed_at: '', from: '', to: '', not_returned: [], rollback_command: '', log: '' }
 const dockerRun = extra => ({ ...dockerIdle, ...extra })
 const running = dockerRun({ state: 'running', from: '28.0.4', started_at: '2026-10-09T10:00:00Z' })
@@ -274,7 +278,7 @@ async function openDocker(sys = {}, mocks = {}) {
 				},
 				...mocks,
 			},
-			stubs: { 'b-button': press, 'b-message': withSlot, 'b-icon': true },
+			stubs: { 'b-button': press, 'b-message': withSlot, 'b-tag': withSlot, 'b-icon': true },
 		},
 	})
 	await flushPromises()
@@ -315,7 +319,7 @@ describe('the button that updates Docker', () => {
 		['held', 'The Docker packages are on hold, and a hold is deliberate: ReCasaOS does not override it. To update anyway, use the command below.'],
 		['daemon', 'ReCasaOS cannot reach Docker right now, so it will not update it. Check that Docker is running.'],
 		['swarm', 'This machine is part of a Docker swarm, which ReCasaOS does not update.'],
-		['plan', 'The update would change more than Docker\'s own packages, or could not be planned, so ReCasaOS will not run it.'],
+		['plan', planRefusal],
 		['disk', 'There is less than 1 GiB of free disk space where the update needs it, so ReCasaOS will not start it. Free some space and check again.'],
 		['something-new', 'ReCasaOS did not update Docker.'],
 	])('refused with the code "%s": no button, this sentence, and the command to type', async (refusal, sentence) => {
@@ -330,8 +334,27 @@ describe('the button that updates Docker', () => {
 		const names = ['docker-ce-cli', '<b>evil</b>']
 		const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'plan', refusal_detail: names }) })
 
-		expect(w.find('.docker-refusal').text()).toContain('Packages concerned: docker-ce-cli, <b>evil</b>.')
+		expect(w.find('.docker-refusal').text()).toContain('Blocked by: docker-ce-cli, <b>evil</b>.')
 		expect(w.find('.docker-refusal b').exists()).toBe(false)
+	})
+
+	// the core's detail of a refused plan is package names, or one of its fixed markers in
+	// parentheses: both are shown as given, under a label that reads right after either
+	it.each([
+		[['libc6', 'docker.io'], 'Blocked by: libc6, docker.io.'],
+		[['(more than 10 new packages)'], 'Blocked by: (more than 10 new packages).'],
+		[['(invalid name)'], 'Blocked by: (invalid name).'],
+		[['libc6', '(invalid name)'], 'Blocked by: libc6, (invalid name).'],
+	])('a refused plan with the detail %j says %j', async (detail, line) => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'plan', refusal_detail: detail }) })
+
+		expect(w.find('.docker-refusal').text()).toBe(`${planRefusal} ${line}`)
+	})
+
+	it.each([[[]], [null], [undefined], [['']]])('a refused plan with the detail %j is the sentence alone, with no label and no empty list', async (detail) => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'plan', refusal_detail: detail }) })
+
+		expect(w.find('.docker-refusal').text()).toBe(planRefusal)
 	})
 
 	it('is not matched by the core\'s English words: only the code speaks', async () => {
@@ -379,6 +402,57 @@ describe('the confirmation before Docker is updated', () => {
 		expect(minor.find('.docker-major').exists()).toBe(false)
 		expect(minor.find('.docker-confirm').text()).not.toContain('new major version')
 		expect(minor.find('.docker-confirm').text()).toContain('every container stops until it is back')
+	})
+
+	it('shows a package that is not installed yet with no current version and a label, and says so under the table', async () => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({ packages: [...enginePackages, nftables, libnftables] }) })
+
+		await openConfirmation(w)
+
+		const rows = w.findAll('.docker-packages tbody tr')
+		expect(rows.map(row => row.findAll('td').map(cell => cell.text()))).toEqual([
+			['docker-ce', '5:28.0.4-1~debian.11~bullseye', '5:29.8.0-1~debian.11~bullseye'],
+			['containerd.io', '1.7.27-1', '2.3.6-1'],
+			['nftables', 'New package', '1.0.6-2+deb11u2'],
+			['libnftables1', 'New package', '1.0.6-2+deb11u2'],
+		])
+		expect(rows.map(row => row.find('.docker-new-package').exists())).toEqual([false, false, true, true])
+		const sentence = w.find('.docker-new-packages')
+		expect(sentence.text()).toBe('This Docker version also needs these packages that are not installed yet: nftables, libnftables1.')
+		expect(sentence.element.previousElementSibling.classList.contains('docker-packages')).toBe(true)
+		expect(w.find('.docker-major').exists()).toBe(true)
+	})
+
+	it('says "a package", not "these packages", when one is new', async () => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({ packages: [...enginePackages, nftables] }) })
+
+		await openConfirmation(w)
+
+		expect(w.find('.docker-new-packages').text()).toBe('This Docker version also needs a package that is not installed yet: nftables.')
+	})
+
+	it('has no label and no sentence when every package is an upgrade, even one with no current version from an older core', async () => {
+		const older = { name: 'docker-model-plugin', current_version: '', candidate_version: '1.0.0-1' }
+		const w = await openDocker({ getSystemPackages: dockerPackages({ packages: [...enginePackages, older] }) })
+
+		await openConfirmation(w)
+
+		expect(w.find('.docker-new-packages').exists()).toBe(false)
+		expect(w.find('.docker-new-package').exists()).toBe(false)
+		expect(w.find('.docker-packages').text()).not.toContain('New package')
+		expect(w.findAll('.docker-packages tbody tr').map(row => row.findAll('td')[1].text())).toEqual(['5:28.0.4-1~debian.11~bullseye', '1.7.27-1', '—'])
+	})
+
+	it('shows the name of a new package as text, never as markup', async () => {
+		const evil = '<img src=x onerror=alert(1)>'
+		const w = await openDocker({ getSystemPackages: dockerPackages({ packages: [...enginePackages, { ...nftables, name: evil }, libnftables] }) })
+
+		await openConfirmation(w)
+
+		expect(w.find('.docker-confirm img').exists()).toBe(false)
+		expect(w.findAll('.docker-packages tbody tr')[2].find('td').text()).toBe(evil)
+		expect(w.find('.docker-new-packages').text()).toContain(`${evil}, libnftables1.`)
+		expect(w.find('.docker-new-packages img').exists()).toBe(false)
 	})
 
 	it('counts the containers that will not come back and puts them first, highlighted', async () => {
@@ -568,7 +642,7 @@ describe('starting the Docker update', () => {
 	it.each([
 		['nothing', 'Docker has nothing to update.'],
 		['held', 'The Docker packages are on hold'],
-		['plan', 'The update would change more than Docker\'s own packages'],
+		['plan', 'The update would go beyond Docker\'s own packages'],
 	])('says why for "%s", keeps the core\'s reason once, and checks again', async (code, sentence) => {
 		const reason = `english reason for ${code}`
 		const getSystemPackages = vi.fn(dockerPackages())
@@ -581,6 +655,25 @@ describe('starting the Docker update', () => {
 		expect(w.text()).toContain(sentence)
 		expect(w.text().split(reason).length - 1).toBe(1)
 		expect(getSystemPackages).toHaveBeenCalledTimes(2)
+	})
+
+	it.each([
+		[['libc6'], 'Blocked by: libc6.'],
+		[['(more than 10 new packages)'], 'Blocked by: (more than 10 new packages).'],
+		[[], ''],
+	])('shows the detail %j of a plan refused at the start as given, after the sentence', async (detail, line) => {
+		const reason = 'english reason'
+		const w = await openDocker({ startDockerUpdate: () => Promise.reject(refused(409, 'plan', reason, { refusal_detail: detail })) })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		const message = w.text()
+		expect(message).toContain(line ? `${planRefusal} ${line}` : planRefusal)
+		if (!line)
+			expect(message).not.toContain('Blocked by')
+		expect(message.split(reason).length - 1).toBe(1)
 	})
 
 	it.each([
@@ -901,7 +994,7 @@ describe('what the Docker update ended with', () => {
 
 	it.each([
 		['guard', 'The last check before the update failed, so nothing was changed.', false],
-		['plan', 'The update would have changed more than Docker\'s own packages, so it was stopped before anything changed.', false],
+		['plan', 'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.', false],
 		['download', 'The new packages could not be downloaded, so nothing was changed. Check the internet connection and the free disk space, then try again.', false],
 		['install', 'The new packages could not be installed. Docker may be half updated: read the log below.', true],
 		['daemon', 'The new packages were installed, but Docker did not start again, so every container is stopped. Read the log below.', true],
@@ -1013,10 +1106,18 @@ describe('the Docker update\'s words', () => {
 		'Finished {date}',
 		'Dismiss',
 		'Could not start the Docker update.',
+		'New package',
+		'This Docker version also needs a package that is not installed yet: {names}.',
+		'This Docker version also needs these packages that are not installed yet: {names}.',
+		'Blocked by: {names}.',
+		'The update would go beyond Docker\'s own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.',
+		'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
 		expect(fr[key]).not.toBe(key)
+		// French sets a space before : ; ? ! (\s covers the no-break spaces too)
+		expect(fr[key]).not.toMatch(/\S[:;?!]/)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
 	})
