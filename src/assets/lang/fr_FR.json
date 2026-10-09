@@ -1002,5 +1002,13 @@
   "This Docker version also needs these packages that are not installed yet: {names}.": "Cette version de Docker a aussi besoin de ces paquets, qui ne sont pas encore installés : {names}.",
   "Blocked by: {names}.": "Bloquée par : {names}.",
   "The update would go beyond Docker's own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.": "La mise à jour irait au-delà des paquets propres à Docker et des quelques nouveaux paquets dont ils ont besoin, ou n'a pas pu être planifiée : ReCasaOS ne la lancera donc pas.",
-  "The update would have gone beyond Docker's own packages and the few new ones they need, so it was stopped before anything changed.": "La mise à jour serait allée au-delà des paquets propres à Docker et des quelques nouveaux paquets dont ils ont besoin : elle a été arrêtée avant tout changement."
+  "The update would have gone beyond Docker's own packages and the few new ones they need, so it was stopped before anything changed.": "La mise à jour serait allée au-delà des paquets propres à Docker et des quelques nouveaux paquets dont ils ont besoin : elle a été arrêtée avant tout changement.",
+  "The update could not be started, so nothing was changed.": "La mise à jour n'a pas pu démarrer : rien n'a été modifié.",
+  "Preparing the Docker update... your apps keep running.": "Préparation de la mise à jour de Docker... vos apps continuent de tourner.",
+  "Downloading Docker... your apps keep running.": "Téléchargement de Docker... vos apps continuent de tourner.",
+  "Installing Docker... apps restart briefly.": "Installation de Docker... les apps redémarrent brièvement.",
+  "Waiting for Docker to come back...": "Attente du retour de Docker...",
+  "Waiting for your apps to come back...": "Attente du retour de vos apps...",
+  "A half-finished install must be completed first. In a terminal on this machine:": "Une installation à moitié faite doit d'abord être terminée. Dans un terminal sur cette machine :",
+  "Command to finish a half-finished install": "Commande pour terminer une installation à moitié faite"
 }

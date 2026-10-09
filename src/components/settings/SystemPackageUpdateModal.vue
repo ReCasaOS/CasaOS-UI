@@ -105,7 +105,7 @@
 
 					<template v-if="dockerRunning">
 						<p class="has-text-info-on-scheme">{{ dockerRunningText }}</p>
-						<p v-if="dockerStatus.from && dockerStatus.to" class="is-size-7 _has-text-gray">{{ dockerStatus.from }} → {{ dockerStatus.to }}</p>
+						<p v-if="dockerVersions" class="docker-versions is-size-7 _has-text-gray">{{ dockerVersions }}</p>
 						<p v-if="dockerUnknown" class="docker-unknown mt-1 is-size-7 has-text-danger-on-scheme">{{ $t('Status unknown, reopen this window.') }}</p>
 						<p v-else-if="dockerLost" class="docker-lost mt-1 is-size-7 has-text-warning-on-scheme">{{ $t('Connection lost, retrying...') }}</p>
 					</template>
@@ -122,6 +122,10 @@
 							<p class="has-text-danger-on-scheme">{{ $t('The Docker update failed.') }}</p>
 							<p v-if="dockerFailureText" class="mt-1 is-size-7">{{ dockerFailureText }}</p>
 							<p v-else-if="dockerStatus.error" class="mt-1 is-size-7 _has-text-gray">{{ dockerStatus.error }}</p>
+							<template v-if="dockerHalfInstalled">
+								<p class="mt-2 is-size-7">{{ $t('A half-finished install must be completed first. In a terminal on this machine:') }}</p>
+								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to finish a half-finished install')">{{ repairCommand }}</pre>
+							</template>
 							<template v-if="dockerStatus.rollback_command && !dockerNothingChanged">
 								<p class="mt-2 is-size-7">{{ $t('To put the previous version back, run this in a terminal on this machine.') }}</p>
 								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to put the previous Docker version back')">{{ dockerStatus.rollback_command }}</pre>
@@ -296,6 +300,8 @@ const DOCKER_LOST_MS = 10 * 60 * 1000
 // host ports a box's DNS and web server sit on
 const DOCKER_HOST_PORTS = [53, 80, 443]
 const DOCKER_RESTART_COMMAND = 'sudo systemctl restart docker'
+// what apt asks for, before anything else, when dpkg was stopped in the middle of an install
+const DOCKER_REPAIR_COMMAND = 'sudo dpkg --configure -a && sudo apt-get -f install'
 
 // What a refusal means, by the code the core sends (never by its English words). The ones that
 // follow the static codes of `docker.update.refusal` come back from the start as well, as a 409.
@@ -312,12 +318,14 @@ const DOCKER_REFUSALS = {
 	apps: 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes.',
 	changed: 'A newer Docker appeared since this window was opened. Look at the new versions and confirm again.',
 	nothing: 'Docker has nothing to update.',
+	start: 'The update could not be started, so nothing was changed.',
 }
 const DOCKER_REFUSAL_NAMES = {
 	plan: 'Blocked by: {names}.',
 	apps: 'Busy apps: {names}.',
 }
 const DOCKER_FAILURES = {
+	start: 'The update could not be started, so nothing was changed.',
 	guard: 'The last check before the update failed, so nothing was changed.',
 	plan: 'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.',
 	download: 'The new packages could not be downloaded, so nothing was changed. Check the internet connection and the free disk space, then try again.',
@@ -325,8 +333,18 @@ const DOCKER_FAILURES = {
 	daemon: 'The new packages were installed, but Docker did not start again, so every container is stopped. Read the log below.',
 	no_result: 'The update stopped without reporting a result. Read the log below and check Docker before trying again.',
 }
+// where a run is, by the phase the core names (never by the core's English words)
+const DOCKER_PHASES = {
+	preparing: 'Preparing the Docker update... your apps keep running.',
+	downloading: 'Downloading Docker... your apps keep running.',
+	installing: 'Installing Docker... apps restart briefly.',
+	waiting_docker: 'Waiting for Docker to come back...',
+	waiting_containers: 'Waiting for your apps to come back...',
+}
 // a failure that stops before the install changed nothing, and a way back would mean nothing
-const DOCKER_NOTHING_CHANGED = ['guard', 'plan', 'download']
+const DOCKER_NOTHING_CHANGED = ['start', 'guard', 'plan', 'download']
+// dpkg may have been stopped in the middle of the install: apt refuses to do anything else until it is finished
+const DOCKER_HALF_INSTALLED = ['install', 'no_result']
 // refused for a while, not for what is on screen: a new check (apt-get update) would answer nothing
 const DOCKER_TRANSIENT = ['maintenance', 'apps']
 
@@ -399,6 +417,8 @@ export default {
 			// The Docker update has a state of its own: the generic one above is never shared with it.
 			dockerStatus: emptyDockerStatus(),
 			dockerPlan: null,
+			// what the person confirmed, kept while that run goes on: the core says `to` only at the end
+			dockerRunPlan: null,
 			dockerConfirming: false,
 			dockerStarting: false,
 			dockerRefusal: null,
@@ -483,8 +503,22 @@ export default {
 		dockerShowsJob() {
 			return this.dockerRunning || this.dockerTerminal
 		},
+		// Where the run is, when the core says (an older core does not: then the general sentence, which is
+		// true of the whole run, if less helpful)
 		dockerRunningText() {
-			return this.$t(this.dockerFinalizing ? 'Finishing the Docker update...' : 'Updating Docker... apps are restarting')
+			if (this.dockerFinalizing) {
+				return this.$t('Finishing the Docker update...')
+			}
+			return this.$t(pick(DOCKER_PHASES, this.dockerStatus.phase) || 'Updating Docker... apps are restarting')
+		},
+		// The core fills `to` only once the new Docker answers; the plan the person confirmed knows it from the start.
+		dockerVersions() {
+			const from = this.dockerStatus.from || this.dockerRunPlan?.from
+			const to = this.dockerStatus.to || this.dockerRunPlan?.to
+			return from && to && from !== to ? `${from} → ${to}` : ''
+		},
+		dockerHalfInstalled() {
+			return DOCKER_HALF_INSTALLED.includes(this.dockerStatus.error_code)
 		},
 		dockerSuccessText() {
 			return this.dockerStatus.to ? this.$t('Docker was updated to {version}.', { version: this.dockerStatus.to }) : this.$t('Docker was updated.')
@@ -550,6 +584,9 @@ export default {
 		},
 		restartCommand() {
 			return DOCKER_RESTART_COMMAND
+		},
+		repairCommand() {
+			return DOCKER_REPAIR_COMMAND
 		},
 	},
 	mounted() {
@@ -756,12 +793,14 @@ export default {
 			this.dockerStarting = true
 			this.dockerRefusal = null
 			this.error = null
+			const confirmed = { from: this.dockerPlan.from, to: this.dockerPlan.to }
 			try {
 				const response = await this.$api.sys.startDockerUpdate({ plan_id: this.dockerPlan.plan_id })
 				if (this.gone) {
 					return
 				}
 				this.dockerStatus = { ...emptyDockerStatus(), ...response.data.data }
+				this.dockerRunPlan = confirmed
 				this.dockerConfirming = false
 				this.startDockerPolling()
 				this.showTop('dockerJobTitle')
@@ -780,6 +819,7 @@ export default {
 						return
 					}
 					if (['running', 'finalizing'].includes(status?.state)) {
+						this.dockerRunPlan = confirmed
 						this.followDockerStatus(status)
 						this.showTop('dockerJobTitle')
 						return
@@ -849,6 +889,7 @@ export default {
 				}
 				this.stopDockerPolling()
 				this.dockerRefusal = null
+				this.dockerRunPlan = null
 				// the new version shows without anyone pressing "Check for updates"
 				this.checkPackages(true)
 				return

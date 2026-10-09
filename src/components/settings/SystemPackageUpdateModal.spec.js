@@ -643,6 +643,7 @@ describe('starting the Docker update', () => {
 
 	it.each([
 		['nothing', 'Docker has nothing to update.'],
+		['start', 'The update could not be started, so nothing was changed.'],
 		['held', 'The Docker packages are on hold'],
 		['plan', 'The update would go beyond Docker\'s own packages'],
 	])('says why for "%s", keeps the core\'s reason once, and checks again', async (code, sentence) => {
@@ -997,10 +998,97 @@ describe('following the Docker update', () => {
 		}
 	})
 
-	it('shows the versions once the core knows both', async () => {
-		const w = await openDocker({ getDockerUpdateStatus: answer(dockerRun({ state: 'running', from: '28.0.4', to: '29.8.0' })) })
+	// the core fills `to` only once the new Docker answers, so a run that is going shows `from` alone
+	it('shows what Docker goes from and to while it runs, from the plan that was confirmed', async () => {
+		const w = await openDocker({ startDockerUpdate: answer(running), getDockerUpdateStatus: vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(running)) })
+		await openConfirmation(w)
 
-		expect(w.find('.docker-job').text()).toContain('28.0.4 → 29.8.0')
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(running.to).toBe('')
+		expect(w.find('.docker-job .docker-versions').text()).toBe('28.0.4 → 29.8.0')
+	})
+
+	it('forgets the plan when the run ends, so the next run found shows nothing of it', async () => {
+		vi.useFakeTimers()
+		try {
+			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValueOnce(reply(running)).mockResolvedValue(reply(dockerRun({ ...succeeded, to: '' })))
+			const w = await openDocker({ startDockerUpdate: answer(running), getDockerUpdateStatus })
+			await openConfirmation(w)
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(w.vm.dockerStatus.state).toBe('succeeded')
+
+			expect(w.vm.dockerRunPlan).toBeNull()
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('shows no versions on a run it did not start, which only has its `from`, and none when both are the same', async () => {
+		const reopened = await openDocker({ getDockerUpdateStatus: answer(running) })
+		expect(reopened.find('.docker-job').text()).not.toContain('→')
+		expect(reopened.find('.docker-versions').exists()).toBe(false)
+		reopened.unmount()
+
+		const same = await openDocker({ getDockerUpdateStatus: answer(dockerRun({ state: 'running', from: '28.0.4', to: '28.0.4' })) })
+		expect(same.find('.docker-versions').exists()).toBe(false)
+		same.unmount()
+
+		// a core that does fill both
+		const both = await openDocker({ getDockerUpdateStatus: answer(dockerRun({ state: 'running', from: '28.0.4', to: '29.8.0' })) })
+		expect(both.find('.docker-versions').text()).toBe('28.0.4 → 29.8.0')
+	})
+
+	it.each([
+		['preparing', 'Preparing the Docker update... your apps keep running.'],
+		['downloading', 'Downloading Docker... your apps keep running.'],
+		['installing', 'Installing Docker... apps restart briefly.'],
+		['waiting_docker', 'Waiting for Docker to come back...'],
+		['waiting_containers', 'Waiting for your apps to come back...'],
+	])('says what the phase "%s" is', async (phase, sentence) => {
+		const w = await openDocker({ getDockerUpdateStatus: answer({ ...running, phase }) })
+
+		expect(w.find('.docker-job').text()).toContain(sentence)
+		expect(w.find('.docker-job').text()).not.toContain('Updating Docker... apps are restarting')
+		expect(w.find('[role="status"]').text()).toBe(sentence)
+	})
+
+	it.each([[undefined], [''], ['brand-new'], ['__proto__'], ['constructor'], [7], [null]])('keeps the general sentence for a run whose phase is %j', async (phase) => {
+		const w = await openDocker({ getDockerUpdateStatus: answer({ ...running, phase }) })
+
+		expect(w.find('.docker-job').text()).toContain('Updating Docker... apps are restarting')
+	})
+
+	it('follows the phases as the run goes on, and says it is finishing whatever the phase', async () => {
+		vi.useFakeTimers()
+		try {
+			const getDockerUpdateStatus = vi.fn()
+				.mockResolvedValueOnce(reply({ ...running, phase: 'downloading' }))
+				.mockResolvedValueOnce(reply({ ...running, phase: 'downloading' }))
+				.mockResolvedValueOnce(reply({ ...running, phase: 'installing' }))
+				.mockResolvedValue(reply(dockerRun({ state: 'finalizing', phase: 'waiting_containers' })))
+			const w = await openDocker({ getDockerUpdateStatus })
+			expect(w.find('.docker-job').text()).toContain('Downloading Docker... your apps keep running.')
+
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(w.find('.docker-job').text()).toContain('Installing Docker... apps restart briefly.')
+
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(w.find('.docker-job').text()).toContain('Finishing the Docker update...')
+			expect(w.find('.docker-job').text()).not.toContain('Waiting for your apps')
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('does not show a phase once the run is over', async () => {
+		const w = await openDocker({ getDockerUpdateStatus: answer({ ...succeeded, phase: 'waiting_containers' }) })
+
+		expect(w.find('.docker-job').text()).not.toContain('Waiting for your apps')
+		expect(w.find('.docker-job').text()).toContain('Docker was updated to 29.8.0.')
 	})
 
 	it('resumes a run that was going when the window was closed, without checking the packages behind it', async () => {
@@ -1086,6 +1174,7 @@ describe('what the Docker update ended with', () => {
 	})
 
 	it.each([
+		['start', 'The update could not be started, so nothing was changed.', false],
 		['guard', 'The last check before the update failed, so nothing was changed.', false],
 		['plan', 'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.', false],
 		['download', 'The new packages could not be downloaded, so nothing was changed. Check the internet connection and the free disk space, then try again.', false],
@@ -1101,13 +1190,54 @@ describe('what the Docker update ended with', () => {
 		expect(job.text()).toContain(sentence)
 		expect(job.text()).not.toContain('english words')
 		expect(job.find('.package-log').text()).toBe('E: something broke')
-		expect(job.find('pre.docker-command').exists()).toBe(wayBack)
+		// the way back is the last command: a failure that may have stopped dpkg puts the repair before it
+		const commands = job.findAll('pre.docker-command').map(pre => pre.text())
+		expect(commands.includes(command)).toBe(wayBack)
 		if (wayBack) {
-			expect(job.find('pre.docker-command').text()).toBe(command)
+			expect(commands.at(-1)).toBe(command)
 			expect(job.text()).toContain('This has not been tested after a major version change.')
 		} else {
 			expect(job.text()).not.toContain('This has not been tested after a major version change.')
 		}
+	})
+
+	// a power cut, a killed unit or an out-of-memory stop in the middle of dpkg: apt refuses everything until it is finished
+	describe('a half-finished install', () => {
+		const command = 'sudo apt-get install --allow-downgrades docker-ce=5:28.0.4-1~debian.11~bullseye containerd.io=1.7.27-1'
+		const repair = 'sudo dpkg --configure -a && sudo apt-get -f install'
+		const failed = (code, extra = {}) => ended({ state: 'failed', outcome: 'failed', error_code: code, exit_code: 1, rollback_command: command, log: 'E: dpkg was interrupted', ...extra })
+
+		it.each(['install', 'no_result'])('after "%s": says to finish it first, with the commands, before the way back', async (code) => {
+			const w = await failed(code)
+
+			const job = w.find('.docker-job')
+			const commands = job.findAll('pre.docker-command')
+			expect(commands.map(pre => pre.text())).toEqual([repair, command])
+			expect(job.text()).toContain('A half-finished install must be completed first. In a terminal on this machine:')
+			expect(job.html().indexOf('sudo dpkg --configure -a')).toBeLessThan(job.html().indexOf('sudo apt-get install --allow-downgrades'))
+			expect(job.html().indexOf('A half-finished install')).toBeLessThan(job.html().indexOf('To put the previous version back'))
+			expect(commands[0].attributes('aria-label')).toBe('Command to finish a half-finished install')
+		})
+
+		it('after "install" with no way back to offer, still says to finish it', async () => {
+			const w = await failed('install', { rollback_command: '' })
+
+			expect(w.find('.docker-job pre.docker-command').text()).toBe(repair)
+			expect(w.findAll('.docker-job pre.docker-command').length).toBe(1)
+		})
+
+		it.each(['start', 'guard', 'plan', 'download', 'daemon', 'brand-new', ''])('after "%s": says nothing of it', async (code) => {
+			const w = await failed(code)
+
+			expect(w.find('.docker-job').text()).not.toContain('A half-finished install')
+			expect(w.find('.docker-job').html()).not.toContain('dpkg --configure')
+		})
+
+		it('after a success: says nothing of it', async () => {
+			const w = await ended({ error_code: 'install' })
+
+			expect(w.find('.docker-job').html()).not.toContain('dpkg --configure')
+		})
 	})
 
 	it('gives the core\'s words when it fails with a code the window does not know', async () => {
@@ -1383,6 +1513,14 @@ describe('the Docker update\'s words', () => {
 		'Blocked by: {names}.',
 		'The update would go beyond Docker\'s own packages and the few new ones they need, or could not be planned, so ReCasaOS will not run it.',
 		'The update would have gone beyond Docker\'s own packages and the few new ones they need, so it was stopped before anything changed.',
+		'The update could not be started, so nothing was changed.',
+		'Preparing the Docker update... your apps keep running.',
+		'Downloading Docker... your apps keep running.',
+		'Installing Docker... apps restart briefly.',
+		'Waiting for Docker to come back...',
+		'Waiting for your apps to come back...',
+		'A half-finished install must be completed first. In a terminal on this machine:',
+		'Command to finish a half-finished install',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
