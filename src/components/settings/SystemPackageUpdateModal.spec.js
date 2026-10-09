@@ -1031,6 +1031,66 @@ describe('starting the Docker update', () => {
 		}
 	})
 
+	// the answer to the start was lost: until the core says, nobody knows whether the unit is running
+	describe('while it asks whether a start whose answer was lost went through', () => {
+		const lost = () => Promise.reject(Object.assign(new Error('timeout of 60000ms exceeded'), { code: 'ECONNABORTED' }))
+
+		async function startAndHoldTheRead() {
+			const held = {}
+			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockImplementation(() => new Promise((resolve, reject) => {
+				held.answer = resolve
+				held.fail = reject
+			}))
+			const w = await openDocker({ startDockerUpdate: lost, getDockerUpdateStatus })
+			await openConfirmation(w)
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+			return { w, held }
+		}
+
+		it('says it is checking, in the window and in the live region, and not that the apps are restarting', async () => {
+			const { w } = await startAndHoldTheRead()
+
+			expect(w.find('.docker-job').text()).toContain('Checking whether the update started...')
+			expect(w.find('.docker-job').text()).not.toContain('apps are restarting')
+			expect(w.find('.docker-job').text()).not.toContain('Connection lost')
+			expect(w.find('[role="status"]').text()).toBe('Checking whether the update started...')
+			expect(w.find('.docker-versions').exists()).toBe(false)
+			expect(w.find('footer').exists()).toBe(false)
+		})
+
+		it('stops saying it when the core shows no run, and says it could not start', async () => {
+			const { w, held } = await startAndHoldTheRead()
+
+			held.answer(reply(dockerIdle))
+			await flushPromises()
+
+			expect(w.find('.docker-job').exists()).toBe(false)
+			expect(w.text()).not.toContain('Checking whether')
+			expect(w.find('[role="status"]').text()).toBe('Could not start the Docker update.')
+		})
+
+		it('says the run, as the core describes it, when the core shows one', async () => {
+			const { w, held } = await startAndHoldTheRead()
+
+			held.answer(reply({ ...running, phase: 'downloading' }))
+			await flushPromises()
+
+			expect(w.find('.docker-job').text()).toContain('Downloading Docker... your apps keep running.')
+			expect(w.text()).not.toContain('Checking whether')
+		})
+
+		it('stops saying it when the core cannot be asked either', async () => {
+			const { w, held } = await startAndHoldTheRead()
+
+			held.fail(new Error('Network Error'))
+			await flushPromises()
+
+			expect(w.find('.docker-job').exists()).toBe(false)
+			expect(w.text()).not.toContain('Checking whether')
+		})
+	})
+
 	it('says it could not start when the core shows no run after a lost answer, or cannot be asked', async () => {
 		for (const status of [answer(dockerIdle), answer(succeeded), () => Promise.reject(new Error('Network Error'))]) {
 			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockImplementation(status)
@@ -1969,6 +2029,7 @@ describe('the Docker update\'s words', () => {
 		'If you have restarted Docker since, there is nothing left to do.',
 		'If Docker works again since, you do not need this.',
 		'A previous package operation was left unfinished on this machine. Finish it first, then check again.',
+		'Checking whether the update started...',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()

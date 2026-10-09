@@ -1020,5 +1020,6 @@
   "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.": "Un Docker plus récent, {version}, existe dans les sources de paquets de cette machine. La mise à jour du système ne l'installe pas, contrairement à « Mettre à jour Docker » ci-dessous.",
   "If you have restarted Docker since, there is nothing left to do.": "Si vous avez redémarré Docker depuis, il n'y a plus rien à faire.",
   "If Docker works again since, you do not need this.": "Si Docker fonctionne de nouveau depuis, vous n'en avez pas besoin.",
-  "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "Une opération précédente sur les paquets est restée inachevée sur cette machine. Terminez-la d'abord, puis vérifiez à nouveau."
+  "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "Une opération précédente sur les paquets est restée inachevée sur cette machine. Terminez-la d'abord, puis vérifiez à nouveau.",
+  "Checking whether the update started...": "Vérification du démarrage de la mise à jour..."
 }

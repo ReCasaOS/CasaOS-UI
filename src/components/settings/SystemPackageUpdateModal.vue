@@ -458,6 +458,8 @@ export default {
 			dockerStarting: false,
 			// the end of a run was seen by this window, as opposed to a result that was there when it opened
 			dockerWatched: false,
+			// a start whose answer was lost: the core is being asked whether it went through
+			dockerChecking: false,
 			dockerRefusal: null,
 			dockerContainers: emptyContainers(),
 			dockerContainersSeq: 0,
@@ -555,6 +557,9 @@ export default {
 			return !pick(DOCKER_REFUSALS, code) || DOCKER_REASON_CODES.includes(code)
 		},
 		dockerRunningText() {
+			if (this.dockerChecking) {
+				return this.$t('Checking whether the update started...')
+			}
 			if (this.dockerFinalizing) {
 				return this.$t('Finishing the Docker update...')
 			}
@@ -910,8 +915,11 @@ export default {
 				const refused = error?.response && (code || [409, 501].includes(error.response.status))
 				this.dockerConfirming = false
 				if (!refused) {
-					// A lost answer is not a refusal: the core may have started the unit. Ask before saying it did not.
+					// A lost answer is not a refusal: the core may have started the unit. Ask before saying it did not,
+					// and until it answers say nothing of a run either.
+					this.dockerChecking = true
 					const status = await this.readDockerStatus()
+					this.dockerChecking = false
 					if (this.gone) {
 						return
 					}

@@ -1020,5 +1020,6 @@
   "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.": "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.",
   "If you have restarted Docker since, there is nothing left to do.": "If you have restarted Docker since, there is nothing left to do.",
   "If Docker works again since, you do not need this.": "If Docker works again since, you do not need this.",
-  "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "A previous package operation was left unfinished on this machine. Finish it first, then check again."
+  "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "A previous package operation was left unfinished on this machine. Finish it first, then check again.",
+  "Checking whether the update started...": "Checking whether the update started..."
 }
