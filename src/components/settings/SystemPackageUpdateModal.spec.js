@@ -307,6 +307,25 @@ describe('the button that updates Docker', () => {
 		expect(line.html().indexOf('docker-update-button')).toBeLessThan(line.html().indexOf('docker-command'))
 	})
 
+	// the owner's box: docker-ce is kept back by a dependency, so the system update never lists it
+	it('does not say that apt does not offer a newer Docker right above the button that installs it', async () => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({}, { updates: [], candidate: '29.8.0', held: false }) })
+
+		const line = w.find('.docker-line').text()
+		expect(line).toContain('A newer Docker, 29.8.0, exists in this machine\'s package sources. The system update does not install it, but Update Docker below does.')
+		expect(line).not.toContain('apt does not offer it')
+		// and the button itself comes after it
+		expect(line.lastIndexOf('Update Docker')).toBeGreaterThan(line.indexOf('Docker below'))
+		expect(w.find('.docker-update-button').exists()).toBe(true)
+	})
+
+	it('keeps saying why when there is no button for the newer Docker it knows of', async () => {
+		const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'disk' }, { updates: [], candidate: '29.8.0', held: false }) })
+
+		expect(w.find('.docker-line').text()).toContain('apt does not offer it for an update (a hold, or a dependency).')
+		expect(w.find('.docker-line').text()).not.toContain('Update Docker below')
+	})
+
 	it('is not offered by a core that does not know the update, and says nothing about it', async () => {
 		const w = await openDocker({ getSystemPackages: dockerPackages(undefined, { update: undefined }) })
 
@@ -765,7 +784,7 @@ describe('starting the Docker update', () => {
 		expect(w.vm.isRunning).toBe(false)
 	})
 
-	it('keeps the reason when the plan changed, says what to do, and checks again for the new plan', async () => {
+	it('says what to do when the plan changed, in its own words, and checks again for the new plan', async () => {
 		const reason = 'the Docker update plan changed: reconfirm'
 		const startDockerUpdate = vi.fn(() => Promise.reject(refused(409, 'changed', reason)))
 		const newPlan = 'cd'.repeat(32)
@@ -780,7 +799,7 @@ describe('starting the Docker update', () => {
 
 		expect(w.find('.docker-confirm').exists()).toBe(false)
 		expect(w.text()).toContain('A newer Docker appeared since this window was opened. Look at the new versions and confirm again.')
-		expect(w.text().split(reason).length - 1).toBe(1)
+		expect(w.text()).not.toContain(reason)
 		expect(getSystemPackages).toHaveBeenCalledTimes(2)
 		// the person confirms the new plan, not the old one
 		await openConfirmation(w)
@@ -796,7 +815,7 @@ describe('starting the Docker update', () => {
 		['start', 'The update could not be started, so nothing was changed.'],
 		['held', 'The Docker packages are on hold'],
 		['plan', 'The update would go beyond Docker\'s own packages'],
-	])('says why for "%s", keeps the core\'s reason once, and checks again', async (code, sentence) => {
+	])('says why for "%s" in its own words, not in the core\'s English too, and checks again', async (code, sentence) => {
 		const reason = `english reason for ${code}`
 		const getSystemPackages = vi.fn(dockerPackages())
 		const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, code, reason)) })
@@ -806,8 +825,51 @@ describe('starting the Docker update', () => {
 		await flushPromises()
 
 		expect(w.text()).toContain(sentence)
-		expect(w.text().split(reason).length - 1).toBe(1)
+		expect(w.text()).not.toContain(reason)
 		expect(getSystemPackages).toHaveBeenCalledTimes(2)
+	})
+
+	it('gives the core\'s words when it refuses with a code the window does not know, since they are all there is', async () => {
+		const reason = 'something the window has no sentence for'
+		const w = await openDocker({ startDockerUpdate: () => Promise.reject(refused(409, 'brand-new', reason)) })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(w.text()).toContain('ReCasaOS did not update Docker.')
+		expect(w.text().split(reason).length - 1).toBe(1)
+	})
+
+	// the same refusal is also what the new check says of the Docker line: the sentence is not said twice
+	it('says a refusal once when the new check says the same of the Docker line', async () => {
+		const getSystemPackages = vi.fn()
+			.mockImplementationOnce(dockerPackages())
+			.mockImplementation(dockerPackages({ available: false, refusal: 'held' }))
+		const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', 'english reason')) })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+		expect(visible.split('a hold is deliberate').length - 1).toBe(1)
+		expect(w.find('.docker-update-button').exists()).toBe(false)
+		expect(w.find('pre.docker-command').exists()).toBe(true)
+	})
+
+	it('says both when the new check refuses for another reason than the start did', async () => {
+		const getSystemPackages = vi.fn()
+			.mockImplementationOnce(dockerPackages())
+			.mockImplementation(dockerPackages({ available: false, refusal: 'disk' }))
+		const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'changed', 'english reason')) })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(w.text()).toContain('A newer Docker appeared since this window was opened.')
+		expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 	})
 
 	it.each([
@@ -826,14 +888,15 @@ describe('starting the Docker update', () => {
 		expect(message).toContain(line ? `${planRefusal} ${line}` : planRefusal)
 		if (!line)
 			expect(message).not.toContain('Blocked by')
-		expect(message.split(reason).length - 1).toBe(1)
+		expect(message).not.toContain(reason)
 	})
 
+	// "maintenance" carries a fact the sentence does not (which unit is running): the core's words stay under it
 	it.each([
-		['maintenance', [], 'Another update or package operation is running on this machine. Try again when it is done.'],
-		['apps', ['nextcloud', 'immich'], 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes. Busy apps: nextcloud, immich.'],
-		['apps', [], 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes.'],
-	])('for "%s" says it is a matter of waiting, with no new check of the packages', async (code, detail, sentence) => {
+		['maintenance', [], 1, 'Another update or package operation is running on this machine. Try again when it is done.'],
+		['apps', ['nextcloud', 'immich'], 0, 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes. Busy apps: nextcloud, immich.'],
+		['apps', [], 0, 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes.'],
+	])('for "%s" says it is a matter of waiting, with no new check of the packages', async (code, detail, shown, sentence) => {
 		const reason = 'english reason'
 		const getSystemPackages = vi.fn(dockerPackages())
 		const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, code, reason, { refusal_detail: detail })) })
@@ -843,7 +906,7 @@ describe('starting the Docker update', () => {
 		await flushPromises()
 
 		expect(w.text()).toContain(sentence)
-		expect(w.text().split(reason).length - 1).toBe(1)
+		expect(w.text().split(reason).length - 1).toBe(shown)
 		expect(getSystemPackages).toHaveBeenCalledTimes(1)
 		// what is on screen is still true: the button is there for another go
 		expect(w.find('.docker-update-button').exists()).toBe(true)
@@ -1406,6 +1469,52 @@ describe('what the Docker update ended with', () => {
 		expect(w.find('.docker-job').text()).toContain('something new went wrong')
 	})
 
+	// the last result stays until the next run: it can be days old when the window opens, and the person may have acted since
+	describe('a result that may be old', () => {
+		it.each([
+			['a restart pending', { outcome: 'restart_pending' }, 'Docker is updated, but the old version'],
+			['a success', {}, 'Docker was updated to 29.8.0.'],
+			['a failure', { state: 'failed', outcome: 'failed', error_code: 'daemon' }, 'The Docker update failed.'],
+		])('shows when %s finished before saying what became of it', async (_, extra, sentence) => {
+			const w = await ended(extra)
+
+			const html = w.find('.docker-job').html()
+			expect(html.indexOf('Finished')).toBeGreaterThan(html.indexOf('Docker update'))
+			expect(html.indexOf('Finished')).toBeLessThan(html.indexOf(sentence))
+			expect(w.findAll('.docker-job').length).toBe(1)
+			expect(w.find('.docker-job').text().split('Finished').length - 1).toBe(1)
+		})
+
+		it('says no date for a run that never said when it finished', async () => {
+			const w = await ended({ state: 'failed', outcome: 'failed', error_code: 'no_result', completed_at: '' })
+
+			expect(w.find('.docker-job').text()).not.toContain('Finished')
+		})
+
+		it('tells whoever restarted Docker since that nothing is left to do', async () => {
+			const pending = await ended({ outcome: 'restart_pending' })
+			expect(pending.find('.docker-job').text()).toContain('If you have restarted Docker since, there is nothing left to do.')
+			pending.unmount()
+
+			const done = await ended({})
+			expect(done.find('.docker-job').text()).not.toContain('If you have restarted Docker since')
+		})
+
+		it('tells whoever has Docker working again that the way back is not for them, where there is a way back', async () => {
+			const command = 'sudo apt-get install --allow-downgrades docker-ce=5:28.0.4-1~debian.11~bullseye'
+			const back = await ended({ state: 'failed', outcome: 'failed', error_code: 'daemon', rollback_command: command })
+			expect(back.find('.docker-job').text()).toContain('If Docker works again since, you do not need this.')
+			back.unmount()
+
+			const none = await ended({ state: 'failed', outcome: 'failed', error_code: 'download', rollback_command: command })
+			expect(none.find('.docker-job').text()).not.toContain('you do not need this')
+			none.unmount()
+
+			const without = await ended({ state: 'failed', outcome: 'failed', error_code: 'daemon', rollback_command: '' })
+			expect(without.find('.docker-job').text()).not.toContain('you do not need this')
+		})
+	})
+
 	it('can be dismissed, and the Docker line is there again', async () => {
 		const w = await ended({ state: 'failed', outcome: 'failed', error_code: 'download' })
 
@@ -1686,6 +1795,9 @@ describe('the Docker update\'s words', () => {
 		'One running container restarts only when it fails, so it may stay stopped.',
 		'{n} running containers restart only when they fail, so they may stay stopped.',
 		'A container that restarts only when it fails may stay stopped: start it from the dashboard.',
+		'A newer Docker, {version}, exists in this machine\'s package sources. The system update does not install it, but Update Docker below does.',
+		'If you have restarted Docker since, there is nothing left to do.',
+		'If Docker works again since, you do not need this.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
@@ -1694,6 +1806,15 @@ describe('the Docker update\'s words', () => {
 		expect(fr[key]).not.toMatch(/\S[:;?!]/)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
+	})
+
+	// "toutes les configurations n'ont pas été testées" can be read as "none was tested"
+	it('says in French that not every setup was tested, which is not that none was', () => {
+		const key = 'This is a new major version of Docker, from {from} to {to}. Apps that talk to Docker directly may need an update of their own, and not every setup has been tested with it.'
+
+		expect(fr[key]).toContain('n\'ont pas toutes été testées')
+		expect(fr[key]).not.toContain('toutes les configurations')
+		expect(fr['Listing the running containers...']).toBe('Récupération de la liste des conteneurs...')
 	})
 
 	// the refusals and the failures are looked up by code: a sentence added to a table without its

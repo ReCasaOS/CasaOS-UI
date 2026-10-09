@@ -950,9 +950,9 @@
   "Update Docker": "Mettre à jour Docker",
   "Update Docker to {version}": "Mettre à jour Docker vers {version}",
   "Docker update": "Mise à jour de Docker",
-  "This is a new major version of Docker, from {from} to {to}. Apps that talk to Docker directly may need an update of their own, and not every setup has been tested with it.": "Il s'agit d'une nouvelle version majeure de Docker, de {from} à {to}. Les apps qui parlent directement à Docker peuvent avoir besoin de leur propre mise à jour, et toutes les configurations n'ont pas été testées avec elle.",
+  "This is a new major version of Docker, from {from} to {to}. Apps that talk to Docker directly may need an update of their own, and not every setup has been tested with it.": "Il s'agit d'une nouvelle version majeure de Docker, de {from} à {to}. Les apps qui parlent directement à Docker peuvent avoir besoin de leur propre mise à jour, et les configurations n'ont pas toutes été testées avec elle.",
   "Running containers": "Conteneurs en cours d'exécution",
-  "Listing the running containers...": "Liste des conteneurs en cours d'exécution...",
+  "Listing the running containers...": "Récupération de la liste des conteneurs...",
   "The running containers could not be listed. You can still update.": "La liste des conteneurs en cours d'exécution n'a pas pu être obtenue. Vous pouvez quand même mettre à jour.",
   "No container is running.": "Aucun conteneur n'est en cours d'exécution.",
   "One running container will not start again by itself.": "Un conteneur en cours d'exécution ne redémarrera pas de lui-même.",
@@ -1016,5 +1016,8 @@
   "May stay stopped": "Peut rester arrêté",
   "One running container restarts only when it fails, so it may stay stopped.": "Un conteneur en cours d'exécution ne redémarre qu'après un échec : il peut donc rester arrêté.",
   "{n} running containers restart only when they fail, so they may stay stopped.": "{n} conteneurs en cours d'exécution ne redémarrent qu'après un échec : ils peuvent donc rester arrêtés.",
-  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "Un conteneur qui ne redémarre qu'après un échec peut rester arrêté : démarrez-le depuis le tableau de bord."
+  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "Un conteneur qui ne redémarre qu'après un échec peut rester arrêté : démarrez-le depuis le tableau de bord.",
+  "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.": "Un Docker plus récent, {version}, existe dans les sources de paquets de cette machine. La mise à jour du système ne l'installe pas, contrairement à « Mettre à jour Docker » ci-dessous.",
+  "If you have restarted Docker since, there is nothing left to do.": "Si vous avez redémarré Docker depuis, il n'y a plus rien à faire.",
+  "If Docker works again since, you do not need this.": "Si Docker fonctionne de nouveau depuis, vous n'en avez pas besoin."
 }

@@ -16,10 +16,10 @@
 				<span v-if="error.detail" class="is-block is-size-7 mt-1">{{ error.detail }}</span>
 			</b-message>
 
-			<!-- a refused Docker update: the sentence comes from the code, the core's own words under it -->
+			<!-- a refused Docker update: the sentence comes from the code; the core's own words (English) only where they say what the sentence cannot -->
 			<b-message v-if="dockerRefusal" class="mb-3" size="is-small" type="is-warning">
 				{{ dockerRefusalText(dockerRefusal.code, dockerRefusal.names) }}
-				<span v-if="dockerRefusal.reason" class="is-block is-size-7 mt-1">{{ dockerRefusal.reason }}</span>
+				<span v-if="dockerRefusal.reason && dockerShowsReason" class="is-block is-size-7 mt-1">{{ dockerRefusal.reason }}</span>
 			</b-message>
 
 			<!-- every value below is a text node: container names are third-party strings, never HTML -->
@@ -119,9 +119,13 @@
 					</template>
 
 					<template v-else>
+						<!-- the last result stays until the next run, so it can be old: the date comes first -->
+						<p v-if="dockerFinishedAt" class="docker-finished is-size-7 _has-text-gray">{{ $t('Finished {date}', { date: dockerFinishedAt }) }}</p>
+
 						<template v-if="dockerRestartPending">
 							<p class="has-text-warning-on-scheme">{{ $t('Docker is updated, but the old version is still running. Restart it to finish the update.') }}</p>
 							<p class="mt-1 is-size-7">{{ $t('Restarting Docker stops every container until it is back.') }}</p>
+							<p class="mt-1 is-size-7">{{ $t('If you have restarted Docker since, there is nothing left to do.') }}</p>
 							<p class="mt-2 is-size-7">{{ $t('In a terminal on this machine:') }}</p>
 							<pre class="docker-command" tabindex="0" :aria-label="$t('Command to restart Docker')">{{ restartCommand }}</pre>
 						</template>
@@ -138,6 +142,7 @@
 								<p class="mt-2 is-size-7">{{ $t('To put the previous version back, run this in a terminal on this machine.') }}</p>
 								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to put the previous Docker version back')">{{ dockerStatus.rollback_command }}</pre>
 								<p class="mt-1 is-size-7 _has-text-gray">{{ $t('This has not been tested after a major version change.') }}</p>
+								<p class="mt-1 is-size-7 _has-text-gray">{{ $t('If Docker works again since, you do not need this.') }}</p>
 							</template>
 						</template>
 
@@ -171,8 +176,6 @@
 								{{ $t('A container with a restart policy was not running yet when the update ended. Give it a moment, then check it from the dashboard.') }}
 							</p>
 						</div>
-
-						<p v-if="dockerFinishedAt" class="mt-2 is-size-7 _has-text-gray">{{ $t('Finished {date}', { date: dockerFinishedAt }) }}</p>
 					</template>
 
 					<div v-if="dockerShowsLog" class="package-log mt-3">
@@ -251,7 +254,8 @@
 							<b-button v-if="dockerUpdate && dockerUpdate.available" ref="dockerUpdateButton" class="docker-update-button mt-2" :disabled="isRunning" rounded size="is-small" type="is-primary" @click="openDockerConfirm">
 								{{ $t('Update Docker') }}
 							</b-button>
-							<p v-else-if="dockerUpdate && dockerUpdate.refusal" class="docker-refusal mt-2 is-size-7">
+							<!-- not again when the message above says the very same thing -->
+							<p v-else-if="dockerUpdate && dockerUpdate.refusal && dockerUpdate.refusal !== dockerRefusal?.code" class="docker-refusal mt-2 is-size-7">
 								{{ dockerRefusalText(dockerUpdate.refusal, dockerUpdate.refusal_detail) }}
 							</p>
 						</template>
@@ -333,6 +337,9 @@ const DOCKER_REFUSALS = {
 	nothing: 'Docker has nothing to update.',
 	start: 'The update could not be started, so nothing was changed.',
 }
+// The core's reason is English. It is shown under the sentence of a code only where it says what the
+// sentence cannot (this host lacks apt-get; which unit is running), and for a code with no sentence.
+const DOCKER_REASON_CODES = ['unsupported', 'maintenance']
 const DOCKER_REFUSAL_NAMES = {
 	plan: 'Blocked by: {names}.',
 	apps: 'Busy apps: {names}.',
@@ -498,6 +505,10 @@ export default {
 		// a newer engine exists in the package sources and the update does not offer it
 		dockerBehind() {
 			const version = this.info.docker?.candidate
+			// the button below does what the system update does not: the sentence must not say nobody can
+			if (this.dockerUpdate?.available) {
+				return this.$t('A newer Docker, {version}, exists in this machine\'s package sources. The system update does not install it, but Update Docker below does.', { version })
+			}
 			return this.$t(this.info.docker?.held
 				? 'A newer Docker, {version}, exists in this machine\'s package sources, but the package is on hold, so no update offers it.'
 				: 'A newer Docker, {version}, exists in this machine\'s package sources, but apt does not offer it for an update (a hold, or a dependency).', { version })
@@ -528,6 +539,10 @@ export default {
 		},
 		// Where the run is, when the core says (an older core does not: then the general sentence, which is
 		// true of the whole run, if less helpful)
+		dockerShowsReason() {
+			const code = this.dockerRefusal?.code
+			return !pick(DOCKER_REFUSALS, code) || DOCKER_REASON_CODES.includes(code)
+		},
 		dockerRunningText() {
 			if (this.dockerFinalizing) {
 				return this.$t('Finishing the Docker update...')

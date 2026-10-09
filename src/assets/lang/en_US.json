@@ -1016,5 +1016,8 @@
   "May stay stopped": "May stay stopped",
   "One running container restarts only when it fails, so it may stay stopped.": "One running container restarts only when it fails, so it may stay stopped.",
   "{n} running containers restart only when they fail, so they may stay stopped.": "{n} running containers restart only when they fail, so they may stay stopped.",
-  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "A container that restarts only when it fails may stay stopped: start it from the dashboard."
+  "A container that restarts only when it fails may stay stopped: start it from the dashboard.": "A container that restarts only when it fails may stay stopped: start it from the dashboard.",
+  "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.": "A newer Docker, {version}, exists in this machine's package sources. The system update does not install it, but Update Docker below does.",
+  "If you have restarted Docker since, there is nothing left to do.": "If you have restarted Docker since, there is nothing left to do.",
+  "If Docker works again since, you do not need this.": "If Docker works again since, you do not need this."
 }
