@@ -410,6 +410,8 @@ export default {
 			dockerLost: false,
 			dockerLostSince: 0,
 			dockerUnknown: false,
+			// a read of the Docker update's state has worked at least once
+			dockerStatusRead: false,
 			// set when the window is closed: an answer that comes after must not start anything
 			gone: false,
 		}
@@ -577,27 +579,44 @@ export default {
 			} catch {
 				// The package check below provides the useful error message.
 			}
-			try {
-				const response = await this.$api.sys.getDockerUpdateStatus()
-				if (this.gone) {
-					return
-				}
-				const status = response.data.data
-				if (status) {
-					this.dockerStatus = { ...emptyDockerStatus(), ...status }
-					if (this.dockerRunning) {
-						// apt is busy with it: a package check now would only wait behind it
-						this.startDockerPolling()
-						return
-					}
-				}
-			} catch {
-				// A core older than the Docker update has no such route; the check below says what matters.
+			// apt is busy with a run: a package check now would only wait behind it
+			if (this.followDockerStatus(await this.readDockerStatus()) || this.gone) {
+				return
 			}
 			this.checkPackages(true)
 		},
+		// The Docker update's state, or null: a core older than the Docker update has no such route, and
+		// a failed read is not an answer. Only a read that worked is remembered as one.
+		async readDockerStatus() {
+			try {
+				const status = (await this.$api.sys.getDockerUpdateStatus()).data.data
+				if (this.gone) {
+					return null
+				}
+				this.dockerStatusRead = true
+				return status ? { ...emptyDockerStatus(), ...status } : null
+			} catch {
+				return null
+			}
+		},
+		// shows what a read found; true when it is a run, which is then followed
+		followDockerStatus(status) {
+			if (!status) {
+				return false
+			}
+			this.dockerStatus = status
+			if (!this.dockerRunning) {
+				return false
+			}
+			this.startDockerPolling()
+			return true
+		},
 		async checkPackages(preserveStatus = false) {
 			this.stopPolling()
+			// "Check for updates" after a first read that failed is the second chance to see a run
+			if (preserveStatus !== true && !this.dockerStatusRead && (this.followDockerStatus(await this.readDockerStatus()) || this.gone)) {
+				return
+			}
 			this.isChecking = true
 			this.error = null
 			if (preserveStatus !== true) {
@@ -755,6 +774,16 @@ export default {
 				const refused = error?.response && (code || [409, 501].includes(error.response.status))
 				this.dockerConfirming = false
 				if (!refused) {
+					// A lost answer is not a refusal: the core may have started the unit. Ask before saying it did not.
+					const status = await this.readDockerStatus()
+					if (this.gone) {
+						return
+					}
+					if (['running', 'finalizing'].includes(status?.state)) {
+						this.followDockerStatus(status)
+						this.showTop('dockerJobTitle')
+						return
+					}
 					this.fail('Could not start the Docker update.', error)
 					return
 				}

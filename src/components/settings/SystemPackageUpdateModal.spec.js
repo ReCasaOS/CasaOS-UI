@@ -739,6 +739,97 @@ describe('starting the Docker update', () => {
 		expect(w.find('.docker-confirm').exists()).toBe(false)
 		expect(w.find('footer').exists()).toBe(true)
 	})
+
+	it('asks the core what became of the update before it says it did not start, when the answer was lost on the way', async () => {
+		vi.useFakeTimers()
+		try {
+			const timeout = Object.assign(new Error('timeout of 60000ms exceeded'), { code: 'ECONNABORTED' })
+			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(running))
+			const w = await openDocker({ startDockerUpdate: () => Promise.reject(timeout), getDockerUpdateStatus })
+			await openConfirmation(w)
+
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+
+			expect(w.text()).not.toContain('Could not start the Docker update.')
+			expect(w.find('.docker-job').text()).toContain('Updating Docker... apps are restarting')
+			expect(w.find('footer').exists()).toBe(false)
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+			// and it goes on following it
+			const reads = getDockerUpdateStatus.mock.calls.length
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(getDockerUpdateStatus.mock.calls.length).toBeGreaterThan(reads)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('says it could not start when the core shows no run after a lost answer, or cannot be asked', async () => {
+		for (const status of [answer(dockerIdle), answer(succeeded), () => Promise.reject(new Error('Network Error'))]) {
+			const getDockerUpdateStatus = vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockImplementation(status)
+			const w = await openDocker({ startDockerUpdate: () => Promise.reject(new Error('timeout of 60000ms exceeded')), getDockerUpdateStatus })
+			await openConfirmation(w)
+
+			await w.find('.docker-confirm-button').trigger('click')
+			await flushPromises()
+
+			expect(w.text()).toContain('Could not start the Docker update.')
+			expect(w.find('.docker-update-button').exists()).toBe(true)
+			expect(w.vm.dockerRunning).toBe(false)
+			w.unmount()
+		}
+	})
+
+	it('does not ask for the status after a refusal: the core answered', async () => {
+		const getDockerUpdateStatus = vi.fn(answer(dockerIdle))
+		const w = await openDocker({ startDockerUpdate: () => Promise.reject(refused(409, 'changed', 'a newer version appeared')), getDockerUpdateStatus })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(getDockerUpdateStatus).toHaveBeenCalledTimes(1)
+	})
+
+	it('reads the status again on "Check for updates" when the first read failed, and shows the run it finds', async () => {
+		vi.useFakeTimers()
+		try {
+			const getDockerUpdateStatus = vi.fn().mockRejectedValueOnce(new Error('Network Error')).mockResolvedValue(reply(running))
+			const getSystemPackages = vi.fn(dockerPackages())
+			const w = await openDocker({ getDockerUpdateStatus, getSystemPackages })
+			expect(w.find('.docker-job').exists()).toBe(false)
+			expect(getSystemPackages).toHaveBeenCalledTimes(1)
+
+			await w.findAll('footer button')[0].trigger('click')
+			await flushPromises()
+
+			expect(w.find('.docker-job').text()).toContain('Updating Docker... apps are restarting')
+			expect(w.find('footer').exists()).toBe(false)
+			// apt is busy with it: no check behind it
+			expect(getSystemPackages).toHaveBeenCalledTimes(1)
+			const reads = getDockerUpdateStatus.mock.calls.length
+			await vi.advanceTimersByTimeAsync(2000)
+			expect(getDockerUpdateStatus.mock.calls.length).toBeGreaterThan(reads)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('checks as usual on "Check for updates" when the first read of the status worked, or the core has no such route', async () => {
+		const missing = Object.assign(new Error('Request failed with status code 404'), { response: { status: 404 } })
+		for (const [first, reads] of [[answer(dockerIdle), 1], [() => Promise.reject(missing), 2]]) {
+			const getDockerUpdateStatus = vi.fn(first)
+			const getSystemPackages = vi.fn(dockerPackages())
+			const w = await openDocker({ getDockerUpdateStatus, getSystemPackages })
+
+			await w.findAll('footer button')[0].trigger('click')
+			await flushPromises()
+
+			expect(getDockerUpdateStatus).toHaveBeenCalledTimes(reads)
+			expect(getSystemPackages).toHaveBeenCalledTimes(2)
+			w.unmount()
+		}
+	})
 })
 
 describe('following the Docker update', () => {
