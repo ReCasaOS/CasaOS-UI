@@ -1,0 +1,12 @@
+ReCasaOS CasaOS-UI
+
+Changes made to this repository by the ReCasaOS maintainer since it was forked
+(the Vue 3 migration, the dark theme, the new components and the rest of that
+author's commits in this repository's history) are offered under the Apache
+License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+This does not apply to code written by IceWhale Technology, by alvins82 or by
+the authors of other forks before the changes above, whose licensing status is
+unchanged: this repository has never carried a LICENSE file, and this notice is
+not a licence for the repository as a whole. Contributions by other people are
+offered by their authors.
