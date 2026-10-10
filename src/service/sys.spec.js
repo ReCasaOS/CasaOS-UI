@@ -94,3 +94,14 @@ describe('docker update client', () => {
 		expect(sent().url).toBe('/v1/sys/docker/update/status')
 	})
 })
+
+describe('operating system client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads the support state from the core\'s v1 sys group, and sends nothing', async () => {
+		await sys.getOs()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os')
+		expect(sent().data).toBeUndefined()
+	})
+})
