@@ -80,4 +80,6 @@ The dashboard is the work of IceWhale and its contributors, and their copyright 
 
 This repository has never carried a LICENSE file — not upstream, not in any fork; `git log --all --diff-filter=A -- LICENSE` returns nothing. We have not added one, because we are not in a position to grant a licence its authors did not. CasaOS as a whole is published under the Apache License 2.0, and the built dashboard ships inside CasaOS releases under that licence, as upstream shipped it.
 
+The changes made here by the ReCasaOS maintainer since the fork (the Vue 3 migration, the dark theme, the new components and the rest of that author's commits) are offered under the Apache License 2.0; see [NOTICE](NOTICE). That statement covers only those changes: it does not reach IceWhale's code or alvins82's, and it is not a licence for the repository as a whole.
+
 CasaOS is a mark of IceWhale. This distribution uses the name to say what it is a release of, and nothing more.
