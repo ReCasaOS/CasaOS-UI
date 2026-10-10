@@ -1023,5 +1023,9 @@
   "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "A previous package operation was left unfinished on this machine. Finish it first, then check again.",
   "Checking whether the update started...": "Checking whether the update started...",
   "Installing Docker packages... your apps keep running.": "Installing Docker packages... your apps keep running.",
-  "Docker packages were updated.": "Docker packages were updated."
+  "Docker packages were updated.": "Docker packages were updated.",
+  "The update to Docker {to} could not be completed. There is no way back to Docker {from} that has been shown to work.": "The update to Docker {to} could not be completed. There is no way back to Docker {from} that has been shown to work.",
+  "The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.": "The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.",
+  "In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.": "In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.",
+  "Going back to the previous major version is not supported: in a test the containers did not start again.": "Going back to the previous major version is not supported: in a test the containers did not start again."
 }
