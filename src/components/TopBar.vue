@@ -468,6 +468,18 @@
 				</b-tooltip>
 			</div>
 			<!-- Terminal  End -->
+
+			<!-- System support badge Start: only when the system's security updates have ended or end soon -->
+			<button v-if="osSupportBadge"
+				:class="`is-${osSupportBadge.tone}`"
+				aria-haspopup="dialog"
+				class="os-support-badge ml-3"
+				type="button"
+				@click="showOsSupport">
+				<b-icon :icon="osSupportBadge.icon" size="is-small" />
+				<span>{{ $t(osSupportBadge.label) }}</span>
+			</button>
+			<!-- System support badge End -->
 		</div>
 
 		<div class="navbar-menu">
@@ -512,6 +524,8 @@ import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import OsSupportModal from './settings/OsSupportModal.vue'
+import { osBadge } from './settings/osSupport'
 import { mixin } from '@/mixins/mixin'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
@@ -570,6 +584,9 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			// The view of GET /v1/sys/os. null until the core answers: a core older than
+			// the feature, or a call that failed, shows no badge.
+			os: null,
 			// The window's two selects: whole hours, 00:00 to 23:00.
 			hours: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`),
 			deviceModel: '',
@@ -610,6 +627,10 @@ export default {
 		},
 		isRaspberryPi() {
 			return this.deviceModel.toLowerCase().includes('raspberry')
+		},
+		// The badge for the system's end of support, or null
+		osSupportBadge() {
+			return osBadge(this.os)
 		},
 		// The automatic update's state line. Paused is always the last attempt's
 		// version: its second failure is what paused it.
@@ -687,6 +708,7 @@ export default {
 		this.getTelemetry()
 		this.getAutoUpdate()
 		this.getAlerts()
+		this.getOs()
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
@@ -806,6 +828,39 @@ export default {
 				canCancel: ['escape'],
 				scroll: 'keep',
 				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(). Nothing is shown unless the core answers with a
+		// state that calls for a badge: an older core (404) and a failed call are silent.
+		getOs() {
+			this.$api.sys.getOs().then((res) => {
+				this.os = res.data.data
+			}).catch(() => {})
+		},
+
+		// Buefy's own autoFocus is off: it would move the focus to the window's frame,
+		// and the window puts it on its heading. The badge gets the focus back when the
+		// window closes, by Escape, a click outside or its Close button.
+		showOsSupport(event) {
+			const opener = event?.currentTarget
+			const back = () => opener?.focus?.()
+			this.$buefy.modal.open({
+				component: OsSupportModal,
+				hasModalCard: true,
+				trapFocus: true,
+				autoFocus: false,
+				ariaRole: 'dialog',
+				ariaModal: true,
+				ariaLabel: this.$t('Operating system'),
+				canCancel: ['escape', 'outside'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				props: {
+					os: this.os,
+				},
+				onCancel: back,
+				events: { close: back },
 			})
 		},
 
@@ -1371,6 +1426,51 @@ export default {
 
 	.icon {
 		color: var(--casa-text-secondary);
+	}
+}
+
+// The badge of a system whose security updates have ended or end soon: the text in
+// the ordinary text colour on a tint, so it reads at AA in both themes; the border
+// and the icon carry the colour (amber, then the app's red-orange for ended).
+.top-bar .os-support-badge {
+	--os-badge-signal: var(--casa-text-warning);
+
+	display: inline-flex;
+	align-items: center;
+	// the brand row stretches its children to the bar's height: a pill, not a block
+	align-self: center;
+	flex-shrink: 1;
+	gap: 0.25rem;
+	// The icons before it take up to 12rem on a phone: the text wraps to a second line
+	// rather than leave the screen (it is longer in French).
+	max-width: calc(100vw - 12.5rem);
+	min-width: 0;
+	min-height: 2rem;
+	padding: 0.125rem 0.625rem 0.125rem 0.375rem;
+	border: 1px solid var(--os-badge-signal);
+	border-radius: 9999px;
+	background: var(--casa-warning-tint);
+	color: var(--casa-text);
+	font-size: 0.75rem;
+	line-height: 1.1;
+	text-align: left;
+	white-space: normal;
+	cursor: pointer;
+
+	&.is-danger {
+		--os-badge-signal: var(--casa-text-attention);
+
+		background: var(--casa-danger-tint);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--os-badge-signal);
+		outline-offset: 2px;
+	}
+
+	.icon {
+		flex-shrink: 0;
+		color: var(--os-badge-signal);
 	}
 }
 
