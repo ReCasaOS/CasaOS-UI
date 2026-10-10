@@ -29,6 +29,7 @@
 
 				<b-message v-if="dockerPlan.major_jump" class="docker-major mt-3" size="is-small" type="is-danger">
 					{{ $t('This is a new major version of Docker, from {from} to {to}. Apps that talk to Docker directly may need an update of their own, and not every setup has been tested with it.', { from: dockerPlan.from, to: dockerPlan.to }) }}
+					<span class="docker-major-back is-block mt-2">{{ $t('Going back to the previous major version is not supported: in a test the containers did not start again.') }}</span>
 					<span v-if="dockerSocketContainers.length" class="docker-socket is-block mt-2">{{ $t('These containers talk to Docker directly and may need their own update: {names}.', { names: dockerSocketContainers.join(', ') }) }}</span>
 				</b-message>
 				<b-message v-if="dockerPlanRestarts" class="mt-3" size="is-small" type="is-warning">
@@ -138,7 +139,10 @@
 								<p class="mt-2 is-size-7">{{ $t('A half-finished install must be completed first. In a terminal on this machine:') }}</p>
 								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to finish a half-finished install')">{{ repairCommand }}</pre>
 							</template>
-							<template v-if="dockerStatus.rollback_command && !dockerNothingChanged">
+							<template v-if="dockerMajorJump">
+								<p v-if="dockerNoWayBack" class="docker-no-way-back mt-2 is-size-7">{{ dockerNoWayBack }}</p>
+							</template>
+							<template v-else-if="dockerStatus.rollback_command && !dockerNothingChanged">
 								<p class="mt-2 is-size-7">{{ $t('To put the previous version back, run this in a terminal on this machine.') }}</p>
 								<pre class="docker-command" tabindex="0" :aria-label="$t('Command to put the previous Docker version back')">{{ dockerStatus.rollback_command }}</pre>
 								<p class="mt-1 is-size-7 _has-text-gray">{{ $t('This has not been tested after a major version change.') }}</p>
@@ -416,6 +420,7 @@ function emptyDockerStatus() {
 		completed_at: '',
 		from: '',
 		to: '',
+		major_jump: false,
 		not_returned: [],
 		rollback_command: '',
 		log: '',
@@ -578,11 +583,33 @@ export default {
 		dockerQuiet() {
 			return this.dockerStatus.plan_restarts === false
 		},
-		// The core fills `to` only once the new Docker answers; the plan the person confirmed knows it from the start.
+		// The core says both from the start of a run; a run of an older core says `to` only once the new Docker
+		// answers, and the plan the person confirmed knows it from the start.
+		dockerFrom() {
+			return this.dockerStatus.from || this.dockerRunPlan?.from
+		},
+		dockerTo() {
+			return this.dockerStatus.to || this.dockerRunPlan?.to
+		},
 		dockerVersions() {
-			const from = this.dockerStatus.from || this.dockerRunPlan?.from
-			const to = this.dockerStatus.to || this.dockerRunPlan?.to
+			const { dockerFrom: from, dockerTo: to } = this
 			return from && to && from !== to ? `${from} → ${to}` : ''
+		},
+		// only a true is believed: an older core does not say, and a string is not a yes
+		dockerMajorJump() {
+			return this.dockerStatus.major_jump === true
+		},
+		// The way back that was tried after a major jump (the old packages) brought Docker back and not the containers:
+		// it is not offered, and this says so where it would have been. A failure that changed nothing has no way back to speak of.
+		dockerNoWayBack() {
+			if (!this.dockerMajorJump || this.dockerNothingChanged) {
+				return ''
+			}
+			const { dockerFrom: from, dockerTo: to } = this
+			const first = from && to
+				? this.$t('The update to Docker {to} could not be completed. There is no way back to Docker {from} that has been shown to work.', { from, to })
+				: this.$t('The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.')
+			return `${first} ${this.$t('In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.')}`
 		},
 		dockerHalfInstalled() {
 			return DOCKER_HALF_INSTALLED.includes(this.dockerStatus.error_code)
@@ -616,7 +643,7 @@ export default {
 			if (this.dockerRestartPending) {
 				result = this.$t('Docker is updated, but the old version is still running. Restart it to finish the update.')
 			} else if (this.dockerStatus.state === 'failed') {
-				result = [this.$t('The Docker update failed.'), this.dockerFailureText].filter(Boolean).join(' ')
+				result = [this.$t('The Docker update failed.'), this.dockerFailureText, this.dockerNoWayBack].filter(Boolean).join(' ')
 			}
 			return [age, result, this.dockerNotReturnedText]
 		},

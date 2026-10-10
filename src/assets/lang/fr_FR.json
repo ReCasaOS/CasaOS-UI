@@ -1023,5 +1023,9 @@
   "A previous package operation was left unfinished on this machine. Finish it first, then check again.": "Une opération précédente sur les paquets est restée inachevée sur cette machine. Terminez-la d'abord, puis vérifiez à nouveau.",
   "Checking whether the update started...": "Vérification du démarrage de la mise à jour...",
   "Installing Docker packages... your apps keep running.": "Installation des paquets Docker... vos apps continuent de tourner.",
-  "Docker packages were updated.": "Les paquets Docker ont été mis à jour."
+  "Docker packages were updated.": "Les paquets Docker ont été mis à jour.",
+  "The update to Docker {to} could not be completed. There is no way back to Docker {from} that has been shown to work.": "La mise à jour vers Docker {to} n'a pas pu être menée à son terme. Aucun moyen de revenir à Docker {from} n'a fait ses preuves.",
+  "The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.": "La mise à jour vers la nouvelle version majeure de Docker n'a pas pu être menée à son terme. Aucun moyen de revenir à la version majeure précédente n'a fait ses preuves.",
+  "In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.": "Lors d'un test, les paquets sont bien revenus en arrière et Docker a démarré, mais les conteneurs n'ont pas redémarré d'eux-mêmes. Vos images et vos volumes sont dans /var/lib/docker ; vérifiez journalctl -u docker et vos apps depuis le tableau de bord.",
+  "Going back to the previous major version is not supported: in a test the containers did not start again.": "Revenir à la version majeure précédente n'est pas pris en charge : lors d'un test, les conteneurs n'ont pas redémarré."
 }

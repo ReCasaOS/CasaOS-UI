@@ -468,6 +468,7 @@ describe('the confirmation before Docker is updated', () => {
 		expect(major.find('.docker-major').text()).toContain('This is a new major version of Docker, from 28.0.4 to 29.8.0.')
 		expect(major.find('.docker-major').text()).toContain('Apps that talk to Docker directly may need an update of their own')
 		expect(major.find('.docker-major').text()).toContain('not every setup has been tested')
+		expect(major.find('.docker-major .docker-major-back').text()).toBe('Going back to the previous major version is not supported: in a test the containers did not start again.')
 		major.unmount()
 
 		const minor = await openDocker({ getSystemPackages: dockerPackages({ from: '29.2.0', to: '29.8.0', major_jump: false }) })
@@ -475,6 +476,7 @@ describe('the confirmation before Docker is updated', () => {
 		expect(minor.find('.docker-confirm').text()).toContain('Docker 29.2.0 → 29.8.0')
 		expect(minor.find('.docker-major').exists()).toBe(false)
 		expect(minor.find('.docker-confirm').text()).not.toContain('new major version')
+		expect(minor.find('.docker-confirm').text()).not.toContain('Going back')
 		expect(minor.find('.docker-confirm').text()).toContain('every container stops until it is back')
 	})
 
@@ -1336,6 +1338,17 @@ describe('following the Docker update', () => {
 		expect(w.find('.docker-job .docker-versions').text()).toBe('28.0.4 → 29.8.0')
 	})
 
+	// the core says them from the start of a run now: what it says beats the plan that was frozen when the person confirmed
+	it('shows what Docker goes from and to while it runs, from what the core says before what was confirmed', async () => {
+		const w = await openDocker({ startDockerUpdate: answer(running), getDockerUpdateStatus: vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(dockerRun({ state: 'running', from: '28.0.5', to: '29.9.0', major_jump: true }))) })
+		await openConfirmation(w)
+
+		await w.find('.docker-confirm-button').trigger('click')
+		await flushPromises()
+
+		expect(w.find('.docker-job .docker-versions').text()).toBe('28.0.5 → 29.9.0')
+	})
+
 	it('forgets the plan when the run ends, so the next run found shows nothing of it', async () => {
 		vi.useFakeTimers()
 		try {
@@ -1572,6 +1585,88 @@ describe('what the Docker update ended with', () => {
 			const w = await ended({ error_code: 'install' })
 
 			expect(w.find('.docker-job').html()).not.toContain('dpkg --configure')
+		})
+	})
+
+	// the way back that was tried after a major jump brought the engine back and not the containers: it is not offered
+	describe('a major version that failed', () => {
+		const command = 'sudo apt-get install --allow-downgrades docker-ce=5:28.0.4-1~debian.11~bullseye containerd.io=1.7.29'
+		const repair = 'sudo dpkg --configure -a && sudo apt-get -f install'
+		const failedMajor = (extra = {}) => ended({ state: 'failed', outcome: 'failed', error_code: 'daemon', exit_code: 1, from: '28.0.4', to: '29.8.0', major_jump: true, rollback_command: command, log: 'E: something broke', ...extra })
+		const tail = 'In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.'
+		const wayBack = ['To put the previous version back', 'This has not been tested after a major version change.', 'If Docker works again since, you do not need this.']
+
+		it('offers no way back, and says there is none, with the versions the core names', async () => {
+			const w = await failedMajor()
+
+			const job = w.find('.docker-job')
+			expect(job.text()).toContain('The Docker update failed.')
+			expect(job.find('pre.docker-command').exists()).toBe(false)
+			expect(job.html()).not.toContain('--allow-downgrades')
+			for (const words of wayBack)
+				expect(job.text()).not.toContain(words)
+			expect(job.find('.docker-no-way-back').text()).toBe(`The update to Docker 29.8.0 could not be completed. There is no way back to Docker 28.0.4 that has been shown to work. ${tail}`)
+			expect(job.find('.package-log').text()).toBe('E: something broke')
+		})
+
+		it('says it without versions when the core names none, and does not hard-code a number', async () => {
+			for (const names of [{ from: '', to: '' }, { from: '28.0.4', to: '' }, { from: '', to: '29.8.0' }]) {
+				const w = await failedMajor(names)
+
+				expect(w.find('.docker-no-way-back').text()).toBe(`The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work. ${tail}`)
+				expect(w.find('.docker-job pre.docker-command').exists()).toBe(false)
+				w.unmount()
+			}
+		})
+
+		it.each(['install', 'no_result'])('after "%s": still says to finish what dpkg left, and still no way back', async (code) => {
+			const w = await failedMajor({ error_code: code })
+
+			const job = w.find('.docker-job')
+			expect(job.findAll('pre.docker-command').map(pre => pre.text())).toEqual([repair])
+			expect(job.html().indexOf('A half-finished install')).toBeLessThan(job.html().indexOf('docker-no-way-back'))
+			expect(job.find('.docker-no-way-back').exists()).toBe(true)
+			expect(job.html()).not.toContain('--allow-downgrades')
+		})
+
+		it.each(['start', 'guard', 'plan', 'download'])('after "%s", where nothing changed: there is nothing to go back from, so neither the way back nor the sentence', async (code) => {
+			const w = await failedMajor({ error_code: code })
+
+			expect(w.find('.docker-no-way-back').exists()).toBe(false)
+			expect(w.find('.docker-job pre.docker-command').exists()).toBe(false)
+		})
+
+		it('has the sentence spoken, since the command it replaces was not', async () => {
+			const w = await failedMajor()
+
+			expect(w.find('[role="status"]').text()).toContain('The update to Docker 29.8.0 could not be completed. There is no way back to Docker 28.0.4 that has been shown to work.')
+		})
+
+		it.each([
+			['a run of the same major version', { major_jump: false, from: '28.0.4', to: '28.1.0' }],
+			['a core that does not say', { major_jump: undefined }],
+			['a core that says it with a string', { major_jump: 'true' }],
+			['a core that says it with a number', { major_jump: 1 }],
+			['a core that says nothing useful', { major_jump: null }],
+		])('keeps the way back for %s', async (_, extra) => {
+			const w = await failedMajor(extra)
+
+			const job = w.find('.docker-job')
+			expect(job.find('.docker-no-way-back').exists()).toBe(false)
+			expect(job.find('pre.docker-command').text()).toBe(command)
+			expect(job.text()).toContain('To put the previous version back')
+			expect(job.text()).toContain('This has not been tested after a major version change.')
+		})
+
+		it('does not change what a success or a restart to do looks like', async () => {
+			const done = await ended({ major_jump: true })
+			expect(done.find('.docker-job').text()).toContain('Docker was updated to 29.8.0.')
+			expect(done.find('.docker-no-way-back').exists()).toBe(false)
+			done.unmount()
+
+			const pending = await ended({ major_jump: true, outcome: 'restart_pending' })
+			expect(pending.find('.docker-job pre.docker-command').text()).toBe('sudo systemctl restart docker')
+			expect(pending.find('.docker-no-way-back').exists()).toBe(false)
 		})
 	})
 
@@ -2126,6 +2221,10 @@ describe('the Docker update\'s words', () => {
 		'Checking whether the update started...',
 		'Installing Docker packages... your apps keep running.',
 		'Docker packages were updated.',
+		'The update to Docker {to} could not be completed. There is no way back to Docker {from} that has been shown to work.',
+		'The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.',
+		'In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.',
+		'Going back to the previous major version is not supported: in a test the containers did not start again.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
