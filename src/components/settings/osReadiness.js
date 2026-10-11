@@ -575,7 +575,7 @@ export const READINESS_ACTIONS = {
 // The names of the fields of `data` that a sentence did not use and that are listed beside it, in the owner's
 // words: the field's own name is shown for a name this table does not have (a newer core's). Every name the
 // core's checks send (pkg/osreadiness) is here, except the flags (true or false), which are never listed.
-const DETAIL_LABELS = {
+export const DETAIL_LABELS = {
 	id: 'Distribution',
 	version_id: 'Version',
 	kind: 'Kind',

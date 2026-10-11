@@ -336,8 +336,11 @@ describe('the icon of a row', () => {
 
 		const rows = wrapper.findAll(`.os-check.is-${severity}`)
 		expect(rows.length).toBeGreaterThan(0)
-		for (const row of rows)
+		for (const row of rows) {
 			expect(row.find('.os-check-icon').html()).toContain(icon)
+			// the icon is for the eye: the sentence and the word Passed are for the ear
+			expect(row.find('.os-check-icon').attributes('aria-hidden')).toBe('true')
+		}
 	})
 
 	it('is not the check mark for a blocker', async () => {
@@ -592,6 +595,23 @@ describe('copying the report', () => {
 
 		await wrapper.find('.os-readiness-copy').trigger('click')
 		await flushPromises()
+		expect(wrapper.find('textarea').exists()).toBe(false)
+	})
+
+	// the box that was open for the last answer is not the next answer's: it does not open by itself for it
+	it('closes the box of the text when another check is asked, and does not open it again for the next answer', async () => {
+		copy.mockRejectedValue(new Error('denied'))
+		await run()
+		await wrapper.find('.os-readiness-copy').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('textarea').exists()).toBe(true)
+
+		getOsReadiness.mockReturnValueOnce(answer(REPORT))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.find('.os-readiness-result').exists()).toBe(true)
+		expect(wrapper.find('.os-readiness-text').exists()).toBe(false)
 		expect(wrapper.find('textarea').exists()).toBe(false)
 	})
 

@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { FIX_BROKEN, READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, READINESS_OWN_SENTENCES, READINESS_REASONS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
+import { DETAIL_LABELS, FIX_BROKEN, READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, READINESS_OWN_SENTENCES, READINESS_REASONS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
+import en from '@/assets/lang/en_US.json'
+import fr from '@/assets/lang/fr_FR.json'
 
 // what the window says of a check that did not finish, under its title
 const DID_NOT_FINISH = 'ReCasaOS could not finish this check, so it counts it as a blocker until it can. Check again in a moment.'
@@ -1163,6 +1165,70 @@ describe('a core that says far too much', () => {
 
 	it('cuts a code that is far too long', () => {
 		expect(row(long, 'warn').code.length).toBe(80)
+	})
+})
+
+// [c16] What the language files must have, built from the tables themselves and not from READINESS_KEYS: the it.each of the
+// view's specs are generated from that list, so a sentence it forgot would shrink them and fail nothing.
+describe('every sentence of the tables', () => {
+	// the names of fields (`by`, `quiet`) are not sentences
+	const strings = value => typeof value === 'string'
+		? [value]
+		: Array.isArray(value)
+			? value.flatMap(strings)
+			: value && typeof value === 'object'
+				? Object.entries(value).filter(([name]) => name !== 'by' && name !== 'quiet').flatMap(([, item]) => strings(item))
+				: []
+	const reachable = [...new Set([
+		...strings(READINESS_CHECKS),
+		...strings(READINESS_ACTIONS),
+		...strings(READINESS_REASONS),
+		...strings(READINESS_OWN_SENTENCES),
+		...strings(DETAIL_LABELS),
+		FIX_BROKEN,
+	])]
+
+	it('is a good many, the variants and the labels of the fields among them', () => {
+		expect(reachable.length).toBeGreaterThan(200)
+		for (const key of [READINESS_CHECKS.bootloader.variants.systemd_boot, READINESS_CHECKS.smart_failed.variants.standby[0], READINESS_CHECKS.docker_origin.variants.snap, DETAIL_LABELS.free_mib, FIX_BROKEN, READINESS_REASONS.timeout, READINESS_OWN_SENTENCES.stale])
+			expect(reachable).toContain(key)
+	})
+
+	it('is all in READINESS_KEYS, the list the language files are checked by', () => {
+		expect(reachable.filter(key => !READINESS_KEYS.includes(key))).toEqual([])
+	})
+
+	it.each(reachable)('is said in English and in French: %s', (key) => {
+		expect(en[key]).toBe(key)
+		expect(fr[key]).toBeTruthy()
+		if (/\s/.test(key))
+			expect(fr[key]).not.toBe(key)
+		for (const param of key.match(/\{\w+\}/g) || [])
+			expect(fr[key]).toContain(param)
+		expect(fr[key]).not.toMatch(/\S[:?!;]/)
+		expect(fr[key]).not.toMatch(/[^\s%]%/)
+	})
+
+	// the sentences the view says of itself, which no table holds
+	it('has the state, the count of blockers, and the check that did not answer or is not known in READINESS_KEYS and in both languages', () => {
+		const views = [
+			readinessView(report([], { state: 'ready' })),
+			readinessView(report([check('uptime_long', 'warn')], { state: 'attention' })),
+			readinessView(report([check('held')], { state: 'blocked' })),
+			readinessView(report([check('held'), check('apps')], { state: 'blocked' })),
+			readinessView(report([check('held', 'warn')], { state: 'blocked' })),
+			readinessView(report([], { state: 'latest' })),
+			readinessView(report([], { state: 'unsupported' })),
+		]
+		const rows = [row('broken_dpkg', 'refuse', { unknown: true }), row('', 'refuse', {}, { title: '' })]
+		const said = [...views.map(view => view.summary.key), ...rows.flatMap(found => [found.sentence?.key, found.title.key])].filter(Boolean)
+
+		expect(said.length).toBeGreaterThanOrEqual(9)
+		for (const key of said) {
+			expect(READINESS_KEYS, key).toContain(key)
+			expect(en[key], key).toBe(key)
+			expect(fr[key], key).toBeTruthy()
+		}
 	})
 })
 
