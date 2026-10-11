@@ -1054,5 +1054,7 @@
   "I know the packages are on hold and I want to update anyway": "I know the packages are on hold and I want to update anyway",
   "The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.": "The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.",
   "The hold on Docker's packages is in place again.": "The hold on Docker's packages is in place again.",
-  "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.": "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold."
+  "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.": "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.",
+  "The update did not start: Docker's packages are on hold.": "The update did not start: Docker's packages are on hold.",
+  "Tick the box above to continue.": "Tick the box above to continue."
 }

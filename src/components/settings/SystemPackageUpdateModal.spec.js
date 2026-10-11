@@ -2161,7 +2161,7 @@ describe('the two updates do not run together', () => {
 	})
 })
 
-// the owner's own box: Docker's packages are on hold, and the update goes ahead on his word, the hold left as it is
+// the owner's own box: Docker's packages are on hold, and the update goes ahead on his word, the hold put back afterwards
 describe('updating Docker while its packages are on hold', () => {
 	const names = ['docker-ce', 'docker-ce-cli', 'containerd.io']
 	const onHold = { held: true, held_packages: names }
@@ -2260,7 +2260,7 @@ describe('updating Docker while its packages are on hold', () => {
 	})
 
 	describe('in the confirmation', () => {
-		it('shows a notice and a box to tick above the buttons, and the confirm button waits for the box', async () => {
+		it('shows a notice and a box to tick before the tables, and the confirm button waits for the box', async () => {
 			const { w } = await opened()
 
 			const view = w.find('.docker-confirm')
@@ -2272,10 +2272,11 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(label.classList.contains('docker-held-confirm')).toBe(true)
 			expect(box(w).element.checked).toBe(false)
 			expect(confirmButton(w).attributes('disabled')).toBeDefined()
-			// the last thing the person reads before the footer that holds the buttons
+			// before the tables, so that a small window shows it without scrolling past the lists; the buttons are in the footer
 			const html = w.html()
-			expect(html.indexOf('docker-subtitle')).toBeLessThan(html.indexOf('docker-held-notice'))
 			expect(html.indexOf('docker-held-notice')).toBeLessThan(html.indexOf('docker-held-confirm'))
+			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('docker-packages'))
+			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('docker-subtitle'))
 			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('<footer'))
 
 			await box(w).setValue(true)
@@ -2453,11 +2454,53 @@ describe('updating Docker while its packages are on hold', () => {
 				w.unmount()
 			}
 		})
+
+		describe('for a screen reader and a keyboard', () => {
+			const why = 'Tick the box above to continue.'
+
+			it('marks the box as required and describes it by the notice', async () => {
+				const { w } = await opened()
+
+				expect(box(w).attributes('aria-required')).toBe('true')
+				const described = document.getElementById(box(w).attributes('aria-describedby'))
+				expect(described).not.toBeNull()
+				expect(described.textContent.trim()).toBe(notice)
+				expect(w.find('.docker-held-notice').element.contains(described)).toBe(true)
+			})
+
+			it('says in the footer why the confirm button is disabled, only while the box is empty, and ties the sentence to the button', async () => {
+				const { w } = await opened()
+
+				const sentence = w.find('.docker-held-reason')
+				const id = sentence.attributes('id')
+				expect(sentence.text()).toBe(why)
+				expect(w.find('footer').element.contains(sentence.element)).toBe(true)
+				expect(id).toBeTruthy()
+				expect(document.getElementById(id)).toBe(sentence.element)
+				expect(confirmButton(w).attributes('aria-describedby')).toBe(id)
+
+				await box(w).setValue(true)
+				expect(w.find('.docker-held-reason').exists()).toBe(false)
+				expect(confirmButton(w).attributes('aria-describedby')).toBeUndefined()
+
+				await box(w).setValue(false)
+				expect(w.find('.docker-held-reason').text()).toBe(why)
+				expect(confirmButton(w).attributes('aria-describedby')).toBe(id)
+			})
+
+			it('has no such sentence for a plan that is not on hold', async () => {
+				const { w } = await opened({})
+
+				expect(w.find('.docker-held-reason').exists()).toBe(false)
+				expect(confirmButton(w).attributes('aria-describedby')).toBeUndefined()
+			})
+		})
 	})
 
 	describe('when the hold appears after the plan was shown', () => {
 		const reason = 'Docker\'s packages are on hold. Confirm that the update may go ahead anyway; the hold is put back afterwards.'
 		const heldNow = 'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.'
+		const notStarted = 'The update did not start: Docker\'s packages are on hold.'
 		const newPlan = 'cd'.repeat(32)
 
 		it('checks again, says so in its own words, and offers the update on the hold, with its notice', async () => {
@@ -2476,6 +2519,7 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(w.find('.docker-confirm').exists()).toBe(false)
 			expect(w.text()).toContain(heldNow)
 			expect(w.text()).not.toContain('a hold is deliberate')
+			expect(w.text()).not.toContain(notStarted)
 			expect(w.text()).not.toContain(reason)
 			expect(w.find('.docker-held').text()).toBe(lineSentence)
 			expect(w.find('.docker-update-button').exists()).toBe(true)
@@ -2515,6 +2559,7 @@ describe('updating Docker while its packages are on hold', () => {
 			const visible = w.text().replace(w.find('.docker-announcer').text(), '')
 			expect(visible.split('a hold is deliberate').length - 1).toBe(1)
 			expect(visible).not.toContain(heldNow)
+			expect(visible).not.toContain(notStarted)
 			expect(w.find('.docker-update-button').exists()).toBe(false)
 		})
 
@@ -2541,24 +2586,40 @@ describe('updating Docker while its packages are on hold', () => {
 
 				expect(w.text()).not.toContain(deliberate)
 				expect(w.text()).not.toContain(heldNow)
+				expect(w.text()).not.toContain(notStarted)
 				expect(w.find('.docker-update-button').exists()).toBe(false)
 				expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 			})
 
-			it('does not say it when the 409 names the packages and the new check finds no hold and offers the update', async () => {
-				const w = await refusedThenChecked(dockerPackages({ plan_id: newPlan }), { refusal_detail: names })
-
+			// nobody else would say that the update did not start: the confirmation is gone, and the new check has nothing to say of the hold
+			const saysOnlyThat = (w) => {
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(notStarted).length - 1).toBe(1)
+				expect(w.find('[role="status"]').text()).toContain(notStarted)
 				expect(w.text()).not.toContain(deliberate)
 				expect(w.text()).not.toContain(heldNow)
+				expect(w.text()).not.toContain(reason)
+			}
+
+			it('says only that the update did not start when the 409 names the packages and the new check finds no hold and offers the update', async () => {
+				const w = await refusedThenChecked(dockerPackages({ plan_id: newPlan }), { refusal_detail: names })
+
+				saysOnlyThat(w)
 				expect(w.find('.docker-update-button').exists()).toBe(true)
 			})
 
-			it('does not say it when the 409 names the packages and the new check cannot be read, and says that it could not', async () => {
+			it('says that the update did not start, and that the check failed, when the 409 names the packages and the new check cannot be read', async () => {
 				const w = await refusedThenChecked(() => Promise.reject(failure), { refusal_detail: names })
 
-				expect(w.text()).not.toContain(deliberate)
-				expect(w.text()).not.toContain(heldNow)
+				saysOnlyThat(w)
 				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+
+			it('says that the update did not start when the 409 names nothing and the new check says the packages are on hold but gives no reason', async () => {
+				const w = await refusedThenChecked(dockerPackages({ ...onHold, available: false, refusal: '' }), {})
+
+				saysOnlyThat(w)
+				expect(w.find('.docker-update-button').exists()).toBe(false)
 			})
 
 			it('keeps saying it, once, for a core that names nothing and whose new check cannot be read either', async () => {
@@ -2566,6 +2627,7 @@ describe('updating Docker while its packages are on hold', () => {
 
 				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
 				expect(visible.split(deliberate).length - 1).toBe(1)
+				expect(w.text()).not.toContain(notStarted)
 				expect(w.text()).toContain('Could not check for system package updates.')
 			})
 		})
@@ -2744,6 +2806,8 @@ describe('the Docker update\'s words', () => {
 		'The hold on Docker\'s packages is in place again.',
 		'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.',
 		'The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.',
+		'The update did not start: Docker\'s packages are on hold.',
+		'Tick the box above to continue.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
