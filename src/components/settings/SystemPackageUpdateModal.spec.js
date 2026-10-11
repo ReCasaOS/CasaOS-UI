@@ -2577,18 +2577,35 @@ describe('updating Docker while its packages are on hold', () => {
 				return w
 			}
 
-			it.each([
-				['the 409 names the packages and the new check refuses for another reason', { refusal_detail: names }, { available: false, refusal: 'disk' }],
-				['the 409 names nothing and the new check says the packages are on hold, but refuses for another reason', {}, { ...onHold, available: false, refusal: 'disk' }],
-				['the 409 names the packages and the new check says so too', { refusal_detail: names }, { ...onHold, available: false, refusal: 'disk' }],
-			])('does not say it when %s: the refusal of the check is what is said', async (_, more, update) => {
+			// The confirmation the person pressed a button in is gone, and the Docker line below is not in the live region: the refusal
+			// of the new check is said at the top, like the code of any other 409, and the Docker line does not repeat it.
+			const refusals = [
+				['disk', [], 'There is less than 1 GiB of free disk space where the update needs it, so ReCasaOS will not start it. Free some space and check again.'],
+				['apps', ['nextcloud', '', null, 'immich'], 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes. Busy apps: nextcloud, immich.'],
+			]
+			const afterAHold = [
+				['the 409 names the packages and the new check says nothing of a hold', { refusal_detail: names }, {}],
+				['the 409 names the packages and the new check says they are on hold', { refusal_detail: names }, onHold],
+				['the 409 names the packages and the new check says they are not on hold', { refusal_detail: names }, { held: false, held_packages: [] }],
+				['the 409 names nothing and the new check says the packages are on hold', {}, onHold],
+			]
+			const cases = afterAHold.flatMap(([about, more, held]) => refusals.map(([code, detail, sentence]) => {
+				return [`${about}, and refuses for "${code}"`, more, { ...held, available: false, refusal: code, refusal_detail: detail }, code, sentence]
+			}))
+
+			it.each(cases)('says the refusal of the new check, once, at the top and in the live region, when %s', async (_, more, update, code, sentence) => {
 				const w = await refusedThenChecked(dockerPackages(update), more)
 
+				expect(w.vm.dockerRefusal).toMatchObject({ code, reason: '' })
+				expect(w.find('[role="status"]').text()).toBe(sentence)
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(sentence).length - 1).toBe(1)
+				expect(w.find('.docker-refusal').exists()).toBe(false)
+				expect(w.find('.docker-confirm').exists()).toBe(false)
 				expect(w.text()).not.toContain(deliberate)
 				expect(w.text()).not.toContain(heldNow)
 				expect(w.text()).not.toContain(notStarted)
 				expect(w.find('.docker-update-button').exists()).toBe(false)
-				expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 			})
 
 			// nobody else would say that the update did not start: the confirmation is gone, and the new check has nothing to say of the hold
@@ -2622,13 +2639,31 @@ describe('updating Docker while its packages are on hold', () => {
 				expect(w.find('.docker-update-button').exists()).toBe(false)
 			})
 
-			it('keeps saying it, once, for a core that names nothing and whose new check cannot be read either', async () => {
-				const w = await refusedThenChecked(() => Promise.reject(failure), {})
+			it.each([
+				[{}],
+				[{ refusal_detail: [] }],
+				[{ refusal_detail: ['', null, 42] }],
+				[{ refusal_detail: 'docker-ce' }],
+			])('keeps saying it, once, for a core that names nothing (%j) and whose new check cannot be read either', async (more) => {
+				const w = await refusedThenChecked(() => Promise.reject(failure), more)
 
 				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
 				expect(visible.split(deliberate).length - 1).toBe(1)
 				expect(w.text()).not.toContain(notStarted)
 				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+
+			// the core cannot confirm a hold, so the sentence comes first, and what else the check refused is on the Docker line, in its own words
+			it.each([
+				[{}],
+				[{ held: false, held_packages: [] }],
+			])('says it first, and leaves the refusal of the check to the Docker line, for a core that names nothing and finds no hold (%j)', async (held) => {
+				const w = await refusedThenChecked(dockerPackages({ ...held, available: false, refusal: 'disk' }), {})
+
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(deliberate).length - 1).toBe(1)
+				expect(w.vm.dockerRefusal.code).toBe('held')
+				expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 			})
 		})
 
@@ -2849,6 +2884,13 @@ describe('the Docker update\'s words', () => {
 		expect(fr[notice]).toContain('Cette commande lève le blocage des paquets qu\'elle met à jour')
 		expect(fr[notice]).toContain('ReCasaOS le remet en place quand la mise à jour est terminée, et vous dit s\'il l\'a fait')
 		expect(fr['The hold on Docker\'s packages is in place again.']).toContain('de nouveau en place')
+		// the box and the notice are above the footer that carries this sentence (see "shows a notice and a box to tick before the tables")
+		expect(fr['Tick the box above to continue.']).toContain('ci-dessus')
+		expect(fr['Tick the box above to continue.']).not.toContain('ci-dessous')
+		// the box says that the person updates anyway, and that is the point of it
+		expect(fr['I know the packages are on hold and I want to update anyway']).toContain('quand même')
+		// the accent is part of the verb the person reads, and the command after it is typed as it is
+		expect(fr['The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.']).toContain('vérifiez avec apt-mark showhold.')
 		expect(fr['The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.']).toContain('un blocage posé ou levé')
 	})
 

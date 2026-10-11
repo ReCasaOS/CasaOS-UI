@@ -1053,14 +1053,17 @@ export default {
 					if (!this.gone) {
 						// A core that knows holds names the packages in its 409 and says `held` in its check, and for it the sentence
 						// of a hold that is deliberate and never overridden is false: it is for a core that can confirm no hold.
-						// What else the check refused is on the Docker line, in its own words. When it refused nothing and offers
-						// no update on a hold (it could not be read, or it finds no hold), nothing else says that the update did not
-						// start: the confirmation is gone.
+						// What else the check refused is said here too, in its own words (the Docker line below does not repeat it, and
+						// is not in the live region: the confirmation is gone, and nothing else would tell the person why). When it refused
+						// nothing and offers no update on a hold (it could not be read, or it finds no hold), nothing else says that the
+						// update did not start.
 						if (this.dockerHeld) {
 							this.dockerRefusal = { ...refusal, code: 'held_now' }
 						} else if (!refusal.names.length && this.dockerUpdate?.held !== true) {
 							this.dockerRefusal = refusal
-						} else if (!this.dockerUpdate?.refusal) {
+						} else if (this.dockerUpdate?.refusal) {
+							this.dockerRefusal = { code: this.dockerUpdate.refusal, reason: '', names: cleanNames(this.dockerUpdate.refusal_detail) }
+						} else {
 							this.dockerRefusal = { ...refusal, code: 'held_not_started' }
 						}
 					}
