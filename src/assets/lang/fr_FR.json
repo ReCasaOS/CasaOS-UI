@@ -987,7 +987,7 @@
   "An update is already running on this machine.": "Une mise à jour est déjà en cours sur cette machine.",
   "Another update or package operation is running on this machine. Try again when it is done.": "Une autre mise à jour ou opération sur les paquets est en cours sur cette machine. Réessayez quand elle sera terminée.",
   "Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes.": "Certaines apps sont occupées en ce moment, ou ReCasaOS n'a pas pu le vérifier. Réessayez dans quelques minutes.",
-  "A newer Docker appeared since this window was opened. Look at the new versions and confirm again.": "Un Docker plus récent est apparu depuis l'ouverture de cette fenêtre. Regardez les nouvelles versions et confirmez à nouveau.",
+  "The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.": "La mise à jour de Docker proposée a changé depuis l'ouverture de cette fenêtre (un Docker plus récent, ou un blocage posé ou levé). Regardez-la de nouveau et confirmez à nouveau.",
   "Docker has nothing to update.": "Docker n'a rien à mettre à jour.",
   "Busy apps: {names}.": "Apps occupées : {names}.",
   "ReCasaOS did not update Docker.": "ReCasaOS n'a pas mis Docker à jour.",
@@ -1290,5 +1290,13 @@
   "Not before": "Pas avant le",
   "Architecture": "Architecture",
   "Variant": "Variante",
-  "App names": "Noms des applications"
+  "App names": "Noms des applications",
+  "The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.": "Les paquets Docker sont bloqués ({names}). Le bouton « Mettre à jour Docker » les met à jour quand même, après votre confirmation, puis remet le blocage en place.",
+  "Docker's packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.": "Les paquets de Docker sont bloqués ({names}). Cette mise à jour a lieu quand même, comme le ferait la commande du terminal avec --allow-change-held-packages. Cette commande lève le blocage des paquets qu'elle met à jour : ReCasaOS le remet en place quand la mise à jour est terminée, et vous dit s'il l'a fait.",
+  "I know the packages are on hold and I want to update anyway": "Je sais que les paquets sont bloqués et je veux quand même faire la mise à jour",
+  "The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.": "Les paquets Docker ont été bloqués depuis la dernière vérification de cette fenêtre : la mise à jour n'a donc pas démarré. Elle peut encore avoir lieu si vous la confirmez : appuyez de nouveau sur « Mettre à jour Docker ».",
+  "The hold on Docker's packages is in place again.": "Le blocage des paquets de Docker est de nouveau en place.",
+  "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.": "Le blocage des paquets de Docker n'a pas pu être confirmé après la mise à jour : vérifiez avec apt-mark showhold.",
+  "The update did not start: Docker's packages are on hold.": "La mise à jour n'a pas démarré : les paquets de Docker sont bloqués.",
+  "Tick the box above to continue.": "Cochez la case ci-dessus pour continuer."
 }
