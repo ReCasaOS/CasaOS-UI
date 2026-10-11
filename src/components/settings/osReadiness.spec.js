@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, canCheckReadiness, formatSize, readinessView } from './osReadiness'
+import { READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
 
 // The codes of the readiness spec, pinned here: the dashboard, the CI proof and the copy of the
 // report the owner keeps all use them. A code added to the table without the spec, or dropped
@@ -43,12 +43,22 @@ describe('the table of checks', () => {
 	it.each(SPEC_CODES)('says %s in a label and in a sentence that needs no data', (code) => {
 		const entry = READINESS_CHECKS[code]
 		expect(entry.label).toBeTruthy()
-		for (const candidates of [entry.text, entry.refuse, entry.warn, entry.info].filter(Boolean).map(list => [].concat(list))) {
+		for (const candidates of [entry.text, entry.refuse, entry.warn, entry.info, ...Object.values(entry.variants ?? {})].filter(Boolean).map(list => [].concat(list))) {
 			// the last one is what is said when the core sent no data for it
 			expect(candidates.at(-1)).not.toMatch(/\{\w+\}/)
 			// and the ones before it use data the view knows how to read
 			for (const key of candidates)
-				expect(key.match(/\{(\w+)\}/g) || []).toSatisfy(found => found.every(p => ['names', 'arch', 'days', 'percent', 'date', 'free', 'needed', 'total'].includes(p.slice(1, -1))))
+				expect(key.match(/\{(\w+)\}/g) || []).toSatisfy(found => found.every(p => ['names', 'variant', 'arch', 'days', 'percent', 'date', 'free', 'needed', 'total'].includes(p.slice(1, -1))))
+		}
+	})
+
+	// a code that tells its causes apart by a field of the data has a sentence for each value it names, and
+	// an action that it has a rule for is one that exists
+	it('has its variants wherever it names the field that chooses them, and rules only for the actions that exist', () => {
+		for (const [code, entry] of Object.entries(READINESS_CHECKS)) {
+			expect(Boolean(entry.by), code).toBe(Boolean(entry.variants))
+			for (const action of Object.keys(entry.actions ?? {}))
+				expect(Object.keys(READINESS_ACTIONS), `${code}.${action}`).toContain(action)
 		}
 	})
 
@@ -284,7 +294,8 @@ describe('the data of the core\'s own checks', () => {
 
 	it('lists what says who the system is, and what it is, when the sentence has no place for it', () => {
 		expect(row('unsupported_os', 'refuse', { id: 'ubuntu', version_id: '20.04' }).details).toEqual([{ name: 'id', value: 'ubuntu' }, { name: 'version_id', value: '20.04' }])
-		expect(row('vendor_os', 'refuse', { variant: 'raspberrypi' }).details).toEqual([{ name: 'variant', value: 'raspberrypi' }])
+		// the variant is said by its name in the sentence
+		expect(row('vendor_os', 'refuse', { variant: 'raspberrypi' }).details).toEqual([])
 		expect(row('container', 'refuse', { kind: 'lxc' }).details).toEqual([{ name: 'kind', value: 'lxc' }])
 		expect(row('keyring_old', 'info', { minimum: '2023.3', installed: '2021.1.1' }).details).toEqual([{ name: 'minimum', value: '2023.3' }, { name: 'installed', value: '2021.1.1' }])
 	})
@@ -517,7 +528,12 @@ describe('the size', () => {
 		[0, 'en_us', '0 MiB'],
 		[1048576, 'en_us', '1 MiB'],
 		[314572800, 'en_us', '300 MiB'],
-		[1073741823, 'en_us', '1,024 MiB'],
+		// cut down to what is shown, never rounded up
+		[1073741823, 'en_us', '1,023 MiB'],
+		[1048575, 'en_us', '0 MiB'],
+		[2146435072, 'en_us', '1.9 GiB'],
+		[1610612735, 'en_us', '1.4 GiB'],
+		[2146435072, 'fr_fr', '1,9 Gio'],
 		[1073741824, 'en_us', '1 GiB'],
 		[1610612736, 'en_us', '1.5 GiB'],
 		[1610612736, 'fr_fr', '1,5 Gio'],
@@ -529,5 +545,443 @@ describe('the size', () => {
 
 	it.each([-1, Number.NaN, Infinity, '12', null, undefined, {}])('writes nothing for %j', (bytes) => {
 		expect(formatSize(bytes, 'en_us')).toBe('')
+	})
+})
+
+// What the final core (pkg/osreadiness/checks_*.go) really puts in `data`, code by code: a sample of each, as it
+// sends it. A flag (true or false) is left out by the window; any other field is said in the sentence or listed
+// with a label of its own, never as a raw word.
+const CORE_SAMPLES = {
+	unsupported_os: ['refuse', { id: 'ubuntu', version_id: '20.04' }],
+	vendor_os: ['refuse', { variant: 'truenas' }],
+	unproven_arch: ['refuse', { arch: 'arm64' }],
+	container: ['refuse', { kind: 'lxc' }],
+	virt_xen: ['refuse', {}],
+	no_systemd: ['refuse', {}],
+	not_root: ['refuse', {}],
+	busy: ['refuse', { source: 'unit', unit: 'apt-daily.service' }],
+	apps: ['refuse', { apps: ['jellyfin'], count: 1 }],
+	reboot_first: ['refuse', { restart_requested: true, running: '5.10.0-35-amd64', installed: '5.10.0-36-amd64' }],
+	uptime_long: ['warn', { days: 412 }],
+	broken_dpkg: ['refuse', { audit: true, updates: 2, apt_check: true }],
+	held: ['refuse', { packages: ['libc6', 'snapd'], count: 2 }],
+	held_docker: ['info', { packages: ['docker-ce'] }],
+	sources_cdrom: ['refuse', { files: ['local.list'] }],
+	sources_alias: ['refuse', { files: ['debian.list'], suites: ['stable'] }],
+	sources_pin: ['refuse', { files: ['preferences', 'pin:stable'], default_release: 'bullseye' }],
+	sources_proposed: ['refuse', { files: ['debian.list'], suites: ['bullseye-proposed-updates'] }],
+	sources_format: ['refuse', { files: ['odd.list'] }],
+	sources_third_party: ['warn', { files: ['docker.list'], hosts: ['download.docker.com'], docker_files: ['docker.list'] }],
+	sources_backports: ['info', { files: ['debian.list'] }],
+	sources_firmware: ['info', { non_free: true, packages: ['firmware-linux-nonfree'] }],
+	foreign_arch: ['refuse', { architectures: ['i386'], packages: ['libc6'], count: 1 }],
+	keyring_old: ['info', { minimum: '2021.1.1+deb11u1', installed: '2020.1' }],
+	openssh_old: ['info', { installed: '1:9.2p1-2', minimum: '1:9.2p1-2+deb12u7' }],
+	host_services: ['refuse', { services: ['postgresql'], packages: ['postgresql-13'] }],
+	dkms: ['warn', { modules: ['r8168'], network: false, disk: false, secure_boot: true, mok: true }],
+	merged_usr: ['refuse', { directories: ['/bin', '/lib'] }],
+	cgroup1: ['refuse', { filesystem: 'tmpfs' }],
+	bootloader: ['refuse', { kind: 'not_grub' }],
+	root_zfs: ['refuse', { dataset: 'rpool/ROOT/debian' }],
+	root_luks: ['refuse', { device: '/dev/sda3' }],
+	md_degraded: ['refuse', { arrays: ['md0'] }],
+	smart_failed: ['info', { checked: false, why: 'unavailable', disks: ['/dev/vda'] }],
+	log_on_tmpfs: ['refuse', { filesystem: 'tmpfs', mount_point: '/var/log' }],
+	disk_root: ['refuse', { path: '/', free_mib: 1200, needed_mib: 2048 }],
+	disk_archives: ['refuse', { path: '/var/cache/apt/archives', free_mib: 900, needed_mib: 1536 }],
+	disk_boot: ['refuse', { path: '/boot', free_mib: 120, needed_mib: 300 }],
+	ram: ['warn', { ram_mib: 1024, swap_mib: 512, total_mib: 1536, needed_mib: 2048 }],
+	power: ['refuse', { battery: 'BAT0', status: 'discharging', percent: 42 }],
+	fstab_unresolved: ['refuse', { mounts: ['/data'], count: 1 }],
+	fstab_network: ['warn', { mounts: ['/mnt/nas'], count: 1 }],
+	network_uplink: ['refuse', { interface: 'wlan0' }],
+	docker_swarm: ['refuse', {}],
+	docker_origin: ['refuse', { origin: 'snap' }],
+	docker_down: ['warn', {}],
+	docker_update_pending: ['warn', { package: 'docker-ce', installed: '5:28.0.4-1~debian.11~bullseye', candidate: '5:29.8.0-1~debian.11~bullseye' }],
+	containers_policy: ['warn', { names: ['jellyfin'], count: 1 }],
+	containers_ports: ['warn', { names: ['pihole'], ports: ['53'], host_network: false }],
+	backup_age: ['warn', { days: 31, last_backup: '2026-09-10' }],
+	hold_until: ['warn', { not_before: '2026-11-28' }],
+}
+
+describe('what the final core really sends', () => {
+	it.each(Object.entries(CORE_SAMPLES))('names every field of %s, in its sentence or with a label', (code, [severity, data]) => {
+		const found = row(code, severity, data)
+
+		expect(found.sentence).not.toBe(null)
+		for (const detail of found.details)
+			expect(detailLabel(detail.name), `${code}.${detail.name}`).toBeTruthy()
+	})
+
+	it('has a label for the names of the fields it lists, and none for a name it does not know', () => {
+		for (const name of ['free_mib', 'needed_mib', 'total_mib', 'ram_mib', 'swap_mib', 'count', 'path', 'status', 'battery'])
+			expect(detailLabel(name), name).toBeTruthy()
+		for (const name of ['from_the_future', 'constructor', '__proto__', '', undefined, 3])
+			expect(detailLabel(name), String(name)).toBe('')
+	})
+
+	// [c24] [c46]: the mount points are the names of the fstab rows, and the folders of merged_usr
+	it.each(['fstab_unresolved', 'fstab_network'])('names the mount points in the sentence of %s', (code) => {
+		const found = row(code, 'refuse', { mounts: ['/data', '/mnt/nas'], count: 2 })
+
+		expect(found.sentence.key).toContain('{names}')
+		expect(found.sentence.params).toEqual({ names: '/data, /mnt/nas' })
+		expect(found.details).toEqual([{ name: 'count', value: '2' }])
+	})
+
+	it('names the folders that are not links to /usr', () => {
+		const found = row('merged_usr', 'refuse', { directories: ['/bin', '/sbin'] })
+
+		expect(found.sentence.params).toEqual({ names: '/bin, /sbin' })
+		expect(found.details).toEqual([])
+	})
+
+	it('says Debian, and not Ubuntu, of the keys the core checks only for Debian', () => {
+		expect(READINESS_CHECKS.keyring_old.text).toMatch(/Debian/)
+		expect(READINESS_CHECKS.keyring_old.text).not.toMatch(/Ubuntu/)
+	})
+
+	it('says fstab_network for what the core looks at now: a network share mounted at start without _netdev or nofail', () => {
+		for (const sentence of [].concat(READINESS_CHECKS.fstab_network.text)) {
+			expect(sentence).toMatch(/_netdev/)
+			expect(sentence).toMatch(/nofail/)
+			expect(sentence).not.toMatch(/verif/i)
+		}
+	})
+})
+
+// [c25] [c44]: a /boot that is too small in total is not a /boot that lacks free room
+describe('disk_boot', () => {
+	const small = { path: '/boot', total_mib: 512, needed_mib: 700 }
+
+	it('says the filesystem is too small, with its size and the one needed, when the core sends no free room', () => {
+		const found = row('disk_boot', 'refuse', small)
+
+		expect(found.sentence.params).toEqual({ total: '512 MiB', needed: '700 MiB' })
+		expect(found.sentence.key).toContain('{total}')
+		expect(found.sentence.key).not.toContain('{free}')
+		expect(found.sentence.key).toMatch(/too small/)
+		expect(found.details).toEqual([{ name: 'path', value: '/boot' }])
+	})
+
+	it('says the sizes of the too small /boot in French', () => {
+		expect(row('disk_boot', 'refuse', small, {}, 'fr_fr').sentence.params).toEqual({ total: '512 Mio', needed: '700 Mio' })
+	})
+
+	it('still says the free room for the variant that lacks room', () => {
+		const found = row('disk_boot', 'refuse', { path: '/boot', free_mib: 120, needed_mib: 300 })
+
+		expect(found.sentence.params).toEqual({ free: '120 MiB', needed: '300 MiB' })
+		expect(found.sentence.key).toContain('{free}')
+	})
+
+	it('never tells the owner to free disk space for a /boot that is too small, whatever the core says', () => {
+		expect(row('disk_boot', 'refuse', small, { action: 'free_disk_space' }).action).toBe('')
+		expect(row('disk_boot', 'refuse', small, { action: 'none' }).action).toBe('')
+	})
+
+	it('tells him to free disk space when there is too little free room', () => {
+		expect(row('disk_boot', 'refuse', { path: '/boot', free_mib: 120, needed_mib: 300 }, { action: 'free_disk_space' }).action).toBe(READINESS_ACTIONS.free_disk_space)
+		// a core that sends no sizes at all says no room that could be freed
+		expect(row('disk_boot', 'refuse', {}, { action: 'free_disk_space' }).action).toBe('')
+	})
+
+	it('says the other disks the same way as before', () => {
+		expect(row('disk_root', 'refuse', { path: '/', free_mib: 1200, needed_mib: 2048 }, { action: 'free_disk_space' }).action).toBe(READINESS_ACTIONS.free_disk_space)
+	})
+})
+
+// [c26]: one sentence for each reason a disk was not looked at
+describe('smart_failed', () => {
+	const WHY = ['no_smartctl', 'unavailable', 'no_block_device', 'no_disk', 'standby', 'partial']
+
+	it('says a different sentence for each reason', () => {
+		const keys = WHY.map(why => row('smart_failed', 'info', { checked: false, why }).sentence.key)
+
+		expect(new Set(keys).size).toBe(WHY.length)
+	})
+
+	it('says the tool is not installed for no_smartctl, and only then', () => {
+		for (const why of WHY) {
+			const key = row('smart_failed', 'info', { checked: false, why }).sentence.key
+			expect(/smartctl/.test(key), why).toBe(why === 'no_smartctl')
+		}
+	})
+
+	it.each(['unavailable', 'standby'])('names the disks of %s', (why) => {
+		const found = row('smart_failed', 'info', { checked: false, why, disks: ['/dev/sda', '/dev/sdb'] })
+
+		expect(found.sentence.key).toContain('{names}')
+		expect(found.sentence.params).toEqual({ names: '/dev/sda, /dev/sdb' })
+		expect(found.details).toEqual([])
+	})
+
+	it.each(['unavailable', 'standby'])('says the sentence of %s without the disks when the core named none', (why) => {
+		const found = row('smart_failed', 'info', { checked: false, why })
+
+		expect(found.sentence.key).not.toContain('{names}')
+		expect(found.sentence.params).toEqual({})
+	})
+
+	it('says that a disk that sleeps was not woken, and that a stack that is too long was asked in part', () => {
+		expect(row('smart_failed', 'info', { why: 'standby' }).sentence.key).toMatch(/asleep/)
+		expect(row('smart_failed', 'info', { why: 'standby' }).sentence.key).toMatch(/not woken/)
+		expect(row('smart_failed', 'info', { why: 'partial' }).sentence.key).toMatch(/first 16/)
+	})
+
+	it('does not list the reason as a raw word', () => {
+		for (const why of WHY)
+			expect(row('smart_failed', 'info', { checked: false, why }).details, why).toEqual([])
+	})
+
+	it.each([undefined, 'from_the_future', '', 3, null, ['standby'], 'constructor'])('says that the health was not checked, without a reason, for the reason %j', (why) => {
+		const found = row('smart_failed', 'info', { checked: false, why })
+
+		expect(found.sentence.key).toMatch(/not checked/)
+		expect(found.sentence.key).not.toMatch(/smartctl/)
+	})
+
+	it('still says a disk that is failing, with its name', () => {
+		const found = row('smart_failed', 'refuse', { disks: ['/dev/sda'] })
+
+		expect(found.sentence.key).toMatch(/failing/)
+		expect(found.sentence.params).toEqual({ names: '/dev/sda' })
+	})
+})
+
+// [c28]: the battery sentence follows the status the core sends
+describe('power', () => {
+	it('says the machine runs on its battery only when it is discharging', () => {
+		const found = row('power', 'refuse', { battery: 'BAT0', status: 'discharging', percent: 42 })
+
+		expect(found.sentence.key).toMatch(/running on its battery/)
+		expect(found.sentence.params).toEqual({ percent: '42' })
+		expect(found.details).toEqual([{ name: 'battery', value: 'BAT0' }])
+	})
+
+	it.each(['charging', 'full', 'unknown', undefined])('does not say it runs on its battery when the status is %j, and says the charge is under what an upgrade needs', (status) => {
+		const found = row('power', 'refuse', { battery: 'BAT0', status, percent: 40 })
+
+		expect(found.sentence.key).not.toMatch(/running on its battery/)
+		expect(found.sentence.key).toMatch(/50%/)
+		expect(found.sentence.key).toMatch(/plugged in/)
+		expect(found.sentence.params).toEqual({ percent: '40' })
+	})
+
+	it('lists the status it did not use, and the battery', () => {
+		expect(row('power', 'refuse', { battery: 'BAT0', status: 'charging', percent: 40 }).details).toEqual([{ name: 'battery', value: 'BAT0' }, { name: 'status', value: 'charging' }])
+	})
+
+	it('says the discharging sentence without a charge when the core sent none', () => {
+		const found = row('power', 'refuse', { battery: 'BAT0', status: 'discharging' })
+
+		expect(found.sentence.key).toMatch(/running on its battery/)
+		expect(found.sentence.params).toEqual({})
+	})
+
+	it('says the plain sentence for a battery that says nothing', () => {
+		const found = row('power', 'refuse', {})
+
+		expect(found.sentence.key).not.toMatch(/running on its battery/)
+		expect(found.sentence.params).toEqual({})
+	})
+
+	// [d8] a charge that is not a percentage is not printed as one
+	it.each([250, 101, -1, 42.5, '40', null])('does not say a charge of %j', (percent) => {
+		const found = row('power', 'refuse', { status: 'discharging', percent })
+
+		expect(found.sentence.params).toEqual({})
+	})
+
+	it('says a charge of 100%', () => {
+		expect(row('power', 'refuse', { status: 'discharging', percent: 100 }).sentence.params).toEqual({ percent: '100' })
+	})
+})
+
+// [c29] [c42]: an action is said only where it fits the code
+describe('the action of a code', () => {
+	it.each(['foreign_arch', 'sources_third_party'])('says nothing of the package sources for %s, whatever the core says', (code) => {
+		expect(row(code, 'refuse', {}, { action: 'review_sources' }).action).toBe('')
+		expect(row(code, 'refuse', {}, { action: 'none' }).action).toBe('')
+	})
+
+	it.each(['sources_cdrom', 'sources_alias', 'sources_pin', 'sources_proposed', 'sources_format'])('says to review the package sources for %s', (code) => {
+		expect(row(code, 'refuse', {}, { action: 'review_sources' }).action).toBe(READINESS_ACTIONS.review_sources)
+	})
+
+	it('says the other actions of foreign_arch', () => {
+		expect(row('foreign_arch', 'refuse', {}, { action: 'restart_machine' }).action).toBe(READINESS_ACTIONS.restart_machine)
+	})
+})
+
+// [c30]: the ways the boot loader is not as the upgrade needs, systemd-boot among them, each said
+describe('bootloader', () => {
+	const KINDS = ['not_grub', 'systemd_boot', 'esp_not_mounted', 'esp_full', 'install_devices_empty', 'install_device_missing']
+
+	it('says a different sentence for each kind', () => {
+		const keys = KINDS.map(kind => row('bootloader', 'refuse', { kind }).sentence.key)
+
+		expect(new Set(keys).size).toBe(KINDS.length)
+	})
+
+	it('says what to run for the two kinds of a BIOS machine', () => {
+		expect(row('bootloader', 'refuse', { kind: 'install_devices_empty' }).sentence.key).toMatch(/dpkg-reconfigure grub-pc/)
+		expect(row('bootloader', 'refuse', { kind: 'install_device_missing' }).sentence.key).toMatch(/dpkg-reconfigure grub-pc/)
+	})
+
+	it('says systemd-boot by its name', () => {
+		expect(row('bootloader', 'refuse', { kind: 'systemd_boot' }).sentence.key).toMatch(/systemd-boot/)
+		expect(row('bootloader', 'refuse', { kind: 'not_grub' }).sentence.key).not.toMatch(/systemd-boot/)
+	})
+
+	it('says the room of the EFI partition, in the language asked', () => {
+		const data = { kind: 'esp_full', free_mib: 4, needed_mib: 16 }
+
+		expect(row('bootloader', 'refuse', data).sentence.params).toEqual({ free: '4 MiB', needed: '16 MiB' })
+		expect(row('bootloader', 'refuse', data, {}, 'fr_fr').sentence.params).toEqual({ free: '4 Mio', needed: '16 Mio' })
+		expect(row('bootloader', 'refuse', { kind: 'esp_full' }).sentence.params).toEqual({})
+	})
+
+	it('does not list the kind as a raw word, and keeps what the sentence does not use', () => {
+		expect(row('bootloader', 'refuse', { kind: 'esp_not_mounted' }).details).toEqual([])
+		expect(row('bootloader', 'refuse', { kind: 'install_device_missing', count: 2 }).details).toEqual([{ name: 'count', value: '2' }])
+	})
+
+	it.each([undefined, 'from_the_future', '', 3, null, 'constructor', '__proto__'])('says the one sentence of the code for the kind %j', (kind) => {
+		const found = row('bootloader', 'refuse', { kind })
+
+		expect(found.sentence).toEqual({ key: READINESS_CHECKS.bootloader.text, params: {} })
+	})
+})
+
+// the new data of the final core
+describe('a system the core calls a variant', () => {
+	it.each([
+		['raspberrypi', 'Raspberry Pi OS'],
+		['armbian', 'Armbian'],
+		['dietpi', 'DietPi'],
+		['proxmox', 'Proxmox VE'],
+		['proxmox_backup', 'Proxmox Backup Server'],
+		['proxmox_mail', 'Proxmox Mail Gateway'],
+		['openmediavault', 'OpenMediaVault'],
+		['truenas', 'TrueNAS'],
+	])('names %s as %s', (variant, name) => {
+		const found = row('vendor_os', 'refuse', { variant })
+
+		expect(found.sentence.params).toEqual({ variant: name })
+		expect(found.sentence.key).toContain('{variant}')
+		expect(found.details).toEqual([])
+	})
+
+	it.each(['from_the_future', '<b>x</b>', '', 3, null, 'constructor', '__proto__'])('says the plain sentence for the variant %j', (variant) => {
+		const found = row('vendor_os', 'refuse', { variant })
+
+		expect(found.sentence.params).toEqual({})
+		expect(found.sentence.key).not.toContain('{variant}')
+	})
+})
+
+describe('a date that is wrong', () => {
+	it('says the date of the machine is wrong, and not that there is no upgrade from this release', () => {
+		const found = row('unsupported_os', 'refuse', { unknown: true, reason: 'clock', id: 'debian', version_id: '11' }, { detail: 'The date of this machine is wrong: set it.' })
+
+		expect(found.unknown).toBe(true)
+		expect(found.sentence.key).toMatch(/date of this machine is wrong/)
+		expect(found.sentence.key).not.toMatch(/could not finish/)
+		expect(found.reason).toBe('')
+		expect(found.title).toEqual({ key: READINESS_CHECKS.unsupported_os.label })
+	})
+
+	it.each(['timeout', 'tool_missing', 'unreadable', 'failed', undefined, 'CLOCK'])('says the check could not finish for the reason %j', (reason) => {
+		const found = row('unsupported_os', 'refuse', { unknown: true, reason }, { detail: 'the core says' })
+
+		expect(found.sentence.key).toMatch(/could not finish this check/)
+		expect(found.reason).toBe('the core says')
+	})
+
+	it('is a blocker', () => {
+		const view = readinessView(report([check('unsupported_os', 'refuse', { unknown: true, reason: 'clock' })], { state: 'blocked' }))
+
+		expect(view.blockers).toHaveLength(1)
+		expect(view.summary).toEqual({ key: 'Not ready: 1 blocker', params: {} })
+	})
+})
+
+describe('docker_update_pending', () => {
+	const data = { package: 'docker-ce', installed: '5:28.0.4-1~debian.11~bullseye', candidate: '5:29.8.0-1~debian.11~bullseye' }
+
+	it('tells him to update Docker first when its packages are not on hold', () => {
+		const found = row('docker_update_pending', 'warn', data)
+
+		expect(found.sentence.key).toMatch(/Update Docker first/)
+		expect(found.details.map(detail => detail.name)).toEqual(['package', 'installed', 'candidate'])
+	})
+
+	it('says, when its packages are on hold, that a newer Docker exists, that the upgrade leaves it as it is, and where to update it', () => {
+		const found = row('docker_update_pending', 'info', { ...data, held: true })
+
+		expect(found.sentence.key).toMatch(/newer Docker exists/)
+		expect(found.sentence.key).toMatch(/on hold/)
+		expect(found.sentence.key).toMatch(/leaves Docker as it is/)
+		expect(found.sentence.key).toMatch(/System packages window/)
+		expect(found.sentence.key).toMatch(/before or after the upgrade/)
+		expect(found.sentence.key).not.toMatch(/Update Docker first/)
+		expect(found.details.map(detail => detail.name)).toEqual(['package', 'installed', 'candidate'])
+	})
+
+	it('is a note, not a blocker and not a warning', () => {
+		const view = readinessView(report([check('docker_update_pending', 'info', { ...data, held: true })], { state: 'ready' }))
+
+		expect(view.notes.map(r => r.code)).toEqual(['docker_update_pending'])
+		expect(view.state).toBe('ready')
+	})
+
+	it('says the sentence of a warning for a held that is not true', () => {
+		for (const held of [false, 'yes', 1, null])
+			expect(row('docker_update_pending', 'warn', { ...data, held }).sentence.key).toMatch(/Update Docker first/)
+	})
+})
+
+// [d8]: what the window cuts
+describe('a core that says far too much', () => {
+	const long = 'x'.repeat(10000)
+
+	it('cuts the title and the detail of a code it does not know', () => {
+		const found = row('from_the_future', 'warn', {}, { title: long, detail: long })
+
+		expect(found.title.text.length).toBe(300)
+		expect(found.sentence.text.length).toBe(300)
+	})
+
+	it('cuts the reason of a check that did not answer', () => {
+		const found = row('broken_dpkg', 'refuse', { unknown: true }, { detail: long })
+
+		expect(found.reason.length).toBe(300)
+	})
+
+	it('cuts a code that is far too long', () => {
+		expect(row(long, 'warn').code.length).toBe(80)
+	})
+})
+
+describe('the size, cut down to what is said', () => {
+	it.each([
+		['disk_root', { free_mib: 2047, needed_mib: 2048 }, { free: '1.9 GiB', needed: '2 GiB' }],
+		['disk_archives', { free_mib: 1535, needed_mib: 1536 }, { free: '1.4 GiB', needed: '1.5 GiB' }],
+		['disk_boot', { free_mib: 299, needed_mib: 300 }, { free: '299 MiB', needed: '300 MiB' }],
+	])('never says the same number for what is lacking and what is needed (%s)', (code, data, params) => {
+		const found = row(code, 'refuse', data)
+
+		expect(found.sentence.params).toEqual(params)
+		expect(found.sentence.params.free).not.toBe(found.sentence.params.needed)
+	})
+
+	it('says the memory that is just under the 2 GiB it warns under as under it', () => {
+		expect(row('ram', 'warn', { total_mib: 2047 }).sentence.params).toEqual({ total: '1.9 GiB' })
+	})
+
+	it('says a size of exactly the threshold as the threshold', () => {
+		expect(row('disk_root', 'refuse', { free_mib: 2048, needed_mib: 2048 }).sentence.params).toEqual({ free: '2 GiB', needed: '2 GiB' })
 	})
 })
