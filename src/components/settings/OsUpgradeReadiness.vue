@@ -82,7 +82,7 @@
 
 <script>
 import copy from 'clipboard-copy'
-import { readinessView } from './osReadiness'
+import { DETAIL_FORMAT, detailLabel, readinessView } from './osReadiness'
 
 // What each kind of row shows next to it: the icon is for the eye, the group's heading and
 // the word "Passed" are for the ear.
@@ -150,9 +150,13 @@ export default {
 		this.gone = true
 	},
 	methods: {
-		// the core's other fields of a check, as `name: value · name: value`
+		// the core's other fields of a check, as `name: value · name: value`, each name in the owner's words
+		// (the field's own name for one this window has no word for)
 		detailsText(row) {
-			return row.details.map(detail => `${detail.name}: ${detail.value}`).join(' · ')
+			return row.details.map((detail) => {
+				const label = detailLabel(detail.name)
+				return this.$t(DETAIL_FORMAT, { name: label ? this.$t(label) : detail.name, value: detail.value })
+			}).join(' · ')
 		},
 
 		// a message of the view: a language-file key with its data, or the core's own text

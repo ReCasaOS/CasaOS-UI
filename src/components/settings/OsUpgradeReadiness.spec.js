@@ -275,13 +275,13 @@ describe('the answer', () => {
 		const rows = wrapper.findAll('.os-check')
 		expect(rows[0].find('.os-check-sentence').text()).toMatch(/^Some packages are on hold\. A hold/)
 		// the one number the core did send is not lost
-		expect(rows[1].find('.os-check-details').text()).toBe('free_mib: 120')
+		expect(rows[1].find('.os-check-details').text()).toBe('Free (MiB): 120')
 	})
 
 	it('lists the other fields of the core on one line, in its order', async () => {
 		await run({ ...REPORT, checks: [check('sources_third_party', 'warn', { files: ['docker.list'], hosts: ['download.docker.com'], docker_files: ['docker.list'] })] })
 
-		expect(wrapper.find('.os-check-details').text()).toBe('hosts: download.docker.com · docker_files: docker.list')
+		expect(wrapper.find('.os-check-details').text()).toBe('Hosts: download.docker.com · Docker\'s files: docker.list')
 	})
 
 	it('shows the sizes in the sentence', async () => {
@@ -290,6 +290,83 @@ describe('the answer', () => {
 		expect(wrapper.find('.os-check-sentence').text()).toBe('The /boot partition has only 120 MiB free, and the upgrade needs at least 300 MiB. The new kernel could not be installed, and the machine might not start.')
 		expect(wrapper.find('.os-check-details').exists()).toBe(false)
 		expect(wrapper.find('.os-check-action').text()).toBe('Free some disk space, then check again.')
+	})
+})
+
+describe('the fields of a check, in the owner\'s words', () => {
+	it('names each field by its label, the name of one it has no label for as it is, and keeps the markup of a value as text', async () => {
+		await run({ ...REPORT, checks: [check('from_the_future', 'warn', { count: 2, path: '/boot', other: '<b>x</b>' })] })
+
+		expect(wrapper.find('.os-check-details').text()).toBe('Number: 2 · Path: /boot · other: <b>x</b>')
+		expect(wrapper.find('.os-check-details b').exists()).toBe(false)
+	})
+
+	it('names them in French, with the space French sets before a colon', async () => {
+		i18n.global.locale = 'fr_fr'
+		await run({ ...REPORT, checks: [check('disk_boot', 'refuse', { path: '/boot', free_mib: 120 }), check('from_the_future', 'warn', { other: 'x' })] }, { props: { locale: 'fr_fr' } })
+		const details = wrapper.findAll('.os-check-details').map(detail => detail.text())
+		expect(details).toEqual(['Chemin : /boot · Libre (Mio) : 120', 'other : x'])
+	})
+})
+
+// the icon is what backs the colour up: a blocker never has the check mark of a check that passed
+describe('the icon of a row', () => {
+	it.each([
+		['refuse', 'mdi-alert-circle-outline'],
+		['warn', 'mdi-alert-outline'],
+		['info', 'mdi-information-outline'],
+		['ok', 'mdi-check-circle-outline'],
+	])('is %s for %s', async (severity, icon) => {
+		await run({ state: 'blocked', checks: [check('held', 'refuse'), check('uptime_long', severity === 'refuse' ? 'refuse' : severity)] })
+
+		const rows = wrapper.findAll(`.os-check.is-${severity}`)
+		expect(rows.length).toBeGreaterThan(0)
+		for (const row of rows)
+			expect(row.find('.os-check-icon').html()).toContain(icon)
+	})
+
+	it('is not the check mark for a blocker', async () => {
+		await run({ state: 'blocked', checks: [check('held', 'refuse')] })
+
+		expect(wrapper.find('.os-check.is-refuse .os-check-icon').html()).not.toContain('check-circle')
+	})
+})
+
+describe('rows of the final core', () => {
+	it('says the date of the machine is wrong, as a blocker, and only that', async () => {
+		await run({ state: 'blocked', checks: [check('unsupported_os', 'refuse', { unknown: true, reason: 'clock', id: 'debian', version_id: '11' }, { detail: 'The date of this machine is wrong: set it.' })] })
+
+		expect(wrapper.find('.os-readiness-result').text()).toBe('Not ready: 1 blocker')
+		expect(wrapper.find('.os-check-title').text()).toBe('Operating system version')
+		expect(wrapper.find('.os-check-sentence').text()).toMatch(/^The date of this machine is wrong: it is before the day/)
+		expect(wrapper.find('.os-check-reason').exists()).toBe(false)
+		expect(wrapper.text()).not.toContain('There is no upgrade')
+	})
+
+	it('says a newer Docker whose packages are on hold as a note, with where it can be updated', async () => {
+		await run({ state: 'ready', checks: [check('docker_update_pending', 'info', { package: 'docker-ce', installed: '5:28.0.4-1', candidate: '5:29.8.0-1', held: true })] })
+
+		expect(wrapper.find('.os-readiness-result').text()).toBe('Ready')
+		expect(wrapper.find('.os-readiness-group.is-warnings').exists()).toBe(false)
+		expect(wrapper.find('.os-readiness-group.is-others summary').text()).toBe('Other checks (passed: 0, notes: 1)')
+		expect(wrapper.find('.os-readiness-group.is-others .os-check-sentence').text()).toMatch(/^A newer Docker exists, but Docker's packages are on hold\./)
+		expect(wrapper.find('.os-readiness-group.is-others .os-check-details').text()).toBe('Package: docker-ce · Installed: 5:28.0.4-1 · Version on offer: 5:29.8.0-1')
+	})
+
+	it('names the mount point of a disk of fstab that is not there, and says nothing of the package sources for a foreign architecture', async () => {
+		await run({ state: 'blocked', checks: [check('fstab_unresolved', 'refuse', { mounts: ['/data'], count: 1 }), check('foreign_arch', 'refuse', { architectures: ['i386'], packages: ['libc6'], count: 1 }, { action: 'review_sources' })] })
+
+		const rows = wrapper.findAll('.os-check')
+		expect(rows[0].find('.os-check-sentence').text()).toMatch(/^A disk or partition listed in \/etc\/fstab cannot be found.*\(\/data\)\./)
+		expect(rows[0].find('.os-check-details').text()).toBe('Number: 1')
+		expect(rows[1].find('.os-check-action').exists()).toBe(false)
+	})
+
+	it('says a /boot that is too small, with its sizes, and no action', async () => {
+		await run({ state: 'blocked', checks: [check('disk_boot', 'refuse', { path: '/boot', total_mib: 512, needed_mib: 700 })] })
+
+		expect(wrapper.find('.os-check-sentence').text()).toMatch(/too small for the upgrade to Debian 13: its filesystem is only 512 MiB.*at least 700 MiB/)
+		expect(wrapper.find('.os-check-action').exists()).toBe(false)
 	})
 })
 
@@ -314,7 +391,8 @@ describe('what the window does not know', () => {
 		const rows = wrapper.findAll('.os-readiness-group.is-blockers .os-check')
 		expect(rows[0].find('.os-check-title').text()).toBe('title of from_the_future')
 		expect(rows[0].find('.os-check-sentence').text()).toBe('detail of from_the_future')
-		expect(rows[0].find('.os-check-details').text()).toBe('packages: libc6')
+		// a field this window has no word for is shown by its own name
+		expect(rows[0].find('.os-check-details').text()).toBe('Packages: libc6')
 		// an action it has no sentence for says nothing
 		expect(rows[0].find('.os-check-action').exists()).toBe(false)
 		// a severity it does not know is shown with the warnings, never hidden
@@ -349,6 +427,7 @@ describe('when the call fails', () => {
 	it.each([
 		['a core that has no such route', { response: { status: 404 } }, 'This version of ReCasaOS cannot run this check yet. Update ReCasaOS, then try again.'],
 		['a call that took too long', { code: 'ECONNABORTED' }, 'The check took too long. Try again.'],
+		['a connection that timed out', { code: 'ETIMEDOUT' }, 'The check took too long. Try again.'],
 		['a server error', { response: { status: 500 } }, 'The check could not be completed. Try again.'],
 		['no network', {}, 'The check could not be completed. Try again.'],
 	])('says so for %s, in the announcing place, and lets the owner try again', async (_, error, sentence) => {
