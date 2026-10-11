@@ -2533,7 +2533,7 @@ describe('updating Docker while its packages are on hold', () => {
 			['a failure that changed nothing', { state: 'failed', outcome: 'failed', error_code: 'download', exit_code: 1 }],
 		]
 
-		it.each(results)('says the hold is still in place after %s, and nothing else of it', async (_, extra) => {
+		it.each(results)('says the hold is in place again after %s, and nothing else of it', async (_, extra) => {
 			const w = await ended({ ...extra, held: true, held_packages: names, holds_kept: true })
 
 			expect(w.find('.docker-hold-result').text()).toBe(kept)
