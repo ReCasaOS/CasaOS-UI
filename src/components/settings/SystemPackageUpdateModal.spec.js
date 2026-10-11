@@ -2239,6 +2239,24 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(w.find('.docker-held').text()).toContain('(<b>evil</b>)')
 			expect(w.find('.docker-held b').exists()).toBe(false)
 		})
+
+		// the core ends the command with the apt-mark that puts the hold back: the page prints what it is given, and a name in it is text
+		it('prints the manual command as the core gives it, the apt-mark that puts the hold back included', async () => {
+			const command = 'sudo apt-get update && sudo apt-get install --only-upgrade --allow-change-held-packages docker-ce docker-ce-cli containerd.io && sudo apt-mark hold containerd.io docker-ce docker-ce-cli'
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold, { manual_command: command }) })
+
+			expect(w.find('.docker-line pre.docker-command').text()).toBe(command)
+		})
+
+		it('shows a name in the manual command as text, never as markup', async () => {
+			const command = 'sudo apt-get install --allow-change-held-packages <img src=x onerror=1> && sudo apt-mark hold <b>x</b>'
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold, { manual_command: command }) })
+
+			const pre = w.find('.docker-line pre.docker-command')
+			expect(pre.text()).toBe(command)
+			expect(pre.find('img').exists()).toBe(false)
+			expect(pre.find('b').exists()).toBe(false)
+		})
 	})
 
 	describe('in the confirmation', () => {
@@ -2248,6 +2266,10 @@ describe('updating Docker while its packages are on hold', () => {
 			const view = w.find('.docker-confirm')
 			expect(view.find('.docker-held-notice').text()).toBe(notice)
 			expect(view.find('.docker-held-confirm').text()).toBe(tick)
+			// a real label around the box: its words are the box's name, and a click on them ticks it
+			const label = box(w).element.closest('label')
+			expect(label).not.toBeNull()
+			expect(label.classList.contains('docker-held-confirm')).toBe(true)
 			expect(box(w).element.checked).toBe(false)
 			expect(confirmButton(w).attributes('disabled')).toBeDefined()
 			// the last thing the person reads before the footer that holds the buttons
@@ -2387,6 +2409,49 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(w.find('.docker-held-notice').exists()).toBe(false)
 			await confirm(w)
 			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+		})
+
+		it.each([
+			['other names', { held: true, held_packages: ['containerd.io'] }],
+			['no hold any more', { held: false, held_packages: [] }],
+		])('keeps the names of the plan in its notice when a check lands meanwhile with %s', async (_, later) => {
+			const { w, startDockerUpdate } = await opened()
+
+			w.vm.info = { ...w.vm.info, docker: { ...w.vm.info.docker, update: { ...w.vm.info.docker.update, ...later } } }
+			await flushPromises()
+
+			expect(w.find('.docker-held-notice').text()).toBe(notice)
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(startDockerUpdate.mock.calls[0][0]).toStrictEqual({ plan_id: planId, allow_held: true })
+		})
+
+		it('sends the plan once when the confirm button is pressed twice', async () => {
+			const startDockerUpdate = vi.fn(pending)
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold), startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+
+			await confirmButton(w).trigger('click')
+			await confirmButton(w).trigger('click')
+			await flushPromises()
+
+			expect(startDockerUpdate).toHaveBeenCalledTimes(1)
+		})
+
+		it('names only the usable names of the plan: no empty entry, nothing that is not a string, twenty at most, and a list that is not a list names nothing', async () => {
+			const many = Array.from({ length: 25 }, (_, index) => `pkg-${index}`)
+			for (const [list, shown] of [
+				[['docker-ce', '', null, 42, { name: 'x' }, 'containerd.io'], '(docker-ce, containerd.io)'],
+				['docker-ce', '()'],
+				[many, `(${many.slice(0, 20).join(', ')})`],
+			]) {
+				const { w } = await opened({ held: true, held_packages: list })
+
+				expect(w.find('.docker-held-notice').text()).toContain(shown)
+				expect(box(w).exists()).toBe(true)
+				w.unmount()
+			}
 		})
 	})
 
@@ -2581,6 +2646,29 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(going.find('.docker-hold-result').exists()).toBe(false)
 			expect(going.find('[role="status"]').text()).not.toContain('hold')
 		})
+
+		// the core ends the way back with the apt-mark that puts the hold back: the page prints what it is given, and a name in it is text
+		describe('the way back of a run that went ahead of the hold', () => {
+			const command = 'sudo apt-get install --allow-downgrades --allow-change-held-packages containerd.io=1.7.27-1 docker-ce=5:28.0.4-1~debian.11~bullseye docker-ce-cli=5:28.0.4-1~debian.11~bullseye && sudo apt-mark hold containerd.io docker-ce docker-ce-cli'
+			const failed = rollback => ended({ state: 'failed', outcome: 'failed', error_code: 'install', exit_code: 1, held: true, held_packages: names, holds_kept: true, rollback_command: rollback })
+			const commandsOf = w => w.findAll('.docker-job pre.docker-command').map(pre => pre.text())
+
+			it('prints it as the core gives it, the apt-mark that puts the hold back included', async () => {
+				const w = await failed(command)
+
+				expect(commandsOf(w).at(-1)).toBe(command)
+				expect(w.find('.docker-hold-result').text()).toBe(kept)
+			})
+
+			it('shows a name in it as text, never as markup', async () => {
+				const evil = 'sudo apt-get install <img src=x onerror=1> && sudo apt-mark hold <b>x</b>'
+				const w = await failed(evil)
+
+				expect(commandsOf(w).at(-1)).toBe(evil)
+				expect(w.find('.docker-job pre.docker-command img').exists()).toBe(false)
+				expect(w.find('.docker-job pre.docker-command b').exists()).toBe(false)
+			})
+		})
 	})
 })
 
@@ -2674,6 +2762,17 @@ describe('the Docker update\'s words', () => {
 		for (const key of said) {
 			expect(key).not.toMatch(/leaves the hold alone|the hold stays|does not release|still in place/i)
 			expect(fr[key]).not.toMatch(/laisse le blocage|reste en place|ne le lève pas|toujours en place/i)
+		}
+	})
+
+	// the name of a command is not translated: the person types it
+	it('keeps the names of the commands in both languages', () => {
+		const unconfirmed = 'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.'
+		const notice = 'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
+
+		for (const [key, command] of [[unconfirmed, 'apt-mark showhold'], [notice, '--allow-change-held-packages']]) {
+			expect(en[key]).toContain(command)
+			expect(fr[key]).toContain(command)
 		}
 	})
 
