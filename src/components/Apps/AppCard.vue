@@ -188,6 +188,7 @@ import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -447,6 +448,9 @@ export default {
 					break
 				case 'Files':
 					this.homeShowFiles()
+					break
+				case VM_APP_NAME:
+					openVirtualMachines(this.$buefy, this.$store.state)
 					break
 				default:
 					break

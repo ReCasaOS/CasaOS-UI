@@ -1048,5 +1048,6 @@
   "{name} is the next release.": "{name} is the next release.",
   "ReCasaOS cannot upgrade the operating system for you yet.": "ReCasaOS cannot upgrade the operating system for you yet.",
   "There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.": "There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.",
-  "Upgrade guide": "Upgrade guide"
+  "Upgrade guide": "Upgrade guide",
+  "Virtual Machines": "Virtual Machines"
 }

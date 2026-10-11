@@ -946,5 +946,6 @@
   "Are you sure you want to update the system packages listed?": "Vuoi davvero aggiornare i pacchetti di sistema elencati?",
   "No newer Docker is offered by this machine's package sources.": "Le sorgenti dei pacchetti di questa macchina non offrono un Docker più recente.",
   "A newer Docker, {version}, exists in this machine's package sources, but the package is on hold, so no update offers it.": "Nelle sorgenti dei pacchetti di questa macchina c'è un Docker più recente, {version}, ma il pacchetto è bloccato (hold), quindi nessun aggiornamento lo propone.",
-  "A newer Docker, {version}, exists in this machine's package sources, but apt does not offer it for an update (a hold, or a dependency).": "Nelle sorgenti dei pacchetti di questa macchina c'è un Docker più recente, {version}, ma apt non lo propone come aggiornamento (un hold, o una dipendenza)."
+  "A newer Docker, {version}, exists in this machine's package sources, but apt does not offer it for an update (a hold, or a dependency).": "Nelle sorgenti dei pacchetti di questa macchina c'è un Docker più recente, {version}, ma apt non lo propone come aggiornamento (un hold, o una dipendenza).",
+  "Virtual Machines": "Macchine virtuali"
 }

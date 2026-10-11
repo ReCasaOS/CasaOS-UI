@@ -107,6 +107,7 @@ import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -345,8 +346,10 @@ export default {
 						en_us: item.name,
 					}
 				})
+				// the virtual machines join Files where the module answers
+				const vmApps = await hasVirtualMachines() ? [vmApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, orgNewAppList, listLinkApp)
+				const casaAppList = concat(builtInApplications, vmApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)

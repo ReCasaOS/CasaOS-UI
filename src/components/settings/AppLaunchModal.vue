@@ -55,7 +55,8 @@
 </template>
 
 <script>
-import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 
 export default {
 	name: 'AppLaunchModal',
@@ -64,19 +65,28 @@ export default {
 			inIframe: this.$store.state.appLaunchInIframe,
 			exceptions: [...(this.$store.state.appLaunchExceptions || [])],
 			apps: [],
+			hasVMs: false,
 			isLoading: true,
 			loadError: '',
 		}
 	},
 	computed: {
 		builtins() {
-			return [
+			const builtins = [
 				{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') },
 				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
 			]
+			if (this.hasVMs) {
+				builtins.push({ id: VMS_LAUNCH_ID, title: this.$t('Virtual Machines') })
+			}
+			return builtins
 		},
 	},
 	async mounted() {
+		hasVirtualMachines().then((available) => {
+			this.hasVMs = available
+		})
+
 		try {
 			const response = await this.$openAPI.appManagement.compose.myComposeAppList()
 			const list = (response && response.data && response.data.data) || {}
