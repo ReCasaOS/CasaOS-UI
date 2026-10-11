@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
-import { flushPromises } from '@vue/test-utils'
+import Buefy from 'buefy'
+import { flushPromises, shallowMount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import OsSupportModal from './settings/OsSupportModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
@@ -47,6 +49,7 @@ describe('the anonymous statistics switch', () => {
 			getHardwareInfo: vi.fn(),
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
+			getOs: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
 			vm[name] = TopBar.methods[name].bind(vm)
@@ -159,6 +162,7 @@ describe('the automatic update row', () => {
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
+			getOs: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
 			vm[name] = TopBar.methods[name].bind(vm)
@@ -361,6 +365,7 @@ describe('the alerts row', () => {
 		const vm = {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
+			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
 			getUserInfo: vi.fn(),
@@ -389,5 +394,168 @@ describe('the alerts row', () => {
 	it('says "Alerts" in English and French', () => {
 		expect(en.Alerts).toBe('Alerts')
 		expect(fr.Alerts).toBe('Alertes')
+	})
+})
+
+// GET /v1/sys/os, as the core answers it
+function osView(support, fields = {}) {
+	return {
+		id: 'debian',
+		version_id: '11',
+		codename: 'bullseye',
+		pretty_name: 'Debian GNU/Linux 11 (bullseye)',
+		arch: 'amd64',
+		known: true,
+		support,
+		next: { id: 'debian', version_id: '12', codename: 'bookworm', pretty_name: 'Debian 12 (bookworm)', state: 'report' },
+		...fields,
+	}
+}
+
+// The badge is in the bar's own row, so a shallow mount renders it for real.
+describe('the system support badge', () => {
+	const never = () => new Promise(() => {})
+	const answer = data => vi.fn(() => Promise.resolve({ data: { success: 200, data } }))
+
+	// getOs: the one call under test; every other call of the bar waits for ever.
+	function mountBar(getOs, options = {}) {
+		const sys = new Proxy({ getOs }, { get: (target, name) => target[name] ?? never })
+		const open = vi.fn()
+		const toast = vi.fn()
+		const wrapper = shallowMount(TopBar, {
+			...options,
+			props: { initBarData: { lang: 'en_us', search_engine: 'https://duckduckgo.com/?q=', search_switch: true, recommend_switch: true, existing_apps_switch: true } },
+			global: {
+				plugins: [Buefy],
+				mocks: {
+					$t: key => key,
+					$te: () => true,
+					$i18n: { locale: 'en_us' },
+					$api: { sys },
+					$EventBus: createEventBus(),
+					$messageBus: () => {},
+					$buefy: { modal: { open }, toast: { open: toast } },
+					$store: {
+						state: { isMobile: false, sidebarOpen: false, notImportList: [], appLaunchInIframe: false, user: { username: 'tester' } },
+						commit: () => {},
+					},
+				},
+			},
+		})
+		return { wrapper, open, toast }
+	}
+	const badge = wrapper => wrapper.find('.os-support-badge')
+
+	it('asks the core once, when the bar mounts', async () => {
+		const getOs = answer(osView({ state: 'supported', ends: '2028-06-30', precision: 'day' }))
+		mountBar(getOs)
+		await flushPromises()
+
+		expect(getOs).toHaveBeenCalledTimes(1)
+	})
+
+	it('says in amber that the support ends soon', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'ending_soon', ends: '2027-06-01', precision: 'month' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('System support ends soon')
+		expect(badge(wrapper).classes()).toContain('is-warning')
+		expect(badge(wrapper).classes()).not.toContain('is-danger')
+		expect(badge(wrapper).find('b-icon-stub').attributes('icon')).toBe('alert-outline')
+	})
+
+	it('says in red-orange that the system support ended', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'security_ended', ends: '2026-08-31', precision: 'day' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('System support ended')
+		expect(badge(wrapper).classes()).toContain('is-danger')
+		expect(badge(wrapper).classes()).not.toContain('is-warning')
+	})
+
+	it('is a button in the bar\'s row, which a phone shows, and opens a dialog', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'security_ended', ends: '2026-08-31', precision: 'day' })))
+		await flushPromises()
+
+		expect(badge(wrapper).element.tagName).toBe('BUTTON')
+		expect(badge(wrapper).attributes('type')).toBe('button')
+		expect(badge(wrapper).attributes('aria-haspopup')).toBe('dialog')
+		// .navbar-menu is hidden below 1024px
+		expect(wrapper.find('.navbar-brand .os-support-badge').exists()).toBe(true)
+		expect(wrapper.find('.navbar-menu .os-support-badge').exists()).toBe(false)
+	})
+
+	it.each([
+		['a supported system', osView({ state: 'supported', ends: '2028-06-30', precision: 'day' })],
+		['an unknown state', osView({ state: 'unknown' })],
+		['a system the core does not know', osView({ state: 'unknown' }, { id: 'linuxmint', known: false, next: undefined })],
+		['a known flag of false with a state that would show', osView({ state: 'security_ended' }, { known: false })],
+		// Raspberry Pi OS and its kind say debian: the core says known:false and a variant, nothing more
+		['a Raspberry Pi OS (variant)', osView({ state: 'unknown' }, { known: false, variant: 'raspberrypi', next: undefined })],
+		['a variant, even with a state that would show', osView({ state: 'security_ended' }, { variant: 'proxmox' })],
+		['an answer that is not a view', {}],
+		['an empty answer', null],
+	])('shows nothing for %s', async (_, view) => {
+		const { wrapper, toast } = mountBar(answer(view))
+		await flushPromises()
+
+		expect(badge(wrapper).exists()).toBe(false)
+		expect(toast).not.toHaveBeenCalled()
+	})
+
+	// an older core has no route (404); the others are a core that is busy or gone
+	it.each([404, 401, 500, undefined])('shows nothing, and says nothing, when the call fails (%s)', async (status) => {
+		const getOs = vi.fn(() => Promise.reject(Object.assign(new Error(`status ${status}`), { response: status && { status } })))
+		const { wrapper, toast } = mountBar(getOs)
+		await flushPromises()
+
+		expect(getOs).toHaveBeenCalledTimes(1)
+		expect(badge(wrapper).exists()).toBe(false)
+		expect(toast).not.toHaveBeenCalled()
+	})
+
+	it('shows nothing while the core has not answered', async () => {
+		const { wrapper } = mountBar(vi.fn(never))
+		await flushPromises()
+
+		expect(badge(wrapper).exists()).toBe(false)
+	})
+
+	it('opens the Operating system window on the view the core gave, with its focus left to the window', async () => {
+		const view = osView({ state: 'security_ended', ends: '2026-08-31', precision: 'day' })
+		const { wrapper, open } = mountBar(answer(view))
+		await flushPromises()
+
+		await badge(wrapper).trigger('click')
+
+		expect(open).toHaveBeenCalledTimes(1)
+		const options = open.mock.calls[0][0]
+		expect(options.component).toBe(OsSupportModal)
+		expect(options.props.os).toEqual(view)
+		expect(options.hasModalCard).toBe(true)
+		expect(options.trapFocus).toBe(true)
+		expect(options.autoFocus).toBe(false)
+		expect(options.canCancel).toEqual(expect.arrayContaining(['escape', 'outside']))
+		// a dialog with a name, for a screen reader
+		expect(options.ariaRole).toBe('dialog')
+		expect(options.ariaModal).toBe(true)
+		expect(options.ariaLabel).toBe('Operating system')
+	})
+
+	// Buefy leaves the focus on nothing when a window closes
+	it.each([
+		['Escape or a click outside', options => options.onCancel('escape')],
+		['its Close button', options => options.events.close()],
+	])('gives the focus back to the badge when the window closes by %s', async (_, close) => {
+		const { wrapper, open } = mountBar(answer(osView({ state: 'security_ended', ends: '2026-08-31', precision: 'day' })), { attachTo: document.body })
+		await flushPromises()
+		await badge(wrapper).trigger('click')
+		document.activeElement?.blur()
+		expect(document.activeElement).not.toBe(badge(wrapper).element)
+
+		close(open.mock.calls[0][0])
+
+		expect(document.activeElement).toBe(badge(wrapper).element)
+		wrapper.unmount()
 	})
 })

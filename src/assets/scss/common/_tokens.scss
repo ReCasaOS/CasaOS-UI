@@ -49,6 +49,9 @@
 	--casa-danger-tint-strong: hsla(18, 100%, 80%, 1);
 	--casa-danger-soft: hsla(348, 100%, 95%, 1);
 	--casa-warning-tint: #fff7e6;
+	// Amber that reads on the surface and on --casa-warning-tint (6.7:1 and 6.3:1): the
+	// top bar's badge of a system whose support ends soon.
+	--casa-text-warning: hsl(36, 100%, 26%);
 	--casa-scrollbar-thumb: rgba(0, 0, 0, 0.3);
 	--casa-scrollbar-thumb-soft: rgba(0, 0, 0, 0.2);
 
@@ -130,6 +133,7 @@ html[data-theme='dark'] {
 	--casa-danger-tint-strong: hsla(18, 98%, 55%, 0.32);
 	--casa-danger-soft: hsla(348, 86%, 61%, 0.18);
 	--casa-warning-tint: hsla(40, 100%, 43%, 0.18);
+	--casa-text-warning: hsl(40, 100%, 60%);
 	--casa-scrollbar-thumb: rgba(255, 255, 255, 0.3);
 	--casa-scrollbar-thumb-soft: rgba(255, 255, 255, 0.2);
 	--casa-hover-soft: rgba(255, 255, 255, 0.05);

@@ -122,6 +122,17 @@ const sys = {
 		return api.get(`${PREFIX}/docker/update/status`)
 	},
 
+	// The operating system and the end of its security updates: { id, version_id, codename,
+	// pretty_name, arch, known, variant?, support: { state, ends, precision,
+	// extended: { name, ends, precision? }, source }, next: { id, version_id, codename,
+	// pretty_name, state } }. `variant` (raspberrypi, armbian...) is a system that says
+	// debian or ubuntu and is not: no support claim. Read-only: it reads
+	// /etc/os-release and a dated table, with no apt and no network. A core older than the
+	// feature answers 404.
+	getOs() {
+		return api.get(`${PREFIX}/os`)
+	},
+
 	// stop casaos
 	stopCasaOS() {
 		return api.post(`${PREFIX}/stop`)
