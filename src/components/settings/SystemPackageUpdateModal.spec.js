@@ -853,7 +853,8 @@ describe('starting the Docker update', () => {
 		await flushPromises()
 
 		expect(w.find('.docker-confirm').exists()).toBe(false)
-		expect(w.text()).toContain('A newer Docker appeared since this window was opened. Look at the new versions and confirm again.')
+		expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.')
+		expect(w.text()).not.toContain('A newer Docker appeared')
 		expect(w.text()).not.toContain(reason)
 		expect(getSystemPackages).toHaveBeenCalledTimes(2)
 		// the person confirms the new plan, not the old one
@@ -923,7 +924,7 @@ describe('starting the Docker update', () => {
 		await w.find('.docker-confirm-button').trigger('click')
 		await flushPromises()
 
-		expect(w.text()).toContain('A newer Docker appeared since this window was opened.')
+		expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted).')
 		expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 	})
 
@@ -2164,8 +2165,8 @@ describe('the two updates do not run together', () => {
 describe('updating Docker while its packages are on hold', () => {
 	const names = ['docker-ce', 'docker-ce-cli', 'containerd.io']
 	const onHold = { held: true, held_packages: names }
-	const lineSentence = 'The Docker packages are on hold (docker-ce, docker-ce-cli, containerd.io). The Update Docker button updates them anyway, once you confirm, and leaves the hold alone.'
-	const notice = 'Docker\'s packages are on hold (docker-ce, docker-ce-cli, containerd.io). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would, and the hold stays in place: ReCasaOS does not release it.'
+	const lineSentence = 'The Docker packages are on hold (docker-ce, docker-ce-cli, containerd.io). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.'
+	const notice = 'Docker\'s packages are on hold (docker-ce, docker-ce-cli, containerd.io). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
 	const tick = 'I know the packages are on hold and I want to update anyway'
 	const box = w => w.find('.docker-held-confirm input')
 	const confirmButton = w => w.find('.docker-confirm-button')
@@ -2295,6 +2296,51 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(startDockerUpdate).not.toHaveBeenCalled()
 		})
 
+		// the box is emptied where the confirmation opens: these two ways out do not go through Cancel
+		it.each([
+			['a 409 that says the offer changed', () => Promise.reject(refused(409, 'changed', 'the plan changed: reconfirm')), 'cd'.repeat(32)],
+			['an answer that never came', () => Promise.reject(new Error('Network Error')), planId],
+		])('starts with the box empty again after %s', async (_, reject, next) => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages(onHold)).mockImplementation(dockerPackages({ ...onHold, plan_id: next }))
+			const startDockerUpdate = vi.fn().mockImplementationOnce(reject).mockImplementation(goes())
+			const w = await openDocker({ getSystemPackages, startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(w.find('.docker-confirm').exists()).toBe(false)
+
+			await openConfirmation(w)
+
+			expect(box(w).element.checked).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+			await w.vm.startDockerUpdate()
+			expect(startDockerUpdate).toHaveBeenCalledTimes(1)
+			// it goes only once the person ticks it again, with the plan of the last check
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(startDockerUpdate).toHaveBeenCalledTimes(2)
+			expect(startDockerUpdate.mock.calls[1][0]).toStrictEqual({ plan_id: next, allow_held: true })
+		})
+
+		it('asks for nothing, and sends no allow_held, when the hold was lifted after the box was ticked and the offer changed', async () => {
+			const newPlan = 'cd'.repeat(32)
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages(onHold)).mockImplementation(dockerPackages({ plan_id: newPlan }))
+			const startDockerUpdate = vi.fn().mockImplementationOnce(() => Promise.reject(refused(409, 'changed', 'the plan changed: reconfirm'))).mockImplementation(goes())
+			const w = await openDocker({ getSystemPackages, startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+			await confirm(w)
+
+			expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.')
+			expect(w.text()).not.toContain('A newer Docker appeared')
+			await openConfirmation(w)
+			expect(w.find('.docker-held-notice').exists()).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeUndefined()
+			await confirm(w)
+
+			expect(startDockerUpdate.mock.calls[1][0]).toStrictEqual({ plan_id: newPlan })
+		})
+
 		it('has no notice and no box for a plan that is not on hold, and sends the plan alone', async () => {
 			const { w, startDockerUpdate } = await opened({})
 
@@ -2345,7 +2391,7 @@ describe('updating Docker while its packages are on hold', () => {
 	})
 
 	describe('when the hold appears after the plan was shown', () => {
-		const reason = 'Docker\'s packages are on hold. Confirm that the update may go ahead anyway; the hold stays.'
+		const reason = 'Docker\'s packages are on hold. Confirm that the update may go ahead anyway; the hold is put back afterwards.'
 		const heldNow = 'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.'
 		const newPlan = 'cd'.repeat(32)
 
@@ -2407,6 +2453,58 @@ describe('updating Docker while its packages are on hold', () => {
 			expect(w.find('.docker-update-button').exists()).toBe(false)
 		})
 
+		// A core that knows holds names the packages in its 409 and says `held` in its check: for it, a hold that is deliberate and never
+		// overridden is false. The sentence is for a core that can confirm nothing.
+		describe('the sentence of a hold that is deliberate', () => {
+			const deliberate = 'a hold is deliberate'
+			const failure = Object.assign(new Error('Request failed with status code 500'), { response: { data: { message: 'E: Could not get lock' } } })
+
+			async function refusedThenChecked(recheck, more) {
+				const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(recheck)
+				const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', reason, more)) })
+				await openConfirmation(w)
+				await confirm(w)
+				return w
+			}
+
+			it.each([
+				['the 409 names the packages and the new check refuses for another reason', { refusal_detail: names }, { available: false, refusal: 'disk' }],
+				['the 409 names nothing and the new check says the packages are on hold, but refuses for another reason', {}, { ...onHold, available: false, refusal: 'disk' }],
+				['the 409 names the packages and the new check says so too', { refusal_detail: names }, { ...onHold, available: false, refusal: 'disk' }],
+			])('does not say it when %s: the refusal of the check is what is said', async (_, more, update) => {
+				const w = await refusedThenChecked(dockerPackages(update), more)
+
+				expect(w.text()).not.toContain(deliberate)
+				expect(w.text()).not.toContain(heldNow)
+				expect(w.find('.docker-update-button').exists()).toBe(false)
+				expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
+			})
+
+			it('does not say it when the 409 names the packages and the new check finds no hold and offers the update', async () => {
+				const w = await refusedThenChecked(dockerPackages({ plan_id: newPlan }), { refusal_detail: names })
+
+				expect(w.text()).not.toContain(deliberate)
+				expect(w.text()).not.toContain(heldNow)
+				expect(w.find('.docker-update-button').exists()).toBe(true)
+			})
+
+			it('does not say it when the 409 names the packages and the new check cannot be read, and says that it could not', async () => {
+				const w = await refusedThenChecked(() => Promise.reject(failure), { refusal_detail: names })
+
+				expect(w.text()).not.toContain(deliberate)
+				expect(w.text()).not.toContain(heldNow)
+				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+
+			it('keeps saying it, once, for a core that names nothing and whose new check cannot be read either', async () => {
+				const w = await refusedThenChecked(() => Promise.reject(failure), {})
+
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(deliberate).length - 1).toBe(1)
+				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+		})
+
 		it('says nothing once the window is closed, when the new check answers after', async () => {
 			let late
 			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(() => new Promise((resolve) => {
@@ -2426,7 +2524,7 @@ describe('updating Docker while its packages are on hold', () => {
 
 	describe('what the result says of the hold', () => {
 		const ended = extra => openDocker({ getDockerUpdateStatus: answer({ ...succeeded, ...extra }) })
-		const kept = 'The hold on Docker\'s packages is still in place.'
+		const kept = 'The hold on Docker\'s packages is in place again.'
 		const unknown = 'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.'
 		const results = [
 			['a success', {}],
@@ -2446,7 +2544,7 @@ describe('updating Docker while its packages are on hold', () => {
 			const w = await ended({ ...extra, held: true, held_packages: names, holds_kept: false })
 
 			expect(w.find('.docker-hold-result').text()).toBe(unknown)
-			expect(w.find('.docker-job').text()).not.toContain('still in place')
+			expect(w.find('.docker-job').text()).not.toContain('in place again')
 		})
 
 		it('says it was not confirmed when the core says a hold and not whether it was kept, or a string for a yes', async () => {
@@ -2551,12 +2649,13 @@ describe('the Docker update\'s words', () => {
 		'The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.',
 		'In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.',
 		'Going back to the previous major version is not supported: in a test the containers did not start again.',
-		'The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and leaves the hold alone.',
-		'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would, and the hold stays in place: ReCasaOS does not release it.',
+		'The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.',
+		'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.',
 		'I know the packages are on hold and I want to update anyway',
 		'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.',
-		'The hold on Docker\'s packages is still in place.',
+		'The hold on Docker\'s packages is in place again.',
 		'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.',
+		'The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
@@ -2565,6 +2664,29 @@ describe('the Docker update\'s words', () => {
 		expect(fr[key]).not.toMatch(/\S[:;?!]/)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
+	})
+
+	// the update goes ahead of the hold, as the terminal command does, and ReCasaOS puts it back: no sentence may say that it never left
+	it('promises no hold that stays, in either language', () => {
+		const said = Object.keys(en).filter(key => /\bhold\b/i.test(key))
+
+		expect(said.length).toBeGreaterThanOrEqual(6)
+		for (const key of said) {
+			expect(key).not.toMatch(/leaves the hold alone|the hold stays|does not release|still in place/i)
+			expect(fr[key]).not.toMatch(/laisse le blocage|reste en place|ne le lève pas|toujours en place/i)
+		}
+	})
+
+	// a French that says the hold is left alone, or that nobody puts it back, would be the old promise again in other words
+	it('says in French that the update drops the hold, that ReCasaOS puts it back, and that the offer may have changed for a hold', () => {
+		const line = 'The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.'
+		const notice = 'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
+
+		expect(fr[line]).toContain('puis remet le blocage en place')
+		expect(fr[notice]).toContain('Cette commande lève le blocage des paquets qu\'elle met à jour')
+		expect(fr[notice]).toContain('ReCasaOS le remet en place quand la mise à jour est terminée, et vous dit s\'il l\'a fait')
+		expect(fr['The hold on Docker\'s packages is in place again.']).toContain('de nouveau en place')
+		expect(fr['The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.']).toContain('un blocage posé ou levé')
 	})
 
 	// "toutes les configurations n'ont pas été testées" can be read as "none was tested"
