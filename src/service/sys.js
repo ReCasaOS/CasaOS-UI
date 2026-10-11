@@ -1,4 +1,4 @@
-import { api } from './service.js'
+import { api, instance } from './service.js'
 
 const PREFIX = '/sys'
 
@@ -131,6 +131,16 @@ const sys = {
 	// feature answers 404.
 	getOs() {
 		return api.get(`${PREFIX}/os`)
+	},
+
+	// Whether this machine could be upgraded to the next release, and why not:
+	// { checked_at, state, hop: { from, to }, counts, checks: [{ code, severity, title, detail,
+	// data, action }], text }. `text` is the same report as plain text, for "Copy the report".
+	// Read-only: no write, no apt update, no network. The core answers within 20 seconds, so
+	// the call waits 30. A core older than the feature answers 404. Through the instance: api.get
+	// takes its second argument as the query string, not as a request config.
+	getOsReadiness() {
+		return instance.get(`/v1${PREFIX}/os/readiness`, { timeout: 30000 })
 	},
 
 	// stop casaos

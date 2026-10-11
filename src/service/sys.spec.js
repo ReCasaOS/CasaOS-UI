@@ -104,4 +104,14 @@ describe('operating system client', () => {
 		expect(sent().url).toBe('/v1/sys/os')
 		expect(sent().data).toBeUndefined()
 	})
+
+	// The core answers within 20 seconds (its checks run in parallel, with a budget), so the
+	// call waits 30 and not the 60 of the shared client.
+	it('asks whether the machine can be upgraded from its own route, sends nothing, and waits 30 seconds', async () => {
+		await sys.getOsReadiness()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os/readiness')
+		expect(sent().data).toBeUndefined()
+		expect(sent().timeout).toBe(30000)
+	})
 })
