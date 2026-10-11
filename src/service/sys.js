@@ -111,8 +111,10 @@ const sys = {
 		return api.get(`${PREFIX}/docker/containers`)
 	},
 
-	// Update Docker's packages. data: { plan_id } from `docker.update` of getSystemPackages: the
-	// core refuses (409, the code in data.error_code) when it is no longer the plan it computes.
+	// Update Docker's packages. data: { plan_id, allow_held? } from `docker.update` of getSystemPackages:
+	// the core refuses (409, the code in data.error_code) when it is no longer the plan it computes.
+	// `allow_held: true` is the person's word that the update may go ahead although Docker's packages
+	// are on hold (`docker.update.held`); without it the core refuses a held plan with `held`.
 	startDockerUpdate(data) {
 		return api.post(`${PREFIX}/docker/update`, data)
 	},
