@@ -4,7 +4,7 @@ import Buefy from 'buefy'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OsSupportModal from './OsSupportModal.vue'
-import { SUPPORT_SENTENCES } from './osSupport'
+import { EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import i18n from '@/plugins/i18n'
@@ -40,6 +40,7 @@ const BULLSEYE = {
 	next: { id: 'debian', version_id: '12', codename: 'bookworm', pretty_name: 'Debian 12 (bookworm)', state: 'report' },
 }
 
+// Ubuntu 22.04 at its standard end, which Canonical gives to the month, and an ESM end it gives to the month too
 const JAMMY = {
 	id: 'ubuntu',
 	version_id: '22.04',
@@ -51,7 +52,7 @@ const JAMMY = {
 		state: 'ending_soon',
 		ends: '2027-06-01',
 		precision: 'month',
-		extended: { name: 'Ubuntu Pro (ESM)', ends: '2032-04-21' },
+		extended: { name: 'Ubuntu Pro (ESM)', ends: '2032-04-21', precision: 'month' },
 		source: 'https://ubuntu.com/about/release-cycle',
 	},
 	next: { id: 'ubuntu', version_id: '24.04', codename: 'noble', pretty_name: 'Ubuntu 24.04 LTS', state: 'report' },
@@ -86,17 +87,26 @@ describe('the operating system window', () => {
 		expect(wrapper.find('.os-arch').text()).toBe('amd64')
 	})
 
-	it('says an ended system has not had security updates since the day, as a danger', () => {
+	// the vendor's free (Debian) or standard (Ubuntu) security support is what the window says ended:
+	// Ubuntu Pro and Debian ELTS exist, so it never says that nothing arrives
+	it('says the free security updates of an ended Debian ended on the day, as a danger', () => {
 		open(BULLSEYE)
 
-		expect(wrapper.find('.os-status').text()).toBe('Debian GNU/Linux 11 (bullseye) has not received security updates from its distribution since August 31, 2026.')
+		expect(wrapper.find('.os-status').text()).toBe('Free security updates for Debian GNU/Linux 11 (bullseye) ended on August 31, 2026.')
 		expect(wrapper.find('article.message').classes()).toContain('is-danger')
 	})
 
-	it('says a system that ends soon is supported until about the month, as a warning', () => {
+	it('says the standard security support of an ended Ubuntu ended, with the month as around', () => {
+		open({ ...JAMMY, support: { ...JAMMY.support, state: 'security_ended' } })
+
+		expect(wrapper.find('.os-status').text()).toBe('Standard security support for Ubuntu 22.04.5 LTS ended around June 2027.')
+		expect(wrapper.find('article.message').classes()).toContain('is-danger')
+	})
+
+	it('says the standard security support of an Ubuntu that ends soon ends around the month, as a warning', () => {
 		open(JAMMY)
 
-		expect(wrapper.find('.os-status').text()).toBe('Ubuntu 22.04.5 LTS receives security updates from its distribution until about June 2027.')
+		expect(wrapper.find('.os-status').text()).toBe('Standard security support for Ubuntu 22.04.5 LTS ends around June 2027.')
 		expect(wrapper.find('article.message').classes()).toContain('is-warning')
 		expect(wrapper.find('article.message').classes()).not.toContain('is-danger')
 	})
@@ -104,23 +114,39 @@ describe('the operating system window', () => {
 	it('says a day-precision date that is still to come as a date', () => {
 		open({ ...JAMMY, support: { ...JAMMY.support, precision: 'day', ends: '2027-06-01' } })
 
-		expect(wrapper.find('.os-status').text()).toBe('Ubuntu 22.04.5 LTS receives security updates from its distribution until June 1, 2027.')
+		expect(wrapper.find('.os-status').text()).toBe('Standard security support for Ubuntu 22.04.5 LTS ends on June 1, 2027.')
 	})
 
-	it('says one neutral sentence on the vendor\'s extended programme, with its name and date and no price', () => {
+	it('says one neutral sentence on the extended programme, offered separately, with its name and date and no price', () => {
 		open(BULLSEYE)
 
-		expect(wrapper.find('.os-extended').text()).toBe('Extended security maintenance exists from the vendor: Debian ELTS (Freexian) until June 30, 2031.')
-		expect(wrapper.find('.os-extended').text()).not.toMatch(/\b(paid|free|price|cost|buy|subscription)\b|[$€]/i)
+		expect(wrapper.find('.os-extended').text()).toBe('Extended security maintenance is offered separately: Debian ELTS (Freexian), until June 30, 2031.')
+		expect(wrapper.find('.os-extended').text()).not.toMatch(/\b(paid|free|price|cost|buy|subscription|vendor|official)\b|[$€]/i)
 	})
 
-	it('names the next release, says ReCasaOS cannot upgrade yet and asks for a snapshot or console access', () => {
+	it('writes the extended programme\'s date to the month when the core says so', () => {
+		open(JAMMY)
+
+		expect(wrapper.find('.os-extended').text()).toBe('Extended security maintenance is offered separately: Ubuntu Pro (ESM), until around April 2032.')
+	})
+
+	it('names the next release and says ReCasaOS cannot upgrade yet', () => {
 		open(BULLSEYE)
 
 		expect(wrapper.find('.os-next').text()).toBe('Debian 12 (bookworm) is the next release.')
-		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS cannot upgrade the operating system for you yet. Before any upgrade, take a snapshot of the machine or make sure you have console access.')
+		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS cannot upgrade the operating system for you yet.')
 	})
 
+	// no automatic way back: the snapshot is what goes back, the console is for a machine that does not start
+	it('says there is no automatic way back, that a snapshot is what goes back and the console is for a machine that does not start', () => {
+		open(BULLSEYE)
+
+		const text = wrapper.find('.os-snapshot').text()
+		expect(text).toBe('There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.')
+		expect(text).not.toMatch(/snapshot of the machine or/i)
+	})
+
+	// the exact addresses are pinned in osSupport.spec.js, with the date they were fetched
 	it('links the upgrade chapter of the Debian 12 release notes for a Debian 11, from the next release\'s version', () => {
 		open(BULLSEYE)
 
@@ -159,6 +185,7 @@ describe('the operating system window', () => {
 
 		expect(wrapper.find('.os-next').exists()).toBe(false)
 		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+		expect(wrapper.find('.os-snapshot').exists()).toBe(false)
 		expect(wrapper.find('a').exists()).toBe(false)
 		expect(wrapper.find('.os-status').exists()).toBe(true)
 	})
@@ -181,7 +208,7 @@ describe('the operating system window', () => {
 		const { arch, ...withoutArch } = BULLSEYE
 		open({ ...withoutArch, support: { state: 'security_ended' } })
 
-		expect(wrapper.find('.os-status').text()).toBe('Debian GNU/Linux 11 (bullseye) no longer receives security updates from its distribution.')
+		expect(wrapper.find('.os-status').text()).toBe('Free security updates for Debian GNU/Linux 11 (bullseye) have ended.')
 		expect(wrapper.find('.os-arch').exists()).toBe(false)
 	})
 
@@ -242,7 +269,7 @@ describe('the operating system window', () => {
 	it('puts a name that looks like a placeholder in the sentence as it is', () => {
 		open({ ...BULLSEYE, pretty_name: '{date} @:Operating system | x', support: { ...BULLSEYE.support, extended: undefined } })
 
-		expect(wrapper.find('.os-status').text()).toBe('{date} @:Operating system | x has not received security updates from its distribution since August 31, 2026.')
+		expect(wrapper.find('.os-status').text()).toBe('Free security updates for {date} @:Operating system | x ended on August 31, 2026.')
 	})
 })
 
@@ -255,18 +282,20 @@ describe('the operating system window in French', () => {
 		open(BULLSEYE)
 
 		expect(wrapper.find('.os-title').text()).toBe('Système d\'exploitation')
-		expect(wrapper.find('.os-status').text()).toBe('Debian GNU/Linux 11 (bullseye) ne reçoit plus de mises à jour de sécurité de sa distribution depuis le 31 août 2026.')
-		expect(wrapper.find('.os-extended').text()).toBe('Une maintenance de sécurité étendue existe auprès de l\'éditeur : Debian ELTS (Freexian) jusqu\'au 30 juin 2031.')
+		expect(wrapper.find('.os-status').text()).toBe('Les mises à jour de sécurité gratuites pour Debian GNU/Linux 11 (bullseye) ont pris fin le 31 août 2026.')
+		expect(wrapper.find('.os-extended').text()).toBe('Une maintenance de sécurité étendue est proposée séparément : Debian ELTS (Freexian), jusqu\'au 30 juin 2031.')
 		expect(wrapper.find('.os-next').text()).toBe('Debian 12 (bookworm) est la prochaine version.')
-		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS ne peut pas encore mettre à niveau le système d\'exploitation à votre place. Avant toute mise à niveau, faites un instantané (snapshot) de la machine ou assurez-vous d\'avoir un accès console.')
+		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS ne peut pas encore mettre à niveau le système d\'exploitation à votre place.')
+		expect(wrapper.find('.os-snapshot').text()).toBe('Une mise à niveau n\'a pas de retour arrière automatique : un instantané (snapshot) de la machine est ce qui permet de revenir en arrière, et l\'accès console sert quand la machine ne démarre plus. Faites un instantané avant toute mise à niveau.')
 		expect(wrapper.find('.os-link a').text()).toBe('Notes de version')
 		expect(wrapper.findAll('button').map(b => b.text())).toContain('Fermer')
 	})
 
-	it('says a month as "environ", and the upgrade guide in French', () => {
+	it('says a month as "vers", the extended programme\'s as "environ", and the upgrade guide in French', () => {
 		open(JAMMY)
 
-		expect(wrapper.find('.os-status').text()).toBe('Ubuntu 22.04.5 LTS reçoit les mises à jour de sécurité de sa distribution jusqu\'à environ juin 2027.')
+		expect(wrapper.find('.os-status').text()).toBe('Le support de sécurité standard pour Ubuntu 22.04.5 LTS prend fin vers juin 2027.')
+		expect(wrapper.find('.os-extended').text()).toBe('Une maintenance de sécurité étendue est proposée séparément : Ubuntu Pro (ESM), jusqu\'à environ avril 2032.')
 		expect(wrapper.find('.os-link a').text()).toBe('Guide de mise à niveau')
 	})
 })
@@ -277,19 +306,20 @@ describe('the operating system window in a language that has no translation yet'
 		i18n.global.locale = 'de_de'
 		open(BULLSEYE)
 
-		expect(wrapper.find('.os-status').text()).toBe('Debian GNU/Linux 11 (bullseye) has not received security updates from its distribution since August 31, 2026.')
+		expect(wrapper.find('.os-status').text()).toBe('Free security updates for Debian GNU/Linux 11 (bullseye) ended on August 31, 2026.')
 	})
 })
 
 describe('the language files', () => {
 	const keys = [
 		'Operating system',
-		'System out of support',
+		'System support ended',
 		'System support ends soon',
 		...SUPPORT_SENTENCES,
-		'Extended security maintenance exists from the vendor: {name} until {date}.',
+		...EXTENDED_SENTENCES,
 		'{name} is the next release.',
-		'ReCasaOS cannot upgrade the operating system for you yet. Before any upgrade, take a snapshot of the machine or make sure you have console access.',
+		'ReCasaOS cannot upgrade the operating system for you yet.',
+		'There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.',
 		'Release notes',
 		'Upgrade guide',
 		'Close',

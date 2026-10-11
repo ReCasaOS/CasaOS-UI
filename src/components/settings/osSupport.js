@@ -4,60 +4,102 @@
  * distribution.
  *
  * Texts are language-file keys. Every value that comes from the core is shown as a
- * text node, never as HTML, and the links are built here from the release's id: the
- * `source` URL the core sends is not used.
+ * text node, never as HTML, and the links are built here from the release's id and
+ * version: the `source` URL the core sends is not used.
+ *
+ * What the states say is what the vendor's free or standard security support covers:
+ * Ubuntu Pro (ESM) and Debian ELTS exist after it, so "ended" is never "no updates at
+ * all".
  */
+
+// One sentence per distribution, per state and per precision of the date, and one for a
+// date that is missing. The date's own words ("on", "until", "around") are in the
+// sentence because they do not carry over from one language to the next as a piece to
+// glue in. A distribution that is not here has no sentence, and no badge.
+const ENDED = 'ended'
+const ENDING = 'ending'
+const SENTENCES = new Map([
+	['debian', {
+		[ENDED]: {
+			day: 'Free security updates for {name} ended on {date}.',
+			month: 'Free security updates for {name} ended around {date}.',
+			none: 'Free security updates for {name} have ended.',
+		},
+		[ENDING]: {
+			day: 'Free security updates for {name} end on {date}.',
+			month: 'Free security updates for {name} end around {date}.',
+			none: 'Free security updates for {name} will end soon.',
+		},
+	}],
+	['ubuntu', {
+		[ENDED]: {
+			day: 'Standard security support for {name} ended on {date}.',
+			month: 'Standard security support for {name} ended around {date}.',
+			none: 'Standard security support for {name} has ended.',
+		},
+		[ENDING]: {
+			day: 'Standard security support for {name} ends on {date}.',
+			month: 'Standard security support for {name} ends around {date}.',
+			none: 'Standard security support for {name} will end soon.',
+		},
+	}],
+])
+const KINDS = new Map([['security_ended', ENDED], ['ending_soon', ENDING]])
+
+// Every key of the sentences above, for the language files' test.
+export const SUPPORT_SENTENCES = [...SENTENCES.values()].flatMap(kinds => Object.values(kinds).flatMap(Object.values))
+
+// The later programme is Canonical's for Ubuntu and Freexian's for Debian: the sentence
+// says that it is offered separately, and whose it is only through the name the core sends.
+const EXTENDED = {
+	day: 'Extended security maintenance is offered separately: {name}, until {date}.',
+	month: 'Extended security maintenance is offered separately: {name}, until around {date}.',
+}
+export const EXTENDED_SENTENCES = Object.values(EXTENDED)
 
 // The two states that call for a badge. `supported` and `unknown` show nothing.
 const BADGES = new Map([
 	['ending_soon', { tone: 'warning', label: 'System support ends soon', icon: 'alert-outline' }],
-	['security_ended', { tone: 'danger', label: 'System out of support', icon: 'alert-circle-outline' }],
+	['security_ended', { tone: 'danger', label: 'System support ended', icon: 'alert-circle-outline' }],
 ])
 
 /**
  * The badge for what the core answered, or null: nothing for a supported or an unknown
- * system, for one the core does not know, or for an answer that is not a view.
+ * system, for one the core does not know or knows as a variant (Raspberry Pi OS,
+ * Armbian... say debian and are not Debian), for a distribution that has no sentence, or
+ * for an answer that is not a view.
  */
 export function osBadge(os) {
-	if (!os || os.known === false)
+	if (!os || os.known === false || os.variant || !SENTENCES.has(os.id))
 		return null
 	return BADGES.get(os.support?.state) ?? null
 }
 
-// One sentence per state and per precision of the date, and one for a date that is
-// missing. The date's own words ("on", "until", "about") are in the sentence because
-// they do not carry over from one language to the next as a piece to glue in.
-const ENDED = 'ended'
-const ENDING = 'ending'
-const SENTENCES = {
-	[ENDED]: {
-		day: '{name} has not received security updates from its distribution since {date}.',
-		month: '{name} has not received security updates from its distribution since about {date}.',
-		none: '{name} no longer receives security updates from its distribution.',
-	},
-	[ENDING]: {
-		day: '{name} receives security updates from its distribution until {date}.',
-		month: '{name} receives security updates from its distribution until about {date}.',
-		none: '{name} will soon stop receiving security updates from its distribution.',
-	},
-}
-
-// Every key of the sentences above, for the language files' test.
-export const SUPPORT_SENTENCES = Object.values(SENTENCES).flatMap(Object.values)
-
 /**
- * The key of the sentence for a support view and the date to put in it, or null when
- * the state is not one that has a sentence. `locale` is the language of the sentence
- * (an Intl tag or a language-file name such as fr_fr).
+ * The key of the sentence for a distribution's support view and the date to put in it,
+ * or null when the state is not one that has a sentence. `locale` is the language of
+ * the sentence (an Intl tag or a language-file name such as fr_fr).
  */
-export function supportSentence(support, locale) {
-	const kind = support?.state === 'security_ended' ? ENDED : support?.state === 'ending_soon' ? ENDING : null
-	if (!kind)
+export function supportSentence(support, locale, distro) {
+	const sentences = SENTENCES.get(distro)?.[KINDS.get(support?.state)]
+	if (!sentences)
 		return null
 	const date = formatDate(support.ends, support.precision, locale)
 	if (!date)
-		return { key: SENTENCES[kind].none }
-	return { key: SENTENCES[kind][support.precision === 'month' ? 'month' : 'day'], date }
+		return { key: sentences.none }
+	return { key: sentences[support.precision === 'month' ? 'month' : 'day'], date }
+}
+
+/**
+ * The key of the sentence for the extended programme and the date to put in it, or null
+ * without a name or a real date. The core's `extended.precision` is absent from an older
+ * core: that date is a day.
+ */
+export function extendedSentence(extended, locale) {
+	const date = formatDate(extended?.ends, extended?.precision, locale)
+	if (!extended?.name || !date)
+		return null
+	return { key: EXTENDED[extended.precision === 'month' ? 'month' : 'day'], date }
 }
 
 /**

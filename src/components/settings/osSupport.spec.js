@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SUPPORT_SENTENCES, formatDate, osBadge, releaseLink, releaseName, supportSentence } from './osSupport'
+import { EXTENDED_SENTENCES, SUPPORT_SENTENCES, extendedSentence, formatDate, osBadge, releaseLink, releaseName, supportSentence } from './osSupport'
 
 // GET /v1/sys/os, as the core answers it
 function view(support, fields = {}) {
@@ -18,9 +18,13 @@ function view(support, fields = {}) {
 describe('the badge', () => {
 	it.each([
 		['ending_soon', { tone: 'warning', label: 'System support ends soon' }],
-		['security_ended', { tone: 'danger', label: 'System out of support' }],
+		['security_ended', { tone: 'danger', label: 'System support ended' }],
 	])('shows for %s', (state, expected) => {
 		expect(osBadge(view({ state, ends: '2026-08-31', precision: 'day' }))).toEqual(expect.objectContaining(expected))
+	})
+
+	it.each(['debian', 'ubuntu'])('shows for %s', (id) => {
+		expect(osBadge(view({ state: 'security_ended' }, { id }))).not.toBe(null)
 	})
 
 	// the keys of the badge's table are states; a state named like an Object method is not one
@@ -30,6 +34,20 @@ describe('the badge', () => {
 
 	it('shows nothing for a system the core does not know, whatever the state says', () => {
 		expect(osBadge(view({ state: 'security_ended' }, { known: false }))).toBe(null)
+	})
+
+	// Raspberry Pi OS and its kind say debian: the core says known:false and a variant,
+	// and the badge holds without the first
+	it.each(['raspberrypi', 'armbian', 'dietpi', 'proxmox', 'openmediavault', 'something-new'])('shows nothing for the variant %s', (variant) => {
+		expect(osBadge(view({ state: 'unknown' }, { known: false, variant }))).toBe(null)
+		expect(osBadge(view({ state: 'security_ended' }, { variant }))).toBe(null)
+		expect(osBadge(view({ state: 'ending_soon' }, { known: true, variant }))).toBe(null)
+	})
+
+	it('shows nothing for a distribution that has no sentence, and for ids that are not texts', () => {
+		expect(osBadge(view({ state: 'security_ended' }, { id: 'linuxmint' }))).toBe(null)
+		expect(osBadge(view({ state: 'security_ended' }, { id: 'constructor' }))).toBe(null)
+		expect(osBadge(view({ state: 'security_ended' }, { id: undefined }))).toBe(null)
 	})
 
 	it.each([null, undefined, {}, [], 'security_ended', 42, { known: true }, { support: null }])('shows nothing for an answer that is not a view: %j', (answer) => {
@@ -65,35 +83,93 @@ describe('the date', () => {
 })
 
 describe('the sentence', () => {
+	// state, ends, precision, date written, then what each distribution says
 	it.each([
-		['security_ended', '2026-08-31', 'day', '{name} has not received security updates from its distribution since {date}.', 'August 31, 2026'],
-		['security_ended', '2027-06-01', 'month', '{name} has not received security updates from its distribution since about {date}.', 'June 2027'],
-		['ending_soon', '2027-06-01', 'day', '{name} receives security updates from its distribution until {date}.', 'June 1, 2027'],
-		['ending_soon', '2027-06-01', 'month', '{name} receives security updates from its distribution until about {date}.', 'June 2027'],
-	])('for %s ending %s at precision %s', (state, ends, precision, key, date) => {
-		expect(supportSentence({ state, ends, precision }, 'en_us')).toEqual({ key, date })
+		['security_ended', '2026-08-31', 'day', 'August 31, 2026', 'Free security updates for {name} ended on {date}.', 'Standard security support for {name} ended on {date}.'],
+		['security_ended', '2027-06-01', 'month', 'June 2027', 'Free security updates for {name} ended around {date}.', 'Standard security support for {name} ended around {date}.'],
+		['ending_soon', '2027-06-01', 'day', 'June 1, 2027', 'Free security updates for {name} end on {date}.', 'Standard security support for {name} ends on {date}.'],
+		['ending_soon', '2027-06-01', 'month', 'June 2027', 'Free security updates for {name} end around {date}.', 'Standard security support for {name} ends around {date}.'],
+	])('for %s ending %s at precision %s', (state, ends, precision, date, debian, ubuntu) => {
+		const support = { state, ends, precision }
+		expect(supportSentence(support, 'en_us', 'debian')).toEqual({ key: debian, date })
+		expect(supportSentence(support, 'en_us', 'ubuntu')).toEqual({ key: ubuntu, date })
 	})
 
 	it.each([
-		['security_ended', '{name} no longer receives security updates from its distribution.'],
-		['ending_soon', '{name} will soon stop receiving security updates from its distribution.'],
-	])('for %s without a date says it without one', (state, key) => {
-		expect(supportSentence({ state }, 'en_us')).toEqual({ key })
-		expect(supportSentence({ state, ends: '2026-02-31', precision: 'day' }, 'en_us')).toEqual({ key })
+		['security_ended', 'Free security updates for {name} have ended.', 'Standard security support for {name} has ended.'],
+		['ending_soon', 'Free security updates for {name} will end soon.', 'Standard security support for {name} will end soon.'],
+	])('for %s without a date says it without one', (state, debian, ubuntu) => {
+		for (const support of [{ state }, { state, ends: '2026-02-31', precision: 'day' }]) {
+			expect(supportSentence(support, 'en_us', 'debian')).toEqual({ key: debian })
+			expect(supportSentence(support, 'en_us', 'ubuntu')).toEqual({ key: ubuntu })
+		}
 	})
 
 	it.each(['supported', 'unknown', '', undefined, 'constructor'])('says nothing for the state %s', (state) => {
-		expect(supportSentence({ state, ends: '2026-08-31', precision: 'day' }, 'en_us')).toBe(null)
+		expect(supportSentence({ state, ends: '2026-08-31', precision: 'day' }, 'en_us', 'debian')).toBe(null)
+	})
+
+	it.each(['linuxmint', 'raspbian', '', undefined, null, 'constructor', '__proto__'])('says nothing for the distribution %s', (distro) => {
+		expect(supportSentence({ state: 'security_ended', ends: '2026-08-31', precision: 'day' }, 'en_us', distro)).toBe(null)
 	})
 
 	it('says nothing without a support view', () => {
-		expect(supportSentence(undefined, 'en_us')).toBe(null)
-		expect(supportSentence(null, 'en_us')).toBe(null)
+		expect(supportSentence(undefined, 'en_us', 'debian')).toBe(null)
+		expect(supportSentence(null, 'en_us', 'debian')).toBe(null)
 	})
 
-	it('lists the six sentences, for the language files\' test', () => {
-		expect(new Set(SUPPORT_SENTENCES).size).toBe(6)
+	it('lists the twelve sentences, for the language files\' test', () => {
+		expect(new Set(SUPPORT_SENTENCES).size).toBe(12)
 		expect(SUPPORT_SENTENCES.every(key => key.includes('{name}'))).toBe(true)
+	})
+
+	// the vendor's free or standard security support is what ends: Ubuntu Pro and Debian
+	// ELTS exist, so no sentence says that nothing arrives or that the system is dead
+	it('claims only the free or standard security support, never that no update arrives', () => {
+		for (const key of SUPPORT_SENTENCES) {
+			expect(key).toMatch(/^(Free security updates|Standard security support) for \{name\} /)
+			expect(key).not.toMatch(/out of support|no longer|no updates|unsupported|its distribution/i)
+		}
+	})
+})
+
+describe('the extended programme', () => {
+	it.each([
+		[{ name: 'Debian ELTS (Freexian)', ends: '2031-06-30', precision: 'day' }, 'Extended security maintenance is offered separately: {name}, until {date}.', 'June 30, 2031'],
+		// an older core sends no precision: a day
+		[{ name: 'Debian ELTS (Freexian)', ends: '2031-06-30' }, 'Extended security maintenance is offered separately: {name}, until {date}.', 'June 30, 2031'],
+		[{ name: 'Ubuntu Pro (ESM)', ends: '2030-05-31', precision: 'month' }, 'Extended security maintenance is offered separately: {name}, until around {date}.', 'May 2030'],
+		// anything but month is a day
+		[{ name: 'Ubuntu Pro (ESM)', ends: '2032-04-21', precision: 'week' }, 'Extended security maintenance is offered separately: {name}, until {date}.', 'April 21, 2032'],
+	])('says it is offered separately, with its name and its date, for %j', (extended, key, date) => {
+		expect(extendedSentence(extended, 'en_us')).toEqual({ key, date })
+	})
+
+	it('writes the date in the language asked', () => {
+		expect(extendedSentence({ name: 'x', ends: '2030-05-31', precision: 'month' }, 'fr_fr').date).toBe('mai 2030')
+	})
+
+	it.each([
+		undefined,
+		null,
+		{},
+		{ name: '', ends: '2031-06-30' },
+		{ ends: '2031-06-30' },
+		{ name: 'Debian ELTS (Freexian)' },
+		{ name: 'Debian ELTS (Freexian)', ends: 'someday' },
+		{ name: 'Debian ELTS (Freexian)', ends: '2031-02-31', precision: 'month' },
+	])('says nothing for %j', (extended) => {
+		expect(extendedSentence(extended, 'en_us')).toBe(null)
+	})
+
+	// no price, no "free", no word on whose programme it is: the name says it
+	it('says nothing of its price, nor of whose it is', () => {
+		expect(EXTENDED_SENTENCES).toHaveLength(2)
+		for (const key of EXTENDED_SENTENCES) {
+			expect(key).not.toMatch(/\b(paid|free|price|cost|buy|subscription|vendor|official)\b|[$€]/i)
+			expect(key).toContain('{name}')
+			expect(key).toContain('{date}')
+		}
 	})
 })
 

@@ -464,11 +464,11 @@ describe('the system support badge', () => {
 		expect(badge(wrapper).find('b-icon-stub').attributes('icon')).toBe('alert-outline')
 	})
 
-	it('says in red-orange that the system is out of support', async () => {
+	it('says in red-orange that the system support ended', async () => {
 		const { wrapper } = mountBar(answer(osView({ state: 'security_ended', ends: '2026-08-31', precision: 'day' })))
 		await flushPromises()
 
-		expect(badge(wrapper).text()).toBe('System out of support')
+		expect(badge(wrapper).text()).toBe('System support ended')
 		expect(badge(wrapper).classes()).toContain('is-danger')
 		expect(badge(wrapper).classes()).not.toContain('is-warning')
 	})
@@ -490,6 +490,9 @@ describe('the system support badge', () => {
 		['an unknown state', osView({ state: 'unknown' })],
 		['a system the core does not know', osView({ state: 'unknown' }, { id: 'linuxmint', known: false, next: undefined })],
 		['a known flag of false with a state that would show', osView({ state: 'security_ended' }, { known: false })],
+		// Raspberry Pi OS and its kind say debian: the core says known:false and a variant, nothing more
+		['a Raspberry Pi OS (variant)', osView({ state: 'unknown' }, { known: false, variant: 'raspberrypi', next: undefined })],
+		['a variant, even with a state that would show', osView({ state: 'security_ended' }, { variant: 'proxmox' })],
 		['an answer that is not a view', {}],
 		['an empty answer', null],
 	])('shows nothing for %s', async (_, view) => {

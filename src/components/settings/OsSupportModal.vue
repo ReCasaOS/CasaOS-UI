@@ -32,7 +32,10 @@
 					{{ $t('{name} is the next release.', { name: nextName }) }}
 				</p>
 				<p class="os-cannot mt-1">
-					{{ $t('ReCasaOS cannot upgrade the operating system for you yet. Before any upgrade, take a snapshot of the machine or make sure you have console access.') }}
+					{{ $t('ReCasaOS cannot upgrade the operating system for you yet.') }}
+				</p>
+				<p class="os-snapshot mt-1">
+					{{ $t('There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.') }}
 				</p>
 				<p v-if="link" class="os-link mt-2">
 					<a :href="link.href" rel="noopener noreferrer" target="_blank">{{ $t(link.label) }}</a>
@@ -47,7 +50,7 @@
 </template>
 
 <script>
-import { formatDate, releaseLink, releaseName, supportSentence } from './osSupport'
+import { extendedSentence, releaseLink, releaseName, supportSentence } from './osSupport'
 
 export default {
 	name: 'OsSupportModal',
@@ -70,16 +73,13 @@ export default {
 			return this.$te('Operating system') ? this.$i18n.locale : 'en_us'
 		},
 		statusText() {
-			const sentence = supportSentence(this.os.support, this.locale)
+			const sentence = supportSentence(this.os.support, this.locale, this.os.id)
 			return sentence && this.$t(sentence.key, { name: this.name, date: sentence.date })
 		},
-		// The vendor's own later programme, named and dated, with no word on its price.
+		// The later programme, named and dated, with no word on its price or on whose it is.
 		extendedText() {
-			const extended = this.os.support?.extended
-			const date = formatDate(extended?.ends, 'day', this.locale)
-			if (!extended?.name || !date)
-				return ''
-			return this.$t('Extended security maintenance exists from the vendor: {name} until {date}.', { name: extended.name, date })
+			const sentence = extendedSentence(this.os.support?.extended, this.locale)
+			return sentence && this.$t(sentence.key, { name: this.os.support.extended.name, date: sentence.date })
 		},
 		nextName() {
 			return releaseName(this.os.next)
