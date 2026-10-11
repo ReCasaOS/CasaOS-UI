@@ -121,12 +121,12 @@ describe('the operating system window', () => {
 		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS cannot upgrade the operating system for you yet. Before any upgrade, take a snapshot of the machine or make sure you have console access.')
 	})
 
-	it('links the release notes of the next Debian, built from its codename', () => {
+	it('links the upgrade chapter of the Debian 12 release notes for a Debian 11, from the next release\'s version', () => {
 		open(BULLSEYE)
 
 		const link = wrapper.find('.os-link a')
 		expect(link.text()).toBe('Release notes')
-		expect(link.attributes('href')).toBe('https://www.debian.org/releases/bookworm/release-notes/')
+		expect(link.attributes('href')).toBe('https://www.debian.org/releases/bookworm/amd64/release-notes/ch-upgrading.en.html')
 		expect(link.attributes('target')).toBe('_blank')
 		expect(link.attributes('rel')).toBe('noopener noreferrer')
 	})
@@ -136,18 +136,18 @@ describe('the operating system window', () => {
 
 		const link = wrapper.find('.os-link a')
 		expect(link.text()).toBe('Upgrade guide')
-		expect(link.attributes('href')).toBe('https://documentation.ubuntu.com/server/how-to/software/upgrade-your-release/')
+		expect(link.attributes('href')).toBe('https://ubuntu.com/server/docs/how-to/software/upgrade-your-release/')
 	})
 
 	it('takes no link from the core: only the links it builds are on the page', () => {
 		open({ ...BULLSEYE, support: { ...BULLSEYE.support, source: 'https://evil.example/support' }, next: { ...BULLSEYE.next, url: 'https://evil.example/next', source: 'https://evil.example/next' } })
 
-		expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual(['https://www.debian.org/releases/bookworm/release-notes/'])
+		expect(wrapper.findAll('a').map(a => a.attributes('href'))).toEqual(['https://www.debian.org/releases/bookworm/amd64/release-notes/ch-upgrading.en.html'])
 		expect(wrapper.html()).not.toContain('evil.example')
 	})
 
-	it('has no link for a codename that is not one', () => {
-		open({ ...BULLSEYE, next: { ...BULLSEYE.next, codename: 'bookworm/../../evil' } })
+	it('has no link for a next release that is not in the table', () => {
+		open({ ...BULLSEYE, next: { ...BULLSEYE.next, version_id: '99' } })
 
 		expect(wrapper.find('a').exists()).toBe(false)
 		expect(wrapper.find('.os-next').exists()).toBe(true)

@@ -95,15 +95,27 @@ export function releaseName(release) {
 	return release.pretty_name || [release.id, release.version_id].filter(Boolean).join(' ')
 }
 
+// The official page to read before upgrading TO a release, keyed by that release's id and
+// version. Each address was fetched on 2026-10-11 and answered 200 (the flat
+// /releases/<codename>/release-notes/ of Debian is a 404 for bookworm, and
+// documentation.ubuntu.com redirects to ubuntu.com): when Debian or Canonical move a
+// page, change it here and in the spec that pins it. A release that is not here has no link.
+const DEBIAN_NOTES = 'Release notes'
+const UBUNTU_GUIDE = { label: 'Upgrade guide', href: 'https://ubuntu.com/server/docs/how-to/software/upgrade-your-release/' }
+const RELEASE_LINKS = new Map([
+	['debian-12', { label: DEBIAN_NOTES, href: 'https://www.debian.org/releases/bookworm/amd64/release-notes/ch-upgrading.en.html' }],
+	['debian-13', { label: DEBIAN_NOTES, href: 'https://www.debian.org/releases/trixie/release-notes/upgrading.en.html' }],
+	['ubuntu-24.04', UBUNTU_GUIDE],
+	['ubuntu-26.04', UBUNTU_GUIDE],
+])
+
 /**
- * The official page to read before upgrading to the next release, by distribution, or
- * null. The Debian page is the release notes of the next release; the codename is part
- * of the address, so it is checked.
+ * The official page for the upgrade to `next`, or null. Only an id and a version, both
+ * texts, go into the key: the codename, the pretty name and every address the core might
+ * send are not read.
  */
 export function releaseLink(next) {
-	if (next?.id === 'debian' && typeof next.codename === 'string' && /^[a-z][a-z0-9]{1,19}$/.test(next.codename))
-		return { label: 'Release notes', href: `https://www.debian.org/releases/${next.codename}/release-notes/` }
-	if (next?.id === 'ubuntu')
-		return { label: 'Upgrade guide', href: 'https://documentation.ubuntu.com/server/how-to/software/upgrade-your-release/' }
-	return null
+	if (typeof next?.id !== 'string' || typeof next.version_id !== 'string')
+		return null
+	return RELEASE_LINKS.get(`${next.id}-${next.version_id}`) ?? null
 }

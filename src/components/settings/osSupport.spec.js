@@ -112,34 +112,58 @@ describe('the name of a release', () => {
 	})
 })
 
+// The addresses below are the ones fetched on 2026-10-11, each answering 200 (the Ubuntu
+// guide's old address, documentation.ubuntu.com, answers 301 to the one pinned here, and
+// Debian's flat /releases/bookworm/release-notes/ answers 404). They are pinned as
+// strings on purpose: when a vendor moves a page, this is where it is noticed.
 describe('the official page', () => {
-	it('is the release notes of the next Debian', () => {
-		expect(releaseLink({ id: 'debian', codename: 'bookworm' })).toEqual({
-			label: 'Release notes',
-			href: 'https://www.debian.org/releases/bookworm/release-notes/',
-		})
-		expect(releaseLink({ id: 'debian', codename: 'trixie' }).href).toBe('https://www.debian.org/releases/trixie/release-notes/')
+	it.each([
+		['debian', '12', 'Release notes', 'https://www.debian.org/releases/bookworm/amd64/release-notes/ch-upgrading.en.html'],
+		['debian', '13', 'Release notes', 'https://www.debian.org/releases/trixie/release-notes/upgrading.en.html'],
+		['ubuntu', '24.04', 'Upgrade guide', 'https://ubuntu.com/server/docs/how-to/software/upgrade-your-release/'],
+		['ubuntu', '26.04', 'Upgrade guide', 'https://ubuntu.com/server/docs/how-to/software/upgrade-your-release/'],
+	])('for the upgrade to %s %s is %s: %s', (id, version_id, label, href) => {
+		expect(releaseLink({ id, version_id })).toEqual({ label, href })
 	})
 
-	it('is the upgrade guide of Ubuntu, whatever the release', () => {
-		for (const codename of ['noble', 'resolute', undefined]) {
-			expect(releaseLink({ id: 'ubuntu', codename })).toEqual({
-				label: 'Upgrade guide',
-				href: 'https://documentation.ubuntu.com/server/how-to/software/upgrade-your-release/',
-			})
-		}
+	// the key is the next release's id and version: nothing else the core sends is read
+	it('takes its address from the id and the version only', () => {
+		const link = releaseLink({ id: 'debian', version_id: '12', codename: 'bookworm/../../evil', pretty_name: 'x', url: 'https://evil.example/', source: 'https://evil.example/', href: 'https://evil.example/' })
+		expect(link.href).toBe('https://www.debian.org/releases/bookworm/amd64/release-notes/ch-upgrading.en.html')
+		expect(releaseLink({ id: 'debian', codename: 'bookworm' })).toBe(null)
+		expect(releaseLink({ id: 'debian', version_id: '13', codename: 'bookworm' }).href).toContain('/trixie/')
 	})
 
-	// the codename goes into an address: nothing but a codename gets there
-	it.each([undefined, null, '', 'a', 'Bookworm', 'book worm', 'bookworm/../../evil', 'bookworm?x=1', 'bookworm#x', '..', 'a'.repeat(21), 12, ['bookworm'], 'bookworm\n'])('has no page for the Debian codename %j', (codename) => {
-		expect(releaseLink({ id: 'debian', codename })).toBe(null)
+	// a release that is not in the table has no link: the first one that goes in is a
+	// page somebody fetched
+	it.each([
+		['debian', '11'],
+		['debian', '14'],
+		['debian', '12.1'],
+		['debian', ' 12'],
+		['debian', ''],
+		['ubuntu', '22.04'],
+		['ubuntu', '24.10'],
+		['ubuntu', '26.10'],
+		['ubuntu', '24.4'],
+		['linuxmint', '22'],
+		['raspbian', '12'],
+		['Debian', '12'],
+		['constructor', '12'],
+		['__proto__', '12'],
+	])('has no page for %s %s', (id, version_id) => {
+		expect(releaseLink({ id, version_id })).toBe(null)
 	})
 
-	it('has no page for another distribution, and takes no address from the core', () => {
-		expect(releaseLink({ id: 'linuxmint', codename: 'wilma' })).toBe(null)
-		expect(releaseLink({ id: 'raspbian', codename: 'bookworm' })).toBe(null)
-		expect(releaseLink(null)).toBe(null)
-		expect(releaseLink(undefined)).toBe(null)
-		expect(releaseLink({ id: 'ubuntu', url: 'https://evil.example/', source: 'https://evil.example/', href: 'https://evil.example/' }).href).not.toContain('evil')
+	it.each([
+		[{ id: ['debian'], version_id: ['12'] }],
+		[{ id: 'debian', version_id: 12 }],
+		[{ id: 'debian' }],
+		[{ version_id: '12' }],
+		[{}],
+		[null],
+		[undefined],
+	])('has no page for %j', (next) => {
+		expect(releaseLink(next)).toBe(null)
 	})
 })
