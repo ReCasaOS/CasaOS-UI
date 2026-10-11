@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
+import { FIX_BROKEN, READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, READINESS_OWN_SENTENCES, READINESS_REASONS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
+
+// what the window says of a check that did not finish, under its title
+const DID_NOT_FINISH = 'ReCasaOS could not finish this check, so it counts it as a blocker until it can. Check again in a moment.'
 
 // The codes of the readiness spec, pinned here: the dashboard, the CI proof and the copy of the
 // report the owner keeps all use them. A code added to the table without the spec, or dropped
@@ -264,7 +268,9 @@ describe('the data of the core\'s own checks', () => {
 		['foreign_arch', { architectures: ['i386'], packages: ['libc6:i386'], count: 1 }, { names: 'libc6:i386' }, [{ name: 'architectures', value: 'i386' }, { name: 'count', value: '1' }]],
 		// the service the owner knows, and not the package that brings it
 		['host_services', { services: ['postgresql'], packages: ['postgresql-13'] }, { names: 'postgresql' }, [{ name: 'packages', value: 'postgresql-13' }]],
-		['busy', { source: 'unit', unit: 'apt-daily.service' }, { names: 'apt-daily.service' }, [{ name: 'source', value: 'unit' }]],
+		// the source (a unit, or the maintenance of the updater) is not a word the owner reads
+		['busy', { source: 'unit', unit: 'apt-daily.service' }, { names: 'apt-daily.service' }, []],
+		['busy', { source: 'maintenance' }, {}, []],
 		['hold_until', { not_before: '2026-11-28' }, { date: 'November 28, 2026' }, []],
 		['power', { capacity: 40 }, { percent: '40' }, []],
 		['disk_root', { available_bytes: 1200000000, minimum_bytes: 2147483648 }, { free: '1.1 GiB', needed: '2 GiB' }, []],
@@ -308,11 +314,11 @@ describe('the data of the core\'s own checks', () => {
 
 describe('a check that did not answer', () => {
 	// fail closed: the core says refuse with data.unknown, and the dashboard counts it a blocker
-	it('is said as a blocker that could not be checked, with the core\'s reason as text', () => {
+	it('is said as a blocker that could not be checked, with the core\'s own words as text when it gave no reason code', () => {
 		const found = row('broken_dpkg', 'refuse', { unknown: true }, { detail: 'timed out after 5s' })
 		expect(found.title).toEqual({ key: READINESS_CHECKS.broken_dpkg.label })
-		expect(found.sentence).toEqual({ key: 'ReCasaOS could not finish this check, so it counts it as a blocker until it can. Check again in a moment.', params: {} })
-		expect(found.reason).toBe('timed out after 5s')
+		expect(found.sentence).toEqual({ key: DID_NOT_FINISH, params: {} })
+		expect(found.reason).toEqual({ text: 'timed out after 5s' })
 		expect(found.unknown).toBe(true)
 	})
 
@@ -335,7 +341,61 @@ describe('a check that did not answer', () => {
 	})
 
 	it('has no reason when the core gave none', () => {
-		expect(row('broken_dpkg', 'refuse', { unknown: true }, { detail: '' }).reason).toBe('')
+		expect(row('broken_dpkg', 'refuse', { unknown: true }, { detail: '' }).reason).toBe(null)
+	})
+
+	// [c12] [c21]: the core's reason is a code of a closed set (pkg/osreadiness/engine.go), said in the window's language
+	describe('and why', () => {
+		const CODES = ['timeout', 'not_finished', 'tool_missing', 'too_large', 'missing', 'unreadable', 'not_allowed', 'unexpected_output', 'panic', 'invalid_result', 'failed']
+
+		it('has a sentence for each code of the core\'s closed set, each its own, and for no other', () => {
+			expect(Object.keys(READINESS_REASONS).sort()).toEqual([...CODES].sort())
+			expect(new Set(Object.values(READINESS_REASONS)).size).toBe(CODES.length)
+			expect(Object.keys(READINESS_OWN_SENTENCES).sort()).toEqual(['clock', 'stale'])
+		})
+
+		it.each(CODES)('says %s by its own sentence under the one of a check that did not finish, and not in the core\'s English words', (reason) => {
+			const found = row('apps', 'refuse', { unknown: true, reason }, { detail: 'This could not be checked: the core says it in English.' })
+
+			expect(found.sentence).toEqual({ key: DID_NOT_FINISH, params: {} })
+			expect(found.reason).toEqual({ key: READINESS_REASONS[reason] })
+			expect(JSON.stringify(found)).not.toContain('in English')
+			expect(found.details).toEqual([])
+		})
+
+		it.each([
+			['clock', /date of this machine is wrong/],
+			['stale', /too old to know the releases/],
+		])('says %s as a sentence of its own, and nothing under it', (reason, said) => {
+			const found = row('unsupported_os', 'refuse', { unknown: true, reason, id: 'debian', version_id: '12' }, { detail: 'the core says it in English' })
+
+			expect(found.sentence.key).toMatch(said)
+			expect(found.sentence.key).not.toMatch(/could not finish/)
+			expect(found.reason).toBe(null)
+			expect(found.title).toEqual({ key: READINESS_CHECKS.unsupported_os.label })
+			expect(found.unknown).toBe(true)
+		})
+
+		it('tells the owner of a ReCasaOS that is too old to update it, and not that there is no upgrade from his release', () => {
+			expect(READINESS_OWN_SENTENCES.stale).toMatch(/Update ReCasaOS/)
+			expect(READINESS_OWN_SENTENCES.stale).toMatch(/eighteen months/)
+			expect(READINESS_OWN_SENTENCES.stale).not.toMatch(/no upgrade|not a Debian/i)
+		})
+
+		it.each(['from_the_future', 'CLOCK', 'Stale', 'constructor', '__proto__', 'toString', '', 3, null, undefined, ['timeout'], { timeout: true }])('says the core\'s own words, as text, for a reason it does not know: %j', (reason) => {
+			const found = row('apps', 'refuse', { unknown: true, reason }, { detail: 'the core says' })
+
+			expect(found.sentence).toEqual({ key: DID_NOT_FINISH, params: {} })
+			expect(found.reason).toEqual({ text: 'the core says' })
+		})
+
+		it('is a blocker for a ReCasaOS that is too old, with every other check shown beside it', () => {
+			const view = readinessView(report([check('unsupported_os', 'refuse', { unknown: true, reason: 'stale' }), check('held', 'ok')], { state: 'blocked' }))
+
+			expect(view.blockers.map(r => r.code)).toEqual(['unsupported_os'])
+			expect(view.passed.map(r => r.code)).toEqual(['held'])
+			expect(view.summary).toEqual({ key: 'Not ready: 1 blocker', params: {} })
+		})
 	})
 })
 
@@ -346,6 +406,39 @@ describe('the action', () => {
 
 	it.each(['none', 'format_disk', '', undefined, null, 3, ['restart_machine'], 'constructor', '__proto__'])('says nothing for the action %j', (action) => {
 		expect(row('busy', 'refuse', {}, { action }).action).toBe('')
+	})
+
+	// [c13] the core sends finish_dpkg for each of the three flags of broken_dpkg, and dpkg --configure -a answers two of them
+	describe('of broken_dpkg', () => {
+		const action = data => row('broken_dpkg', 'refuse', data, { action: 'finish_dpkg' }).action
+
+		it.each([
+			['an operation dpkg left unfinished (dpkg --audit)', { audit: true }],
+			['a journal that has one', { updates: 2 }],
+			['an operation dpkg left unfinished, with broken dependencies besides', { audit: true, apt_check: true }],
+			['a journal that has one, with broken dependencies besides', { updates: 2, apt_check: true }],
+			['both, with broken dependencies besides', { audit: true, updates: 1, apt_check: true }],
+			['a core that sent no flag', {}],
+		])('says dpkg --configure -a for %s', (_, data) => {
+			expect(action(data)).toBe(READINESS_ACTIONS.finish_dpkg)
+			expect(action(data)).toMatch(/dpkg --configure -a/)
+		})
+
+		it('says apt-get --fix-broken install for dependencies that are not met, alone', () => {
+			expect(action({ apt_check: true })).toBe(FIX_BROKEN)
+			expect(FIX_BROKEN).toMatch(/apt-get --fix-broken install/)
+			expect(FIX_BROKEN).not.toMatch(/dpkg --configure/)
+		})
+
+		it.each([0, -1, 1.5, 'x', null])('does not take %j unfinished operations for one', (updates) => {
+			expect(action({ updates, apt_check: true })).toBe(FIX_BROKEN)
+		})
+
+		it('leaves the other actions, and the action of other codes, as they are', () => {
+			expect(row('broken_dpkg', 'refuse', { apt_check: true }, { action: 'restart_machine' }).action).toBe(READINESS_ACTIONS.restart_machine)
+			expect(row('broken_dpkg', 'refuse', { apt_check: true }, { action: 'none' }).action).toBe('')
+			expect(row('busy', 'refuse', { apt_check: true }, { action: 'finish_dpkg' }).action).toBe(READINESS_ACTIONS.finish_dpkg)
+		})
 	})
 })
 
@@ -637,6 +730,25 @@ describe('what the final core really sends', () => {
 		expect(found.details).toEqual([])
 	})
 
+	// the third parties are told by the Release file apt keeps of a source: a mirror it has none of is among them
+	it('says that a mirror of Debian or Ubuntu that apt keeps no Release file for is listed with the third parties', () => {
+		for (const sentence of [].concat(READINESS_CHECKS.sources_third_party.text)) {
+			expect(sentence).toMatch(/A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it/)
+			expect(sentence).toMatch(/run apt update on the machine, then check again/)
+		}
+	})
+
+	// [c15] the check runs on Ubuntu as well as on Debian, and on one folder as well as on three
+	it('says the next release, and neither a distribution nor how many folders', () => {
+		for (const sentence of [].concat(READINESS_CHECKS.merged_usr.text)) {
+			expect(sentence).not.toMatch(/Debian|Ubuntu|\b\d\d\b/)
+			expect(sentence).toMatch(/next release/)
+			expect(sentence).not.toMatch(/^The folders/)
+		}
+		expect(row('merged_usr', 'refuse', { directories: ['/lib'] }).sentence.params).toEqual({ names: '/lib' })
+		expect(row('merged_usr', 'refuse', { directories: ['/lib'] }, {}, 'fr_fr').sentence.key).toBe(row('merged_usr', 'refuse', { directories: ['/lib'] }).sentence.key)
+	})
+
 	it('says Debian, and not Ubuntu, of the keys the core checks only for Debian', () => {
 		expect(READINESS_CHECKS.keyring_old.text).toMatch(/Debian/)
 		expect(READINESS_CHECKS.keyring_old.text).not.toMatch(/Ubuntu/)
@@ -769,8 +881,9 @@ describe('power', () => {
 		expect(found.sentence.params).toEqual({ percent: '40' })
 	})
 
-	it('lists the status it did not use, and the battery', () => {
-		expect(row('power', 'refuse', { battery: 'BAT0', status: 'charging', percent: 40 }).details).toEqual([{ name: 'battery', value: 'BAT0' }, { name: 'status', value: 'charging' }])
+	// [c14] the sentence says whether it runs on its battery: the status as a raw word adds nothing to it
+	it.each(['charging', 'full', 'unknown', 'discharging'])('lists the battery and never the status %s', (status) => {
+		expect(row('power', 'refuse', { battery: 'BAT0', status, percent: 40 }).details).toEqual([{ name: 'battery', value: 'BAT0' }])
 	})
 
 	it('says the discharging sentence without a charge when the core sent none', () => {
@@ -889,15 +1002,15 @@ describe('a date that is wrong', () => {
 		expect(found.unknown).toBe(true)
 		expect(found.sentence.key).toMatch(/date of this machine is wrong/)
 		expect(found.sentence.key).not.toMatch(/could not finish/)
-		expect(found.reason).toBe('')
+		expect(found.reason).toBe(null)
 		expect(found.title).toEqual({ key: READINESS_CHECKS.unsupported_os.label })
 	})
 
-	it.each(['timeout', 'tool_missing', 'unreadable', 'failed', undefined, 'CLOCK'])('says the check could not finish for the reason %j', (reason) => {
+	it.each(['timeout', 'tool_missing', 'unreadable', 'failed', undefined, 'CLOCK'])('does not say the date is wrong for the reason %j', (reason) => {
 		const found = row('unsupported_os', 'refuse', { unknown: true, reason }, { detail: 'the core says' })
 
 		expect(found.sentence.key).toMatch(/could not finish this check/)
-		expect(found.reason).toBe('the core says')
+		expect(found.reason).not.toBe(null)
 	})
 
 	it('is a blocker', () => {
@@ -905,6 +1018,94 @@ describe('a date that is wrong', () => {
 
 		expect(view.blockers).toHaveLength(1)
 		expect(view.summary).toEqual({ key: 'Not ready: 1 blocker', params: {} })
+	})
+})
+
+// [c5] [c22]: a Docker that is there and not running is not asked (asking would start it): the three checks that need its
+// answer say they did not look, as a note
+describe('a Docker that is not running', () => {
+	const CODES = ['docker_swarm', 'containers_policy', 'containers_ports']
+
+	it.each(CODES)('says %s was not looked at, in a sentence of its own, and does not list the reason', (code) => {
+		const found = row(code, 'info', { why: 'not_running' })
+
+		expect(found.severity).toBe('info')
+		expect(found.sentence.key).toMatch(/^Docker is not running, so /)
+		expect(found.sentence.key).toMatch(/was not looked at/)
+		expect(found.sentence.key).toMatch(/changes nothing/)
+		expect(found.sentence.key).toMatch(/Start Docker/)
+		expect(found.details).toEqual([])
+		expect(found.unknown).toBe(false)
+	})
+
+	it('says what each of the three did not look at', () => {
+		const said = CODES.map(code => row(code, 'info', { why: 'not_running' }).sentence.key)
+
+		expect(new Set(said).size).toBe(3)
+		expect(said[0]).toMatch(/swarm/)
+		expect(said[1]).toMatch(/would not start again/)
+		expect(said[2]).toMatch(/port 53, 80 or 443/)
+	})
+
+	it.each(CODES)('says the same of %s when the note comes without a reason this window knows', (code) => {
+		for (const data of [{}, { why: 'from_the_future' }, { why: 3 }]) {
+			const found = row(code, 'info', data)
+
+			expect(found.sentence.key, JSON.stringify(data)).toBe(row(code, 'info', { why: 'not_running' }).sentence.key)
+		}
+	})
+
+	it.each(CODES)('still says the refusal or the warning of %s as before', (code) => {
+		const sentence = [].concat(READINESS_CHECKS[code].text).at(-1)
+
+		expect(row(code, code === 'docker_swarm' ? 'refuse' : 'warn').sentence.key).toBe(sentence)
+		expect(sentence).not.toMatch(/not running/)
+	})
+
+	it('is a note: the report stays ready for it, and Docker not running is the warning of docker_down', () => {
+		const view = readinessView(report([check('docker_swarm', 'info', { why: 'not_running' }), check('containers_policy', 'info', { why: 'not_running' }), check('docker_down', 'warn')], { state: 'attention' }))
+
+		expect(view.notes.map(r => r.code)).toEqual(['docker_swarm', 'containers_policy'])
+		expect(view.warnings.map(r => r.code)).toEqual(['docker_down'])
+		expect(view.state).toBe('attention')
+	})
+})
+
+// [c14] where Docker comes from: the core names it, and the window says it in words
+describe('docker_origin', () => {
+	it.each([
+		['distribution', /docker\.io package/],
+		['snap', /from snap/],
+		['unknown', /put there by hand/],
+	])('says %s in words, and does not list it as a raw word', (origin, said) => {
+		const found = row('docker_origin', 'refuse', { origin })
+
+		expect(found.sentence.key).toMatch(said)
+		expect(found.sentence.key).toMatch(/Docker's own repository \(docker-ce\)/)
+		expect(found.details).toEqual([])
+	})
+
+	it('says a different thing for each origin', () => {
+		const said = ['distribution', 'snap', 'unknown'].map(origin => row('docker_origin', 'refuse', { origin }).sentence.key)
+
+		expect(new Set(said).size).toBe(3)
+	})
+
+	it.each(['from_the_future', '', 3, null, undefined, 'constructor', '__proto__'])('says the plain sentence of the code for the origin %j', (origin) => {
+		expect(row('docker_origin', 'refuse', { origin }).sentence.key).toBe(READINESS_CHECKS.docker_origin.text)
+	})
+})
+
+// [c11] a pending update of a Docker whose packages are on hold: what the sentence says of the window is true of the window
+describe('the System packages window and a held Docker', () => {
+	it('asks to confirm a hold before it updates Docker, as the sentence of the report says', () => {
+		const modal = readFileSync('src/components/settings/SystemPackageUpdateModal.vue', 'utf8')
+
+		expect(READINESS_CHECKS.docker_update_pending.variants.true).toMatch(/System packages window \(it asks you to confirm, because of the hold\)/)
+		// the box of the confirmation, and the button that waits for it
+		expect(modal).toContain('I know the packages are on hold and I want to update anyway')
+		expect(modal).toContain('dockerHeldConfirmed')
+		expect(modal).toContain('dockerAwaitsBox')
 	})
 })
 
@@ -957,7 +1158,7 @@ describe('a core that says far too much', () => {
 	it('cuts the reason of a check that did not answer', () => {
 		const found = row('broken_dpkg', 'refuse', { unknown: true }, { detail: long })
 
-		expect(found.reason.length).toBe(300)
+		expect(found.reason.text.length).toBe(300)
 	})
 
 	it('cuts a code that is far too long', () => {

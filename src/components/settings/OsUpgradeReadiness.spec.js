@@ -269,6 +269,21 @@ describe('the answer', () => {
 		expect(row.find('.os-check-reason').text()).toBe('timed out after 5s')
 	})
 
+	// [c12] [c21]: the core's reason is a code, and the window says it in its own language
+	it('says why a check did not answer by the code of its reason, in the language of the window, and not in the core\'s English words', async () => {
+		const checks = [check('apps', 'refuse', { unknown: true, reason: 'tool_missing' }, { detail: 'This could not be checked: a tool it needs is not installed.' })]
+
+		await run({ ...REPORT, checks })
+		expect(wrapper.find('.os-check-sentence').text()).toBe('ReCasaOS could not finish this check, so it counts it as a blocker until it can. Check again in a moment.')
+		expect(wrapper.find('.os-check-reason').text()).toBe('A tool this check needs is not installed on this machine.')
+
+		i18n.global.locale = 'fr_fr'
+		await run({ ...REPORT, checks }, { props: { locale: 'fr_fr' } })
+		expect(wrapper.find('.os-check-sentence').text()).toBe('ReCasaOS n\'a pas pu terminer ce contrôle : il le compte comme bloquant tant qu\'il n\'a pas abouti. Relancez la vérification dans un instant.')
+		expect(wrapper.find('.os-check-reason').text()).toBe('Un outil dont ce contrôle a besoin n\'est pas installé sur cette machine.')
+		expect(wrapper.text()).not.toContain('This could not be checked')
+	})
+
 	it('shows the plain sentence of a code for a core that sent no data, and keeps what it did send', async () => {
 		await run({ ...REPORT, checks: [check('held', 'refuse'), check('disk_boot', 'refuse', { free_mib: 120 })] })
 
@@ -341,6 +356,55 @@ describe('rows of the final core', () => {
 		expect(wrapper.find('.os-check-sentence').text()).toMatch(/^The date of this machine is wrong: it is before the day/)
 		expect(wrapper.find('.os-check-reason').exists()).toBe(false)
 		expect(wrapper.text()).not.toContain('There is no upgrade')
+	})
+
+	// [c3]: a table of releases more than eighteen months old is a ReCasaOS to update, and not a release with no upgrade
+	it('says this ReCasaOS is too old to know the releases, as a blocker, with the other checks beside it, in both languages', async () => {
+		const report = { state: 'blocked', checks: [check('unsupported_os', 'refuse', { unknown: true, reason: 'stale', id: 'debian', version_id: '12' }, { detail: 'The table of the releases that this ReCasaOS carries was written on 2026-10-09, more than eighteen months ago.' }), check('merged_usr', 'ok')] }
+
+		await run(report)
+		expect(wrapper.find('.os-readiness-result').text()).toBe('Not ready: 1 blocker')
+		expect(wrapper.find('.os-check-title').text()).toBe('Operating system version')
+		expect(wrapper.find('.os-check-sentence').text()).toMatch(/^This ReCasaOS is too old to know the releases: .*Update ReCasaOS/)
+		expect(wrapper.find('.os-check-reason').exists()).toBe(false)
+		expect(wrapper.find('.os-check-details').exists()).toBe(false)
+		expect(wrapper.find('.os-readiness-group.is-others summary').text()).toBe('Other checks (passed: 1, notes: 0)')
+		expect(wrapper.text()).not.toContain('There is no upgrade')
+		expect(wrapper.text()).not.toContain('eighteen months ago.')
+
+		i18n.global.locale = 'fr_fr'
+		await run(report, { props: { locale: 'fr_fr' } })
+		expect(wrapper.find('.os-check-sentence').text()).toMatch(/^Cette version de ReCasaOS est trop ancienne pour connaître les versions : .*Mettez ReCasaOS à jour/)
+		expect(wrapper.find('.os-check-reason').exists()).toBe(false)
+	})
+
+	// [c5] [c22]: Docker is there and not running, so the checks that need its answer say they did not look
+	it('says the checks that did not ask Docker, as notes, and the warning of docker_down beside them', async () => {
+		await run({ state: 'attention', checks: [check('docker_down', 'warn'), check('docker_swarm', 'info', { why: 'not_running' }), check('containers_policy', 'info', { why: 'not_running' }), check('containers_ports', 'info', { why: 'not_running' })] })
+
+		expect(wrapper.find('.os-readiness-result').text()).toBe('Ready, with things to look at')
+		const notes = wrapper.findAll('.os-readiness-group.is-others .os-check')
+		expect(notes).toHaveLength(3)
+		expect(notes[0].find('.os-check-title').text()).toBe('Docker Swarm')
+		expect(notes[0].find('.os-check-sentence').text()).toMatch(/^Docker is not running, so whether this machine is part of a Docker swarm was not looked at/)
+		expect(notes[2].find('.os-check-sentence').text()).toMatch(/port 53, 80 or 443/)
+		// the reason is the sentence's, and not a raw word beside it
+		expect(wrapper.findAll('.os-check-details')).toHaveLength(0)
+		expect(wrapper.text()).not.toContain('not_running')
+	})
+
+	// [c14]: the values of the core's own words are never a raw token under a sentence that says them
+	it('says no raw word of the source of the package work, the state of the battery or the origin of Docker', async () => {
+		await run({ state: 'blocked', checks: [check('busy', 'refuse', { source: 'unit', unit: 'apt-daily.service' }), check('power', 'refuse', { battery: 'BAT0', status: 'charging', percent: 40 }), check('docker_origin', 'refuse', { origin: 'snap' })] })
+
+		const rows = wrapper.findAll('.os-check')
+		expect(rows[0].find('.os-check-sentence').text()).toBe('Something else is changing the system\'s packages right now (apt-daily.service).')
+		expect(rows[0].find('.os-check-details').exists()).toBe(false)
+		expect(rows[1].find('.os-check-details').text()).toBe('Battery: BAT0')
+		expect(rows[2].find('.os-check-sentence').text()).toMatch(/^Docker comes from snap\./)
+		expect(rows[2].find('.os-check-details').exists()).toBe(false)
+		for (const word of ['unit', 'charging', 'snap'])
+			expect(wrapper.findAll('.os-check-details').map(details => details.text()).join(' ')).not.toContain(word)
 	})
 
 	it('says a newer Docker whose packages are on hold as a note, with where it can be updated', async () => {

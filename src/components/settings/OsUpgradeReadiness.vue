@@ -49,7 +49,7 @@
 								{{ say(row.sentence) }}
 							</p>
 							<p v-if="row.reason" class="os-check-reason is-size-7 _has-text-gray">
-								{{ row.reason }}
+								{{ say(row.reason) }}
 							</p>
 							<p v-if="row.details.length" class="os-check-details is-size-7 _has-text-gray">
 								{{ detailsText(row) }}

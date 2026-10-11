@@ -130,6 +130,15 @@ function resolve(param, data, locale) {
 	return null
 }
 
+// What the checks that need Docker's daemon say when Docker is there and its service does not run: the daemon is not asked (asking it
+// would start it, and a report starts nothing), and the core says so, as a note, with the reason `not_running`.
+const SWARM_NOT_ASKED = 'Docker is not running, so whether this machine is part of a Docker swarm was not looked at: asking Docker would start it, and this check changes nothing. Start Docker, then check again.'
+const POLICY_NOT_ASKED = 'Docker is not running, so which containers would not start again after the upgrade was not looked at: asking Docker would start it, and this check changes nothing. Start Docker, then check again.'
+const PORTS_NOT_ASKED = 'Docker is not running, so which containers publish port 53, 80 or 443, or use the machine\'s own network, was not looked at: asking Docker would start it, and this check changes nothing. Start Docker, then check again.'
+
+// What to do about dependencies that are not met (apt_check), the one flag of broken_dpkg that dpkg --configure -a does not repair.
+export const FIX_BROKEN = 'Repair the packages whose dependencies are not met (on the machine, sudo apt-get --fix-broken install does it), then check again.'
+
 /**
  * One entry per code of the readiness spec: a `label` (what is looked at, for the list of what
  * passed and as the title of a row) and the sentence of the code. A sentence is a language-file
@@ -139,8 +148,10 @@ function resolve(param, data, locale) {
  * says `text` for any severity it has no sentence of its own for. A code whose cause the core
  * tells apart by one field of its data (`by`: the kind of boot loader, why a disk was not looked
  * at) has a sentence per value of it in `variants`, each a sentence or a list like the above; the
- * field is not listed again. `actions` says, per action code, when the action fits the code: false
- * for never, or a function of the data.
+ * field is not listed again. `quiet` names the fields of the data that the sentences say already, or
+ * that add nothing to them: they are never listed. `actions` says, per action code, when the action
+ * fits the code: false for never, or a function of the data that says whether it does (true or false)
+ * or which sentence of the action to say (a language-file key).
  *
  * What the sentences say is what the owner can do about it, or what the upgrade does by itself.
  * A code that normally comes with an `action` says what it means, and the action says what to do.
@@ -189,6 +200,8 @@ export const READINESS_CHECKS = {
 			'Something else is changing the system\'s packages right now ({names}).',
 			'Something else is changing the system\'s packages right now: an update, the automatic updates or another package manager.',
 		],
+		// `unit` is the service that is at work, which the sentence names; `source` says which way the core found it
+		quiet: ['source'],
 	},
 	apps: {
 		label: 'Apps in progress',
@@ -211,6 +224,10 @@ export const READINESS_CHECKS = {
 	broken_dpkg: {
 		label: 'Package manager state',
 		text: 'The package manager (dpkg) has an operation left unfinished, or is in an inconsistent state, so an upgrade would start from a broken base.',
+		// the core sends finish_dpkg for each of its three flags: an operation that dpkg left unfinished (audit, updates), which
+		// dpkg --configure -a finishes, and dependencies that are not met (apt_check), which only apt repairs. Both: dpkg first, and
+		// the check, asked again, says the rest.
+		actions: { finish_dpkg: data => data.audit === true || (Number.isInteger(data.updates) && data.updates > 0) || data.apt_check !== true ? true : FIX_BROKEN },
 	},
 	held: {
 		label: 'Held packages',
@@ -257,8 +274,9 @@ export const READINESS_CHECKS = {
 	sources_third_party: {
 		label: 'Third-party package sources',
 		text: [
-			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. Sources: {names}.',
-			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade.',
+			// a source on a host that is not Debian's or Ubuntu's own counts as theirs only when the Release file apt keeps for it says so
+			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it (run apt update on the machine, then check again). Sources: {names}.',
+			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it (run apt update on the machine, then check again).',
 		],
 		// nothing in the sources is wrong: the sentence says what the upgrade does with them
 		actions: { review_sources: false },
@@ -314,8 +332,9 @@ export const READINESS_CHECKS = {
 	merged_usr: {
 		label: 'Merged /usr layout',
 		text: [
-			'The folders {names} are not links to /usr, which Debian 12 and later require. ReCasaOS does not convert this for you: it has to be converted by hand first.',
-			'The folders /bin, /sbin and /lib are not links to /usr, which Debian 12 and later require. ReCasaOS does not convert this for you: it has to be converted by hand first.',
+			// it runs on Ubuntu as well, and on one folder as well as on three
+			'Some of the system folders are not links to /usr ({names}), which the next release requires. ReCasaOS does not convert this for you: it has to be converted by hand first.',
+			'Some of the system folders (/bin, /sbin or /lib) are not links to /usr, which the next release requires. ReCasaOS does not convert this for you: it has to be converted by hand first.',
 		],
 	},
 	cgroup1: {
@@ -440,6 +459,8 @@ export const READINESS_CHECKS = {
 			'The machine\'s battery is under 50%, which is too low for an upgrade: a power cut in the middle of an upgrade can leave it unable to start. Keep it plugged in and let it charge.',
 		],
 		by: 'status',
+		// charging, full or unknown: the sentence says the charge is under what an upgrade needs, and the word adds nothing
+		quiet: ['status'],
 		variants: {
 			discharging: [
 				'The machine is running on its battery, which is at {percent}%: a power cut in the middle of an upgrade can leave it unable to start. Plug it in and let it charge.',
@@ -462,10 +483,20 @@ export const READINESS_CHECKS = {
 	docker_swarm: {
 		label: 'Docker Swarm',
 		text: 'This machine is part of a Docker swarm, which the upgrade does not handle.',
+		info: SWARM_NOT_ASKED,
+		by: 'why',
+		variants: { not_running: SWARM_NOT_ASKED },
 	},
 	docker_origin: {
 		label: 'Where Docker comes from',
 		text: 'Docker comes from the system\'s docker.io package, from snap, or from an unknown source. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
+		// the core names where it comes from (docker-repository is the one that passes, and says nothing here)
+		by: 'origin',
+		variants: {
+			distribution: 'Docker comes from the system\'s own docker.io package. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
+			snap: 'Docker comes from snap. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
+			unknown: 'A Docker is on this machine, but no package or snap says where it comes from: it was put there by hand, or comes from a source ReCasaOS does not know. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
+		},
 	},
 	docker_down: {
 		label: 'Docker state',
@@ -486,6 +517,9 @@ export const READINESS_CHECKS = {
 			'These containers are not set to restart by themselves, so they stay stopped after the restart that ends the upgrade: {names}. Start them by hand afterwards, or change their restart policy first.',
 			'Some containers are not set to restart by themselves, so they stay stopped after the restart that ends the upgrade. Start them by hand afterwards, or change their restart policy first.',
 		],
+		info: POLICY_NOT_ASKED,
+		by: 'why',
+		variants: { not_running: POLICY_NOT_ASKED },
 	},
 	containers_ports: {
 		label: 'Containers serving the network',
@@ -493,6 +527,9 @@ export const READINESS_CHECKS = {
 			'These containers use the machine\'s own network or publish port 53, 80 or 443: {names}. This machine may be your DNS or web server, which will be down during the upgrade.',
 			'Some containers use the machine\'s own network or publish port 53, 80 or 443. This machine may be your DNS or web server, which will be down during the upgrade.',
 		],
+		info: PORTS_NOT_ASKED,
+		by: 'why',
+		variants: { not_running: PORTS_NOT_ASKED },
 	},
 	backup_age: {
 		label: 'Last app backup',
@@ -603,8 +640,31 @@ export const DETAIL_FORMAT = '{name}: {value}'
 
 const UNKNOWN_CHECK = 'A check this window does not know'
 const DID_NOT_ANSWER = 'ReCasaOS could not finish this check, so it counts it as a blocker until it can. Check again in a moment.'
-// the core's reason `clock`: the date of the machine is before the day its table of releases was written
-const CLOCK_WRONG = 'The date of this machine is wrong: it is before the day this version of ReCasaOS was written, so the report cannot tell what upgrade this machine has. Set the date (and the time synchronisation of the machine), then check again.'
+
+// Why a check did not answer: the core's `data.reason`, a closed set of codes (reasonText of pkg/osreadiness/engine.go), each said here in the
+// window's own language, under the one sentence of a check that did not finish. The core's English words are shown only for a code that is
+// not in this table (a newer core's).
+export const READINESS_REASONS = {
+	timeout: 'The check did not answer in time.',
+	not_finished: 'The report ran out of time before it got to this check.',
+	tool_missing: 'A tool this check needs is not installed on this machine.',
+	too_large: 'What this check has to read is larger than it can read.',
+	missing: 'A file or a device this check reads is not there.',
+	unreadable: 'A file or a folder this check reads cannot be read.',
+	not_allowed: 'The check asked for something a read-only report does not do, so it was stopped.',
+	unexpected_output: 'A tool answered with something this check does not understand.',
+	panic: 'The check failed unexpectedly.',
+	invalid_result: 'The check gave an answer that is not valid.',
+	failed: 'A tool or a file this check needs failed.',
+}
+
+// Two reasons are a sentence of their own, with nothing under it, since the cause is not the check but this machine's date, or this
+// ReCasaOS: `clock`, the date of the machine is before the day its table of releases was written, and `stale`, the table is more than
+// eighteen months old, so that it cannot say what upgrade a release has.
+export const READINESS_OWN_SENTENCES = {
+	clock: 'The date of this machine is wrong: it is before the day this version of ReCasaOS was written, so the report cannot tell what upgrade this machine has. Set the date (and the time synchronisation of the machine), then check again.',
+	stale: 'This ReCasaOS is too old to know the releases: the table of releases it carries was written more than eighteen months ago, so it cannot tell what upgrade this machine has. Update ReCasaOS (or set the date of the machine, if it is wrong), then check again.',
+}
 
 // The sentence for the state of the report. A blocked report is counted: see the view.
 const STATES = {
@@ -627,7 +687,9 @@ export const READINESS_KEYS = [...new Set([
 	MANY_BLOCKERS,
 	UNKNOWN_CHECK,
 	DID_NOT_ANSWER,
-	CLOCK_WRONG,
+	...Object.values(READINESS_REASONS),
+	...Object.values(READINESS_OWN_SENTENCES),
+	FIX_BROKEN,
 	DETAIL_FORMAT,
 ])]
 
@@ -640,10 +702,11 @@ function sentenceFor(entry, severity, data, locale) {
 	const value = entry.by ? data[entry.by] : undefined
 	const variant = typeof value === 'string' || typeof value === 'boolean' ? own(entry.variants ?? {}, String(value)) : undefined
 	const candidates = [].concat(variant ?? own(entry, severity) ?? entry.text)
+	// the fields the code's sentences say already, and the one that chose the sentence, are not listed again
+	const said = [...(entry.quiet ?? []), ...(variant === undefined ? [] : [entry.by])]
 	for (const key of candidates) {
 		const params = {}
-		// the field that chose the sentence is said by it, and not listed again
-		const used = variant === undefined ? [] : [entry.by]
+		const used = [...said]
 		let filled = true
 		for (const [, name] of key.matchAll(/\{(\w+)\}/g)) {
 			const found = resolve(PARAMS[name], data, locale)
@@ -658,15 +721,19 @@ function sentenceFor(entry, severity, data, locale) {
 			return { key, params, used }
 	}
 	// unreachable while the last sentence of each code has no placeholder (a test sees to it)
-	return { key: candidates.at(-1), params: {}, used: variant === undefined ? [] : [entry.by] }
+	return { key: candidates.at(-1), params: {}, used: said }
 }
 
 // What to do about a row, if the code says it fits: `actions` of the code says false for an action that
-// does not (the sentence says what to do, or there is nothing to do), or a function of the data.
+// does not (the sentence says what to do, or there is nothing to do), or a function of the data that says
+// whether it does, or which other sentence of the action fits (a key).
 function actionFor(entry, action, data, locale) {
 	const sentence = own(READINESS_ACTIONS, action) ?? ''
-	const fits = entry ? own(entry.actions ?? {}, action) : undefined
-	return typeof fits === 'function' ? (fits(data, locale) ? sentence : '') : fits === false ? '' : sentence
+	const rule = entry ? own(entry.actions ?? {}, action) : undefined
+	const fits = typeof rule === 'function' ? rule(data, locale) : rule
+	if (!sentence || fits === false)
+		return ''
+	return typeof fits === 'string' ? fits : sentence
 }
 
 const MAX_DETAILS = 6
@@ -703,7 +770,7 @@ function rowOf(raw, index, locale) {
 		unknown,
 		title: entry ? { key: entry.label } : { text: text(raw.title) || code },
 		sentence: null,
-		reason: '',
+		reason: null,
 		action: actionFor(entry, raw.action, data, locale),
 		details: [],
 	}
@@ -711,10 +778,14 @@ function rowOf(raw, index, locale) {
 		row.title = { key: UNKNOWN_CHECK }
 
 	if (unknown) {
-		// the date of the machine is wrong: that is the sentence, and the core's English words add nothing to it
-		const clock = data.reason === 'clock'
-		row.sentence = { key: clock ? CLOCK_WRONG : DID_NOT_ANSWER, params: {} }
-		row.reason = clock ? '' : text(raw.detail)
+		// The core says why by a code. The date of the machine being wrong, and this ReCasaOS being too old for its table of
+		// releases, are the sentence of the row: the core's English words add nothing to them. Any other reason is said under the
+		// sentence of a check that did not finish, by its code, and the core's own words only for a code this window does not know.
+		const alone = own(READINESS_OWN_SENTENCES, data.reason)
+		const why = own(READINESS_REASONS, data.reason)
+		const detail = text(raw.detail)
+		row.sentence = { key: alone ?? DID_NOT_ANSWER, params: {} }
+		row.reason = alone ? null : why ? { key: why } : detail ? { text: detail } : null
 	} else if (severity !== 'ok') {
 		if (entry) {
 			const { key, params, used } = sentenceFor(entry, severity, data, locale)
