@@ -333,8 +333,8 @@ export const READINESS_CHECKS = {
 		label: 'Merged /usr layout',
 		text: [
 			// it runs on Ubuntu as well, and on one folder as well as on three
-			'Some of the system folders are not links to /usr ({names}), which the next release requires. ReCasaOS does not convert this for you: it has to be converted by hand first.',
-			'Some of the system folders (/bin, /sbin or /lib) are not links to /usr, which the next release requires. ReCasaOS does not convert this for you: it has to be converted by hand first.',
+			'Some of the system folders are not links to /usr ({names}), as they are in the merged /usr layout. ReCasaOS refuses to upgrade such a system for now, because it has not proven here that the upgrade converts it: convert it first (the usrmerge package does it), then check again.',
+			'Some of the system folders (/bin, /sbin or /lib) are not links to /usr, as they are in the merged /usr layout. ReCasaOS refuses to upgrade such a system for now, because it has not proven here that the upgrade converts it: convert it first (the usrmerge package does it), then check again.',
 		],
 	},
 	cgroup1: {
@@ -495,12 +495,12 @@ export const READINESS_CHECKS = {
 		variants: {
 			distribution: 'Docker comes from the system\'s own docker.io package. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
 			snap: 'Docker comes from snap. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
-			unknown: 'A Docker is on this machine, but no package or snap says where it comes from: it was put there by hand, or comes from a source ReCasaOS does not know. ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
+			unknown: 'Docker is on this machine, but it does not come from Docker\'s own repository: it was put there by hand, or installed from a source ReCasaOS does not know (a mirror of Docker\'s repository, a package file, a snap whose service is stopped). ReCasaOS only upgrades a machine whose Docker was installed from Docker\'s own repository (docker-ce).',
 		},
 	},
 	docker_down: {
 		label: 'Docker state',
-		text: 'Docker is not running, so ReCasaOS cannot see your containers or tell which ones would not come back after the upgrade. Start Docker, then check again.',
+		text: 'Docker is not running, or does not answer, so ReCasaOS cannot see your containers or tell which ones would not come back after the upgrade. Start Docker, or find out why it does not answer, then check again.',
 	},
 	docker_update_pending: {
 		label: 'Docker update waiting',

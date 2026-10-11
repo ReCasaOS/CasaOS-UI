@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DETAIL_LABELS, FIX_BROKEN, READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, READINESS_OWN_SENTENCES, READINESS_REASONS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
+import { DETAIL_FORMAT, DETAIL_LABELS, FIX_BROKEN, READINESS_ACTIONS, READINESS_CHECKS, READINESS_KEYS, READINESS_OWN_SENTENCES, READINESS_REASONS, canCheckReadiness, detailLabel, formatSize, readinessView } from './osReadiness'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 
@@ -356,6 +356,34 @@ describe('a check that did not answer', () => {
 			expect(Object.keys(READINESS_OWN_SENTENCES).sort()).toEqual(['clock', 'stale'])
 		})
 
+		// pinned by what each says, and not by the table against itself: two sentences crossed in the table, or in a language file, fail here
+		const SAYS = {
+			timeout: [/did not answer in time/, /pas répondu à temps/],
+			not_finished: [/ran out of time/, /manqué de temps/],
+			tool_missing: [/not installed/, /pas installé/],
+			too_large: [/larger than it can read/, /dépasse ce qu'il peut lire/],
+			missing: [/is not there/, /est absent/],
+			unreadable: [/cannot be read/, /ne peut pas être lu/],
+			not_allowed: [/read-only report does not do/, /lecture seule/],
+			unexpected_output: [/does not understand/, /ne comprend pas/],
+			panic: [/failed unexpectedly/, /échoué de façon inattendue/],
+			invalid_result: [/answer that is not valid/, /réponse qui n'est pas valide/],
+			failed: [/needs failed/, /n'a pas fonctionné/],
+		}
+
+		it('has a literal for each reason', () => {
+			expect(Object.keys(SAYS).sort()).toEqual([...CODES].sort())
+		})
+
+		it.each(CODES)('says %s in English and in French by what it means, and no other reason says it', (reason) => {
+			const [english, french] = SAYS[reason]
+
+			for (const other of CODES) {
+				expect(english.test(READINESS_REASONS[other]), `en ${reason} / ${other}`).toBe(other === reason)
+				expect(french.test(fr[READINESS_REASONS[other]]), `fr ${reason} / ${other}`).toBe(other === reason)
+			}
+		})
+
 		it.each(CODES)('says %s by its own sentence under the one of a check that did not finish, and not in the core\'s English words', (reason) => {
 			const found = row('apps', 'refuse', { unknown: true, reason }, { detail: 'This could not be checked: the core says it in English.' })
 
@@ -419,6 +447,8 @@ describe('the action', () => {
 			['a journal that has one', { updates: 2 }],
 			['an operation dpkg left unfinished, with broken dependencies besides', { audit: true, apt_check: true }],
 			['a journal that has one, with broken dependencies besides', { updates: 2, apt_check: true }],
+			['a journal that has just one, with broken dependencies besides', { updates: 1, apt_check: true }],
+			['a journal that has just one', { updates: 1 }],
 			['both, with broken dependencies besides', { audit: true, updates: 1, apt_check: true }],
 			['a core that sent no flag', {}],
 		])('says dpkg --configure -a for %s', (_, data) => {
@@ -740,12 +770,18 @@ describe('what the final core really sends', () => {
 		}
 	})
 
-	// [c15] the check runs on Ubuntu as well as on Debian, and on one folder as well as on three
-	it('says the next release, and neither a distribution nor how many folders', () => {
+	// [c15] the check runs on Ubuntu as well as on Debian, and on one folder as well as on three. [c5] [c11] The refusal is ReCasaOS's own, for now: Debian's
+	// notes say the upgrade converts such a system, so the sentence does not say what a release requires.
+	it('says ReCasaOS refuses for now and what to do, and neither what a release requires nor a distribution nor how many folders', () => {
 		for (const sentence of [].concat(READINESS_CHECKS.merged_usr.text)) {
-			expect(sentence).not.toMatch(/Debian|Ubuntu|\b\d\d\b/)
-			expect(sentence).toMatch(/next release/)
+			expect(sentence).not.toMatch(/Debian|Ubuntu|\b\d\d\b|release|requires|needs/)
 			expect(sentence).not.toMatch(/^The folders/)
+			expect(sentence).not.toMatch(/by hand/)
+			expect(sentence).toMatch(/ReCasaOS refuses to upgrade such a system for now, because it has not proven here that the upgrade converts it/)
+			expect(sentence).toMatch(/convert it first \(the usrmerge package does it\), then check again\.$/)
+			expect(fr[sentence]).not.toMatch(/exige|suivante|version|à la main/)
+			expect(fr[sentence]).toMatch(/Pour l'instant, ReCasaOS refuse de mettre à niveau un tel système, faute d'avoir prouvé ici que la mise à niveau le convertit/)
+			expect(fr[sentence]).toMatch(/convertissez-le d'abord \(le paquet usrmerge le fait\), puis relancez la vérification\.$/)
 		}
 		expect(row('merged_usr', 'refuse', { directories: ['/lib'] }).sentence.params).toEqual({ names: '/lib' })
 		expect(row('merged_usr', 'refuse', { directories: ['/lib'] }, {}, 'fr_fr').sentence.key).toBe(row('merged_usr', 'refuse', { directories: ['/lib'] }).sentence.key)
@@ -1073,6 +1109,27 @@ describe('a Docker that is not running', () => {
 	})
 })
 
+// [c3] docker_down warns in two states and sends no data in either: Docker's service that does not run, and a service that runs and does not
+// answer. The window cannot tell which, so it says both, and never says Docker is not running of one that runs.
+describe('docker_down', () => {
+	const sentence = () => row('docker_down', 'warn').sentence.key
+
+	it('says Docker is not running or does not answer, and to start it or to find out why it does not answer', () => {
+		expect(sentence()).toMatch(/^Docker is not running, or does not answer, so ReCasaOS cannot see your containers or tell which ones would not come back after the upgrade\. /)
+		expect(sentence()).toMatch(/Start Docker, or find out why it does not answer, then check again\.$/)
+		expect(row('docker_down', 'warn').details).toEqual([])
+	})
+
+	it('says it in French the same way', () => {
+		expect(fr[sentence()]).toMatch(/^Docker ne tourne pas, ou ne répond pas : ReCasaOS ne peut donc pas voir vos conteneurs/)
+		expect(fr[sentence()]).toMatch(/Démarrez Docker, ou cherchez pourquoi il ne répond pas, puis relancez la vérification\.$/)
+	})
+
+	it('says it for a warning that comes with any data', () => {
+		expect(row('docker_down', 'warn', { why: 'from_the_future', count: 3 }).sentence.key).toBe(sentence())
+	})
+})
+
 // [c14] where Docker comes from: the core names it, and the window says it in words
 describe('docker_origin', () => {
 	it.each([
@@ -1091,6 +1148,19 @@ describe('docker_origin', () => {
 		const said = ['distribution', 'snap', 'unknown'].map(origin => row('docker_origin', 'refuse', { origin }).sentence.key)
 
 		expect(new Set(said).size).toBe(3)
+	})
+
+	// [c4] the core says unknown for a Docker that no package brought (a client or a socket, a snap whose snapd is stopped) and for a
+	// docker-ce package that apt does not show from Docker's repository (a mirror, a package file): the sentence is true of each
+	it('says of an unknown origin only what is true of each cause the core has for it', () => {
+		const sentence = row('docker_origin', 'refuse', { origin: 'unknown' }).sentence.key
+
+		expect(sentence).toMatch(/^Docker is on this machine, but it does not come from Docker's own repository: /)
+		expect(sentence).toMatch(/a mirror of Docker's repository, a package file, a snap whose service is stopped/)
+		expect(sentence).not.toMatch(/no package|no snap/)
+		expect(fr[sentence]).toMatch(/^Docker est présent sur cette machine, mais il ne vient pas du dépôt de Docker lui-même : /)
+		expect(fr[sentence]).toMatch(/un miroir du dépôt de Docker, un fichier de paquet, un snap dont le service est arrêté/)
+		expect(fr[sentence]).not.toMatch(/aucun paquet|ni snap/)
 	})
 
 	it.each(['from_the_future', '', 3, null, undefined, 'constructor', '__proto__'])('says the plain sentence of the code for the origin %j', (origin) => {
@@ -1171,6 +1241,9 @@ describe('a core that says far too much', () => {
 // [c16] What the language files must have, built from the tables themselves and not from READINESS_KEYS: the it.each of the
 // view's specs are generated from that list, so a sentence it forgot would shrink them and fail nothing.
 describe('every sentence of the tables', () => {
+	// what the view says of itself and the component says of a field: no table holds them, and READINESS_KEYS, which the it.each of the view are
+	// generated from, is not the list to take them from
+	const OWN = [DETAIL_FORMAT, 'Ready', 'Ready, with things to look at', 'Not ready', 'Not ready: 1 blocker', 'Not ready: {n} blockers', 'Latest release', 'Not supported for an upgrade from here', 'A check this window does not know', DID_NOT_FINISH]
 	// the names of fields (`by`, `quiet`) are not sentences
 	const strings = value => typeof value === 'string'
 		? [value]
@@ -1186,11 +1259,12 @@ describe('every sentence of the tables', () => {
 		...strings(READINESS_OWN_SENTENCES),
 		...strings(DETAIL_LABELS),
 		FIX_BROKEN,
+		...OWN,
 	])]
 
 	it('is a good many, the variants and the labels of the fields among them', () => {
 		expect(reachable.length).toBeGreaterThan(200)
-		for (const key of [READINESS_CHECKS.bootloader.variants.systemd_boot, READINESS_CHECKS.smart_failed.variants.standby[0], READINESS_CHECKS.docker_origin.variants.snap, DETAIL_LABELS.free_mib, FIX_BROKEN, READINESS_REASONS.timeout, READINESS_OWN_SENTENCES.stale])
+		for (const key of [READINESS_CHECKS.bootloader.variants.systemd_boot, READINESS_CHECKS.smart_failed.variants.standby[0], READINESS_CHECKS.docker_origin.variants.snap, DETAIL_LABELS.free_mib, FIX_BROKEN, READINESS_REASONS.timeout, READINESS_OWN_SENTENCES.stale, DETAIL_FORMAT, 'Not ready: {n} blockers'])
 			expect(reachable).toContain(key)
 	})
 
@@ -1205,6 +1279,8 @@ describe('every sentence of the tables', () => {
 			expect(fr[key]).not.toBe(key)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
+		// in the order of the English: {free} and {needed}, or {name} and {value}, are not interchangeable
+		expect(fr[key].match(/\{\w+\}/g) || []).toEqual(key.match(/\{\w+\}/g) || [])
 		expect(fr[key]).not.toMatch(/\S[:?!;]/)
 		expect(fr[key]).not.toMatch(/[^\s%]%/)
 	})

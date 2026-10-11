@@ -396,6 +396,24 @@ describe('rows of the final core', () => {
 		expect(wrapper.text()).not.toContain('not_running')
 	})
 
+	// [c3] [c4] [c5]: three sentences the owner reads of his own machine, true of every cause the core has for them
+	it('says Docker not running or not answering, a Docker of an unknown origin and the merged /usr refusal, in both languages', async () => {
+		const report = { state: 'blocked', checks: [check('docker_origin', 'refuse', { origin: 'unknown' }), check('merged_usr', 'refuse', { directories: ['/bin', '/lib'] }), check('docker_down', 'warn')] }
+
+		await run(report)
+		let rows = wrapper.findAll('.os-check-sentence').map(sentence => sentence.text())
+		expect(rows[0]).toMatch(/^Docker is on this machine, but it does not come from Docker's own repository: .*a snap whose service is stopped/)
+		expect(rows[1]).toMatch(/^Some of the system folders are not links to \/usr \(\/bin, \/lib\), as they are in the merged \/usr layout\. ReCasaOS refuses to upgrade such a system for now/)
+		expect(rows[2]).toMatch(/^Docker is not running, or does not answer, so ReCasaOS cannot see your containers/)
+
+		i18n.global.locale = 'fr_fr'
+		await run(report, { props: { locale: 'fr_fr' } })
+		rows = wrapper.findAll('.os-check-sentence').map(sentence => sentence.text())
+		expect(rows[0]).toMatch(/^Docker est présent sur cette machine, mais il ne vient pas du dépôt de Docker lui-même : /)
+		expect(rows[1]).toMatch(/^Certains dossiers du système ne sont pas des liens vers \/usr \(\/bin, \/lib\), comme ils le sont avec la fusion de \/usr\. Pour l'instant, ReCasaOS refuse/)
+		expect(rows[2]).toMatch(/^Docker ne tourne pas, ou ne répond pas : ReCasaOS ne peut donc pas voir vos conteneurs/)
+	})
+
 	// [c14]: the values of the core's own words are never a raw token under a sentence that says them
 	it('says no raw word of the source of the package work, the state of the battery or the origin of Docker', async () => {
 		await run({ state: 'blocked', checks: [check('busy', 'refuse', { source: 'unit', unit: 'apt-daily.service' }), check('power', 'refuse', { battery: 'BAT0', status: 'charging', percent: 40 }), check('docker_origin', 'refuse', { origin: 'snap' })] })
