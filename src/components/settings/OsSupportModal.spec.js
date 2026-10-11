@@ -4,6 +4,7 @@ import Buefy from 'buefy'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OsSupportModal from './OsSupportModal.vue'
+import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
 import { EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
@@ -270,6 +271,59 @@ describe('the operating system window', () => {
 		open({ ...BULLSEYE, pretty_name: '{date} @:Operating system | x', support: { ...BULLSEYE.support, extended: undefined } })
 
 		expect(wrapper.find('.os-status').text()).toBe('Free security updates for {date} @:Operating system | x ended on August 31, 2026.')
+	})
+})
+
+// The report of whether the machine could be upgraded: read-only, and asked for by a button
+describe('the readiness section of the operating system window', () => {
+	const section = () => wrapper.findComponent(OsUpgradeReadiness)
+
+	it('is in the window of a known Debian or Ubuntu that has a next release, and asks nothing on its own', () => {
+		const getOsReadiness = vi.fn()
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: { getOsReadiness } } } } })
+
+		expect(section().exists()).toBe(true)
+		expect(section().props('locale')).toBe('en_us')
+		expect(wrapper.find('.os-readiness-title').text()).toBe('Can this machine be upgraded?')
+		expect(wrapper.find('.os-readonly').text()).toBe('This check changes nothing on the machine.')
+		expect(getOsReadiness).not.toHaveBeenCalled()
+		wrapper.unmount()
+
+		open(JAMMY)
+		expect(section().exists()).toBe(true)
+	})
+
+	it('asks in the language of the window', () => {
+		i18n.global.locale = 'fr_fr'
+		open(BULLSEYE)
+		expect(section().props('locale')).toBe('fr_fr')
+
+		i18n.global.locale = 'de_de'
+		wrapper.unmount()
+		open(BULLSEYE)
+		expect(section().props('locale')).toBe('en_us')
+	})
+
+	it.each([
+		['no next release', { next: undefined }],
+		['a next release with no name', { next: {} }],
+		['a system the core does not know', { known: false }],
+		['a variant', { variant: 'raspberrypi' }],
+		['a variant that says debian', { known: true, variant: 'armbian' }],
+		['a distribution it has no sentences for', { id: 'linuxmint' }],
+	])('is not in the window for %s', (_, change) => {
+		open({ ...BULLSEYE, ...change })
+
+		expect(section().exists()).toBe(false)
+		expect(wrapper.find('.os-readiness').exists()).toBe(false)
+		// the rest of the window is as it was
+		expect(wrapper.find('.os-name').exists()).toBe(true)
+	})
+
+	it('has no button that acts on the machine: the check, and Close', () => {
+		open(BULLSEYE)
+
+		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Check whether this machine can be upgraded', 'Close'])
 	})
 })
 
