@@ -853,7 +853,8 @@ describe('starting the Docker update', () => {
 		await flushPromises()
 
 		expect(w.find('.docker-confirm').exists()).toBe(false)
-		expect(w.text()).toContain('A newer Docker appeared since this window was opened. Look at the new versions and confirm again.')
+		expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.')
+		expect(w.text()).not.toContain('A newer Docker appeared')
 		expect(w.text()).not.toContain(reason)
 		expect(getSystemPackages).toHaveBeenCalledTimes(2)
 		// the person confirms the new plan, not the old one
@@ -923,7 +924,7 @@ describe('starting the Docker update', () => {
 		await w.find('.docker-confirm-button').trigger('click')
 		await flushPromises()
 
-		expect(w.text()).toContain('A newer Docker appeared since this window was opened.')
+		expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted).')
 		expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
 	})
 
@@ -2160,6 +2161,614 @@ describe('the two updates do not run together', () => {
 	})
 })
 
+// the owner's own box: Docker's packages are on hold, and the update goes ahead on his word, the hold put back afterwards
+describe('updating Docker while its packages are on hold', () => {
+	const names = ['docker-ce', 'docker-ce-cli', 'containerd.io']
+	const onHold = { held: true, held_packages: names }
+	const lineSentence = 'The Docker packages are on hold (docker-ce, docker-ce-cli, containerd.io). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.'
+	const notice = 'Docker\'s packages are on hold (docker-ce, docker-ce-cli, containerd.io). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
+	const tick = 'I know the packages are on hold and I want to update anyway'
+	const box = w => w.find('.docker-held-confirm input')
+	const confirmButton = w => w.find('.docker-confirm-button')
+	const keysOf = fn => Object.keys(fn.mock.calls[0][0])
+	const goes = () => vi.fn(answer(dockerRun({ state: 'running' })))
+	const polls = () => vi.fn().mockResolvedValueOnce(reply(dockerIdle)).mockResolvedValue(reply(running))
+
+	async function opened(update = onHold) {
+		const startDockerUpdate = goes()
+		const w = await openDocker({ getSystemPackages: dockerPackages(update), startDockerUpdate, getDockerUpdateStatus: polls() })
+		await openConfirmation(w)
+		return { w, startDockerUpdate }
+	}
+
+	async function confirm(w) {
+		await confirmButton(w).trigger('click')
+		await flushPromises()
+	}
+
+	describe('on the Docker line', () => {
+		it('says in plain words that the packages are on hold and that the button updates anyway, and keeps the button and the command', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold) })
+
+			const line = w.find('.docker-line')
+			expect(line.find('.docker-held').text()).toBe(lineSentence)
+			expect(line.text()).not.toContain('a hold is deliberate')
+			expect(line.find('.docker-refusal').exists()).toBe(false)
+			expect(line.find('.docker-update-button').exists()).toBe(true)
+			expect(line.find('pre.docker-command').exists()).toBe(true)
+			const html = line.html()
+			expect(html.indexOf('docker-held')).toBeLessThan(html.indexOf('docker-update-button'))
+			expect(html.indexOf('docker-update-button')).toBeLessThan(html.indexOf('docker-command'))
+		})
+
+		it('says nothing of a hold when the core says none, as an older core does not', async () => {
+			for (const extra of [{}, { held: false, held_packages: [] }]) {
+				const w = await openDocker({ getSystemPackages: dockerPackages(extra) })
+
+				expect(w.find('.docker-held').exists()).toBe(false)
+				expect(w.find('.docker-update-button').exists()).toBe(true)
+				w.unmount()
+			}
+		})
+
+		it.each([['true'], [1], ['yes'], [null]])('does not take %j for a hold: only a true is believed', async (held) => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ held, held_packages: names }) })
+
+			expect(w.find('.docker-held').exists()).toBe(false)
+		})
+
+		it('says it only of an update that is offered: a refused one has the sentence of its refusal', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ ...onHold, available: false, refusal: 'disk' }) })
+
+			expect(w.find('.docker-held').exists()).toBe(false)
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+			expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB')
+		})
+
+		it('keeps the old sentence, and no button, for a core that still refuses a hold', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ available: false, refusal: 'held' }) })
+
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+			expect(w.find('.docker-refusal').text()).toContain('a hold is deliberate: ReCasaOS does not override it. To update anyway, use the command below.')
+			expect(w.find('.docker-held').exists()).toBe(false)
+		})
+
+		it('shows a package name as text, never as markup', async () => {
+			const w = await openDocker({ getSystemPackages: dockerPackages({ held: true, held_packages: ['<b>evil</b>'] }) })
+
+			expect(w.find('.docker-held').text()).toContain('(<b>evil</b>)')
+			expect(w.find('.docker-held b').exists()).toBe(false)
+		})
+
+		// the core ends the command with the apt-mark that puts the hold back: the page prints what it is given, and a name in it is text
+		it('prints the manual command as the core gives it, the apt-mark that puts the hold back included', async () => {
+			const command = 'sudo apt-get update && sudo apt-get install --only-upgrade --allow-change-held-packages docker-ce docker-ce-cli containerd.io && sudo apt-mark hold containerd.io docker-ce docker-ce-cli'
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold, { manual_command: command }) })
+
+			expect(w.find('.docker-line pre.docker-command').text()).toBe(command)
+		})
+
+		it('shows a name in the manual command as text, never as markup', async () => {
+			const command = 'sudo apt-get install --allow-change-held-packages <img src=x onerror=1> && sudo apt-mark hold <b>x</b>'
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold, { manual_command: command }) })
+
+			const pre = w.find('.docker-line pre.docker-command')
+			expect(pre.text()).toBe(command)
+			expect(pre.find('img').exists()).toBe(false)
+			expect(pre.find('b').exists()).toBe(false)
+		})
+	})
+
+	describe('in the confirmation', () => {
+		it('shows a notice and a box to tick before the tables, and the confirm button waits for the box', async () => {
+			const { w } = await opened()
+
+			const view = w.find('.docker-confirm')
+			expect(view.find('.docker-held-notice').text()).toBe(notice)
+			expect(view.find('.docker-held-confirm').text()).toBe(tick)
+			// a real label around the box: its words are the box's name, and a click on them ticks it
+			const label = box(w).element.closest('label')
+			expect(label).not.toBeNull()
+			expect(label.classList.contains('docker-held-confirm')).toBe(true)
+			expect(box(w).element.checked).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+			// before the tables, so that a small window shows it without scrolling past the lists; the buttons are in the footer
+			const html = w.html()
+			expect(html.indexOf('docker-held-notice')).toBeLessThan(html.indexOf('docker-held-confirm'))
+			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('docker-packages'))
+			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('docker-subtitle'))
+			expect(html.indexOf('docker-held-confirm')).toBeLessThan(html.indexOf('<footer'))
+
+			await box(w).setValue(true)
+			expect(confirmButton(w).attributes('disabled')).toBeUndefined()
+			await box(w).setValue(false)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+		})
+
+		it('sends allow_held with the plan once the box is ticked', async () => {
+			const { w, startDockerUpdate } = await opened()
+
+			await box(w).setValue(true)
+			await confirm(w)
+
+			expect(startDockerUpdate).toHaveBeenCalledTimes(1)
+			expect(startDockerUpdate.mock.calls[0][0]).toStrictEqual({ plan_id: planId, allow_held: true })
+		})
+
+		it('does not start without the box, whatever asks for it', async () => {
+			const { w, startDockerUpdate } = await opened()
+
+			await w.vm.startDockerUpdate()
+			await confirmButton(w).trigger('click')
+			await flushPromises()
+
+			expect(startDockerUpdate).not.toHaveBeenCalled()
+			expect(w.find('.docker-confirm').exists()).toBe(true)
+		})
+
+		it('starts with the box empty again every time it opens', async () => {
+			const { w, startDockerUpdate } = await opened()
+			await box(w).setValue(true)
+			await w.findAll('footer button')[0].trigger('click')
+
+			await openConfirmation(w)
+
+			expect(box(w).element.checked).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+			await w.vm.startDockerUpdate()
+			expect(startDockerUpdate).not.toHaveBeenCalled()
+		})
+
+		// the box is emptied where the confirmation opens: these two ways out do not go through Cancel
+		it.each([
+			['a 409 that says the offer changed', () => Promise.reject(refused(409, 'changed', 'the plan changed: reconfirm')), 'cd'.repeat(32)],
+			['an answer that never came', () => Promise.reject(new Error('Network Error')), planId],
+		])('starts with the box empty again after %s', async (_, reject, next) => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages(onHold)).mockImplementation(dockerPackages({ ...onHold, plan_id: next }))
+			const startDockerUpdate = vi.fn().mockImplementationOnce(reject).mockImplementation(goes())
+			const w = await openDocker({ getSystemPackages, startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(w.find('.docker-confirm').exists()).toBe(false)
+
+			await openConfirmation(w)
+
+			expect(box(w).element.checked).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+			await w.vm.startDockerUpdate()
+			expect(startDockerUpdate).toHaveBeenCalledTimes(1)
+			// it goes only once the person ticks it again, with the plan of the last check
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(startDockerUpdate).toHaveBeenCalledTimes(2)
+			expect(startDockerUpdate.mock.calls[1][0]).toStrictEqual({ plan_id: next, allow_held: true })
+		})
+
+		it('asks for nothing, and sends no allow_held, when the hold was lifted after the box was ticked and the offer changed', async () => {
+			const newPlan = 'cd'.repeat(32)
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages(onHold)).mockImplementation(dockerPackages({ plan_id: newPlan }))
+			const startDockerUpdate = vi.fn().mockImplementationOnce(() => Promise.reject(refused(409, 'changed', 'the plan changed: reconfirm'))).mockImplementation(goes())
+			const w = await openDocker({ getSystemPackages, startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+			await confirm(w)
+
+			expect(w.text()).toContain('The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.')
+			expect(w.text()).not.toContain('A newer Docker appeared')
+			await openConfirmation(w)
+			expect(w.find('.docker-held-notice').exists()).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeUndefined()
+			await confirm(w)
+
+			expect(startDockerUpdate.mock.calls[1][0]).toStrictEqual({ plan_id: newPlan })
+		})
+
+		it('has no notice and no box for a plan that is not on hold, and sends the plan alone', async () => {
+			const { w, startDockerUpdate } = await opened({})
+
+			expect(w.find('.docker-held-notice').exists()).toBe(false)
+			expect(w.find('.docker-held-confirm').exists()).toBe(false)
+			expect(confirmButton(w).attributes('disabled')).toBeUndefined()
+			await confirm(w)
+
+			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+		})
+
+		it('never sends allow_held for a plan that is not on hold, whatever the box says', async () => {
+			const { w, startDockerUpdate } = await opened({})
+			w.vm.dockerHeldConfirmed = true
+
+			await confirm(w)
+
+			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+		})
+
+		it.each([['true'], [1], [null]])('does not take %j for a hold of the plan', async (held) => {
+			const { w, startDockerUpdate } = await opened({ held, held_packages: names })
+
+			expect(w.find('.docker-held-notice').exists()).toBe(false)
+			await confirm(w)
+
+			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+		})
+
+		it('shows a package name as text, never as markup', async () => {
+			const evil = '<img src=x onerror=1>'
+			const { w } = await opened({ held: true, held_packages: [evil] })
+
+			expect(w.find('.docker-held-notice').text()).toContain(`(${evil})`)
+			expect(w.find('.docker-held-notice img').exists()).toBe(false)
+		})
+
+		it('says what it was shown even when a check lands meanwhile and finds a hold', async () => {
+			const { w, startDockerUpdate } = await opened({})
+
+			w.vm.info = { ...w.vm.info, docker: { ...w.vm.info.docker, update: { ...w.vm.info.docker.update, ...onHold } } }
+			await flushPromises()
+
+			expect(w.find('.docker-held-notice').exists()).toBe(false)
+			await confirm(w)
+			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+		})
+
+		it.each([
+			['other names', { held: true, held_packages: ['containerd.io'] }],
+			['no hold any more', { held: false, held_packages: [] }],
+		])('keeps the names of the plan in its notice when a check lands meanwhile with %s', async (_, later) => {
+			const { w, startDockerUpdate } = await opened()
+
+			w.vm.info = { ...w.vm.info, docker: { ...w.vm.info.docker, update: { ...w.vm.info.docker.update, ...later } } }
+			await flushPromises()
+
+			expect(w.find('.docker-held-notice').text()).toBe(notice)
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(startDockerUpdate.mock.calls[0][0]).toStrictEqual({ plan_id: planId, allow_held: true })
+		})
+
+		it('sends the plan once when the confirm button is pressed twice', async () => {
+			const startDockerUpdate = vi.fn(pending)
+			const w = await openDocker({ getSystemPackages: dockerPackages(onHold), startDockerUpdate })
+			await openConfirmation(w)
+			await box(w).setValue(true)
+
+			await confirmButton(w).trigger('click')
+			await confirmButton(w).trigger('click')
+			await flushPromises()
+
+			expect(startDockerUpdate).toHaveBeenCalledTimes(1)
+		})
+
+		it('names only the usable names of the plan: no empty entry, nothing that is not a string, twenty at most, and a list that is not a list names nothing', async () => {
+			const many = Array.from({ length: 25 }, (_, index) => `pkg-${index}`)
+			for (const [list, shown] of [
+				[['docker-ce', '', null, 42, { name: 'x' }, 'containerd.io'], '(docker-ce, containerd.io)'],
+				['docker-ce', '()'],
+				[many, `(${many.slice(0, 20).join(', ')})`],
+			]) {
+				const { w } = await opened({ held: true, held_packages: list })
+
+				expect(w.find('.docker-held-notice').text()).toContain(shown)
+				expect(box(w).exists()).toBe(true)
+				w.unmount()
+			}
+		})
+
+		describe('for a screen reader and a keyboard', () => {
+			const why = 'Tick the box above to continue.'
+
+			it('marks the box as required and describes it by the notice', async () => {
+				const { w } = await opened()
+
+				expect(box(w).attributes('aria-required')).toBe('true')
+				const described = document.getElementById(box(w).attributes('aria-describedby'))
+				expect(described).not.toBeNull()
+				expect(described.textContent.trim()).toBe(notice)
+				expect(w.find('.docker-held-notice').element.contains(described)).toBe(true)
+			})
+
+			it('says in the footer why the confirm button is disabled, only while the box is empty, and ties the sentence to the button', async () => {
+				const { w } = await opened()
+
+				const sentence = w.find('.docker-held-reason')
+				const id = sentence.attributes('id')
+				expect(sentence.text()).toBe(why)
+				expect(w.find('footer').element.contains(sentence.element)).toBe(true)
+				expect(id).toBeTruthy()
+				expect(document.getElementById(id)).toBe(sentence.element)
+				expect(confirmButton(w).attributes('aria-describedby')).toBe(id)
+
+				await box(w).setValue(true)
+				expect(w.find('.docker-held-reason').exists()).toBe(false)
+				expect(confirmButton(w).attributes('aria-describedby')).toBeUndefined()
+
+				await box(w).setValue(false)
+				expect(w.find('.docker-held-reason').text()).toBe(why)
+				expect(confirmButton(w).attributes('aria-describedby')).toBe(id)
+			})
+
+			it('has no such sentence for a plan that is not on hold', async () => {
+				const { w } = await opened({})
+
+				expect(w.find('.docker-held-reason').exists()).toBe(false)
+				expect(confirmButton(w).attributes('aria-describedby')).toBeUndefined()
+			})
+		})
+	})
+
+	describe('when the hold appears after the plan was shown', () => {
+		const reason = 'Docker\'s packages are on hold. Confirm that the update may go ahead anyway; the hold is put back afterwards.'
+		const heldNow = 'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.'
+		const notStarted = 'The update did not start: Docker\'s packages are on hold.'
+		const newPlan = 'cd'.repeat(32)
+
+		it('checks again, says so in its own words, and offers the update on the hold, with its notice', async () => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(dockerPackages({ ...onHold, plan_id: newPlan }))
+			const startDockerUpdate = vi.fn()
+				.mockImplementationOnce(() => Promise.reject(refused(409, 'held', reason, { refusal_detail: names })))
+				.mockImplementation(goes())
+			const w = await openDocker({ getSystemPackages, startDockerUpdate, getDockerUpdateStatus: polls() })
+			await openConfirmation(w)
+
+			await confirm(w)
+
+			// it went without allow_held: nobody had shown the person a hold
+			expect(keysOf(startDockerUpdate)).toEqual(['plan_id'])
+			expect(getSystemPackages).toHaveBeenCalledTimes(2)
+			expect(w.find('.docker-confirm').exists()).toBe(false)
+			expect(w.text()).toContain(heldNow)
+			expect(w.text()).not.toContain('a hold is deliberate')
+			expect(w.text()).not.toContain(notStarted)
+			expect(w.text()).not.toContain(reason)
+			expect(w.find('.docker-held').text()).toBe(lineSentence)
+			expect(w.find('.docker-update-button').exists()).toBe(true)
+			// the live region says it as well
+			expect(w.find('[role="status"]').text()).toBe(heldNow)
+
+			// and the person who presses the button again is asked, with the plan of the new check
+			await openConfirmation(w)
+			expect(w.find('.docker-held-notice').text()).toBe(notice)
+			expect(confirmButton(w).attributes('disabled')).toBeDefined()
+			await box(w).setValue(true)
+			await confirm(w)
+			expect(startDockerUpdate).toHaveBeenCalledTimes(2)
+			expect(startDockerUpdate.mock.calls[1][0]).toStrictEqual({ plan_id: newPlan, allow_held: true })
+		})
+
+		it('says nothing of it while the new check is under way', async () => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(pending)
+			const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', reason, { refusal_detail: names })) })
+			await openConfirmation(w)
+
+			await confirm(w)
+
+			expect(w.text()).toContain('Checking for system package updates...')
+			expect(w.text()).not.toContain(heldNow)
+			expect(w.text()).not.toContain('a hold is deliberate')
+			expect(w.find('.docker-job').exists()).toBe(false)
+		})
+
+		it('says what an older core says when the new check still refuses the hold, and not that the update can go ahead', async () => {
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(dockerPackages({ available: false, refusal: 'held' }))
+			const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', reason)) })
+			await openConfirmation(w)
+
+			await confirm(w)
+
+			const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+			expect(visible.split('a hold is deliberate').length - 1).toBe(1)
+			expect(visible).not.toContain(heldNow)
+			expect(visible).not.toContain(notStarted)
+			expect(w.find('.docker-update-button').exists()).toBe(false)
+		})
+
+		// A core that knows holds names the packages in its 409 and says `held` in its check: for it, a hold that is deliberate and never
+		// overridden is false. The sentence is for a core that can confirm nothing.
+		describe('the sentence of a hold that is deliberate', () => {
+			const deliberate = 'a hold is deliberate'
+			const failure = Object.assign(new Error('Request failed with status code 500'), { response: { data: { message: 'E: Could not get lock' } } })
+
+			async function refusedThenChecked(recheck, more) {
+				const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(recheck)
+				const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', reason, more)) })
+				await openConfirmation(w)
+				await confirm(w)
+				return w
+			}
+
+			// The confirmation the person pressed a button in is gone, and the Docker line below is not in the live region: the refusal
+			// of the new check is said at the top, like the code of any other 409, and the Docker line does not repeat it.
+			const refusals = [
+				['disk', [], 'There is less than 1 GiB of free disk space where the update needs it, so ReCasaOS will not start it. Free some space and check again.'],
+				['apps', ['nextcloud', '', null, 'immich'], 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes. Busy apps: nextcloud, immich.'],
+			]
+			const afterAHold = [
+				['the 409 names the packages and the new check says nothing of a hold', { refusal_detail: names }, {}],
+				['the 409 names the packages and the new check says they are on hold', { refusal_detail: names }, onHold],
+				['the 409 names the packages and the new check says they are not on hold', { refusal_detail: names }, { held: false, held_packages: [] }],
+				['the 409 names nothing and the new check says the packages are on hold', {}, onHold],
+			]
+			const cases = afterAHold.flatMap(([about, more, held]) => refusals.map(([code, detail, sentence]) => {
+				return [`${about}, and refuses for "${code}"`, more, { ...held, available: false, refusal: code, refusal_detail: detail }, code, sentence]
+			}))
+
+			it.each(cases)('says the refusal of the new check, once, at the top and in the live region, when %s', async (_, more, update, code, sentence) => {
+				const w = await refusedThenChecked(dockerPackages(update), more)
+
+				expect(w.vm.dockerRefusal).toMatchObject({ code, reason: '' })
+				expect(w.find('[role="status"]').text()).toBe(sentence)
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(sentence).length - 1).toBe(1)
+				expect(w.find('.docker-refusal').exists()).toBe(false)
+				expect(w.find('.docker-confirm').exists()).toBe(false)
+				expect(w.text()).not.toContain(deliberate)
+				expect(w.text()).not.toContain(heldNow)
+				expect(w.text()).not.toContain(notStarted)
+				expect(w.find('.docker-update-button').exists()).toBe(false)
+			})
+
+			// nobody else would say that the update did not start: the confirmation is gone, and the new check has nothing to say of the hold
+			const saysOnlyThat = (w) => {
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(notStarted).length - 1).toBe(1)
+				expect(w.find('[role="status"]').text()).toContain(notStarted)
+				expect(w.text()).not.toContain(deliberate)
+				expect(w.text()).not.toContain(heldNow)
+				expect(w.text()).not.toContain(reason)
+			}
+
+			it('says only that the update did not start when the 409 names the packages and the new check finds no hold and offers the update', async () => {
+				const w = await refusedThenChecked(dockerPackages({ plan_id: newPlan }), { refusal_detail: names })
+
+				saysOnlyThat(w)
+				expect(w.find('.docker-update-button').exists()).toBe(true)
+			})
+
+			it('says that the update did not start, and that the check failed, when the 409 names the packages and the new check cannot be read', async () => {
+				const w = await refusedThenChecked(() => Promise.reject(failure), { refusal_detail: names })
+
+				saysOnlyThat(w)
+				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+
+			it('says that the update did not start when the 409 names nothing and the new check says the packages are on hold but gives no reason', async () => {
+				const w = await refusedThenChecked(dockerPackages({ ...onHold, available: false, refusal: '' }), {})
+
+				saysOnlyThat(w)
+				expect(w.find('.docker-update-button').exists()).toBe(false)
+			})
+
+			it.each([
+				[{}],
+				[{ refusal_detail: [] }],
+				[{ refusal_detail: ['', null, 42] }],
+				[{ refusal_detail: 'docker-ce' }],
+			])('keeps saying it, once, for a core that names nothing (%j) and whose new check cannot be read either', async (more) => {
+				const w = await refusedThenChecked(() => Promise.reject(failure), more)
+
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(deliberate).length - 1).toBe(1)
+				expect(w.text()).not.toContain(notStarted)
+				expect(w.text()).toContain('Could not check for system package updates.')
+			})
+
+			// the core cannot confirm a hold, so the sentence comes first, and what else the check refused is on the Docker line, in its own words
+			it.each([
+				[{}],
+				[{ held: false, held_packages: [] }],
+			])('says it first, and leaves the refusal of the check to the Docker line, for a core that names nothing and finds no hold (%j)', async (held) => {
+				const w = await refusedThenChecked(dockerPackages({ ...held, available: false, refusal: 'disk' }), {})
+
+				const visible = w.text().replace(w.find('.docker-announcer').text(), '')
+				expect(visible.split(deliberate).length - 1).toBe(1)
+				expect(w.vm.dockerRefusal.code).toBe('held')
+				expect(w.find('.docker-refusal').text()).toContain('less than 1 GiB of free disk space')
+			})
+		})
+
+		it('says nothing once the window is closed, when the new check answers after', async () => {
+			let late
+			const getSystemPackages = vi.fn().mockImplementationOnce(dockerPackages()).mockImplementation(() => new Promise((resolve) => {
+				late = resolve
+			}))
+			const w = await openDocker({ getSystemPackages, startDockerUpdate: () => Promise.reject(refused(409, 'held', reason, { refusal_detail: names })) })
+			await openConfirmation(w)
+			await confirm(w)
+
+			w.unmount()
+			late(await dockerPackages(onHold)())
+			await flushPromises()
+
+			expect(w.vm.dockerRefusal).toBeNull()
+		})
+	})
+
+	describe('what the result says of the hold', () => {
+		const ended = extra => openDocker({ getDockerUpdateStatus: answer({ ...succeeded, ...extra }) })
+		const kept = 'The hold on Docker\'s packages is in place again.'
+		const unknown = 'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.'
+		const results = [
+			['a success', {}],
+			['a restart still to do', { outcome: 'restart_pending' }],
+			['a failure that may have changed things', { state: 'failed', outcome: 'failed', error_code: 'install', exit_code: 1 }],
+			['a failure that changed nothing', { state: 'failed', outcome: 'failed', error_code: 'download', exit_code: 1 }],
+		]
+
+		it.each(results)('says the hold is in place again after %s, and nothing else of it', async (_, extra) => {
+			const w = await ended({ ...extra, held: true, held_packages: names, holds_kept: true })
+
+			expect(w.find('.docker-hold-result').text()).toBe(kept)
+			expect(w.find('.docker-job').text()).not.toContain('could not be confirmed')
+		})
+
+		it.each(results)('says the hold could not be confirmed after %s, when the core could not see it', async (_, extra) => {
+			const w = await ended({ ...extra, held: true, held_packages: names, holds_kept: false })
+
+			expect(w.find('.docker-hold-result').text()).toBe(unknown)
+			expect(w.find('.docker-job').text()).not.toContain('in place again')
+		})
+
+		it('says it was not confirmed when the core says a hold and not whether it was kept, or a string for a yes', async () => {
+			for (const extra of [{ held: true }, { held: true, holds_kept: 'true' }, { held: true, holds_kept: 1 }]) {
+				const w = await ended(extra)
+
+				expect(w.find('.docker-hold-result').text()).toBe(unknown)
+				w.unmount()
+			}
+		})
+
+		it('says it is in place on the core\'s word that it was kept, even when it does not say that there was a hold', async () => {
+			const w = await ended({ holds_kept: true })
+
+			expect(w.find('.docker-hold-result').text()).toBe(kept)
+		})
+
+		it('says nothing of a hold for a run that had none, or from a core that does not know them', async () => {
+			for (const extra of [{}, { held: false, held_packages: [], holds_kept: false }, { held: 'true' }, { held: 1, holds_kept: 'yes' }]) {
+				const w = await ended(extra)
+
+				expect(w.find('.docker-hold-result').exists()).toBe(false)
+				expect(w.find('.docker-job').text()).not.toContain('hold')
+				w.unmount()
+			}
+		})
+
+		it('says it in the live region, and not while the run goes on', async () => {
+			const w = await ended({ held: true, holds_kept: true })
+			expect(w.find('[role="status"]').text()).toContain(kept)
+			w.unmount()
+
+			const going = await openDocker({ getDockerUpdateStatus: answer({ ...running, held: true, holds_kept: true }) })
+			expect(going.find('.docker-hold-result').exists()).toBe(false)
+			expect(going.find('[role="status"]').text()).not.toContain('hold')
+		})
+
+		// the core ends the way back with the apt-mark that puts the hold back: the page prints what it is given, and a name in it is text
+		describe('the way back of a run that went ahead of the hold', () => {
+			const command = 'sudo apt-get install --allow-downgrades --allow-change-held-packages containerd.io=1.7.27-1 docker-ce=5:28.0.4-1~debian.11~bullseye docker-ce-cli=5:28.0.4-1~debian.11~bullseye && sudo apt-mark hold containerd.io docker-ce docker-ce-cli'
+			const failed = rollback => ended({ state: 'failed', outcome: 'failed', error_code: 'install', exit_code: 1, held: true, held_packages: names, holds_kept: true, rollback_command: rollback })
+			const commandsOf = w => w.findAll('.docker-job pre.docker-command').map(pre => pre.text())
+
+			it('prints it as the core gives it, the apt-mark that puts the hold back included', async () => {
+				const w = await failed(command)
+
+				expect(commandsOf(w).at(-1)).toBe(command)
+				expect(w.find('.docker-hold-result').text()).toBe(kept)
+			})
+
+			it('shows a name in it as text, never as markup', async () => {
+				const evil = 'sudo apt-get install <img src=x onerror=1> && sudo apt-mark hold <b>x</b>'
+				const w = await failed(evil)
+
+				expect(commandsOf(w).at(-1)).toBe(evil)
+				expect(w.find('.docker-job pre.docker-command img').exists()).toBe(false)
+				expect(w.find('.docker-job pre.docker-command b').exists()).toBe(false)
+			})
+		})
+	})
+})
+
 describe('the Docker update\'s words', () => {
 	it.each([
 		'Update Docker',
@@ -2225,6 +2834,15 @@ describe('the Docker update\'s words', () => {
 		'The update to the new major version of Docker could not be completed. There is no way back to the previous major version that has been shown to work.',
 		'In a test, the packages went back and Docker started, but the containers did not start again by themselves. Your images and volumes are in /var/lib/docker; check journalctl -u docker and your apps from the dashboard.',
 		'Going back to the previous major version is not supported: in a test the containers did not start again.',
+		'The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.',
+		'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.',
+		'I know the packages are on hold and I want to update anyway',
+		'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.',
+		'The hold on Docker\'s packages is in place again.',
+		'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.',
+		'The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.',
+		'The update did not start: Docker\'s packages are on hold.',
+		'Tick the box above to continue.',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
@@ -2233,6 +2851,47 @@ describe('the Docker update\'s words', () => {
 		expect(fr[key]).not.toMatch(/\S[:;?!]/)
 		for (const param of key.match(/\{\w+\}/g) || [])
 			expect(fr[key]).toContain(param)
+	})
+
+	// the update goes ahead of the hold, as the terminal command does, and ReCasaOS puts it back: no sentence may say that it never left
+	it('promises no hold that stays, in either language', () => {
+		const said = Object.keys(en).filter(key => /\bhold\b/i.test(key))
+
+		expect(said.length).toBeGreaterThanOrEqual(6)
+		for (const key of said) {
+			expect(key).not.toMatch(/leaves the hold alone|the hold stays|does not release|still in place/i)
+			expect(fr[key]).not.toMatch(/laisse le blocage|reste en place|ne le lève pas|toujours en place/i)
+		}
+	})
+
+	// the name of a command is not translated: the person types it
+	it('keeps the names of the commands in both languages', () => {
+		const unconfirmed = 'The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.'
+		const notice = 'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
+
+		for (const [key, command] of [[unconfirmed, 'apt-mark showhold'], [notice, '--allow-change-held-packages']]) {
+			expect(en[key]).toContain(command)
+			expect(fr[key]).toContain(command)
+		}
+	})
+
+	// a French that says the hold is left alone, or that nobody puts it back, would be the old promise again in other words
+	it('says in French that the update drops the hold, that ReCasaOS puts it back, and that the offer may have changed for a hold', () => {
+		const line = 'The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.'
+		const notice = 'Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.'
+
+		expect(fr[line]).toContain('puis remet le blocage en place')
+		expect(fr[notice]).toContain('Cette commande lève le blocage des paquets qu\'elle met à jour')
+		expect(fr[notice]).toContain('ReCasaOS le remet en place quand la mise à jour est terminée, et vous dit s\'il l\'a fait')
+		expect(fr['The hold on Docker\'s packages is in place again.']).toContain('de nouveau en place')
+		// the box and the notice are above the footer that carries this sentence (see "shows a notice and a box to tick before the tables")
+		expect(fr['Tick the box above to continue.']).toContain('ci-dessus')
+		expect(fr['Tick the box above to continue.']).not.toContain('ci-dessous')
+		// the box says that the person updates anyway, and that is the point of it
+		expect(fr['I know the packages are on hold and I want to update anyway']).toContain('quand même')
+		// the accent is part of the verb the person reads, and the command after it is typed as it is
+		expect(fr['The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.']).toContain('vérifiez avec apt-mark showhold.')
+		expect(fr['The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.']).toContain('un blocage posé ou levé')
 	})
 
 	// "toutes les configurations n'ont pas été testées" can be read as "none was tested"

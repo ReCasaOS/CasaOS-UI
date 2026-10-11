@@ -88,6 +88,12 @@ describe('docker update client', () => {
 		expect(JSON.parse(sent().data)).toEqual({ plan_id: 'ab'.repeat(32) })
 	})
 
+	it('carries the confirmation of a hold when it is given, as it is given', async () => {
+		await sys.startDockerUpdate({ plan_id: 'ab'.repeat(32), allow_held: true })
+		expect(sent().url).toBe('/v1/sys/docker/update')
+		expect(JSON.parse(sent().data)).toEqual({ plan_id: 'ab'.repeat(32), allow_held: true })
+	})
+
 	it('reads the status from its own route, not the generic package one', async () => {
 		await sys.getDockerUpdateStatus()
 		expect(sent().method).toBe('get')

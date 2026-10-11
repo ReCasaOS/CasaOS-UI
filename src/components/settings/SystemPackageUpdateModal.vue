@@ -36,6 +36,18 @@
 					{{ $t('Updating Docker restarts it: every container stops until it is back. Apps set to restart start again by themselves, the others stay stopped. Do it when that suits you.') }}
 				</b-message>
 
+				<!-- A hold is crossed only on the person's word: the confirm button waits for the box. Both come before the tables, so that a
+					small window shows them without scrolling past the lists. The notice is the box's description. -->
+				<template v-if="dockerPlanHeld">
+					<b-message class="docker-held-notice mt-3" size="is-small" type="is-warning">
+						<span id="docker-held-notice-text">{{ $t('Docker\'s packages are on hold ({names}). This update goes ahead anyway, as the terminal command with --allow-change-held-packages would. That command drops the hold on the packages it updates: ReCasaOS puts it back when the update has ended, and tells you whether it did.', { names: dockerPlanHeldNames.join(', ') }) }}</span>
+					</b-message>
+					<label class="docker-held-confirm checkbox is-flex is-align-items-flex-start mt-2 is-size-7">
+						<input v-model="dockerHeldConfirmed" aria-describedby="docker-held-notice-text" aria-required="true" class="mr-2 mt-1" type="checkbox">
+						<span>{{ $t('I know the packages are on hold and I want to update anyway') }}</span>
+					</label>
+				</template>
+
 				<div class="docker-packages package-list mt-3">
 					<table class="table is-fullwidth is-hoverable">
 						<thead>
@@ -150,6 +162,8 @@
 							</template>
 						</template>
 
+						<p v-if="dockerHoldText" class="docker-hold-result mt-2 is-size-7">{{ dockerHoldText }}</p>
+
 						<div v-if="dockerNotReturned.length" class="docker-not-returned mt-3">
 							<p class="is-size-7 has-text-warning-on-scheme">
 								{{ dockerNotReturnedText }}
@@ -255,6 +269,7 @@
 						<p v-else-if="dockerCanSeeUpdates" class="is-size-7">{{ $t('No newer Docker is offered by this machine\'s package sources.') }}</p>
 						<p v-else class="is-size-7">{{ dockerUnseen }}</p>
 						<template v-if="!dockerRunning">
+							<p v-if="dockerHeld" class="docker-held mt-2 is-size-7">{{ $t('The Docker packages are on hold ({names}). The Update Docker button updates them anyway, once you confirm, and puts the hold back afterwards.', { names: dockerHeldNames.join(', ') }) }}</p>
 							<b-button v-if="dockerUpdate && dockerUpdate.available" ref="dockerUpdateButton" class="docker-update-button mt-2" :disabled="isRunning" rounded size="is-small" type="is-primary" @click="openDockerConfirm">
 								{{ $t('Update Docker') }}
 							</b-button>
@@ -296,11 +311,12 @@
 			</template>
 		</section>
 
-		<footer v-if="dockerConfirming" class="modal-card-foot is-justify-content-flex-end">
+		<footer v-if="dockerConfirming" class="docker-confirm-foot modal-card-foot is-justify-content-flex-end">
+			<p v-if="dockerAwaitsBox" id="docker-held-reason" class="docker-held-reason is-size-7">{{ $t('Tick the box above to continue.') }}</p>
 			<b-button :disabled="dockerStarting" rounded @click="closeDockerConfirm">
 				{{ $t('Cancel') }}
 			</b-button>
-			<b-button class="docker-confirm-button" :disabled="dockerContainers.loading" :loading="dockerStarting" rounded type="is-primary" @click="startDockerUpdate">
+			<b-button class="docker-confirm-button" :aria-describedby="dockerAwaitsBox ? 'docker-held-reason' : null" :disabled="dockerContainers.loading || dockerAwaitsBox" :loading="dockerStarting" rounded type="is-primary" @click="startDockerUpdate">
 				{{ $t(dockerPlanMoves ? 'Update Docker to {version}' : 'Update Docker packages', { version: dockerPlan.to }) }}
 			</b-button>
 		</footer>
@@ -333,7 +349,12 @@ const DOCKER_REPAIR_COMMAND = 'sudo dpkg --configure -a && sudo apt-get -f insta
 const DOCKER_REFUSALS = {
 	unsupported: 'This machine cannot update Docker from here.',
 	origin: 'ReCasaOS only updates a Docker installed from Docker\'s own repository, and this one was not.',
+	// only for a core that cannot confirm a hold: one that can offers the update on it (see startDockerUpdate)
 	held: 'The Docker packages are on hold, and a hold is deliberate: ReCasaOS does not override it. To update anyway, use the command below.',
+	// the code of a `held` that a core which knows holds answers for a plan confirmed without them (see startDockerUpdate)
+	held_now: 'The Docker packages were put on hold since this window last checked, so the update did not start. It can still go ahead if you confirm it: press Update Docker again.',
+	// the code of a `held` that nothing else answers for: the new check offers no update on a hold and refuses nothing (see startDockerUpdate)
+	held_not_started: 'The update did not start: Docker\'s packages are on hold.',
 	dpkg: 'A previous package operation was left unfinished on this machine. Finish it first, then check again.',
 	daemon: 'ReCasaOS cannot reach Docker right now, so it will not update it. Check that Docker is running.',
 	swarm: 'This machine is part of a Docker swarm, which ReCasaOS does not update.',
@@ -342,7 +363,8 @@ const DOCKER_REFUSALS = {
 	running: 'An update is already running on this machine.',
 	maintenance: 'Another update or package operation is running on this machine. Try again when it is done.',
 	apps: 'Some apps are busy right now, or ReCasaOS could not check. Try again in a few minutes.',
-	changed: 'A newer Docker appeared since this window was opened. Look at the new versions and confirm again.',
+	// the plan's id covers the hold: a hold set or lifted since the window looked changes the offer as much as a newer Docker does
+	changed: 'The Docker update on offer has changed since this window was opened (a newer Docker, or a hold set or lifted). Look at it again and confirm again.',
 	nothing: 'Docker has nothing to update.',
 	start: 'The update could not be started, so nothing was changed.',
 }
@@ -421,6 +443,9 @@ function emptyDockerStatus() {
 		from: '',
 		to: '',
 		major_jump: false,
+		// the run went ahead of a hold, which the update drops and the core puts back; it says at the end whether it is in place again
+		held: false,
+		holds_kept: false,
 		not_returned: [],
 		rollback_command: '',
 		log: '',
@@ -473,6 +498,8 @@ export default {
 			dockerRefusal: null,
 			dockerContainers: emptyContainers(),
 			dockerContainersSeq: 0,
+			// the box of the confirmation: a hold is crossed only once it is ticked, and it starts empty every time the view opens
+			dockerHeldConfirmed: false,
 			dockerPollTimer: null,
 			dockerPollActive: false,
 			dockerPollBusy: false,
@@ -540,6 +567,26 @@ export default {
 		// what the packages check says of updating Docker from here; absent on a core without the button
 		dockerUpdate() {
 			return this.info.docker?.update || null
+		},
+		// The update is offered although Docker's packages are on hold: it goes ahead on the person's word, as the terminal command
+		// does, which drops the hold of the packages it updates. The core puts it back, and says whether it did (holds_kept).
+		// Only a true is believed: a core that does not know holds says nothing, and a string is not a yes.
+		dockerHeld() {
+			return !!this.dockerUpdate?.available && this.dockerUpdate.held === true
+		},
+		dockerHeldNames() {
+			return cleanNames(this.dockerUpdate?.held_packages)
+		},
+		// the same, for the plan on screen in the confirmation: the one the person confirms, not the one a later check found
+		dockerPlanHeld() {
+			return this.dockerPlan?.held === true
+		},
+		dockerPlanHeldNames() {
+			return cleanNames(this.dockerPlan?.held_packages)
+		},
+		// a held plan whose box is still empty: the confirm button waits, and says why
+		dockerAwaitsBox() {
+			return this.dockerPlanHeld && !this.dockerHeldConfirmed
 		},
 		// dpkg was stopped in the middle of something: apt refuses to do anything else until it is finished
 		dockerNeedsRepair() {
@@ -645,7 +692,7 @@ export default {
 			} else if (this.dockerStatus.state === 'failed') {
 				result = [this.$t('The Docker update failed.'), this.dockerFailureText, this.dockerNoWayBack].filter(Boolean).join(' ')
 			}
-			return [age, result, this.dockerNotReturnedText]
+			return [age, result, this.dockerHoldText, this.dockerNotReturnedText]
 		},
 		// a clean success needs no log; everything else may
 		dockerShowsLog() {
@@ -666,6 +713,16 @@ export default {
 		dockerNotReturned() {
 			const list = this.dockerStatus.not_returned
 			return Array.isArray(list) ? list.filter(item => item && typeof item.name === 'string') : []
+		},
+		// What the run did with the hold, said of a run that went ahead of one: the update drops it and the core puts it back, and
+		// holds_kept says whether it did. A core that does not know holds says nothing. Not seeing the hold again is not the same
+		// as the hold being gone: it says it could not confirm.
+		dockerHoldText() {
+			const { held, holds_kept: kept } = this.dockerStatus
+			if (kept === true) {
+				return this.$t('The hold on Docker\'s packages is in place again.')
+			}
+			return held === true ? this.$t('The hold on Docker\'s packages could not be confirmed after the update: check with apt-mark showhold.') : ''
 		},
 		// how many, not which: the names are in the table, and the live region is for short sentences
 		dockerNotReturnedText() {
@@ -882,6 +939,7 @@ export default {
 			this.dockerRefusal = null
 			this.error = null
 			this.dockerPlan = JSON.parse(JSON.stringify(this.dockerUpdate))
+			this.dockerHeldConfirmed = false
 			this.dockerConfirming = true
 			if (this.dockerPlanRestarts) {
 				this.loadDockerContainers()
@@ -935,13 +993,19 @@ export default {
 			if (this.isRunning || this.dockerRunning || !this.dockerPlan?.plan_id) {
 				return
 			}
+			// a hold is crossed on the person's word only: the button waits for the box, and nothing else gets round it
+			if (this.dockerAwaitsBox) {
+				return
+			}
 			this.dockerStarting = true
 			this.dockerRefusal = null
 			this.error = null
 			const confirmed = { from: this.dockerPlan.from, to: this.dockerPlan.to }
 			const restarts = this.dockerPlanRestarts
 			try {
-				const response = await this.$api.sys.startDockerUpdate({ plan_id: this.dockerPlan.plan_id })
+				// allow_held only for a held plan whose box is ticked, never otherwise
+				const body = this.dockerPlanHeld ? { plan_id: this.dockerPlan.plan_id, allow_held: true } : { plan_id: this.dockerPlan.plan_id }
+				const response = await this.$api.sys.startDockerUpdate(body)
 				if (this.gone) {
 					return
 				}
@@ -978,8 +1042,32 @@ export default {
 				}
 				// the core's reason travels in the data because the check below clears `error`
 				const reason = typeof data?.error === 'string' ? data.error : error.response.data?.message
-				this.dockerRefusal = { code, reason: typeof reason === 'string' ? reason : '', names: cleanNames(data?.refusal_detail) }
-				if (code === 'running') {
+				const refusal = { code, reason: typeof reason === 'string' ? reason : '', names: cleanNames(data?.refusal_detail) }
+				this.dockerRefusal = refusal
+				if (code === 'held') {
+					// The hold came after this window looked, so the plan was confirmed without it. What there is to say waits
+					// for the new check: a core that knows holds now offers the update on the hold, with its notice.
+					this.dockerRefusal = null
+					this.dockerStarting = false
+					await this.checkPackages(true)
+					if (!this.gone) {
+						// A core that knows holds names the packages in its 409 and says `held` in its check, and for it the sentence
+						// of a hold that is deliberate and never overridden is false: it is for a core that can confirm no hold.
+						// What else the check refused is said here too, in its own words (the Docker line below does not repeat it, and
+						// is not in the live region: the confirmation is gone, and nothing else would tell the person why). When it refused
+						// nothing and offers no update on a hold (it could not be read, or it finds no hold), nothing else says that the
+						// update did not start.
+						if (this.dockerHeld) {
+							this.dockerRefusal = { ...refusal, code: 'held_now' }
+						} else if (!refusal.names.length && this.dockerUpdate?.held !== true) {
+							this.dockerRefusal = refusal
+						} else if (this.dockerUpdate?.refusal) {
+							this.dockerRefusal = { code: this.dockerUpdate.refusal, reason: '', names: cleanNames(this.dockerUpdate.refusal_detail) }
+						} else {
+							this.dockerRefusal = { ...refusal, code: 'held_not_started' }
+						}
+					}
+				} else if (code === 'running') {
 					this.dockerStarting = false
 					await this.loadInitialState()
 					// the job it ran into is on screen now, and says more than the refusal
@@ -1109,6 +1197,17 @@ export default {
 	td {
 		overflow-wrap: anywhere;
 	}
+}
+
+// the reason of a disabled confirm button has a row of its own above the buttons, so that a narrow window does not squeeze them
+.docker-confirm-foot {
+	flex-wrap: wrap;
+}
+
+.docker-held-reason {
+	flex: 1 1 100%;
+	margin-bottom: 0.5rem;
+	text-align: right;
 }
 
 .docker-wont-return td {
