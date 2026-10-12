@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
+import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -7,6 +8,14 @@ import GitAppModal from '@/components/Apps/GitAppModal.vue'
 // canvas the moment it is imported and happy-dom has no 2d context, so the import
 // itself throws. Nothing here renders a template.
 vi.mock('lottie-web-vue', () => ({ default: { name: 'lottie-animation', template: '<div/>' } }))
+
+// the probe is whatever each test says it answers; the card without its icon,
+// which only the bundler can require
+vi.mock('@/components/VirtualMachines/entry', async importOriginal => ({
+	...await importOriginal(),
+	hasVirtualMachines: vi.fn(),
+	vmApplication: () => ({ name: 'Virtual Machines' }),
+}))
 
 // The grid, not the card, is what has to be read again after an update: the app that
 // was updated is a different app now. Only app:updated says an update applied -- a
@@ -110,5 +119,59 @@ describe('app section update outcome', () => {
 
 		expect(vm.getList).not.toHaveBeenCalled()
 		expect(open).not.toHaveBeenCalled()
+	})
+})
+
+// The grid does not wait for the virtual machine probe: the card joins it when
+// the probe answers, at the place the saved order has for it, and an order that
+// has the card is not saved without it while the probe is out.
+describe('app section virtual machines card', () => {
+	function section(names) {
+		const vm = {
+			appList: names.map(name => ({ name })),
+			saveSortData: vi.fn(),
+		}
+		vm.sortApps = AppSection.methods.sortApps.bind(vm)
+		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		return vm
+	}
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('adds the card at its saved place once the module answers', async () => {
+		hasVirtualMachines.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files', 'jellyfin'])
+
+		await AppSection.methods.addVmCardWhenThere.call(vm, ['App Store', 'Virtual Machines', 'Files', 'jellyfin'])
+
+		expect(names(vm)).toEqual(['App Store', 'Virtual Machines', 'Files', 'jellyfin'])
+		expect(vm.saveSortData).not.toHaveBeenCalled()
+	})
+
+	it('adds it once, however many reads of the grid wait on the probe', async () => {
+		hasVirtualMachines.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files'])
+
+		await Promise.all([
+			AppSection.methods.addVmCardWhenThere.call(vm, []),
+			AppSection.methods.addVmCardWhenThere.call(vm, []),
+		])
+
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Virtual Machines'])
+	})
+
+	it('drops the card from the saved order only once the probe says it is not there', async () => {
+		let answer
+		hasVirtualMachines.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		const vm = section(['App Store', 'Files'])
+
+		const added = AppSection.methods.addVmCardWhenThere.call(vm, ['App Store', 'Virtual Machines', 'Files'])
+		expect(vm.saveSortData).not.toHaveBeenCalled()
+		answer(false)
+		await added
+
+		expect(names(vm)).toEqual(['App Store', 'Files'])
+		expect(vm.saveSortData).toHaveBeenCalledTimes(1)
 	})
 })
