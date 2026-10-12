@@ -300,6 +300,7 @@
 					<div v-else-if="status.state === 'failed'" class="mt-4 has-text-danger-on-scheme">
 						{{ $t('System package update failed.') }}
 					</div>
+					<p v-if="systemFinishedAt && !runWatched && !isRunning" class="system-finished is-size-7 _has-text-gray">{{ $t('Finished {date}', { date: systemFinishedAt }) }}</p>
 					<p v-if="status.error && !isReconciliationPending && status.error !== error?.detail" class="mt-1 is-size-7 _has-text-gray">
 						{{ status.error }}
 					</p>
@@ -325,7 +326,7 @@
 			<b-button :loading="isChecking" rounded @click="checkPackages">
 				{{ $t('Check for updates') }}
 			</b-button>
-			<b-button v-if="hasUpdates && status.state !== 'succeeded'" rounded type="is-primary" @click="confirmUpdate">
+			<b-button v-if="hasUpdates && !(status.state === 'succeeded' && runWatched)" rounded type="is-primary" @click="confirmUpdate">
 				{{ $t('Update packages') }}
 			</b-button>
 		</footer>
@@ -493,6 +494,8 @@ export default {
 			dockerStarting: false,
 			// the end of a run was seen by this window, as opposed to a result that was there when it opened
 			dockerWatched: false,
+			// the same for the system update: a result found when the window opened is old, and the list of updates was read after it
+			runWatched: false,
 			// a start whose answer was lost: the core is being asked whether it went through
 			dockerChecking: false,
 			dockerRefusal: null,
@@ -526,6 +529,11 @@ export default {
 		},
 		hasUpdates() {
 			return Array.isArray(this.info.updates) && this.info.updates.length > 0
+		},
+		systemFinishedAt() {
+			const at = this.status.completed_at
+			const date = at ? new Date(at) : null
+			return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : ''
 		},
 		dockerHasUpdates() {
 			return Array.isArray(this.info.docker?.updates) && this.info.docker.updates.length > 0
@@ -908,6 +916,7 @@ export default {
 		},
 		startPolling() {
 			this.stopPolling()
+			this.runWatched = true
 			this.fetchStatus()
 			this.pollTimer = setInterval(() => this.fetchStatus(), 1000)
 		},

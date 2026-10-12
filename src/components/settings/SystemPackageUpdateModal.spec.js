@@ -2922,3 +2922,70 @@ describe('the Docker update\'s words', () => {
 		}
 	})
 })
+
+// ---- the update button when the last run is old --------------------------------------------------------
+
+describe('the system update button and the last run', () => {
+	const updates = answer({
+		supported: true,
+		manager: 'apt',
+		updates: [{ name: 'libc6', current_version: '2.35-1', candidate_version: '2.35-2' }],
+		count: 1,
+	})
+	const oldRun = { ...idle, state: 'succeeded', log: 'CASAOS_PACKAGE_UPDATE_QUEUED 2026-09-14T08:57:43Z', completed_at: '2026-09-14T08:58:10Z' }
+
+	it('is offered when the window opens on a run that finished a while ago, and says when it finished', async () => {
+		const w = await open({ getSystemPackageUpdateStatus: answer(oldRun), getSystemPackages: updates })
+
+		expect(w.text()).toContain('Update packages')
+		expect(w.text()).toContain('System package update completed.')
+		expect(w.text()).toMatch(/Finished .*2026/)
+	})
+
+	it('is offered after an old failed run too', async () => {
+		const w = await open({ getSystemPackageUpdateStatus: answer({ ...oldRun, state: 'failed', error: 'E: boom' }), getSystemPackages: updates })
+
+		expect(w.text()).toContain('Update packages')
+		expect(w.text()).toMatch(/Finished .*2026/)
+	})
+
+	it('says nothing of a date when the core gave none', async () => {
+		const w = await open({ getSystemPackageUpdateStatus: answer({ ...oldRun, completed_at: undefined }), getSystemPackages: updates })
+
+		expect(w.text()).toContain('Update packages')
+		expect(w.text()).not.toContain('Finished')
+	})
+
+	it('is not offered once this window has seen a run end, since the list is older than the run, and comes back with the next check', async () => {
+		const getSystemPackageUpdateStatus = vi.fn()
+			.mockResolvedValueOnce({ data: { success: 200, data: idle } })
+			.mockResolvedValue({ data: { success: 200, data: { ...oldRun, completed_at: '2026-10-12T08:58:10Z' } } })
+		const w = await open({ getSystemPackageUpdateStatus, getSystemPackages: updates, startSystemPackageUpdate: answer({ ...idle, state: 'running' }) })
+		expect(w.text()).toContain('Update packages')
+
+		await w.vm.startUpdate()
+		await flushPromises()
+
+		expect(w.vm.status.state).toBe('succeeded')
+		expect(w.text()).toContain('System package update completed.')
+		expect(w.text()).not.toContain('Update packages')
+		expect(w.text()).not.toContain('Finished')
+
+		await w.vm.checkPackages()
+		await flushPromises()
+		expect(w.vm.status.state).toBe('idle')
+		expect(w.text()).toContain('Update packages')
+	})
+
+	it('is not offered when the run that was going on at the opening ends under the eyes of the window', async () => {
+		const getSystemPackageUpdateStatus = vi.fn()
+			.mockResolvedValueOnce({ data: { success: 200, data: { ...idle, state: 'running' } } })
+			.mockResolvedValue({ data: { success: 200, data: oldRun } })
+		const w = await open({ getSystemPackageUpdateStatus, getSystemPackages: updates })
+
+		expect(w.vm.status.state).toBe('succeeded')
+		expect(w.vm.runWatched).toBe(true)
+		expect(w.text()).not.toContain('Update packages')
+		expect(w.text()).not.toContain('Finished')
+	})
+})
