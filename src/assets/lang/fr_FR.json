@@ -1048,5 +1048,6 @@
   "{name} is the next release.": "{name} est la prochaine version.",
   "ReCasaOS cannot upgrade the operating system for you yet.": "ReCasaOS ne peut pas encore mettre à niveau le système d'exploitation à votre place.",
   "There is no automatic way back from an upgrade: a snapshot of the machine is what lets you go back, and console access is for when the machine does not start. Take a snapshot before any upgrade.": "Une mise à niveau n'a pas de retour arrière automatique : un instantané (snapshot) de la machine est ce qui permet de revenir en arrière, et l'accès console sert quand la machine ne démarre plus. Faites un instantané avant toute mise à niveau.",
-  "Upgrade guide": "Guide de mise à niveau"
+  "Upgrade guide": "Guide de mise à niveau",
+  "Virtual Machines": "Machines virtuelles"
 }
