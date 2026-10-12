@@ -1317,5 +1317,6 @@
   "The hold on Docker's packages is in place again.": "The hold on Docker's packages is in place again.",
   "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.": "The hold on Docker's packages could not be confirmed after the update: check with apt-mark showhold.",
   "The update did not start: Docker's packages are on hold.": "The update did not start: Docker's packages are on hold.",
-  "Tick the box above to continue.": "Tick the box above to continue."
+  "Tick the box above to continue.": "Tick the box above to continue.",
+  "Virtual Machines": "Virtual Machines"
 }

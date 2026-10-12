@@ -107,6 +107,7 @@ import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { VM_APP_NAME, hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -345,28 +346,26 @@ export default {
 						en_us: item.name,
 					}
 				})
+				// the virtual machines join Files where the module answers. The grid
+				// does not wait for the probe: the card is added when it answers, and a
+				// list read again keeps the card it already shows.
+				const hasVmCard = this.appList.some(app => app.name === VM_APP_NAME)
+				const vmApps = hasVmCard ? [vmApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, orgNewAppList, listLinkApp)
+				const casaAppList = concat(builtInApplications, vmApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
 					.then(res => res.data.data.data || [])
 
-				// filter anything not in casaAppList.
-				const propList = casaAppList.map(obj => obj.name)
-				const existingList = lateSortList.filter(item => propList.includes(item))
-				const futureList = propList.filter(item => !lateSortList.includes(item))
-				const newSortList = existingList.concat(futureList)
-
-				// then sort.
-				const sortedAppList = casaAppList.sort((obj1, obj2) => {
-					return newSortList.indexOf(obj1.name) - newSortList.indexOf(obj2.name)
-				})
-
-				const sortedList = sortedAppList.map(obj => obj.name)
-				this.appList = sortedAppList
-				if (!isEqual(lateSortList, sortedList)) {
-					this.saveSortData()
+				this.appList = this.sortApps(casaAppList, lateSortList)
+				// a saved order that has the card is saved again only once the probe
+				// has answered, or the card would lose its place
+				if (hasVmCard || !lateSortList.includes(VM_APP_NAME)) {
+					this.saveSortIfChanged(lateSortList)
+				}
+				if (!hasVmCard) {
+					this.addVmCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -400,6 +399,33 @@ export default {
 			const xorList = xor(oriList, newList)
 			// xorList.reverse()
 			return concat(oriList, xorList)
+		},
+
+		// The apps in the saved order, those it does not have yet at the end.
+		sortApps(apps, savedOrder) {
+			const names = apps.map(app => app.name)
+			const order = savedOrder.filter(name => names.includes(name))
+				.concat(names.filter(name => !savedOrder.includes(name)))
+			return apps.sort((app1, app2) => order.indexOf(app1.name) - order.indexOf(app2.name))
+		},
+
+		saveSortIfChanged(savedOrder) {
+			if (!isEqual(savedOrder, this.appList.map(app => app.name))) {
+				this.saveSortData()
+			}
+		},
+
+		// Adds the Virtual Machines card at its saved place once the probe says the
+		// module is there.
+		addVmCardWhenThere(savedOrder) {
+			return hasVirtualMachines().then((available) => {
+				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, vmApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(VM_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
 		},
 
 		/**
