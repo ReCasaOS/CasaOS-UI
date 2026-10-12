@@ -294,9 +294,9 @@ describe('the answer', () => {
 	})
 
 	it('lists the other fields of the core on one line, in its order', async () => {
-		await run({ ...REPORT, checks: [check('sources_third_party', 'warn', { files: ['docker.list'], hosts: ['download.docker.com'], docker_files: ['docker.list'] })] })
+		await run({ ...REPORT, checks: [check('sources_third_party', 'warn', { docker_files: ['docker.list'], files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com'], other_files: ['tailscale.list'] })] })
 
-		expect(wrapper.find('.os-check-details').text()).toBe('Hosts: download.docker.com · Docker\'s files: docker.list')
+		expect(wrapper.find('.os-check-details').text()).toBe('Docker\'s files: docker.list · Hosts: download.docker.com')
 	})
 
 	it('shows the sizes in the sentence', async () => {
@@ -436,6 +436,46 @@ describe('rows of the final core', () => {
 		expect(wrapper.find('.os-readiness-group.is-others summary').text()).toBe('Other checks (passed: 0, notes: 1)')
 		expect(wrapper.find('.os-readiness-group.is-others .os-check-sentence').text()).toMatch(/^A newer Docker exists, but Docker's packages are on hold\./)
 		expect(wrapper.find('.os-readiness-group.is-others .os-check-details').text()).toBe('Package: docker-ce · Installed: 5:28.0.4-1 · Version on offer: 5:29.8.0-1')
+	})
+
+	// the core's answers for the sources of a third party: Docker's alone is a note and the box is ready, another is a warning; each file is said once
+	describe('and the package sources of a third party', () => {
+		const DOCKER = check('sources_third_party', 'info', { docker_files: ['docker.list'], files: ['docker.list'], hosts: ['download.docker.com'] })
+		const BOTH = check('sources_third_party', 'warn', { docker_files: ['docker.list'], files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com', 'pkgs.tailscale.com'], other_files: ['tailscale.list'] })
+
+		it('says Docker\'s alone as a note, in a sentence of its own, and the box as ready', async () => {
+			await run({ state: 'ready', checks: [DOCKER] })
+
+			expect(wrapper.find('.os-readiness-result').text()).toBe('Ready')
+			expect(wrapper.find('.os-readiness-group.is-warnings').exists()).toBe(false)
+			const note = wrapper.find('.os-readiness-group.is-others .os-check')
+			expect(note.find('.os-check-title').text()).toBe('Third-party package sources')
+			expect(note.find('.os-check-sentence').text()).toBe('Docker\'s package source is not Debian\'s or Ubuntu\'s: the upgrade puts it aside, then rewrites it for the new release. Nothing to do.')
+			expect(note.find('.os-check-details').text()).toBe('Hosts: download.docker.com')
+			expect(note.find('.os-check-action').exists()).toBe(false)
+		})
+
+		it('says the others as a warning that names their files, then Docker\'s exception, then the mirrors, with the rest as details', async () => {
+			await run({ state: 'attention', checks: [BOTH] })
+
+			expect(wrapper.find('.os-readiness-result').text()).toBe('Ready, with things to look at')
+			const warning = wrapper.find('.os-readiness-group.is-warnings .os-check')
+			expect(warning.find('.os-check-sentence').text()).toBe('Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on: tailscale.list. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.')
+			expect(warning.find('.os-check-details').text()).toBe('Docker\'s files: docker.list · Hosts: download.docker.com, pkgs.tailscale.com')
+			expect(warning.find('.os-check-action').exists()).toBe(false)
+		})
+
+		it('says both in French, the file names once', async () => {
+			i18n.global.locale = 'fr_fr'
+			await run({ state: 'ready', checks: [DOCKER] }, { props: { locale: 'fr_fr' } })
+			expect(wrapper.find('.os-check-sentence').text()).toBe('La source de paquets de Docker ne vient ni de Debian ni d\'Ubuntu : la mise à niveau la met de côté, puis la réécrit pour la nouvelle version. Il n\'y a rien à faire.')
+			expect(wrapper.find('.os-check-details').text()).toBe('Serveurs : download.docker.com')
+
+			await run({ state: 'attention', checks: [BOTH] }, { props: { locale: 'fr_fr' } })
+			expect(wrapper.find('.os-check-sentence').text()).toBe('Les sources de paquets qui ne viennent ni de Debian ni d\'Ubuntu sont mises en pause pendant la mise à niveau et le restent ensuite, si bien que les logiciels qu\'elles fournissent ne reçoivent plus de mises à jour tant que vous ne les réactivez pas : tailscale.list. La source de Docker fait exception : elle est réécrite après la mise à niveau. Un miroir de Debian ou d\'Ubuntu figure aussi ici quand apt ne conserve aucun fichier Release pour ce miroir : lancez apt update sur la machine, puis relancez la vérification.')
+			expect(wrapper.find('.os-check-details').text()).toBe('Fichiers de Docker : docker.list · Serveurs : download.docker.com, pkgs.tailscale.com')
+			expect(wrapper.text().match(/tailscale\.list/g)).toHaveLength(1)
+		})
 	})
 
 	it('names the mount point of a disk of fstab that is not there, and says nothing of the package sources for a foreign architecture', async () => {
