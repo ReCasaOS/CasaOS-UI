@@ -78,8 +78,8 @@ It serves on port 8080 and proxies `/v1` and `/v2` to that host.
 
 The dashboard is the work of IceWhale and its contributors, and their copyright headers are kept throughout the source. alvins82's fork is in this repository's history and his changes are still in it.
 
-This repository has never carried a LICENSE file — not upstream, not in any fork; `git log --all --diff-filter=A -- LICENSE` returns nothing. We have not added one, because we are not in a position to grant a licence its authors did not. CasaOS as a whole is published under the Apache License 2.0, and the built dashboard ships inside CasaOS releases under that licence, as upstream shipped it.
+IceWhale has licensed CasaOS-UI under the Apache License 2.0: its repository carries that `LICENSE` since 2026-10-12 ([IceWhaleTech/CasaOS-UI@400a22c](https://github.com/IceWhaleTech/CasaOS-UI/commit/400a22c120e9f14b6e5c2276f9b79253acf95f35)), and this repository carries the same file. Before that date it had never had one, upstream or in any fork, and the dashboard shipped inside CasaOS releases under CasaOS's own licence, the Apache License 2.0 as well.
 
-The changes made here by the ReCasaOS maintainer since the fork (the Vue 3 migration, the dark theme, the new components and the rest of that author's commits) are offered under the Apache License 2.0; see [NOTICE](NOTICE). That statement covers only those changes: it does not reach IceWhale's code or alvins82's, and it is not a licence for the repository as a whole.
+The changes made here by the ReCasaOS maintainer since the fork (the Vue 3 migration, the dark theme, the new components and the rest of that author's commits) are offered under the same licence; see [NOTICE](NOTICE). What the file does not settle is in the NOTICE too: the commits of alvins82 and of the authors of other forks are theirs, and a `LICENSE` upstream is not a grant from them.
 
 CasaOS is a mark of IceWhale. This distribution uses the name to say what it is a release of, and nothing more.
