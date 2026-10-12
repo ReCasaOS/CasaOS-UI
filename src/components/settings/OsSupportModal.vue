@@ -40,6 +40,8 @@
 				<p v-if="link" class="os-link mt-2">
 					<a :href="link.href" rel="noopener noreferrer" target="_blank">{{ $t(link.label) }}</a>
 				</p>
+				<!-- a read-only report: it asks the core, and changes nothing on the machine -->
+				<os-upgrade-readiness v-if="canCheck" :locale="locale" />
 			</template>
 		</section>
 
@@ -50,10 +52,13 @@
 </template>
 
 <script>
+import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
+import { canCheckReadiness } from './osReadiness'
 import { extendedSentence, releaseLink, releaseName, supportSentence } from './osSupport'
 
 export default {
 	name: 'OsSupportModal',
+	components: { OsUpgradeReadiness },
 	props: {
 		// GET /v1/sys/os, as the top bar read it.
 		os: {
@@ -86,6 +91,9 @@ export default {
 		},
 		link() {
 			return releaseLink(this.os.next)
+		},
+		canCheck() {
+			return canCheckReadiness(this.os)
 		},
 	},
 	// The window opens with the reader on its heading. Buefy's own autoFocus is off
