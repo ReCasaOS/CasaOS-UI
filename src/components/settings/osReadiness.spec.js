@@ -265,7 +265,8 @@ describe('the data of the core\'s own checks', () => {
 		['apps', { apps: ['jellyfin'], count: 1 }, { names: 'jellyfin' }, [{ name: 'count', value: '1' }]],
 		['sources_cdrom', { files: ['local.list'] }, { names: 'local.list' }, []],
 		['sources_alias', { files: ['debian.list'], suites: ['stable'] }, { names: 'debian.list' }, [{ name: 'suites', value: 'stable' }]],
-		['sources_third_party', { files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com'], docker_files: ['docker.list'] }, { names: 'docker.list, tailscale.list' }, [{ name: 'hosts', value: 'download.docker.com' }, { name: 'docker_files', value: 'docker.list' }]],
+		// the files of the sources that are not Docker's are named; Docker's are listed beside the hosts, and `files`, which has both, is not said again
+		['sources_third_party', { docker_files: ['docker.list'], files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com', 'pkgs.tailscale.com'], other_files: ['tailscale.list'] }, { names: 'tailscale.list' }, [{ name: 'docker_files', value: 'docker.list' }, { name: 'hosts', value: 'download.docker.com, pkgs.tailscale.com' }]],
 		// the package that has to go, and not the architecture it was built for
 		['foreign_arch', { architectures: ['i386'], packages: ['libc6:i386'], count: 1 }, { names: 'libc6:i386' }, [{ name: 'architectures', value: 'i386' }, { name: 'count', value: '1' }]],
 		// the service the owner knows, and not the package that brings it
@@ -696,7 +697,7 @@ const CORE_SAMPLES = {
 	sources_pin: ['refuse', { files: ['preferences', 'pin:stable'], default_release: 'bullseye' }],
 	sources_proposed: ['refuse', { files: ['debian.list'], suites: ['bullseye-proposed-updates'] }],
 	sources_format: ['refuse', { files: ['odd.list'] }],
-	sources_third_party: ['warn', { files: ['docker.list'], hosts: ['download.docker.com'], docker_files: ['docker.list'] }],
+	sources_third_party: ['warn', { docker_files: ['docker.list'], files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com', 'pkgs.tailscale.com'], other_files: ['tailscale.list'] }],
 	sources_backports: ['info', { files: ['debian.list'] }],
 	sources_firmware: ['info', { non_free: true, packages: ['firmware-linux-nonfree'] }],
 	foreign_arch: ['refuse', { architectures: ['i386'], packages: ['libc6'], count: 1 }],
@@ -762,14 +763,6 @@ describe('what the final core really sends', () => {
 		expect(found.details).toEqual([])
 	})
 
-	// the third parties are told by the Release file apt keeps of a source: a mirror it has none of is among them
-	it('says that a mirror of Debian or Ubuntu that apt keeps no Release file for is listed with the third parties', () => {
-		for (const sentence of [].concat(READINESS_CHECKS.sources_third_party.text)) {
-			expect(sentence).toMatch(/A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it/)
-			expect(sentence).toMatch(/run apt update on the machine, then check again/)
-		}
-	})
-
 	// [c15] the check runs on Ubuntu as well as on Debian, and on one folder as well as on three. [c5] [c11] The refusal is ReCasaOS's own, for now: Debian's
 	// notes say the upgrade converts such a system, so the sentence does not say what a release requires.
 	it('says ReCasaOS refuses for now and what to do, and neither what a release requires nor a distribution nor how many folders', () => {
@@ -798,6 +791,196 @@ describe('what the final core really sends', () => {
 			expect(sentence).toMatch(/nofail/)
 			expect(sentence).not.toMatch(/verif/i)
 		}
+	})
+})
+
+// The three answers of the core for sources_third_party (pkg/osreadiness/checks_sources.go), as it sends them: the keys of `data` in the order of its
+// JSON (sorted), `action` always none. `files` has every source that is not Debian's or Ubuntu's, Docker's among them; `other_files` is there if and
+// only if the severity is warn, `docker_files` if and only if Docker has a source, `hosts` when at least one of them has a host. Docker's source is
+// download.docker.com and nothing else: it is put aside for the upgrade and rewritten after it, which is why it is a note and not a warning.
+describe('sources_third_party', () => {
+	const DOCKER_ONLY = { docker_files: ['docker.list'], files: ['docker.list'], hosts: ['download.docker.com'] }
+	const OTHER_ONLY = { files: ['tailscale.list'], hosts: ['pkgs.tailscale.com'], other_files: ['tailscale.list'] }
+	const BOTH = { docker_files: ['docker.list'], files: ['docker.list', 'tailscale.list'], hosts: ['download.docker.com', 'pkgs.tailscale.com'], other_files: ['tailscale.list'] }
+	// a file with Docker's line and another vendor's: it is in both lists
+	const MIXED_FILE = { docker_files: ['vendors.list'], files: ['vendors.list'], hosts: ['download.docker.com', 'pkgs.tailscale.com'], other_files: ['vendors.list'] }
+	// a source that has no host, and a mirror of Debian that apt keeps no Release file for (which has one), are others too
+	const NO_HOST = { files: ['odd.list'], other_files: ['odd.list'] }
+	const MIRROR_ONLY = { files: ['mirror.list'], hosts: ['mirror.example.edu'], other_files: ['mirror.list'] }
+
+	const OTHERS = 'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on'
+	const EXCEPTION = 'Docker\'s source is the exception: it is rewritten after the upgrade.'
+	const MIRROR = 'A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.'
+	const DOCKER_ALONE = 'Docker\'s package source is not Debian\'s or Ubuntu\'s: the upgrade puts it aside, then rewrites it for the new release. Nothing to do.'
+	const NAMED = `${OTHERS}: {names}. ${MIRROR}`
+	const NAMED_WITH_DOCKER = `${OTHERS}: {names}. ${EXCEPTION} ${MIRROR}`
+	const PLAIN = `${OTHERS}. ${MIRROR}`
+
+	// the sentence as the owner reads it
+	const said = ({ sentence }) => sentence.key.replace(/\{(\w+)\}/g, (_, name) => sentence.params[name])
+	const times = (text, word) => text.split(word).length - 1
+
+	describe('with Docker\'s source alone, which is an info', () => {
+		const found = () => row('sources_third_party', 'info', DOCKER_ONLY, { action: 'none' })
+
+		it('is one short sentence that names nothing, and says there is nothing to do', () => {
+			expect(found().sentence).toEqual({ key: DOCKER_ALONE, params: {} })
+			expect(found().action).toBe('')
+		})
+
+		it('says nothing of what is said of the other sources', () => {
+			expect(said(found())).not.toMatch(/paused|mirror|Release|exception|apt update/)
+		})
+
+		it('lists the host, and neither the files nor Docker\'s files, which are the same file', () => {
+			expect(found().details).toEqual([{ name: 'hosts', value: 'download.docker.com' }])
+			expect(said(found())).not.toContain('docker.list')
+		})
+
+		it('is a note, and the report is ready', () => {
+			const view = readinessView(report([check('sources_third_party', 'info', DOCKER_ONLY, { action: 'none' })], { state: 'ready' }))
+
+			expect(view.notes.map(r => r.code)).toEqual(['sources_third_party'])
+			expect(view.warnings).toEqual([])
+			expect(view.state).toBe('ready')
+			expect(view.summary).toEqual({ key: 'Ready', params: {} })
+		})
+
+		it('says the same of an info that came with no data', () => {
+			expect(row('sources_third_party', 'info').sentence).toEqual({ key: DOCKER_ALONE, params: {} })
+			expect(row('sources_third_party', 'info').details).toEqual([])
+		})
+	})
+
+	describe('with other sources, which is a warning', () => {
+		it('names the files of the sources that are not Docker\'s, and says a mirror of Debian or Ubuntu may be among them', () => {
+			const found = row('sources_third_party', 'warn', OTHER_ONLY, { action: 'none' })
+
+			expect(found.sentence).toEqual({ key: NAMED, params: { names: 'tailscale.list' } })
+			expect(found.action).toBe('')
+			expect(said(found)).toMatch(/^Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, .*: tailscale\.list\. A mirror of Debian or Ubuntu /)
+			expect(found.details).toEqual([{ name: 'hosts', value: 'pkgs.tailscale.com' }])
+		})
+
+		it('says Docker\'s source is the exception, when it is there, and names only the others', () => {
+			const found = row('sources_third_party', 'warn', BOTH, { action: 'none' })
+
+			expect(found.sentence).toEqual({ key: NAMED_WITH_DOCKER, params: { names: 'tailscale.list' } })
+			expect(said(found)).not.toContain('docker.list')
+			// Docker's files and the hosts are listed, labelled, in the order of the core's data
+			expect(found.details).toEqual([{ name: 'docker_files', value: 'docker.list' }, { name: 'hosts', value: 'download.docker.com, pkgs.tailscale.com' }])
+		})
+
+		it('says nothing of Docker when there is no source of Docker\'s', () => {
+			for (const data of [OTHER_ONLY, NO_HOST, MIRROR_ONLY])
+				expect(row('sources_third_party', 'warn', data).sentence.key, JSON.stringify(data)).not.toMatch(/Docker/)
+		})
+
+		it('names a file that has Docker\'s line and another vendor\'s as another\'s, and says Docker\'s exception', () => {
+			const found = row('sources_third_party', 'warn', MIXED_FILE)
+
+			expect(found.sentence).toEqual({ key: NAMED_WITH_DOCKER, params: { names: 'vendors.list' } })
+			expect(found.details).toEqual([{ name: 'docker_files', value: 'vendors.list' }, { name: 'hosts', value: 'download.docker.com, pkgs.tailscale.com' }])
+		})
+
+		it('names a source that has no host, and a mirror, and lists no hosts for the first', () => {
+			expect(row('sources_third_party', 'warn', NO_HOST).sentence).toEqual({ key: NAMED, params: { names: 'odd.list' } })
+			expect(row('sources_third_party', 'warn', NO_HOST).details).toEqual([])
+			expect(row('sources_third_party', 'warn', MIRROR_ONLY).sentence).toEqual({ key: NAMED, params: { names: 'mirror.list' } })
+			expect(row('sources_third_party', 'warn', MIRROR_ONLY).details).toEqual([{ name: 'hosts', value: 'mirror.example.edu' }])
+		})
+
+		it('is a warning, and the report is ready with things to look at, whatever state the core says', () => {
+			for (const state of ['attention', 'ready']) {
+				const view = readinessView(report([check('sources_third_party', 'warn', BOTH, { action: 'none' })], { state }))
+
+				expect(view.warnings.map(r => r.code)).toEqual(['sources_third_party'])
+				expect(view.state).toBe('attention')
+			}
+		})
+
+		it('says no more than the plain sentence for a list of files it cannot read', () => {
+			for (const other_files of [undefined, [], [''], [null, 3], { a: 1 }])
+				expect(row('sources_third_party', 'warn', { other_files }).sentence, JSON.stringify(other_files)).toEqual({ key: PLAIN, params: {} })
+		})
+
+		it('does not say Docker\'s exception for a list of other files it cannot read, even beside Docker\'s source', () => {
+			expect(row('sources_third_party', 'warn', { docker_files: ['docker.list'], other_files: [] }).sentence).toEqual({ key: PLAIN, params: {} })
+		})
+	})
+
+	// each file is said once: the sentence names the others, the details line lists what the sentence does not say, and `files` says it all over again
+	describe('says each file once', () => {
+		it.each([
+			['Docker\'s alone', 'info', DOCKER_ONLY, { 'docker.list': 0 }],
+			['another alone', 'warn', OTHER_ONLY, { 'tailscale.list': 1 }],
+			['both', 'warn', BOTH, { 'docker.list': 1, 'tailscale.list': 1 }],
+			['a mirror', 'warn', MIRROR_ONLY, { 'mirror.list': 1 }],
+		])('for %s', (_, severity, data, files) => {
+			const found = row('sources_third_party', severity, data)
+			const all = [said(found), ...found.details.map(detail => detail.value)].join(' · ')
+
+			for (const [file, count] of Object.entries(files))
+				expect(times(all, file), file).toBe(count)
+			expect(found.details.map(detail => detail.name)).not.toContain('files')
+			expect(found.details.map(detail => detail.name)).not.toContain('other_files')
+		})
+	})
+
+	// a core that has no other_files (one from before it was added) does not get the sentence of a note for what it called a warning
+	describe('for a core that sends no other_files', () => {
+		it('says the warning it was sent, naming its files, and never that there is nothing to do', () => {
+			const found = row('sources_third_party', 'warn', DOCKER_ONLY)
+
+			expect(found.sentence).toEqual({ key: NAMED, params: { names: 'docker.list' } })
+			expect(said(found)).not.toMatch(/Nothing to do/)
+		})
+	})
+
+	it('says the plain sentence of the others for any other severity, with no data', () => {
+		for (const severity of ['refuse', 'warn'])
+			expect(row('sources_third_party', severity).sentence, severity).toEqual({ key: PLAIN, params: {} })
+	})
+
+	describe('in both languages', () => {
+		const DOCKER_ALONE_FR = 'La source de paquets de Docker ne vient ni de Debian ni d\'Ubuntu : la mise à niveau la met de côté, puis la réécrit pour la nouvelle version. Il n\'y a rien à faire.'
+		const OTHERS_FR = 'Les sources de paquets qui ne viennent ni de Debian ni d\'Ubuntu sont mises en pause pendant la mise à niveau et le restent ensuite, si bien que les logiciels qu\'elles fournissent ne reçoivent plus de mises à jour tant que vous ne les réactivez pas'
+		const EXCEPTION_FR = 'La source de Docker fait exception : elle est réécrite après la mise à niveau.'
+		const MIRROR_FR = 'Un miroir de Debian ou d\'Ubuntu figure aussi ici quand apt ne conserve aucun fichier Release pour ce miroir : lancez apt update sur la machine, puis relancez la vérification.'
+
+		// every sentence the code can say, in English (the key) and in French, and the labels it adds
+		const NEW = [
+			[DOCKER_ALONE, DOCKER_ALONE_FR],
+			[NAMED, `${OTHERS_FR} : {names}. ${MIRROR_FR}`],
+			[NAMED_WITH_DOCKER, `${OTHERS_FR} : {names}. ${EXCEPTION_FR} ${MIRROR_FR}`],
+			[PLAIN, `${OTHERS_FR}. ${MIRROR_FR}`],
+			[`${OTHERS}. ${EXCEPTION} ${MIRROR}`, `${OTHERS_FR}. ${EXCEPTION_FR} ${MIRROR_FR}`],
+			[DETAIL_LABELS.other_files, 'Fichiers des autres sources'],
+		]
+
+		it.each(NEW)('says "%s" in English and in French', (key, french) => {
+			expect(READINESS_KEYS).toContain(key)
+			expect(en[key]).toBe(key)
+			expect(fr[key]).toBe(french)
+			expect(fr[key]).not.toMatch(/\S[:?!;]/)
+			// no English word left in the French
+			expect(fr[key]).not.toMatch(/\b(the|and|for|is|are|not|from|with|back|nothing|until|puts|paused|rewritten)\b/i)
+			expect(fr[key].match(/\{\w+\}/g) || []).toEqual(key.match(/\{\w+\}/g) || [])
+		})
+
+		it('has every sentence of the code in the table, and nothing but them in the language files', () => {
+			const keys = [].concat(READINESS_CHECKS.sources_third_party.info, READINESS_CHECKS.sources_third_party.text, ...Object.values(READINESS_CHECKS.sources_third_party.variants))
+
+			expect(keys.sort()).toEqual(NEW.slice(0, 5).map(([key]) => key).sort())
+			// the sentence that said everything at once, with the sources in a list at its end, is gone from both
+			for (const language of [en, fr])
+				expect(Object.keys(language).filter(key => /\(run apt update on the machine|Sources: \{names\}/.test(key))).toEqual([])
+		})
+
+		it('says the details as labels, in French too', () => {
+			expect(fr['Docker\'s files']).toBe('Fichiers de Docker')
+			expect(fr.Hosts).toBe('Serveurs')
+		})
 	})
 })
 

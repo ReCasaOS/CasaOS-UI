@@ -75,7 +75,7 @@ function formatMoment(iso, locale) {
 // services, modules...): the first list it sent is the one the sentence names, the more specific
 // ones first (a service before the packages that bring it).
 const MAX_NAMES = 20
-const NAME_KEYS = ['names', 'services', 'packages', 'modules', 'apps', 'containers', 'files', 'mounts', 'directories', 'devices', 'disks', 'arrays', 'sources', 'units', 'unit', 'architectures']
+const NAME_KEYS = ['names', 'services', 'packages', 'modules', 'apps', 'containers', 'other_files', 'files', 'mounts', 'directories', 'devices', 'disks', 'arrays', 'sources', 'units', 'unit', 'architectures']
 
 function nameList(value) {
 	const list = (Array.isArray(value) ? value : [value])
@@ -149,7 +149,9 @@ export const FIX_BROKEN = 'Repair the packages whose dependencies are not met (o
  * tells apart by one field of its data (`by`: the kind of boot loader, why a disk was not looked
  * at) has a sentence per value of it in `variants`, each a sentence or a list like the above; the
  * field is not listed again. `quiet` names the fields of the data that the sentences say already, or
- * that add nothing to them: they are never listed. `actions` says, per action code, when the action
+ * that add nothing to them: they are never listed. `by` and `quiet` are a function when no one field tells
+ * the cause: `by` of the data, giving the key of the variant (every field is then listed), and `quiet` of the
+ * data and the severity. `actions` says, per action code, when the action
  * fits the code: false for never, or a function of the data that says whether it does (true or false)
  * or which sentence of the action to say (a language-file key).
  *
@@ -273,11 +275,24 @@ export const READINESS_CHECKS = {
 	},
 	sources_third_party: {
 		label: 'Third-party package sources',
+		// Docker's source alone is an info: the upgrade puts it aside and writes it again, so there is nothing to look at, and nothing to name
+		info: 'Docker\'s package source is not Debian\'s or Ubuntu\'s: the upgrade puts it aside, then rewrites it for the new release. Nothing to do.',
+		// the others are what the upgrade pauses, and the core names their files (`other_files`) apart from Docker's, which are listed with the hosts. A source on a
+		// host that is not Debian's or Ubuntu's own counts as theirs only when the Release file apt keeps for it says so: a mirror it has none of is among the others
 		text: [
-			// a source on a host that is not Debian's or Ubuntu's own counts as theirs only when the Release file apt keeps for it says so
-			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it (run apt update on the machine, then check again). Sources: {names}.',
-			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it (run apt update on the machine, then check again).',
+			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on: {names}. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.',
+			'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.',
 		],
+		// Docker's source is among them: its exception is said
+		by: data => nameList(data.other_files) && nameList(data.docker_files) ? 'docker' : undefined,
+		variants: {
+			docker: [
+				'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on: {names}. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.',
+				'Package sources that do not come from Debian or Ubuntu are paused for the upgrade and stay paused afterwards, so the software they provide gets no updates until you switch them back on. Docker\'s source is the exception: it is rewritten after the upgrade. A mirror of Debian or Ubuntu is listed here too when apt keeps no Release file for it: run apt update on the machine, then check again.',
+			],
+		},
+		// `files` has them all, and says it all over again; for Docker's alone, so does `docker_files`
+		quiet: (data, severity) => severity === 'info' ? ['files', 'docker_files'] : ['files'],
 		// nothing in the sources is wrong: the sentence says what the upgrade does with them
 		actions: { review_sources: false },
 	},
@@ -596,6 +611,7 @@ export const DETAIL_LABELS = {
 	suites: 'Release names',
 	hosts: 'Hosts',
 	docker_files: 'Docker\'s files',
+	other_files: 'Other sources\' files',
 	default_release: 'Default release',
 	architectures: 'Architectures',
 	services: 'Services',
@@ -699,11 +715,12 @@ const SEVERITIES = new Set(['refuse', 'warn', 'info', 'ok'])
 // of a code are the ones of the value its `by` field has, when it has one for it, else the one of the
 // severity it comes with, else its text.
 function sentenceFor(entry, severity, data, locale) {
-	const value = entry.by ? data[entry.by] : undefined
+	const value = typeof entry.by === 'function' ? entry.by(data) : entry.by ? data[entry.by] : undefined
 	const variant = typeof value === 'string' || typeof value === 'boolean' ? own(entry.variants ?? {}, String(value)) : undefined
 	const candidates = [].concat(variant ?? own(entry, severity) ?? entry.text)
 	// the fields the code's sentences say already, and the one that chose the sentence, are not listed again
-	const said = [...(entry.quiet ?? []), ...(variant === undefined ? [] : [entry.by])]
+	const quiet = typeof entry.quiet === 'function' ? entry.quiet(data, severity) : entry.quiet ?? []
+	const said = [...quiet, ...(variant === undefined ? [] : [entry.by])]
 	for (const key of candidates) {
 		const params = {}
 		const used = [...said]
