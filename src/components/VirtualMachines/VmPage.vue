@@ -111,6 +111,9 @@ export default {
 			selectedId: '',
 			loading: true,
 			error: '',
+			// How many times each VM was asked for or dropped. An answer that comes
+			// back after a later ask, or after the VM went, is not the VM any more.
+			asked: {},
 		}
 	},
 	computed: {
@@ -172,14 +175,26 @@ export default {
 		},
 		// one VM, from the service, in place
 		async refreshOne(id) {
+			const ask = this.touch(id)
 			try {
 				const res = await vmApi.get(id)
-				this.replace(res.data.data)
+				if (this.asked[id] === ask) {
+					this.replace(res.data.data)
+				}
 			} catch (e) {
-				if (e.response?.status === 404) {
-					this.vms = this.vms.filter(vm => vm.id !== id)
+				if (e.response?.status === 404 && this.asked[id] === ask) {
+					this.drop(id)
 				}
 			}
+		},
+		touch(id) {
+			this.asked[id] = (this.asked[id] || 0) + 1
+			return this.asked[id]
+		},
+		// a VM that is gone; what is still on its way about it is not wanted
+		drop(id) {
+			this.touch(id)
+			this.vms = this.vms.filter(vm => vm.id !== id)
 		},
 		replace(vm) {
 			const i = this.vms.findIndex(v => v.id === vm.id)
@@ -262,7 +277,7 @@ export default {
 						props: { vm },
 						events: {
 							deleted: (deleted) => {
-								this.vms = this.vms.filter(v => v.id !== deleted.id)
+								this.drop(deleted.id)
 								this.saveOrder()
 							},
 						},
@@ -288,13 +303,21 @@ export default {
 		},
 	},
 	sockets: {
+		// The bus does not replay what it sent while this browser was away (a sleep,
+		// a restart of the gateway): each time the socket connects, which includes
+		// each time it connects again, the VMs are read again.
+		connect() {
+			if (!this.loading && this.available) {
+				this.refresh()
+			}
+		},
 		'vm:state-changed': function (res) {
 			const id = res.Properties?.['vm:id']
 			if (!id || !this.available) {
 				return
 			}
 			if (res.Properties['vm:event'] === 'undefined') {
-				this.vms = this.vms.filter(vm => vm.id !== id)
+				this.drop(id)
 			} else {
 				this.refreshOne(id)
 			}
@@ -307,7 +330,7 @@ export default {
 		},
 		'vm:create-error': function (res) {
 			const p = res.Properties || {}
-			this.vms = this.vms.filter(vm => vm.id !== p['vm:id'])
+			this.drop(p['vm:id'])
 			this.$buefy.toast.open({
 				message: escape(this.$t('{name} could not be created: {message}', { name: p['vm:title'] || '', message: p.message || '' })),
 				type: 'is-danger',

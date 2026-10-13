@@ -8,12 +8,34 @@ import { vi } from 'vitest'
 import VmPage from '../VmPage.vue'
 import vmApi from '../api'
 import { HOST, aVm } from './vm'
+import socketPlugin from '@/plugins/socket'
 import i18n from '@/plugins/i18n'
 
+// The message bus' socket, as the plugin only ever uses it: `on` and `off`.
+// `receive` is the bus pushing an event, or the socket connecting.
+function fakeSocket() {
+	const listeners = new Map()
+	return {
+		count: event => (listeners.get(event) || []).length,
+		on(event, fn) {
+			listeners.set(event, [...(listeners.get(event) || []), fn])
+		},
+		off(event, fn) {
+			listeners.set(event, (listeners.get(event) || []).filter(f => f !== fn))
+		},
+		receive(event, ...args) {
+			for (const fn of [...(listeners.get(event) || [])]) {
+				fn(...args)
+			}
+		},
+	}
+}
+
 // What the service answers to the page's first requests
-export function serve({ vms = [aVm()], host = HOST } = {}) {
+export function serve({ vms = [aVm()], host = HOST, list } = {}) {
 	vmApi.host.mockResolvedValue({ data: { data: host } })
-	vmApi.list.mockResolvedValue({ data: { data: vms } })
+	// `list`: a promise of the test's own, to answer when it likes
+	vmApi.list.mockReturnValue(list || Promise.resolve({ data: { data: vms } }))
 	vmApi.images.mockResolvedValue({ data: { data: [] } })
 	vmApi.get.mockImplementation(async id => ({ data: { data: vms.find(vm => vm.id === id) } }))
 }
@@ -33,12 +55,13 @@ export async function mountPage(options = {}) {
 			setCustomStorage: vi.fn().mockResolvedValue({}),
 		},
 	}
+	const socket = fakeSocket()
 	const wrapper = mount(VmPage, {
 		attachTo: document.body,
-		global: { plugins: [Buefy, i18n], mocks: { $api: api } },
+		global: { plugins: [Buefy, i18n, [socketPlugin, socket]], mocks: { $api: api } },
 	})
 	await flushPromises()
 	// what the message bus pushes
-	const fire = (event, Properties) => wrapper.vm.$options.sockets[event].call(wrapper.vm, { Properties })
-	return { wrapper, api, fire }
+	const fire = (event, Properties) => socket.receive(event, { Properties })
+	return { wrapper, api, socket, fire }
 }
