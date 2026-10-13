@@ -597,6 +597,44 @@ describe('when the call fails', () => {
 	})
 })
 
+// the plan below the report is not offered for a system that the report says is unsupported or the latest: the window above tells it
+describe('telling the window the state of the report', () => {
+	it('says nothing before it is asked, the state when it is read, and nothing again when it is asked again', async () => {
+		open()
+		expect(wrapper.emitted('state')).toBeUndefined()
+
+		getOsReadiness.mockReturnValueOnce(answer({ ...REPORT, state: 'latest', checks: [] }))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+		expect(wrapper.emitted('state')).toEqual([[''], ['latest']])
+
+		const late = deferred()
+		getOsReadiness.mockReturnValueOnce(late.promise)
+		await wrapper.find('.os-readiness-check').trigger('click')
+		expect(wrapper.emitted('state').at(-1)).toEqual([''])
+	})
+
+	it('says nothing of a state when the answer could not be read or the call failed', async () => {
+		open()
+		getOsReadiness.mockReturnValueOnce(answer(null))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+		getOsReadiness.mockReturnValueOnce(failure({ response: { status: 500 } }))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.emitted('state')).toEqual([[''], ['']])
+	})
+
+	it('says the state that the window says, which is never ready next to a blocker', async () => {
+		await run(REPORT, {})
+		expect(wrapper.emitted('state').at(-1)).toEqual(['blocked'])
+
+		await run({ ...REPORT, state: 'ready' })
+		expect(wrapper.emitted('state').at(-1)).toEqual(['blocked'])
+	})
+})
+
 describe('copying the report', () => {
 	it('copies the core\'s own text, never one it builds, and says so', async () => {
 		copy.mockResolvedValue(undefined)

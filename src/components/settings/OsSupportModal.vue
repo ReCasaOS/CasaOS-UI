@@ -41,7 +41,9 @@
 					<a :href="link.href" rel="noopener noreferrer" target="_blank">{{ $t(link.label) }}</a>
 				</p>
 				<!-- a read-only report: it asks the core, and changes nothing on the machine -->
-				<os-upgrade-readiness v-if="canCheck" :locale="locale" />
+				<os-upgrade-readiness v-if="canCheck" :locale="locale" @state="readinessState = $event" />
+				<!-- what apt would do and the text to do it by hand: it asks the core, shows itself only for a machine that can be planned, and changes nothing on the machine -->
+				<os-upgrade-plan v-if="canCheck" :locale="locale" :readiness-state="readinessState" />
 			</template>
 		</section>
 
@@ -52,13 +54,14 @@
 </template>
 
 <script>
+import OsUpgradePlan from './OsUpgradePlan.vue'
 import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
 import { canCheckReadiness } from './osReadiness'
 import { extendedSentence, releaseLink, releaseName, supportSentence } from './osSupport'
 
 export default {
 	name: 'OsSupportModal',
-	components: { OsUpgradeReadiness },
+	components: { OsUpgradePlan, OsUpgradeReadiness },
 	props: {
 		// GET /v1/sys/os, as the top bar read it.
 		os: {
@@ -67,6 +70,12 @@ export default {
 		},
 	},
 	emits: ['close'],
+	data() {
+		return {
+			// the state of the readiness report once it was asked ('' before): the plan is not offered below a system it calls unsupported or the latest
+			readinessState: '',
+		}
+	},
 	computed: {
 		name() {
 			return releaseName(this.os)

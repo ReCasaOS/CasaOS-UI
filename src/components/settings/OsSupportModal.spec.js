@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import Buefy from 'buefy'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OsSupportModal from './OsSupportModal.vue'
+import OsUpgradePlan from './OsUpgradePlan.vue'
 import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
 import { EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
 import en from '@/assets/lang/en_US.json'
@@ -324,6 +325,109 @@ describe('the readiness section of the operating system window', () => {
 		open(BULLSEYE)
 
 		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Check whether this machine can be upgraded', 'Close'])
+	})
+})
+
+// What apt would do, and the text to do it by hand: asked of the core when the window opens, and shown only for a machine that can be planned
+describe('the plan section of the operating system window', () => {
+	const section = () => wrapper.findComponent(OsUpgradePlan)
+	const answer = data => Promise.resolve({ data: { success: 200, message: 'ok', data } })
+	const report = state => ({ checked_at: '2026-10-12T09:30:00Z', state, hop: { from: BULLSEYE, to: BULLSEYE.next }, counts: {}, checks: [], text: 'report' })
+
+	// the window opened on a machine that the core says can be planned, with the answers of the calls it makes
+	async function openPlannable(os = BULLSEYE, readiness = report('ready')) {
+		const api = {
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: true, state: 'idle' })),
+			getOsReadiness: vi.fn().mockReturnValue(answer(readiness)),
+			startOsPlan: vi.fn(),
+			getOsRunbook: vi.fn(),
+		}
+		open(os, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		await flushPromises()
+		return api
+	}
+
+	it('is in the window under the readiness section, asks the core once, and starts nothing on its own', async () => {
+		const api = await openPlannable()
+
+		expect(section().exists()).toBe(true)
+		expect(wrapper.find('.os-plan-title').text()).toBe('What would the upgrade do?')
+		expect(api.getOsPlan).toHaveBeenCalledTimes(1)
+		expect(api.startOsPlan).not.toHaveBeenCalled()
+		expect(api.getOsRunbook).not.toHaveBeenCalled()
+		expect(api.getOsReadiness).not.toHaveBeenCalled()
+		const html = wrapper.html()
+		expect(html.indexOf('os-readiness-title')).toBeGreaterThan(-1)
+		expect(html.indexOf('os-readiness-title')).toBeLessThan(html.indexOf('os-plan-title'))
+		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Check whether this machine can be upgraded', 'See what the upgrade would do', 'Close'])
+	})
+
+	it('is in the window of an Ubuntu too, and asks in the language of the window', async () => {
+		i18n.global.locale = 'fr_fr'
+		await openPlannable(JAMMY)
+
+		expect(section().props('locale')).toBe('fr_fr')
+		expect(wrapper.find('.os-plan-title').text()).toBe('Que ferait la mise à niveau ?')
+	})
+
+	it('is not in the window when the core says the machine cannot be planned', async () => {
+		const api = {
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: false, reason: 'identity_unsupported', state: 'idle' })),
+			getOsReadiness: vi.fn(),
+		}
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		await flushPromises()
+
+		expect(section().exists()).toBe(true)
+		expect(wrapper.find('.os-plan').exists()).toBe(false)
+		// the readiness section is none the worse
+		expect(wrapper.find('.os-readiness-title').exists()).toBe(true)
+	})
+
+	it.each([
+		['no next release', { next: undefined }],
+		['a next release with no name', { next: {} }],
+		['a system the core does not know', { known: false }],
+		['a variant', { variant: 'raspberrypi' }],
+		['a distribution it has no sentences for', { id: 'linuxmint' }],
+	])('is not in the window for %s, and asks the core nothing', async (_, change) => {
+		const getOsPlan = vi.fn()
+		open({ ...BULLSEYE, ...change }, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: { getOsPlan } } } } })
+		await flushPromises()
+
+		expect(section().exists()).toBe(false)
+		expect(getOsPlan).not.toHaveBeenCalled()
+	})
+
+	// the report says the system is not one to upgrade from: there is no plan to offer; asked again, it comes back
+	it.each([
+		['unsupported', false],
+		['latest', false],
+		['ready', true],
+		['attention', true],
+		['blocked', true],
+	])('is shown after a readiness report that says "%s": %s', async (state, shown) => {
+		await openPlannable(BULLSEYE, report(state))
+		expect(wrapper.find('.os-plan').exists()).toBe(true)
+
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.find('.os-readiness-report').exists()).toBe(true)
+		expect(wrapper.find('.os-plan').exists()).toBe(shown)
+	})
+
+	it('comes back when the report is asked again and has not answered yet', async () => {
+		const api = await openPlannable(BULLSEYE, report('latest'))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('.os-plan').exists()).toBe(false)
+
+		api.getOsReadiness.mockReturnValueOnce(new Promise(() => {}))
+		await wrapper.find('.os-readiness-check').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.find('.os-plan').exists()).toBe(true)
 	})
 })
 
