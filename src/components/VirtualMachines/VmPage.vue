@@ -92,7 +92,7 @@ import VmDeleteModal from './VmDeleteModal.vue'
 import StorageSettingsModal from './StorageSettingsModal.vue'
 import VmDetail from './VmDetail.vue'
 import { openWithEscape } from './modalStack'
-import { applyOrder, listAddress, stateDot, stateLabel } from './vms'
+import { allowedActions, applyOrder, listAddress, stateDot, stateLabel } from './vms'
 
 const ORDER_KEY = 'vm_order'
 // how long after a failed read, made when the message bus connected, the one
@@ -140,6 +140,14 @@ export default {
 		// the VM picked in the list, or the first one
 		selected() {
 			return this.vms.find(vm => vm.id === this.selectedId) || this.vms[0] || null
+		},
+	},
+	watch: {
+		// the dialog of a VM that is gone has nothing left to ask
+		vms() {
+			if (this.cutting && !this.has(this.cutting.id)) {
+				this.cutting.dialog.close()
+			}
 		},
 	},
 	mounted() {
@@ -356,15 +364,25 @@ export default {
 		// Cancel in focus, as Delete is.
 		confirmCut(action, vm) {
 			const off = action === 'force-off'
-			this.$buefy.dialog.confirm({
+			const dialog = this.$buefy.dialog.confirm({
 				title: off ? this.$t('Force off {name}?', { name: vm.title }) : this.$t('Force reset {name}?', { name: vm.title }),
 				message: off ? this.$t('The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.') : this.$t('The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.'),
 				confirmText: off ? this.$t('Force off') : this.$t('Force reset'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
 				focusOn: 'cancel',
-				onConfirm: () => this.run(vm, () => vmApi.action(vm.id, action), false),
+				onConfirm: () => this.cut(vm.id, action),
 			})
+			// it goes with the VM
+			this.cutting = { id: vm.id, dialog }
+		},
+		// The VM as it is when the person confirms, not as it was when the dialog
+		// opened: it may have gone off since, and the service would answer 409.
+		cut(id, action) {
+			const vm = this.vms.find(v => v.id === id)
+			if (vm && allowedActions(vm.state)[action === 'force-off' ? 'forceOff' : 'reset']) {
+				this.run(vm, () => vmApi.action(id, action), false)
+			}
 		},
 		async run(vm, call, openAfter) {
 			this.busy = { ...this.busy, [vm.id]: true }

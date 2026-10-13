@@ -108,6 +108,7 @@ function deferred() {
 }
 const answer = vm => ({ data: { data: vm } })
 const states = () => [...document.querySelectorAll('.vm-item-state')].map(el => el.textContent.trim())
+const stateOf = () => Object.fromEntries([...document.querySelectorAll('.vm-item')].map(item => [item.querySelector('.vm-item-title').textContent, item.querySelector('.vm-item-state').textContent.trim()]))
 
 describe('keeping the state of the VMs true', () => {
 	let page
@@ -226,7 +227,6 @@ describe('keeping the state of the VMs true', () => {
 	// the service gave it, and it can come after what the page learned since
 	describe('when the list is on its way', () => {
 		const listOf = vms => ({ data: { data: vms } })
-		const stateOf = () => Object.fromEntries([...document.querySelectorAll('.vm-item')].map(item => [item.querySelector('.vm-item-title').textContent, item.querySelector('.vm-item-state').textContent.trim()]))
 
 		it('does not bring a VM back that was removed meanwhile', async () => {
 			page = await mountPage()
@@ -566,6 +566,133 @@ describe('cutting a virtual machine off', () => {
 		focus.mockRestore()
 		expect(dialog().querySelector('img')).toBeNull()
 		expect(dialog().querySelector('.modal-card-title').textContent).toContain(HOSTILE)
+	})
+
+	// the dialog is open for as long as the person thinks: the VM does not wait
+	describe('while the dialog is open', () => {
+		const learn = async (state, event = 'stopped') => {
+			vmApi.get.mockResolvedValue(answer(aVm({ state })))
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': event })
+			await settle()
+		}
+
+		it('does not cut a VM that went off meanwhile, and closes without a word', async () => {
+			page = await mountPage()
+			forceOff()
+			await settle()
+			await learn('shut-off')
+			expect(states()).toEqual(['Off'])
+
+			button('Force off', dialog()).click()
+			await settle()
+			expect(vmApi.action).not.toHaveBeenCalled()
+			expect(isOpen('.dialog')).toBe(false)
+			expect(toasts()).toHaveLength(0)
+		})
+
+		it('does not restart a VM that went off meanwhile either', async () => {
+			page = await mountPage()
+			button('Force reset').click()
+			await settle()
+			await learn('shut-off')
+
+			button('Force reset', dialog()).click()
+			await settle()
+			expect(vmApi.action).not.toHaveBeenCalled()
+			expect(isOpen('.dialog')).toBe(false)
+		})
+
+		// Force off can pull the plug on a VM that is shutting down; a reset cannot
+		it('restarts only what can be restarted, and switches off what can be switched off', async () => {
+			page = await mountPage()
+			vmApi.action.mockResolvedValue(answer(aVm({ state: 'shut-off' })))
+			button('Force reset').click()
+			await settle()
+			await learn('shutting-down', 'stopped')
+			button('Force reset', dialog()).click()
+			await settle()
+			expect(vmApi.action).not.toHaveBeenCalled()
+
+			forceOff()
+			await settle()
+			button('Force off', dialog()).click()
+			await settle()
+			expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'force-off')
+		})
+
+		it('cuts a VM that is paused now, as it can be', async () => {
+			page = await mountPage()
+			vmApi.action.mockResolvedValue(answer(aVm({ state: 'shut-off' })))
+			forceOff()
+			await settle()
+			await learn('paused', 'suspended')
+
+			button('Force off', dialog()).click()
+			await settle()
+			expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'force-off')
+		})
+
+		it('closes when the VM is deleted', async () => {
+			page = await mountPage()
+			forceOff()
+			await settle()
+			expect(isOpen('.dialog')).toBe(true)
+
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'undefined' })
+			await settle()
+			expect(states()).toEqual([])
+			expect(isOpen('.dialog')).toBe(false)
+			expect(vmApi.action).not.toHaveBeenCalled()
+		})
+
+		it('closes when a read of the list no longer has the VM', async () => {
+			page = await mountPage()
+			forceOff()
+			await settle()
+
+			vmApi.list.mockResolvedValue({ data: { data: [] } })
+			page.socket.receive('connect')
+			await settle()
+			expect(states()).toEqual([])
+			expect(isOpen('.dialog')).toBe(false)
+		})
+
+		// the dialog fades for a moment after it closes, and its button still works
+		it('does nothing for a VM that is gone when its button is pressed', async () => {
+			page = await mountPage()
+			forceOff()
+			await settle()
+			const confirm = button('Force off', dialog())
+
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'undefined' })
+			await settle()
+			confirm.click()
+			await settle()
+			expect(vmApi.action).not.toHaveBeenCalled()
+		})
+
+		it('stays open when another VM is deleted', async () => {
+			// Debian comes first, and is the one on show
+			page = await mountPage({ vms: [aVm(), aVm({ id: 'vm-2', title: 'Zeta' })] })
+			forceOff()
+			await settle()
+
+			page.fire('vm:state-changed', { 'vm:id': 'vm-2', 'vm:event': 'undefined' })
+			await settle()
+			expect(isOpen('.dialog')).toBe(true)
+		})
+
+		it('has nothing to close once it is closed', async () => {
+			page = await mountPage()
+			forceOff()
+			await settle()
+			button('Cancel', dialog()).click()
+			await settle()
+
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'undefined' })
+			await settle()
+			expect(states()).toEqual([])
+		})
 	})
 
 	it('leaves Shut down and Restart at one click', async () => {
