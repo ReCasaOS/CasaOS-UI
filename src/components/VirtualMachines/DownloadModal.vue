@@ -72,6 +72,8 @@ export default {
 			starting: false,
 			error: '',
 			timer: null,
+			// the dialog is gone: nothing it waits for may start the polling again
+			closed: false,
 		}
 	},
 	computed: {
@@ -83,6 +85,7 @@ export default {
 		this.refresh()
 	},
 	beforeUnmount() {
+		this.closed = true
 		clearTimeout(this.timer)
 	},
 	methods: {
@@ -111,6 +114,9 @@ export default {
 		},
 		// asks again every second while something downloads
 		async refresh() {
+			if (this.closed) {
+				return
+			}
 			clearTimeout(this.timer)
 			try {
 				const res = await vmApi.downloads()
@@ -118,7 +124,8 @@ export default {
 			} catch (e) {
 				this.error = e.response?.data?.message || e.message
 			}
-			if (this.downloads.some(this.running)) {
+			// closed while the request was on its way: no timer to arm
+			if (!this.closed && this.downloads.some(this.running)) {
 				this.timer = setTimeout(this.refresh, 1000)
 			}
 		},
