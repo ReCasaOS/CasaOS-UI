@@ -21,6 +21,7 @@ import {
 	gbToMib,
 	guessOS,
 	imageKind,
+	isUnderData,
 	keysForText,
 	listAddress,
 	mibToGB,
@@ -95,6 +96,21 @@ describe('imageKind', () => {
 		['', ''],
 	])('%s is %s', (name, kind) => {
 		expect(imageKind(name)).toBe(kind)
+	})
+})
+
+describe('isUnderData', () => {
+	it.each([
+		['/DATA', true],
+		['/DATA/VM/iso', true],
+		['/DATA/VM/iso/alpine.iso', true],
+		['/media/usb/VM/iso/alpine.iso', false],
+		['/media/DATA/alpine.iso', false],
+		['/DATAS/alpine.iso', false],
+		['', false],
+		[undefined, false],
+	])('%s is %s', (path, under) => {
+		expect(isUnderData(path)).toBe(under)
 	})
 })
 

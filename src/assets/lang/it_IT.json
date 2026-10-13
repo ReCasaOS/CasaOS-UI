@@ -1106,5 +1106,6 @@
   "Default folder": "Cartella predefinita",
   "New virtual machines keep their disks here unless you choose another folder, and its iso folder holds the images and downloads. Virtual machines already made keep their disks where they are.": "Le nuove macchine virtuali tengono qui i loro dischi, a meno che tu non scelga un'altra cartella, e la sua cartella iso contiene le immagini e i download. Le macchine virtuali già create tengono i dischi dove sono.",
   "Shut off": "Spenta",
-  "{name} was created but could not be started: {message}": "{name} è stata creata ma non è stato possibile avviarla: {message}"
+  "{name} was created but could not be started: {message}": "{name} è stata creata ma non è stato possibile avviarla: {message}",
+  "Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.": "Le immagini tenute lì non possono ancora essere usate dalle macchine virtuali: il servizio accetta solo immagini da /DATA."
 }

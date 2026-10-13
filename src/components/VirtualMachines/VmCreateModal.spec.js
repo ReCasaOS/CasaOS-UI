@@ -57,3 +57,25 @@ describe('the create dialog', () => {
 		expect(wrapper.emitted('close')).toHaveLength(1)
 	})
 })
+
+// The service reads images from /DATA only, wherever the disks of the VMs go.
+describe('the images the create dialog suggests', () => {
+	let wrapper
+
+	afterEach(() => wrapper?.unmount())
+
+	it('leave out those the service would refuse', async () => {
+		vmApi.images.mockResolvedValue({
+			data: {
+				data: [
+					{ path: '/DATA/VM/iso/alpine.iso', name: 'alpine.iso', kind: 'iso', size_bytes: 1 },
+					{ path: '/media/usb/VM/iso/debian.iso', name: 'debian.iso', kind: 'iso', size_bytes: 1 },
+				],
+			},
+		})
+		wrapper = mount(VmCreateModal, { attachTo: document.body, props: { host: HOST }, global: { plugins: [Buefy, i18n] } })
+		await flushPromises()
+
+		expect(wrapper.vm.suggestions.map(image => image.path)).toEqual(['/DATA/VM/iso/alpine.iso'])
+	})
+})

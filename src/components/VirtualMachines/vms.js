@@ -67,6 +67,12 @@ export function allowedActions(state) {
 	}
 }
 
+// The service takes images from /DATA only, wherever the disks of the VMs go:
+// what a folder under /media holds in its iso folder it refuses.
+export function isUnderData(path) {
+	return path === '/DATA' || (path || '').startsWith('/DATA/')
+}
+
 // Names the service accepts as images, by extension: an ISO goes in the CD-ROM,
 // anything else is a disk image to import. Same list as the service's.
 const DISK_EXTS = ['.qcow2', '.img', '.raw', '.vmdk', '.vdi']

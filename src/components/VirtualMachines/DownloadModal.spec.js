@@ -81,3 +81,33 @@ describe('the download dialog', () => {
 		expect(vmApi.downloads).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('the downloads that can be used', () => {
+	let wrapper
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+	afterEach(() => wrapper?.unmount())
+
+	const done = path => ({ ...running, id: path, state: 'done', done_bytes: 100, path })
+	const open = async (folder, downloads) => {
+		vmApi.downloads.mockResolvedValue(listOf(downloads))
+		wrapper = mount(DownloadModal, { attachTo: document.body, props: { folder }, global: { plugins: [Buefy, i18n] } })
+		await flushPromises()
+	}
+	const uses = () => wrapper.findAll('button').filter(b => b.text() === 'Use')
+	const warning = 'the service only takes images from /DATA'
+
+	it('are offered for use under /DATA', async () => {
+		await open('/DATA/VM/iso', [done('/DATA/VM/iso/debian.iso')])
+		expect(uses()).toHaveLength(1)
+		expect(wrapper.text()).not.toContain(warning)
+	})
+
+	it('are not offered for use anywhere else, and the dialog says why', async () => {
+		await open('/media/usb/VM/iso', [done('/media/usb/VM/iso/debian.iso')])
+		expect(uses()).toHaveLength(0)
+		expect(wrapper.text()).toContain(warning)
+	})
+})

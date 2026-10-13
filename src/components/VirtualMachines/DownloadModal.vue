@@ -20,6 +20,9 @@
 			<p class="is-size-7 has-text-full-03 mt-2">
 				{{ $t('The image goes to {folder}. This machine contacts only the address you give.', { folder }) }}
 			</p>
+			<b-message v-if="!isUnderData(folder)" class="mt-2" size="is-small" type="is-warning">
+				{{ $t('Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.') }}
+			</b-message>
 			<div class="is-flex is-justify-content-flex-end mt-3">
 				<b-button :disabled="!url.trim()" :loading="starting" icon-left="download" size="is-small" type="is-primary"
 					@click="start">{{ $t('Download') }}</b-button>
@@ -54,7 +57,7 @@
 
 <script>
 import vmApi from './api'
-import { downloadProgress, formatBytes, imageKind } from './vms'
+import { downloadProgress, formatBytes, imageKind, isUnderData } from './vms'
 
 export default {
 	name: 'DownloadModal',
@@ -89,11 +92,12 @@ export default {
 		clearTimeout(this.timer)
 	},
 	methods: {
+		isUnderData,
 		running(d) {
 			return d.state === 'downloading' || d.state === 'verifying'
 		},
 		selectable(d) {
-			return !this.isoOnly || imageKind(d.name) === 'iso'
+			return isUnderData(d.path) && (!this.isoOnly || imageKind(d.name) === 'iso')
 		},
 		progressText(d) {
 			const p = downloadProgress(d)

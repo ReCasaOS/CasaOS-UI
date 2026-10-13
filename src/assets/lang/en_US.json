@@ -1666,5 +1666,6 @@
   "Default folder": "Default folder",
   "New virtual machines keep their disks here unless you choose another folder, and its iso folder holds the images and downloads. Virtual machines already made keep their disks where they are.": "New virtual machines keep their disks here unless you choose another folder, and its iso folder holds the images and downloads. Virtual machines already made keep their disks where they are.",
   "Shut off": "Off",
-  "{name} was created but could not be started: {message}": "{name} was created but could not be started: {message}"
+  "{name} was created but could not be started: {message}": "{name} was created but could not be started: {message}",
+  "Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.": "Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA."
 }

@@ -74,7 +74,7 @@ import OsField from './OsField.vue'
 import PathPicker from './PathPicker.vue'
 import ResourcesFields from './ResourcesFields.vue'
 import vmApi from './api'
-import { createDefaults, createRequest, formatBytes, guessOS, imageKind, validateCreate } from './vms'
+import { createDefaults, createRequest, formatBytes, guessOS, imageKind, isUnderData, validateCreate } from './vms'
 
 export default {
 	name: 'VmCreateModal',
@@ -103,7 +103,7 @@ export default {
 		},
 		suggestions() {
 			const q = (this.form.image_path || '').toLowerCase()
-			return this.images.filter(img => !q || img.path.toLowerCase().includes(q))
+			return this.images.filter(img => isUnderData(img.path) && (!q || img.path.toLowerCase().includes(q)))
 		},
 		imageHint() {
 			switch (imageKind(this.form.image_path)) {

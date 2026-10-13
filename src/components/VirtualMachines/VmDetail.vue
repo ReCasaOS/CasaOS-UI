@@ -328,6 +328,7 @@ import {
 	formatBytes,
 	formatDate,
 	formatMemory,
+	isUnderData,
 	networkChoice,
 	networkLabel,
 	networkOptions,
@@ -456,7 +457,7 @@ export default {
 				|| !diskPlanIsEmpty(this.plan) || this.networkChanged || (this.showPorts && this.portsChanged)
 		},
 		isoChoices() {
-			const isos = this.images.filter(img => img.kind === 'iso').map(img => img.path)
+			const isos = this.images.filter(img => img.kind === 'iso' && isUnderData(img.path)).map(img => img.path)
 			if (this.current.cdrom && !isos.includes(this.current.cdrom)) {
 				isos.unshift(this.current.cdrom)
 			}
