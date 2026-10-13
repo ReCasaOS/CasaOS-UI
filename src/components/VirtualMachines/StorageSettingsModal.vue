@@ -49,7 +49,7 @@ export default {
 	},
 	computed: {
 		message() {
-			const free = formatBytes(this.free)
+			const free = formatBytes(this.free, this.$i18n.locale)
 			return free ? this.$t('{free} free', { free }) : ''
 		},
 	},

@@ -90,7 +90,19 @@ export function imageKind(name) {
 	return DISK_EXTS.some(ext => lower.endsWith(ext)) ? 'disk' : ''
 }
 
-export function formatBytes(bytes) {
+// A number in the viewer's words (15,41 in Italian). Without a locale it is
+// written the English way, so the tests do not depend on the machine.
+export function formatNumber(value, locale, digits = 0, minDigits = digits) {
+	const tag = (locale || 'en').replace('_', '-')
+	const options = { minimumFractionDigits: minDigits, maximumFractionDigits: digits }
+	try {
+		return value.toLocaleString(tag, options)
+	} catch {
+		return value.toLocaleString('en', options)
+	}
+}
+
+export function formatBytes(bytes, locale) {
 	if (bytes === undefined || bytes === null || Number.isNaN(bytes)) {
 		return ''
 	}
@@ -101,7 +113,7 @@ export function formatBytes(bytes) {
 		value /= 1024
 		unit++
 	}
-	return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
+	return `${formatNumber(value, locale, value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`
 }
 
 // Defaults for the create form, from what the host has: half the CPUs (at
@@ -472,6 +484,14 @@ export function guessOS(path) {
 // Memory is shown in GB and kept by the service in MiB.
 export function mibToGB(mib) {
 	return mib ? Math.round(mib / 1024 * 100) / 100 : 0
+}
+
+// Memory as people read it: MB below a gigabyte, else GB with up to two decimals.
+export function formatMemory(mib, locale) {
+	if (mib < 1024) {
+		return `${formatNumber(mib || 0, locale)} MB`
+	}
+	return `${formatNumber(mibToGB(mib), locale, 2, 0)} GB`
 }
 
 export function gbToMib(gb) {

@@ -9,7 +9,7 @@
 					<span :class="`state-badge state-${dot}`">{{ $t(label) }}</span>
 				</div>
 				<p class="is-size-7 has-text-full-03 one-line">
-					{{ current.name }} · {{ current.vcpus }} vCPU · {{ memoryLabel(current.memory_mib) }}
+					{{ current.name }} · {{ current.vcpus }} vCPU · {{ formatMemory(current.memory_mib, $i18n.locale) }}
 					<template v-if="current.network && current.network.ip"> · {{ current.network.ip }}</template>
 				</p>
 			</div>
@@ -87,12 +87,12 @@
 						<div :class="{ 'is-removed': disk.target in plan.remove }" :title="disk.path" class="is-flex-grow-1 disk-info">
 							<span class="has-text-weight-semibold">{{ disk.target }}</span>
 							<span v-if="disk.boot" class="has-text-full-03"> · {{ $t('boot') }}</span>
-							· {{ formatBytes(disk.capacity_bytes) }}
+							· {{ formatBytes(disk.capacity_bytes, $i18n.locale) }}
 							<template v-if="plan.grow[disk.target] && !(disk.target in plan.remove)">
 								→ <span class="has-text-weight-semibold">{{ plan.grow[disk.target] }} GB</span>
 							</template>
 							<span v-else-if="disk.allocation_bytes !== undefined" class="has-text-full-03">
-								({{ $t('{size} used', { size: formatBytes(disk.allocation_bytes) }) }})
+								({{ $t('{size} used', { size: formatBytes(disk.allocation_bytes, $i18n.locale) }) }})
 							</span>
 						</div>
 
@@ -327,7 +327,7 @@ import {
 	emptyDiskPlan,
 	formatBytes,
 	formatDate,
-	mibToGB,
+	formatMemory,
 	networkChoice,
 	networkLabel,
 	networkOptions,
@@ -506,6 +506,7 @@ export default {
 		},
 		formatBytes,
 		formatDate,
+		formatMemory,
 		diskGiB,
 		diskActions,
 		diskPlanIsEmpty,
@@ -513,9 +514,6 @@ export default {
 		networkLabel,
 		portLabel,
 		portKey,
-		memoryLabel(mib) {
-			return mib >= 1024 ? `${mibToGB(mib)} GB` : `${mib} MB`
-		},
 		formOf(vm) {
 			return { title: vm.title, vcpus: vm.vcpus, memory_mib: vm.memory_mib, os: vm.os || '' }
 		},

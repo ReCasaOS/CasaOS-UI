@@ -16,7 +16,7 @@
 						<div class="is-flex is-align-items-center">
 							<b-icon :icon="props.option.kind === 'iso' ? 'disc' : 'harddisk'" class="mr-2" size="is-small" />
 							<span class="is-flex-grow-1">{{ props.option.name }}</span>
-							<span class="is-size-7 has-text-full-03">{{ formatBytes(props.option.size_bytes) }}</span>
+							<span class="is-size-7 has-text-full-03">{{ formatBytes(props.option.size_bytes, $i18n.locale) }}</span>
 						</div>
 					</template>
 				</b-autocomplete>
@@ -122,7 +122,7 @@ export default {
 			if (this.folderError) {
 				return this.folderError
 			}
-			const free = formatBytes(this.folderFree)
+			const free = formatBytes(this.folderFree, this.$i18n.locale)
 			return free ? this.$t('{free} free', { free }) : ''
 		},
 	},

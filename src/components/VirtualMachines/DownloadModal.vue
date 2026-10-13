@@ -97,12 +97,12 @@ export default {
 			switch (d.state) {
 				case 'downloading':
 					return p.percent === null
-						? formatBytes(d.done_bytes)
-						: `${p.percent}% · ${formatBytes(d.done_bytes)} / ${formatBytes(d.total_bytes)}`
+						? formatBytes(d.done_bytes, this.$i18n.locale)
+						: `${p.percent}% · ${formatBytes(d.done_bytes, this.$i18n.locale)} / ${formatBytes(d.total_bytes, this.$i18n.locale)}`
 				case 'verifying':
 					return this.$t('checking the SHA-256…')
 				case 'done':
-					return `${this.$t('done')} · ${formatBytes(d.done_bytes)}`
+					return `${this.$t('done')} · ${formatBytes(d.done_bytes, this.$i18n.locale)}`
 				case 'canceled':
 					return this.$t('canceled')
 				default:

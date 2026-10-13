@@ -16,6 +16,8 @@ import {
 	emptyDiskPlan,
 	formatBytes,
 	formatDate,
+	formatMemory,
+	formatNumber,
 	gbToMib,
 	guessOS,
 	imageKind,
@@ -103,6 +105,18 @@ describe('formatBytes', () => {
 		expect(formatBytes(69206016)).toBe('66 MB')
 		expect(formatBytes(2 * 1024 ** 3)).toBe('2.0 GB')
 		expect(formatBytes(undefined)).toBe('')
+	})
+	it('writes the number the viewer\'s way', () => {
+		expect(formatBytes(1536, 'it_it')).toBe('1,5 KB')
+		expect(formatBytes(2 * 1024 ** 3, 'it_it')).toBe('2,0 GB')
+		expect(formatBytes(1536, 'not a locale!')).toBe('1.5 KB')
+	})
+	it('formats numbers and memory', () => {
+		expect(formatNumber(15.41, 'it_it', 2, 0)).toBe('15,41')
+		expect(formatNumber(16, 'it_it', 2, 0)).toBe('16')
+		expect(formatMemory(512, 'it_it')).toBe('512 MB')
+		expect(formatMemory(15780, 'it_it')).toBe('15,41 GB')
+		expect(formatMemory(2048)).toBe('2 GB')
 	})
 })
 

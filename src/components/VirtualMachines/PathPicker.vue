@@ -30,7 +30,7 @@
 					<b-icon :icon="entry.is_dir ? 'folder' : (entry.kind === 'iso' ? 'disc' : 'harddisk')" class="mr-2"
 						size="is-small" />
 					<span class="is-flex-grow-1 one-line">{{ entry.name }}</span>
-					<span v-if="!entry.is_dir" class="has-text-full-03 is-size-7 ml-2">{{ formatBytes(entry.size) }}</span>
+					<span v-if="!entry.is_dir" class="has-text-full-03 is-size-7 ml-2">{{ formatBytes(entry.size, $i18n.locale) }}</span>
 				</li>
 				<li v-if="!entries.length" class="has-text-full-03 is-size-7 py-2">
 					{{ folderOnly ? $t('No folders here.') : (isoOnly ? $t('No ISO in this folder.') : $t('No image in this folder.')) }}

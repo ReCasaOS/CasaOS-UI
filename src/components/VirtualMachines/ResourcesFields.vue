@@ -17,7 +17,7 @@
 </template>
 
 <script>
-import { gbToMib, mibToGB } from './vms'
+import { formatNumber, gbToMib, mibToGB } from './vms'
 
 export default {
 	name: 'ResourcesFields',
@@ -34,7 +34,7 @@ export default {
 			if (this.errors.memory_mib) {
 				return this.$t(this.errors.memory_mib)
 			}
-			return this.$t('This machine has {gb} GB', { gb: mibToGB(this.host.memory_mib) })
+			return this.$t('This machine has {gb} GB', { gb: formatNumber(mibToGB(this.host.memory_mib), this.$i18n.locale, 2, 0) })
 		},
 	},
 	methods: {
