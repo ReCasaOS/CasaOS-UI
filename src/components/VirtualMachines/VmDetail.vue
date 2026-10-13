@@ -32,17 +32,20 @@
 			<b-button v-if="actions.forceOff" :disabled="busy" icon-left="alert-outline" size="is-small"
 				class="power-btn is-force" @click="power('force-off')">{{ $t('Force off') }}</b-button>
 
-			<b-dropdown :mobile-modal="false" aria-role="list" class="ml-auto" position="is-bottom-left">
-				<template #trigger>
-					<b-button :disabled="busy" icon-left="dots-horizontal" size="is-small" :title="$t('More')" />
-				</template>
-				<b-dropdown-item v-if="actions.pause" aria-role="listitem" @click="power('pause')">{{ $t('Pause') }}</b-dropdown-item>
-				<b-dropdown-item v-if="actions.reset" aria-role="listitem" class="has-text-danger" @click="power('reset')">
-					{{ $t('Force reset') }}
-				</b-dropdown-item>
-				<b-dropdown-item v-if="actions.remove" aria-role="listitem" class="has-text-danger"
-					@click="$emit('action', 'delete', current)">{{ $t('Delete') }}</b-dropdown-item>
-			</b-dropdown>
+			<div class="ml-auto is-flex">
+				<b-dropdown v-if="actions.pause || actions.reset" :mobile-modal="false" aria-role="list" position="is-bottom-left">
+					<template #trigger>
+						<b-button :disabled="busy" icon-left="dots-horizontal" size="is-small" :title="$t('More')" />
+					</template>
+					<b-dropdown-item v-if="actions.pause" aria-role="listitem" @click="power('pause')">{{ $t('Pause') }}</b-dropdown-item>
+					<b-dropdown-item v-if="actions.reset" aria-role="listitem" class="has-text-danger" @click="power('reset')">
+						{{ $t('Force reset') }}
+					</b-dropdown-item>
+				</b-dropdown>
+				<!-- asks first: the delete dialog says what goes and what stays -->
+				<b-button v-if="actions.remove" :disabled="busy" :title="$t('Delete')" icon-left="delete-outline"
+					size="is-small" class="power-btn is-force ml-2" @click="$emit('action', 'delete', current)" />
+			</div>
 		</div>
 
 		<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
