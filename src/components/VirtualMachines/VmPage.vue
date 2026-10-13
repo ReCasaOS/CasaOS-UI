@@ -80,6 +80,7 @@
 
 <script>
 import copy from 'clipboard-copy'
+import escape from 'lodash/escape'
 import draggable from 'vuedraggable'
 import OsIcon from './OsIcon.vue'
 import vmApi from './api'
@@ -193,7 +194,7 @@ export default {
 			this.$api.users.setCustomStorage(ORDER_KEY, { data: this.order }).catch(() => {})
 		},
 		toastError(e) {
-			this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger', duration: 5000 })
+			this.$buefy.toast.open({ message: escape(e.response?.data?.message || e.message), type: 'is-danger', duration: 5000 })
 		},
 		create() {
 			this.$buefy.modal.open({
@@ -299,7 +300,7 @@ export default {
 			const p = res.Properties || {}
 			this.vms = this.vms.filter(vm => vm.id !== p['vm:id'])
 			this.$buefy.toast.open({
-				message: this.$t('{name} could not be created: {message}', { name: p['vm:title'] || '', message: p.message || '' }),
+				message: escape(this.$t('{name} could not be created: {message}', { name: p['vm:title'] || '', message: p.message || '' })),
 				type: 'is-danger',
 				duration: 8000,
 			})

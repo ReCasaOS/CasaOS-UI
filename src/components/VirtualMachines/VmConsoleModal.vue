@@ -62,6 +62,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { markRaw } from 'vue'
 import RFB from '@novnc/novnc'
 import vmApi from './api'
@@ -228,7 +229,8 @@ export default {
 				this.state = res.data.data.state
 				this.connect()
 			} catch (e) {
-				this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger', duration: 5000 })
+				// shown as HTML by the toast: escaped
+				this.$buefy.toast.open({ message: escape(e.response?.data?.message || e.message), type: 'is-danger', duration: 5000 })
 			} finally {
 				this.starting = false
 			}
