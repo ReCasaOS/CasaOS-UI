@@ -41,7 +41,7 @@
 					</p>
 					<div v-for="app in plan" :key="app.id" class="is-flex is-align-items-flex-start mb-3">
 						<b-checkbox v-model="selected" :native-value="app.id" class="mr-1 mt-1" size="is-small"></b-checkbox>
-						<img :src="app.icon || defaultIcon" alt="" class="app-icon mr-2" />
+						<img :src="iconOf(app)" alt="" class="app-icon mr-2" @error="failedIcons[app.id] = true" />
 						<div class="is-flex-grow-1">
 							<p class="is-size-7 has-text-weight-bold">{{ app.title }}</p>
 							<p v-for="service in app.services" :key="service.name" class="is-size-7 _has-text-gray service-line">
@@ -84,6 +84,8 @@ export default {
 			detail: '',
 			timer: null,
 			defaultIcon: require('@/assets/img/app/default.svg'),
+			// the apps whose icon did not load (a catalogue address that moved, a blocked host)
+			failedIcons: {},
 			stateLabels: STATE_LABELS,
 		}
 	},
@@ -104,6 +106,12 @@ export default {
 		clearTimeout(this.timer)
 	},
 	methods: {
+		// The icon the app's compose file names, or the one the app grid shows when there is none
+		// or the address does not answer: a broken-image mark says nothing about the app.
+		iconOf(app) {
+			return app.icon && !this.failedIcons[app.id] ? app.icon : this.defaultIcon
+		},
+
 		// A run in progress is shown as it is; otherwise the plan, freshly checked.
 		async load() {
 			try {

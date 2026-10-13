@@ -41,3 +41,50 @@ describe('the update every app dialog, with nothing to confirm', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('the icon of each app in the list', () => {
+	const plan = () => Promise.resolve({
+		data: {
+			data: {
+				apps: [
+					{ id: 'seerr', title: 'seerr', icon: 'https://cdn.example/moved/seerr.png', kind: 'image', services: [{ name: 'seerr', from: 'x/seerr:develop', to: 'x/seerr:develop' }] },
+					{ id: 'bare', title: 'bare', icon: '', kind: 'image', services: [{ name: 'bare', from: 'x/bare:latest', to: 'x/bare:latest' }] },
+				],
+			},
+		},
+	})
+
+	it('shows the address the app names, and the default icon when it names none', async () => {
+		const wrapper = await open(plan)
+		const [named, bare] = wrapper.findAll('img')
+
+		expect(named.attributes('src')).toBe('https://cdn.example/moved/seerr.png')
+		expect(bare.attributes('src')).not.toBe(named.attributes('src'))
+		expect(bare.attributes('src')).toBeTruthy()
+		wrapper.unmount()
+	})
+
+	it('falls back to the default icon when the address does not load, for that app only', async () => {
+		const wrapper = await open(plan)
+		const [named, bare] = wrapper.findAll('img')
+		const fallback = bare.attributes('src')
+
+		await named.trigger('error')
+
+		expect(wrapper.findAll('img')[0].attributes('src')).toBe(fallback)
+		expect(wrapper.findAll('img')[1].attributes('src')).toBe(fallback)
+		wrapper.unmount()
+	})
+
+	it('does not change anything when the default icon itself fails', async () => {
+		const wrapper = await open(plan)
+		const [, bare] = wrapper.findAll('img')
+		const fallback = bare.attributes('src')
+
+		await bare.trigger('error')
+		await bare.trigger('error')
+
+		expect(wrapper.findAll('img')[1].attributes('src')).toBe(fallback)
+		wrapper.unmount()
+	})
+})
