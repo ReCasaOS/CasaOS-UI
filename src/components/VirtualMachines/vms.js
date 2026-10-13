@@ -25,7 +25,13 @@ const STATE_LABELS = {
 }
 
 export function stateLabel(state) {
-	return STATE_LABELS[state] || STATE_LABELS.unknown
+	return Object.hasOwn(STATE_LABELS, state) ? STATE_LABELS[state] : STATE_LABELS.unknown
+}
+
+// Whether a state is one the service has a name for. One that comes by the
+// message bus is anything its sender chose: it is not taken as it is.
+export function isState(state) {
+	return Object.values(STATES).includes(state)
 }
 
 // The dot next to the name: the app cards' classes (start/stop), plus one for

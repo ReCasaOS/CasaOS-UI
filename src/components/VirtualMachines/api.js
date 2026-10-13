@@ -4,6 +4,10 @@ import { api } from '@/service/service.js'
 
 const PREFIX = '/v2/virt_management'
 
+// What goes into a route is one segment of it: an id comes from the message bus
+// as well as from the service, and must not be able to change the route.
+const seg = encodeURIComponent
+
 const vmApi = {
 	host() {
 		return api.get(`${PREFIX}/host`)
@@ -12,34 +16,34 @@ const vmApi = {
 		return api.get(`${PREFIX}/vms`)
 	},
 	get(id) {
-		return api.get(`${PREFIX}/vms/${id}`)
+		return api.get(`${PREFIX}/vms/${seg(id)}`)
 	},
 	create(data) {
 		return api.post(`${PREFIX}/vms`, data)
 	},
 	update(id, data) {
-		return api.patch(`${PREFIX}/vms/${id}`, data)
+		return api.patch(`${PREFIX}/vms/${seg(id)}`, data)
 	},
 	remove(id, deleteDisks) {
-		return api.delete(`${PREFIX}/vms/${id}?delete_disks=${deleteDisks ? 'true' : 'false'}`)
+		return api.delete(`${PREFIX}/vms/${seg(id)}?delete_disks=${deleteDisks ? 'true' : 'false'}`)
 	},
 	// action: start, shutdown, reboot, force-off, reset, pause, resume
 	action(id, action) {
-		return api.post(`${PREFIX}/vms/${id}/${action}`)
+		return api.post(`${PREFIX}/vms/${seg(id)}/${seg(action)}`)
 	},
 	// an empty path ejects
 	setCDROM(id, isoPath) {
-		return api.put(`${PREFIX}/vms/${id}/cdrom`, { iso_path: isoPath })
+		return api.put(`${PREFIX}/vms/${seg(id)}/cdrom`, { iso_path: isoPath })
 	},
 	addDisk(id, sizeGiB) {
-		return api.post(`${PREFIX}/vms/${id}/disks`, { size_gib: sizeGiB })
+		return api.post(`${PREFIX}/vms/${seg(id)}/disks`, { size_gib: sizeGiB })
 	},
 	resizeDisk(id, target, sizeGiB) {
-		return api.patch(`${PREFIX}/vms/${id}/disks/${target}`, { size_gib: sizeGiB })
+		return api.patch(`${PREFIX}/vms/${seg(id)}/disks/${seg(target)}`, { size_gib: sizeGiB })
 	},
 	// the whole list: those not in it go
 	setPorts(id, ports) {
-		return api.put(`${PREFIX}/vms/${id}/ports`, { ports })
+		return api.put(`${PREFIX}/vms/${seg(id)}/ports`, { ports })
 	},
 	// whether a folder can hold VM disks, and its free space
 	storageFolder(path) {
@@ -58,26 +62,26 @@ const vmApi = {
 	},
 	// cancels a running one, or takes a finished one off the list
 	deleteDownload(id) {
-		return api.delete(`${PREFIX}/images/downloads/${id}`)
+		return api.delete(`${PREFIX}/images/downloads/${seg(id)}`)
 	},
 	hostUSB() {
 		return api.get(`${PREFIX}/host/usb`)
 	},
 	// the whole list: those not in it are taken back
 	setUSB(id, devices) {
-		return api.put(`${PREFIX}/vms/${id}/usb`, { devices })
+		return api.put(`${PREFIX}/vms/${seg(id)}/usb`, { devices })
 	},
 	createSnapshot(id, name) {
-		return api.post(`${PREFIX}/vms/${id}/snapshots`, { name })
+		return api.post(`${PREFIX}/vms/${seg(id)}/snapshots`, { name })
 	},
 	revertSnapshot(id, snapshotId) {
-		return api.post(`${PREFIX}/vms/${id}/snapshots/${snapshotId}/revert`)
+		return api.post(`${PREFIX}/vms/${seg(id)}/snapshots/${seg(snapshotId)}/revert`)
 	},
 	deleteSnapshot(id, snapshotId) {
-		return api.delete(`${PREFIX}/vms/${id}/snapshots/${snapshotId}`)
+		return api.delete(`${PREFIX}/vms/${seg(id)}/snapshots/${seg(snapshotId)}`)
 	},
 	removeDisk(id, target, deleteFile) {
-		return api.delete(`${PREFIX}/vms/${id}/disks/${target}?delete_file=${deleteFile ? 'true' : 'false'}`)
+		return api.delete(`${PREFIX}/vms/${seg(id)}/disks/${seg(target)}?delete_file=${deleteFile ? 'true' : 'false'}`)
 	},
 	images() {
 		return api.get(`${PREFIX}/images`)
@@ -88,7 +92,7 @@ const vmApi = {
 	// whose proxy forwards it to the box (vue.config.js).
 	consoleURL(wsProtocol, id) {
 		const token = localStorage.getItem('access_token') || ''
-		return `${wsProtocol}//${window.location.host}${PREFIX}/vms/${id}/console?token=${encodeURIComponent(token)}`
+		return `${wsProtocol}//${window.location.host}${PREFIX}/vms/${seg(id)}/console?token=${encodeURIComponent(token)}`
 	},
 }
 

@@ -98,6 +98,13 @@ const ORDER_KEY = 'vm_order'
 // how long after a failed read, made when the message bus connected, the one
 // more try is made
 const RESYNC_RETRY_MS = 5000
+// The bus is any signed-in user's, and the id it names is asked of the service
+// with the person's token: one that is neither a VM the page has nor a UUID is
+// not asked about.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// How many ids of VMs the page does not have are remembered as asked about: a
+// forged id costs an entry, and a flood of them must not fill the page's memory.
+const ASKED_KEEP = 200
 
 export default {
 	name: 'VmPage',
@@ -120,6 +127,8 @@ export default {
 			// How many times each VM was asked for or dropped. An answer that comes
 			// back after a later ask, or after the VM went, is not the VM any more.
 			asked: {},
+			// the number of the last ask of any VM; `asked` holds each VM's own
+			seq: 0,
 			// how many times the whole list was read: only the newest answer counts
 			listAsk: 0,
 		}
@@ -222,8 +231,23 @@ export default {
 			}
 		},
 		touch(id) {
-			this.asked[id] = (this.asked[id] || 0) + 1
-			return this.asked[id]
+			const ask = ++this.seq
+			this.asked[id] = ask
+			const ids = Object.keys(this.asked)
+			if (ids.length > ASKED_KEEP) {
+				for (const old of ids) {
+					if (this.asked[old] < ask - ASKED_KEEP && !this.has(old)) {
+						delete this.asked[old]
+					}
+				}
+			}
+			return ask
+		},
+		has(id) {
+			return this.vms.some(vm => vm.id === id)
+		},
+		isVmId(id) {
+			return typeof id === 'string' && (UUID.test(id) || this.has(id))
 		},
 		// a VM that is gone; what is still on its way about it is not wanted
 		drop(id) {
@@ -231,6 +255,10 @@ export default {
 			this.vms = this.vms.filter(vm => vm.id !== id)
 		},
 		replace(vm) {
+			// what the service answered, and the page took for a VM
+			if (typeof vm?.id !== 'string') {
+				return
+			}
 			const i = this.vms.findIndex(v => v.id === vm.id)
 			if (i >= 0) {
 				this.vms.splice(i, 1, vm)
@@ -364,8 +392,8 @@ export default {
 			}
 		},
 		'vm:state-changed': function (res) {
-			const id = res.Properties?.['vm:id']
-			if (!id || !this.available) {
+			const id = res?.Properties?.['vm:id']
+			if (!this.available || !this.isVmId(id)) {
 				return
 			}
 			if (res.Properties['vm:event'] === 'undefined') {
@@ -375,14 +403,18 @@ export default {
 			}
 		},
 		'vm:create-end': function (res) {
-			const id = res.Properties?.['vm:id']
-			if (id) {
+			// the VM may not be in the list yet: any name will do, as the id of a
+			// route it is encoded
+			const id = res?.Properties?.['vm:id']
+			if (id && typeof id === 'string') {
 				this.refreshOne(id)
 			}
 		},
 		'vm:create-error': function (res) {
-			const p = res.Properties || {}
-			this.drop(p['vm:id'])
+			const p = res?.Properties || {}
+			if (this.has(p['vm:id'])) {
+				this.drop(p['vm:id'])
+			}
 			this.$buefy.toast.open({
 				message: escape(this.$t('{name} could not be created: {message}', { name: p['vm:title'] || '', message: p.message || '' })),
 				type: 'is-danger',

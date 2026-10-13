@@ -14,7 +14,7 @@ import i18n from '@/plugins/i18n'
 
 // The message bus' socket, as the plugin only ever uses it: `on` and `off`.
 // `receive` is the bus pushing an event, or the socket connecting.
-function fakeSocket() {
+export function fakeSocket() {
 	const listeners = new Map()
 	return {
 		count: event => (listeners.get(event) || []).length,

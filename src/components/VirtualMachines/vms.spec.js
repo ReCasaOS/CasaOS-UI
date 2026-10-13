@@ -21,6 +21,7 @@ import {
 	gbToMib,
 	guessOS,
 	imageKind,
+	isState,
 	isUnderData,
 	keysForText,
 	listAddress,
@@ -55,6 +56,18 @@ describe('stateDot and stateLabel', () => {
 	it('falls back to Unknown', () => {
 		expect(stateLabel('running')).toBe('Running')
 		expect(stateLabel('what')).toBe('Unknown')
+	})
+
+	// a state comes from the message bus, which any signed-in user can write to
+	it('falls back to Unknown for the names every object has', () => {
+		for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+			expect(stateLabel(name)).toBe('Unknown')
+		}
+	})
+
+	it('knows the states of the service, and only those', () => {
+		expect(['running', 'shut-off', 'creating'].every(isState)).toBe(true)
+		expect(['', 'what', 'constructor', '__proto__', undefined, null, 1, {}].some(isState)).toBe(false)
 	})
 })
 

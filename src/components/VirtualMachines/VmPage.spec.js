@@ -368,6 +368,131 @@ describe('keeping the state of the VMs true', () => {
 	})
 })
 
+// The bus carries what any signed-in user sends: an id it names is asked of the
+// service, with the person's token, so it has to be one that can be a VM.
+describe('the events of the message bus', () => {
+	let page
+	const UUID = '3f2b8c1e-5d4a-4e7b-9a10-6c2d8e4f1a7b'
+	const uuid = n => `${n.toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`
+
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+	afterEach(() => {
+		page?.wrapper.unmount()
+		page = null
+	})
+
+	it('ask nothing of the service for an id that cannot be a VM', async () => {
+		page = await mountPage()
+		const notNames = ['', 42, null, undefined, {}, ['vm-1']]
+		const names = ['../../../v1/users/current', '/v1/users/current', '__proto__', 'constructor']
+		for (const id of [...names, ...notNames]) {
+			for (const event of ['started', 'undefined']) {
+				page.fire('vm:state-changed', { 'vm:id': id, 'vm:event': event })
+			}
+		}
+		// the VM of a creation is not in the list yet, so any name will do, but a name
+		for (const id of notNames) {
+			page.fire('vm:create-end', { 'vm:id': id })
+		}
+		await flushPromises()
+
+		expect(vmApi.get).not.toHaveBeenCalled()
+		expect(states()).toEqual(['Running'])
+	})
+
+	it('survive an event that says nothing', async () => {
+		page = await mountPage()
+		for (const res of [null, undefined, {}, { Properties: null }, { Properties: 'vm-1' }]) {
+			for (const event of ['vm:state-changed', 'vm:create-end', 'vm:create-error']) {
+				page.socket.receive(event, res)
+			}
+		}
+		await flushPromises()
+		expect(vmApi.get).not.toHaveBeenCalled()
+		expect(states()).toEqual(['Running'])
+	})
+
+	it('show a VM made elsewhere, by its UUID', async () => {
+		page = await mountPage()
+		vmApi.get.mockResolvedValue(answer(aVm({ id: UUID, title: 'Alpine' })))
+		page.fire('vm:state-changed', { 'vm:id': UUID, 'vm:event': 'defined' })
+		await flushPromises()
+
+		expect(vmApi.get).toHaveBeenCalledWith(UUID)
+		expect(states()).toHaveLength(2)
+	})
+
+	it('show a VM at the end of its creation, whatever its id', async () => {
+		page = await mountPage()
+		vmApi.get.mockResolvedValue(answer(aVm({ id: 'vm-2', title: 'Alpine' })))
+		page.fire('vm:create-end', { 'vm:id': 'vm-2' })
+		await flushPromises()
+
+		expect(vmApi.get).toHaveBeenCalledWith('vm-2')
+		expect(states()).toHaveLength(2)
+	})
+
+	it('put in the list only what is a VM', async () => {
+		page = await mountPage()
+		// what a route other than the VM's would answer
+		for (const answered of [{ username: 'admin' }, 'admin', null, [], { id: 7 }, { id: { toString: () => 'x' } }]) {
+			vmApi.get.mockResolvedValue(answer(answered))
+			page.fire('vm:state-changed', { 'vm:id': UUID, 'vm:event': 'defined' })
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'started' })
+			await flushPromises()
+			expect(states()).toEqual(['Running'])
+		}
+	})
+
+	it('do not leave a counter for each id they name', async () => {
+		page = await mountPage()
+		vmApi.get.mockRejectedValue({ response: { status: 404 } })
+		for (let i = 1; i <= 1000; i++) {
+			page.fire('vm:state-changed', { 'vm:id': uuid(i), 'vm:event': i % 2 ? 'defined' : 'undefined' })
+		}
+		await flushPromises()
+
+		expect(Object.keys(page.wrapper.vm.asked).length).toBeLessThanOrEqual(200)
+		expect(states()).toEqual(['Running'])
+	})
+
+	it('still take the answer about a VM it has, among the answers about many ids', async () => {
+		page = await mountPage()
+		const late = deferred()
+		vmApi.get.mockImplementation(async (id) => {
+			if (id === 'vm-1') {
+				return late.promise
+			}
+			throw Object.assign(new Error('Request failed with status code 404'), { response: { status: 404 } })
+		})
+		page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'stopped' })
+		for (let i = 1; i <= 300; i++) {
+			page.fire('vm:state-changed', { 'vm:id': uuid(i), 'vm:event': 'defined' })
+		}
+		await flushPromises()
+
+		late.resolve(answer(aVm({ state: 'shut-off' })))
+		await flushPromises()
+		expect(states()).toEqual(['Off'])
+	})
+
+	it('take the end of a failed creation off the list only for a VM the page has', async () => {
+		page = await mountPage()
+		page.fire('vm:create-error', { 'vm:id': uuid(1), 'vm:title': 'Alpine', 'message': 'no room' })
+		page.fire('vm:create-error', { 'vm:id': '__proto__', 'vm:title': 'Alpine', 'message': 'no room' })
+		await flushPromises()
+		expect(states()).toEqual(['Running'])
+		expect(Object.keys(page.wrapper.vm.asked)).toEqual([])
+
+		page.fire('vm:create-error', { 'vm:id': 'vm-1', 'vm:title': 'Debian', 'message': 'no room' })
+		await flushPromises()
+		expect(states()).toEqual([])
+	})
+})
+
 describe('cutting a virtual machine off', () => {
 	let page
 

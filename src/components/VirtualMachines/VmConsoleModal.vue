@@ -66,7 +66,7 @@ import escape from 'lodash/escape'
 import { markRaw } from 'vue'
 import RFB from '@novnc/novnc'
 import vmApi from './api'
-import { KEYSYM as KEY, allowedActions, keysForText, stateDot, stateLabel } from './vms'
+import { KEYSYM as KEY, allowedActions, isState, keysForText, stateDot, stateLabel } from './vms'
 
 // between two typed keys; 4 KB of text takes about a minute
 const TYPE_DELAY_MS = 15
@@ -239,7 +239,7 @@ export default {
 	sockets: {
 		'vm:state-changed': function (res) {
 			const p = res.Properties || {}
-			if (p['vm:id'] !== this.vm.id || !p['vm:state']) {
+			if (p['vm:id'] !== this.vm.id || !isState(p['vm:state'])) {
 				return
 			}
 			const before = this.state
