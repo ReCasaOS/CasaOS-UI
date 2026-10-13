@@ -464,15 +464,20 @@ export default {
 		min-height: 16rem;
 	}
 
-	// the close control is a button, for the keyboard: nothing of a button's own
+	// the close control is a button, for the keyboard: nothing of a button's own.
+	// This rule outranks the global ones of .close-button, so it gives each state again.
 	button.close-button {
 		padding: 0;
 		border: 0;
 		color: inherit;
-		background: none;
+		background-color: transparent;
 
 		&:hover {
 			background-color: var(--casa-hover-tint);
+		}
+
+		&:active {
+			background-color: var(--casa-active);
 		}
 	}
 
