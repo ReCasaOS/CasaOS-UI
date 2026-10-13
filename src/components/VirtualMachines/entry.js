@@ -58,7 +58,11 @@ export function openVirtualMachines(buefy, state) {
 		component: VmPage,
 		hasModalCard: true,
 		trapFocus: true,
-		canCancel: ['escape'],
+		// Buefy has no stack of modals: every one that takes Escape takes it, so
+		// one press would close the picker, the form under it and this page. Escape
+		// closes the modal on top, the ones that open nothing; this one opens
+		// others and closes from its own button.
+		canCancel: [],
 		scroll: 'keep',
 		animation: 'zoom-in',
 		customClass: 'vm-modal',

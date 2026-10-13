@@ -216,7 +216,8 @@ export default {
 				component: VmCreateModal,
 				hasModalCard: true,
 				trapFocus: true,
-				canCancel: ['escape'],
+				// it opens the picker and the download dialog: they take Escape, not this
+				canCancel: [],
 				props: { host: this.host },
 				events: {
 					created: (vm, importing) => {
@@ -243,7 +244,8 @@ export default {
 				component: StorageSettingsModal,
 				hasModalCard: true,
 				trapFocus: true,
-				canCancel: ['escape'],
+				// it opens the picker: that takes Escape, not this
+				canCancel: [],
 				props: { host: this.host },
 				events: {
 					saved: (folder) => {

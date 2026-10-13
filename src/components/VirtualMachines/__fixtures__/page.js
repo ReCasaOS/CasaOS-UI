@@ -4,7 +4,8 @@
 // './api' and sets the answers on it.
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
+import { openVirtualMachines } from '../entry'
 import VmPage from '../VmPage.vue'
 import vmApi from '../api'
 import { HOST, aVm } from './vm'
@@ -47,14 +48,36 @@ export function isOpen(selector) {
 	return Boolean(modal) && modal.style.display !== 'none'
 }
 
-export async function mountPage(options = {}) {
-	serve(options)
-	const api = {
+// what the page asks of the dashboard's own API: the user's order, and the folders
+function fakeApi() {
+	return {
 		users: {
 			getCustomStorage: vi.fn().mockResolvedValue({ data: { data: { data: [] } } }),
 			setCustomStorage: vi.fn().mockResolvedValue({}),
 		},
+		folder: { getList: vi.fn().mockResolvedValue({ data: { data: { content: [] } } }) },
 	}
+}
+
+// The page opened the way the app grid opens it, in a modal of its own, so that
+// the modals it opens pile up on it as they do on the dashboard.
+export async function openPage(options = {}) {
+	serve(options)
+	const host = mount({ render: () => null }, {
+		attachTo: document.body,
+		global: { plugins: [Buefy, i18n, [socketPlugin, fakeSocket()]], mocks: { $api: fakeApi() } },
+	})
+	openVirtualMachines(host.vm.$buefy, {})
+	await vi.waitFor(() => expect(isOpen('.vm-page')).toBe(true))
+	await flushPromises()
+	return { host }
+}
+
+export const pressEscape = () => document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape' }))
+
+export async function mountPage(options = {}) {
+	serve(options)
+	const api = fakeApi()
 	const socket = fakeSocket()
 	const wrapper = mount(VmPage, {
 		attachTo: document.body,
