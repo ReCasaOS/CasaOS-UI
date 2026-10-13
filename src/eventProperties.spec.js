@@ -34,6 +34,13 @@ const DECLARED = new Set([
 	'backup:destination',
 	'backup:stamp',
 	'backup:kind',
+	// CasaOS-VirtManagement, service/events.go
+	'vm:id',
+	'vm:name',
+	'vm:title',
+	'vm:state',
+	'vm:event',
+	'vm:disks-deleted',
 	// CasaOS core, service/notify.go -- set as map keys, not declared
 	'file_operate',
 	// Sent by this dashboard itself as query parameters, which AppManagement

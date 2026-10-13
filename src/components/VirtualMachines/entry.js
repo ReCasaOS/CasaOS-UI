@@ -2,6 +2,7 @@
 // module is there, the app card that stands for them next to Files, and how to
 // open the page. Everything else stays in this folder, loaded on demand.
 import { defineAsyncComponent } from 'vue'
+import { openWithEscape } from './modalStack'
 import { VMS_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 
 // loaded when first opened: a box without the module never downloads the page
@@ -54,11 +55,10 @@ export function openVirtualMachines(buefy, state) {
 		return null
 	}
 
-	return buefy.modal.open({
+	return openWithEscape(buefy, {
 		component: VmPage,
 		hasModalCard: true,
 		trapFocus: true,
-		canCancel: ['escape'],
 		scroll: 'keep',
 		animation: 'zoom-in',
 		customClass: 'vm-modal',

@@ -1,20 +1,668 @@
 <template>
-	<!-- The page's frame, the terminal panel's header. The list and the details
-	of the virtual machines come with the module's page. -->
 	<div class="modal-card vm-page">
+		<!-- the terminal panel's header: title, add, close -->
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
-				<h3 class="title is-header mb-0">{{ $t('Virtual Machines') }}</h3>
+				<h3 class="title is-header mb-0 mr-2">{{ $t('Virtual Machines') }}</h3>
+				<b-icon v-if="available" class="close-button" icon="plus-outline" pack="casa"
+					:title="$t('New virtual machine')" @click="create" />
+				<b-icon v-if="available" class="close-button ml-2" icon="cog-outline"
+					:title="$t('Virtual machine settings')" @click="openSettings" />
 			</div>
-			<b-icon class="close-button" icon="close-outline" pack="casa" @click="$emit('close')" />
+			<span v-if="available" class="kvm-badge" :class="[host.kvm ? 'is-on' : 'is-off']">
+				QEMU / KVM {{ host.kvm ? $t('active') : $t('not available') }}
+			</span>
+			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
+				<b-icon icon="close-outline" pack="casa" />
+			</button>
 		</header>
-		<section class="modal-card-body"></section>
+
+		<section class="modal-card-body">
+			<b-loading :active="loading && !vms.length" :is-full-page="false"></b-loading>
+
+			<!-- libvirt missing: say what to install, from what the service found -->
+			<div v-if="!loading && !available" class="vm-empty has-text-centered">
+				<b-image :src="require('@/assets/img/app/vms.svg')" class="is-64x64 mx-auto mb-4" />
+				<p class="title is-5">{{ $t('Virtual machines are not available on this system.') }}</p>
+				<p class="has-text-full-03 mb-3">{{ host.reason || error }}</p>
+				<p class="is-size-7 has-text-full-03">
+					{{ $t('They need libvirt and QEMU. On Debian or Ubuntu:') }}
+				</p>
+				<pre class="is-size-7 mt-2">sudo apt install qemu-system libvirt-daemon-system ovmf</pre>
+			</div>
+
+			<div v-else-if="!loading && !vms.length" class="vm-empty has-text-centered">
+				<b-image :src="require('@/assets/img/app/vms.svg')" class="is-64x64 mx-auto mb-4" />
+				<p class="title is-5">{{ $t('No virtual machines yet') }}</p>
+				<p class="has-text-full-03 mb-4">
+					{{ $t('Create one from an ISO or a disk image. Put images in /DATA/VM/iso with Files.') }}
+				</p>
+				<b-button rounded type="is-primary" @click="create">{{ $t('New virtual machine') }}</b-button>
+			</div>
+
+			<template v-else-if="vms.length">
+				<p v-if="host.kvm === false" class="is-size-7 vm-warning mb-3">
+					{{ $t('KVM is not available: virtual machines run without hardware acceleration and will be slow.') }}
+				</p>
+				<div class="vm-split">
+					<!-- master: every VM, in the user's order -->
+					<draggable v-model="vms" :animation="200" class="vm-list" ghost-class="ghost" item-key="id" tag="div"
+						@end="saveOrder">
+						<template #item="{ element: vm }">
+							<div :class="{ 'is-selected': selected && vm.id === selected.id }" class="vm-item" role="button"
+								@click="selectedId = vm.id">
+								<os-icon :os="vm.os" />
+								<div class="vm-item-text">
+									<p class="vm-item-title" :title="vm.title">{{ vm.title }}</p>
+									<p :class="`vm-item-state state-${stateDot(vm.state)}`">
+										{{ $t(stateLabel(vm.state)) }}
+									</p>
+									<p v-if="listAddress(vm)" :class="{ 'is-stale': listAddress(vm).stale }" class="vm-item-ip">
+										<span :title="listAddress(vm).ip">{{ listAddress(vm).ip }}</span>
+										<b-icon :title="$t('Copy')" class="vm-item-copy" icon="content-copy" size="is-small"
+											@click.stop="copyAddress(listAddress(vm).ip)" />
+									</p>
+								</div>
+								<b-loading :active="!!busy[vm.id] || vm.state === 'creating'" :can-cancel="false" :is-full-page="false" />
+								<span :class="`vm-dot vm-dot-${stateDot(vm.state)}`"></span>
+							</div>
+						</template>
+					</draggable>
+
+					<!-- detail: the one selected -->
+					<div class="vm-detail-pane">
+						<vm-detail v-if="selected" :key="selected.id" :busy="!!busy[selected.id] || selected.state === 'creating'"
+							:host="host" :images="images" :touch="touch" :vm="selected" @action="onAction" @images-changed="loadImages"
+							@updated="settle" />
+					</div>
+				</div>
+			</template>
+		</section>
 	</div>
 </template>
 
 <script>
+import copy from 'clipboard-copy'
+import escape from 'lodash/escape'
+import draggable from 'vuedraggable'
+import OsIcon from './OsIcon.vue'
+import vmApi from './api'
+import VmConsoleModal from './VmConsoleModal.vue'
+import VmCreateModal from './VmCreateModal.vue'
+import VmDeleteModal from './VmDeleteModal.vue'
+import StorageSettingsModal from './StorageSettingsModal.vue'
+import VmDetail from './VmDetail.vue'
+import { openWithEscape } from './modalStack'
+import { allowedActions, applyOrder, isDots, listAddress, stateDot, stateLabel } from './vms'
+
+const ORDER_KEY = 'vm_order'
+// how long after a failed read, made when the message bus connected, the one
+// more try is made
+const RESYNC_RETRY_MS = 5000
+// The bus is any signed-in user's, and the id it names is asked of the service
+// with the person's token: one that is neither a VM the page has nor a UUID is
+// not asked about.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// How many ids of VMs the page does not have are remembered as asked about: a
+// forged id costs an entry, and a flood of them must not fill the page's memory.
+const ASKED_KEEP = 200
+
 export default {
 	name: 'VmPage',
+	components: {
+		Draggable: draggable,
+		OsIcon,
+		VmDetail,
+	},
 	emits: ['close'],
+	data() {
+		return {
+			host: {},
+			vms: [],
+			order: [],
+			busy: {},
+			images: [],
+			selectedId: '',
+			loading: true,
+			error: '',
+			// How many times each VM was asked for or dropped. An answer that comes
+			// back after a later ask, or after the VM went, is not the VM any more.
+			asked: {},
+			// the number of the last ask of any VM; `asked` holds each VM's own
+			seq: 0,
+			// how many times the whole list was read: only the newest answer counts
+			listAsk: 0,
+		}
+	},
+	computed: {
+		available() {
+			return this.host.libvirt === 'available'
+		},
+		// the VM picked in the list, or the first one
+		selected() {
+			return this.vms.find(vm => vm.id === this.selectedId) || this.vms[0] || null
+		},
+	},
+	watch: {
+		// the dialog of a VM that is gone has nothing left to ask
+		vms() {
+			if (this.cutting && !this.has(this.cutting.id)) {
+				this.cutting.dialog.close()
+			}
+		},
+	},
+	mounted() {
+		this.load()
+	},
+	beforeUnmount() {
+		this.closed = true
+		clearTimeout(this.resyncTimer)
+	},
+	methods: {
+		listAddress,
+		stateDot,
+		stateLabel,
+		copyAddress(ip) {
+			copy(ip)
+			this.$buefy.toast.open({ message: this.$t('Copied to clipboard'), type: 'is-success' })
+		},
+		async loadImages() {
+			try {
+				const res = await vmApi.images()
+				this.images = res.data.data || []
+			} catch {
+				// the CD-ROM list only: Browse still works
+				this.images = []
+			}
+		},
+		async load() {
+			this.loading = true
+			try {
+				const res = await vmApi.host()
+				this.host = res.data.data || {}
+				if (this.available) {
+					await this.refresh()
+					this.loadImages()
+				}
+			} catch (e) {
+				this.error = e.response?.data?.message || e.message
+			} finally {
+				this.loading = false
+			}
+		},
+		// Every VM, from the service. Resolves to whether it could be read; the
+		// error is shown unless the person did not ask for the read.
+		async refresh({ quiet = false } = {}) {
+			// Only the newest read is taken, and a VM asked for, made or dropped
+			// since this one began is as the page has it now: the list was true
+			// when the service gave it, and can come after what the page learned.
+			const read = ++this.listAsk
+			const before = { ...this.asked }
+			try {
+				const [list, saved] = await Promise.all([
+					vmApi.list().then(res => res.data.data || []),
+					this.$api.users.getCustomStorage(ORDER_KEY).then(res => res.data.data?.data || []).catch(() => []),
+				])
+				if (read === this.listAsk) {
+					const moved = vm => this.asked[vm.id] !== before[vm.id]
+					const { sorted, order } = applyOrder([...this.vms.filter(moved), ...list.filter(vm => !moved(vm))], saved)
+					this.vms = sorted
+					this.order = order
+				}
+				return true
+			} catch (e) {
+				if (!quiet) {
+					this.toastError(e)
+				}
+				return false
+			}
+		},
+		// What the message bus connecting asks for. Nobody asked, so a failure is
+		// not shown: the page stays as it was, and the read is tried once more.
+		async resync(again = true) {
+			clearTimeout(this.resyncTimer)
+			if (!(await this.refresh({ quiet: true })) && again && !this.closed) {
+				this.resyncTimer = setTimeout(() => this.resync(false), RESYNC_RETRY_MS)
+			}
+		},
+		// one VM, from the service, in place
+		async refreshOne(id) {
+			const ask = this.touch(id)
+			try {
+				const res = await vmApi.get(id)
+				if (this.asked[id] === ask) {
+					this.replace(res.data.data)
+				}
+			} catch (e) {
+				if (e.response?.status === 404 && this.asked[id] === ask) {
+					this.drop(id)
+				}
+			}
+		},
+		touch(id) {
+			const ask = ++this.seq
+			this.asked[id] = ask
+			const ids = Object.keys(this.asked)
+			if (ids.length > ASKED_KEEP) {
+				for (const old of ids) {
+					if (this.asked[old] < ask - ASKED_KEEP && !this.has(old)) {
+						delete this.asked[old]
+					}
+				}
+			}
+			return ask
+		},
+		has(id) {
+			return this.vms.some(vm => vm.id === id)
+		},
+		isVmId(id) {
+			return typeof id === 'string' && (UUID.test(id) || this.has(id))
+		},
+		// a VM that is gone; what is still on its way about it is not wanted
+		drop(id) {
+			this.touch(id)
+			this.vms = this.vms.filter(vm => vm.id !== id)
+		},
+		// What a call about a VM answered, which is the VM only if nothing newer
+		// was learned of it since `ask` was taken
+		settle(vm, ask) {
+			if (this.asked[vm?.id] === ask) {
+				this.replace(vm)
+			}
+		},
+		replace(vm) {
+			// what the service answered, and the page took for a VM
+			if (typeof vm?.id !== 'string') {
+				return
+			}
+			const i = this.vms.findIndex(v => v.id === vm.id)
+			if (i >= 0) {
+				this.vms.splice(i, 1, vm)
+			} else {
+				this.vms.push(vm)
+			}
+		},
+		saveOrder() {
+			this.order = this.vms.map(vm => vm.id)
+			this.$api.users.setCustomStorage(ORDER_KEY, { data: this.order }).catch(() => {})
+		},
+		toastError(e) {
+			this.$buefy.toast.open({ message: escape(e.response?.data?.message || e.message), type: 'is-danger', duration: 5000 })
+		},
+		create() {
+			openWithEscape(this.$buefy, {
+				component: VmCreateModal,
+				hasModalCard: true,
+				trapFocus: true,
+				props: { host: this.host },
+				events: {
+					created: (vm, importing) => {
+						// a list read before it was made does not have it
+						this.touch(vm.id)
+						this.replace(vm)
+						this.selectedId = vm.id
+						if (importing) {
+							this.$buefy.toast.open({ message: this.$t('Copying the disk image. The VM will be ready in a few minutes.'), type: 'is-info', duration: 5000 })
+						}
+					},
+					// made, and not started: it is in the service's list
+					notStarted: (name, message) => {
+						this.refresh()
+						this.$buefy.toast.open({
+							message: escape(this.$t('{name} was created but could not be started: {message}', { name, message })),
+							type: 'is-warning',
+							duration: 8000,
+						})
+					},
+				},
+			})
+		},
+		openSettings() {
+			openWithEscape(this.$buefy, {
+				component: StorageSettingsModal,
+				hasModalCard: true,
+				trapFocus: true,
+				props: { host: this.host },
+				events: {
+					saved: (folder) => {
+						this.host = { ...this.host, storage_path: folder.path, storage_free_bytes: folder.free_bytes }
+						this.loadImages()
+					},
+				},
+			})
+		},
+		openConsole(vm) {
+			this.$buefy.modal.open({
+				component: VmConsoleModal,
+				fullScreen: true,
+				// Esc belongs to the VM: installers and editors need it. The console
+				// closes from its own button only.
+				canCancel: [],
+				customClass: 'vm-console-modal',
+				props: { vm },
+			})
+		},
+		async onAction(action, vm) {
+			switch (action) {
+				case 'console':
+					return this.openConsole(vm)
+				case 'delete':
+					return this.$buefy.modal.open({
+						component: VmDeleteModal,
+						hasModalCard: true,
+						trapFocus: true,
+						canCancel: ['escape'],
+						props: { vm },
+						events: {
+							deleted: (deleted) => {
+								this.drop(deleted.id)
+								this.saveOrder()
+							},
+						},
+					})
+				case 'force-off':
+				case 'reset':
+					return this.confirmCut(action, vm)
+				default:
+					return this.run(vm, () => vmApi.action(vm.id, action), action === 'start')
+			}
+		},
+		// Force off and Force reset cut the guest off without shutting it down: what
+		// it has not saved is lost and its disk can be damaged. Asked first, with
+		// Cancel in focus, as Delete is.
+		confirmCut(action, vm) {
+			const off = action === 'force-off'
+			const dialog = this.$buefy.dialog.confirm({
+				title: off ? this.$t('Force off {name}?', { name: vm.title }) : this.$t('Force reset {name}?', { name: vm.title }),
+				message: off ? this.$t('The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.') : this.$t('The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.'),
+				confirmText: off ? this.$t('Force off') : this.$t('Force reset'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-danger',
+				focusOn: 'cancel',
+				onConfirm: () => this.cut(vm.id, action),
+			})
+			// it goes with the VM
+			this.cutting = { id: vm.id, dialog }
+		},
+		// The VM as it is when the person confirms, not as it was when the dialog
+		// opened: it may have gone off since, and the service would answer 409.
+		cut(id, action) {
+			const vm = this.vms.find(v => v.id === id)
+			if (vm && allowedActions(vm.state)[action === 'force-off' ? 'forceOff' : 'reset']) {
+				this.run(vm, () => vmApi.action(id, action), false)
+			}
+		},
+		// A call about a VM answers with the VM as the service had it then. The
+		// count of the VM is taken before the call is made: if it has moved when
+		// the answer comes, a read or the VM's going came in between.
+		async run(vm, call, openAfter) {
+			const ask = this.touch(vm.id)
+			this.busy = { ...this.busy, [vm.id]: true }
+			try {
+				const res = await call()
+				this.settle(res.data.data, ask)
+				// the VM as the page has it now, and not one that has gone
+				const now = this.vms.find(v => v.id === vm.id)
+				if (openAfter && now) {
+					this.openConsole(now)
+				}
+			} catch (e) {
+				this.toastError(e)
+			} finally {
+				const { [vm.id]: _, ...rest } = this.busy
+				this.busy = rest
+			}
+		},
+	},
+	sockets: {
+		// The bus does not replay what it sent while this browser was away (a sleep,
+		// a restart of the gateway): each time the socket connects, which includes
+		// each time it connects again, the VMs are read again.
+		connect() {
+			if (!this.loading && this.available) {
+				this.resync()
+			}
+		},
+		'vm:state-changed': function (res) {
+			const id = res?.Properties?.['vm:id']
+			if (!this.available || !this.isVmId(id)) {
+				return
+			}
+			if (res.Properties['vm:event'] === 'undefined') {
+				this.drop(id)
+			} else {
+				this.refreshOne(id)
+			}
+		},
+		'vm:create-end': function (res) {
+			// the VM may not be in the list yet: any name will do, as the id of a
+			// route it is encoded, but not dots, which no encoding keeps in one
+			const id = res?.Properties?.['vm:id']
+			if (id && typeof id === 'string' && !isDots(id)) {
+				this.refreshOne(id)
+			}
+		},
+		'vm:create-error': function (res) {
+			const p = res?.Properties || {}
+			if (this.has(p['vm:id'])) {
+				this.drop(p['vm:id'])
+			}
+			this.$buefy.toast.open({
+				message: escape(this.$t('{name} could not be created: {message}', { name: p['vm:title'] || '', message: p.message || '' })),
+				type: 'is-danger',
+				duration: 8000,
+			})
+		},
+	},
 }
 </script>
+
+<style lang="scss" scoped>
+.vm-page {
+	.modal-card-body {
+		position: relative;
+		min-height: 16rem;
+	}
+
+	// the close control is a button, for the keyboard: nothing of a button's own.
+	// This rule outranks the global ones of .close-button, so it gives each state again.
+	button.close-button {
+		padding: 0;
+		border: 0;
+		color: inherit;
+		background-color: transparent;
+
+		&:hover {
+			background-color: var(--casa-hover-tint);
+		}
+
+		&:active {
+			background-color: var(--casa-active);
+		}
+	}
+
+	.kvm-badge {
+		flex-shrink: 0;
+		padding: 0.15rem 0.6rem;
+		border-radius: 1rem;
+		font-size: 0.75rem;
+		font-weight: 500;
+
+		&.is-on {
+			color: #1f9d4c;
+			background: rgba(61, 210, 107, 0.15);
+		}
+
+		&.is-off {
+			color: #b86e00;
+			background: rgba(245, 166, 35, 0.15);
+		}
+	}
+
+	.vm-split {
+		display: grid;
+		grid-template-columns: 16rem minmax(0, 1fr);
+		gap: 1rem;
+		align-items: start;
+
+		@include touch {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	.vm-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		padding: 0.5rem;
+		border-radius: 0.75rem;
+		background: var(--casa-surface-sunken);
+		border: 1px solid var(--casa-border);
+	}
+
+	.vm-item {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.5rem 0.625rem;
+		border-radius: 0.5rem;
+		border: 1px solid transparent;
+		cursor: pointer;
+
+		&:hover {
+			background: var(--casa-hover-tile);
+		}
+
+		&.is-selected {
+			border-color: var(--casa-primary, #3b82f6);
+			background: var(--casa-hover-tile);
+		}
+
+		:deep(.loading-overlay) {
+			border-radius: 0.5rem;
+		}
+	}
+
+	.vm-item-text {
+		flex-grow: 1;
+		min-width: 0;
+	}
+
+	.vm-item-title {
+		overflow: hidden;
+		color: var(--casa-text-strong);
+		font-weight: 500;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.vm-item-state {
+		overflow: hidden;
+		font-size: 0.75rem;
+		color: var(--casa-text-dim);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+
+		&.state-start {
+			color: #1f9d4c;
+		}
+	}
+
+	.vm-item-ip {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 0.75rem;
+		color: var(--casa-text);
+
+		span {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		&.is-stale {
+			color: var(--casa-text-dim);
+		}
+	}
+
+	.vm-item-copy {
+		flex-shrink: 0;
+		color: var(--casa-text-dim);
+		opacity: 0;
+		cursor: pointer;
+
+		&:hover {
+			color: var(--casa-primary, #3b82f6);
+		}
+	}
+
+	.vm-item:hover .vm-item-copy,
+	.vm-item.is-selected .vm-item-copy {
+		opacity: 1;
+	}
+
+	.vm-dot {
+		flex-shrink: 0;
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: #e5484d;
+
+		&.vm-dot-start {
+			background: #3dd26b;
+		}
+
+		&.vm-dot-busy {
+			background: #f5a623;
+		}
+	}
+
+	.vm-detail-pane {
+		min-width: 0;
+		min-height: 30rem;
+		padding: 1rem 1.25rem;
+		border-radius: 0.75rem;
+		border: 1px solid var(--casa-border);
+	}
+
+	.vm-empty {
+		max-width: 28rem;
+		margin: 3rem auto;
+
+		pre {
+			display: inline-block;
+			border-radius: 0.375rem;
+			background: var(--casa-surface-sunken);
+			color: var(--casa-text-strong);
+		}
+	}
+
+	// the warning yellow is unreadable on a light card
+	.vm-warning {
+		color: #a15c00;
+	}
+}
+</style>
+
+<style lang="scss">
+// The modal the page opens in, in the colours every modal has: the list on
+// the left, the selected VM on the right.
+.vm-modal {
+	.animation-content {
+		width: 66rem;
+		max-width: calc(100vw - 2rem) !important;
+	}
+
+	.modal-card.vm-page {
+		width: 100%;
+		max-height: calc(100vh - 5rem);
+
+		.modal-card-body {
+			overflow-y: auto;
+		}
+	}
+}
+</style>
