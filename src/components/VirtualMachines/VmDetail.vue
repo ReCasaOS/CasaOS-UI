@@ -355,6 +355,8 @@ export default {
 		images: { type: Array, default: () => [] },
 		// a power action on this VM is on its way
 		busy: { type: Boolean, default: false },
+		// takes the page's count of a VM: see send
+		touch: { type: Function, default: () => 0 },
 	},
 	// power, console and delete go to the page; changes to the VM come back
 	// through updated
@@ -496,8 +498,7 @@ export default {
 			this.usbBusy = true
 			this.error = ''
 			try {
-				const res = await vmApi.setUSB(this.current.id, usbRequest(this.current, row, on))
-				this.show(res.data.data)
+				await this.send(() => vmApi.setUSB(this.current.id, usbRequest(this.current, row, on)))
 			} catch (e) {
 				this.error = e.response?.data?.message || e.message
 			} finally {
@@ -530,8 +531,14 @@ export default {
 			this.portError = ''
 			this.error = ''
 		},
-		show(vm) {
-			this.$emit('updated', vm)
+		// A call that changes this VM and answers with it. The page's count of the
+		// VM is taken before the call and goes back with the answer: the page
+		// keeps the answer only if it learned nothing newer of the VM meanwhile.
+		async send(call) {
+			const ask = this.touch(this.current.id)
+			const res = await call()
+			this.$emit('updated', res.data.data, ask)
+			return res
 		},
 		removeTitle(disk) {
 			if (this.hasSnapshots) {
@@ -597,19 +604,16 @@ export default {
 					}
 				}
 				if (Object.keys(body).length) {
-					const res = await vmApi.update(this.current.id, body)
-					this.show(res.data.data)
+					const res = await this.send(() => vmApi.update(this.current.id, body))
 					this.network = networkValue(res.data.data.network)
 					this.address = addressForm(res.data.data.network)
 				}
 				for (const step of diskPlanSteps(this.plan)) {
-					const res = await this.runStep(step)
-					this.show(res.data.data)
+					await this.send(() => this.runStep(step))
 					this.plan = withoutStep(this.plan, step)
 				}
 				if (this.portsChanged && this.showPorts) {
-					const res = await vmApi.setPorts(this.current.id, this.ports)
-					this.show(res.data.data)
+					await this.send(() => vmApi.setPorts(this.current.id, this.ports))
 				}
 				this.removedPorts = []
 				this.addedPorts = []
@@ -653,8 +657,7 @@ export default {
 			this.cdBusy = true
 			this.error = ''
 			try {
-				const res = await vmApi.setCDROM(this.current.id, path)
-				this.show(res.data.data)
+				await this.send(() => vmApi.setCDROM(this.current.id, path))
 			} catch (e) {
 				this.error = e.response?.data?.message || e.message
 			} finally {
@@ -665,8 +668,7 @@ export default {
 			this.snapBusy = true
 			this.error = ''
 			try {
-				const res = await call()
-				this.show(res.data.data)
+				await this.send(call)
 				return true
 			} catch (e) {
 				this.error = e.response?.data?.message || e.message

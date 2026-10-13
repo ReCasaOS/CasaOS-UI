@@ -8,8 +8,10 @@ import vmApi from './api'
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({
-	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'create', 'downloads', 'storageFolder'].map(name => [name, vi.fn()])),
+	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'create', 'update', 'downloads', 'storageFolder', 'consoleURL'].map(name => [name, vi.fn()])),
 }))
+// the console of a running VM connects as soon as it opens
+vi.mock('@novnc/novnc', () => ({ default: class { addEventListener() {} disconnect() {} focus() {} } }))
 
 // Buefy renders the message of a toast as HTML.
 const HOSTILE = '<img src=x onerror="window.pwned = 1">'
@@ -714,5 +716,202 @@ describe('cutting a virtual machine off', () => {
 
 		expect(vmApi.action.mock.calls).toEqual([['vm-1', 'shutdown'], ['vm-1', 'reboot']])
 		expect(dialog()).toBeNull()
+	})
+})
+
+// A call about a VM is answered with the VM as the service had it when it
+// answered: that can be before what the page learned of it since, or of a VM
+// that has gone.
+describe('an answer to a call about a VM that comes late', () => {
+	let page
+
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+	afterEach(() => {
+		page?.wrapper.unmount()
+		page = null
+	})
+
+	const button = (text, root = document) => [...root.querySelectorAll('button, .dropdown-item')].find(b => b.textContent.trim() === text)
+	const dialog = () => document.querySelector('.dialog')
+	// what the service says when it is asked, as the bus tells the page to
+	const learn = async (state) => {
+		vmApi.get.mockResolvedValue(answer(aVm({ state })))
+		page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'stopped' })
+		await flushPromises()
+	}
+	const remove = async () => {
+		page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'undefined' })
+		await flushPromises()
+	}
+	// the call is on its way, and its answer is the test's to give
+	const held = () => {
+		const call = deferred()
+		vmApi.action.mockReturnValue(call.promise)
+		vmApi.update.mockReturnValue(call.promise)
+		return call
+	}
+	const shutDown = async () => {
+		button('Shut down', document.querySelector('.power-bar')).click()
+		await flushPromises()
+	}
+	const confirmCut = async (text) => {
+		button(text, document.querySelector('.power-bar') || document).click()
+		await flushPromises()
+		button(text, dialog()).click()
+		await flushPromises()
+	}
+	// the host says its network, or a fixed address cannot be checked and Save stays off
+	const mountForSave = () => mountPage({ host: { ...HOST, network_subnet: '10.8.0.0/24' } })
+	const rename = async (title) => {
+		const input = document.querySelector('.vm-detail input[maxlength="128"]')
+		input.value = title
+		input.dispatchEvent(new Event('input', { bubbles: true }))
+		await flushPromises()
+	}
+
+	it('does not undo what a read learned meanwhile, for Shut down', async () => {
+		page = await mountPage()
+		const call = held()
+		await shutDown()
+		await learn('shut-off')
+		expect(states()).toEqual(['Off'])
+
+		call.resolve(answer(aVm({ state: 'shutting-down' })))
+		await flushPromises()
+		expect(states()).toEqual(['Off'])
+	})
+
+	it('does not bring the VM back when it was deleted meanwhile, for Shut down', async () => {
+		page = await mountPage()
+		const call = held()
+		await shutDown()
+		await remove()
+		expect(states()).toEqual([])
+
+		call.resolve(answer(aVm({ state: 'shutting-down' })))
+		await flushPromises()
+		expect(states()).toEqual([])
+		expect(document.querySelector('.vm-detail')).toBeNull()
+	})
+
+	it('still takes the answer when nothing was learned meanwhile', async () => {
+		page = await mountPage()
+		const call = held()
+		await shutDown()
+		call.resolve(answer(aVm({ state: 'shutting-down' })))
+		await flushPromises()
+		expect(states()).toEqual(['Shutting down…'])
+	})
+
+	// the count of the VM has moved before the call: the answer is still the newest
+	it('takes the answer when the read came before the call was made', async () => {
+		page = await mountPage()
+		await learn('running')
+		const call = held()
+		await shutDown()
+		call.resolve(answer(aVm({ state: 'shutting-down' })))
+		await flushPromises()
+		expect(states()).toEqual(['Shutting down…'])
+	})
+
+	it('does not undo what a read learned meanwhile, for a confirmed Force off', async () => {
+		page = await mountPage()
+		const call = held()
+		await confirmCut('Force off')
+		expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'force-off')
+		await learn('shut-off')
+
+		call.resolve(answer(aVm({ state: 'running' })))
+		await flushPromises()
+		expect(states()).toEqual(['Off'])
+	})
+
+	it('does not bring the VM back when it was deleted meanwhile, for a confirmed Force reset', async () => {
+		page = await mountPage()
+		const call = held()
+		await confirmCut('Force reset')
+		expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'reset')
+		await remove()
+
+		call.resolve(answer(aVm()))
+		await flushPromises()
+		expect(states()).toEqual([])
+	})
+
+	it('does not open the console of a VM that was deleted while it started', async () => {
+		page = await mountPage({ vms: [aVm({ state: 'shut-off' })] })
+		const call = held()
+		button('Start').click()
+		await flushPromises()
+		await remove()
+
+		call.resolve(answer(aVm()))
+		await flushPromises()
+		expect(states()).toEqual([])
+		expect(document.querySelector('.vm-console')).toBeNull()
+	})
+
+	it('opens the console on the VM as a read since showed it', async () => {
+		page = await mountPage({ vms: [aVm({ state: 'shut-off' })] })
+		const call = held()
+		button('Start').click()
+		await flushPromises()
+		await learn('running')
+
+		call.resolve(answer(aVm({ state: 'shut-off' })))
+		await flushPromises()
+		expect(states()).toEqual(['Running'])
+		expect(document.querySelector('.vm-console')).not.toBeNull()
+		expect(document.querySelector('.vm-console-bar .is-size-7').textContent.trim()).toBe('Running')
+	})
+
+	it('does not undo what a read learned meanwhile, for a change saved from the detail', async () => {
+		page = await mountForSave()
+		const call = held()
+		await rename('Renamed')
+		button('Save', document.querySelector('.vm-detail')).click()
+		await flushPromises()
+		expect(vmApi.update).toHaveBeenCalledTimes(1)
+		await learn('shut-off')
+		expect(stateOf()).toEqual({ Debian: 'Off' })
+
+		call.resolve(answer(aVm({ title: 'Renamed' })))
+		await flushPromises()
+		expect(stateOf()).toEqual({ Debian: 'Off' })
+	})
+
+	it('takes the answer of a change saved from the detail when nothing was learned meanwhile', async () => {
+		page = await mountForSave()
+		vmApi.update.mockResolvedValue(answer(aVm({ title: 'Renamed' })))
+		await rename('Renamed')
+		button('Save', document.querySelector('.vm-detail')).click()
+		await flushPromises()
+		expect(stateOf()).toEqual({ Renamed: 'Running' })
+	})
+
+	it('takes the answer of a change saved from the detail when the read came before the save', async () => {
+		page = await mountForSave()
+		await learn('running')
+		vmApi.update.mockResolvedValue(answer(aVm({ title: 'Renamed' })))
+		await rename('Renamed')
+		button('Save', document.querySelector('.vm-detail')).click()
+		await flushPromises()
+		expect(stateOf()).toEqual({ Renamed: 'Running' })
+	})
+
+	it('does not bring the VM back when it was deleted while a change was saved', async () => {
+		page = await mountForSave()
+		const call = held()
+		await rename('Renamed')
+		button('Save', document.querySelector('.vm-detail')).click()
+		await flushPromises()
+		await remove()
+
+		call.resolve(answer(aVm({ title: 'Renamed' })))
+		await flushPromises()
+		expect(states()).toEqual([])
 	})
 })

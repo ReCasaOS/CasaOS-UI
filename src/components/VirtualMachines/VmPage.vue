@@ -72,7 +72,8 @@
 					<!-- detail: the one selected -->
 					<div class="vm-detail-pane">
 						<vm-detail v-if="selected" :key="selected.id" :busy="!!busy[selected.id] || selected.state === 'creating'"
-							:host="host" :images="images" :vm="selected" @action="onAction" @images-changed="loadImages" @updated="replace" />
+							:host="host" :images="images" :touch="touch" :vm="selected" @action="onAction" @images-changed="loadImages"
+							@updated="settle" />
 					</div>
 				</div>
 			</template>
@@ -262,6 +263,13 @@ export default {
 			this.touch(id)
 			this.vms = this.vms.filter(vm => vm.id !== id)
 		},
+		// What a call about a VM answered, which is the VM only if nothing newer
+		// was learned of it since `ask` was taken
+		settle(vm, ask) {
+			if (this.asked[vm?.id] === ask) {
+				this.replace(vm)
+			}
+		},
 		replace(vm) {
 			// what the service answered, and the page took for a VM
 			if (typeof vm?.id !== 'string') {
@@ -384,13 +392,19 @@ export default {
 				this.run(vm, () => vmApi.action(id, action), false)
 			}
 		},
+		// A call about a VM answers with the VM as the service had it then. The
+		// count of the VM is taken before the call is made: if it has moved when
+		// the answer comes, a read or the VM's going came in between.
 		async run(vm, call, openAfter) {
+			const ask = this.touch(vm.id)
 			this.busy = { ...this.busy, [vm.id]: true }
 			try {
 				const res = await call()
-				this.replace(res.data.data)
-				if (openAfter) {
-					this.openConsole(res.data.data)
+				this.settle(res.data.data, ask)
+				// the VM as the page has it now, and not one that has gone
+				const now = this.vms.find(v => v.id === vm.id)
+				if (openAfter && now) {
+					this.openConsole(now)
 				}
 			} catch (e) {
 				this.toastError(e)
