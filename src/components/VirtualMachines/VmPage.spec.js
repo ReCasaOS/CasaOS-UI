@@ -18,6 +18,18 @@ const HOSTILE = '<img src=x onerror="window.pwned = 1">'
 
 const toasts = () => [...document.querySelectorAll('.toast')]
 
+// the form of the real modal, named and sent
+async function createFromTheForm() {
+	document.querySelector('[title="New virtual machine"]').click()
+	await flushPromises()
+	const name = document.querySelector('.vm-create input[maxlength="128"]')
+	name.value = 'Debian'
+	name.dispatchEvent(new Event('input', { bubbles: true }))
+	await flushPromises()
+	;[...document.querySelectorAll('.vm-create button')].find(b => b.textContent.trim() === 'Create').click()
+	await flushPromises()
+}
+
 describe('the toasts of the virtual machine page', () => {
 	let page
 
@@ -70,18 +82,6 @@ describe('creating a virtual machine', () => {
 		page?.wrapper.unmount()
 		page = null
 	})
-
-	// the form of the real modal, named and sent
-	const createFromTheForm = async () => {
-		document.querySelector('[title="New virtual machine"]').click()
-		await flushPromises()
-		const name = document.querySelector('.vm-create input[maxlength="128"]')
-		name.value = 'Debian'
-		name.dispatchEvent(new Event('input', { bubbles: true }))
-		await flushPromises()
-		;[...document.querySelectorAll('.vm-create button')].find(b => b.textContent.trim() === 'Create').click()
-		await flushPromises()
-	}
 
 	it('reads the list again, and says why, when the VM was made and did not start', async () => {
 		page = await mountPage({ vms: [] })
@@ -220,6 +220,151 @@ describe('keeping the state of the VMs true', () => {
 		page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'stopped' })
 		await flushPromises()
 		expect(states()).toEqual([])
+	})
+
+	// the read of the whole list is the same kind of answer: it was true when
+	// the service gave it, and it can come after what the page learned since
+	describe('when the list is on its way', () => {
+		const listOf = vms => ({ data: { data: vms } })
+		const stateOf = () => Object.fromEntries([...document.querySelectorAll('.vm-item')].map(item => [item.querySelector('.vm-item-title').textContent, item.querySelector('.vm-item-state').textContent.trim()]))
+
+		it('does not bring a VM back that was removed meanwhile', async () => {
+			page = await mountPage()
+			const late = deferred()
+			vmApi.list.mockReturnValue(late.promise)
+			page.socket.receive('connect')
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'undefined' })
+			await flushPromises()
+			expect(states()).toEqual([])
+
+			late.resolve(listOf([aVm()]))
+			await flushPromises()
+			expect(states()).toEqual([])
+		})
+
+		it('does not undo a state the page learned meanwhile, and takes the rest of the list', async () => {
+			const other = aVm({ id: 'vm-2', title: 'Alpine' })
+			page = await mountPage({ vms: [aVm(), other] })
+			const late = deferred()
+			vmApi.list.mockReturnValue(late.promise)
+			vmApi.get.mockResolvedValue(answer(aVm({ state: 'shut-off' })))
+			page.socket.receive('connect')
+			page.fire('vm:state-changed', { 'vm:id': 'vm-1', 'vm:event': 'stopped' })
+			await flushPromises()
+			expect(stateOf()).toEqual({ Debian: 'Off', Alpine: 'Running' })
+
+			// as the service saw them when it was asked
+			late.resolve(listOf([aVm(), { ...other, state: 'shut-off' }]))
+			await flushPromises()
+			expect(stateOf()).toEqual({ Debian: 'Off', Alpine: 'Off' })
+		})
+
+		it('keeps a VM that was made meanwhile', async () => {
+			page = await mountPage()
+			const late = deferred()
+			vmApi.list.mockReturnValue(late.promise)
+			vmApi.create.mockResolvedValue({ status: 201, data: { data: aVm({ id: 'vm-2', title: 'Debian 2' }) } })
+			page.socket.receive('connect')
+			await createFromTheForm()
+			expect(states()).toHaveLength(2)
+
+			late.resolve(listOf([aVm()]))
+			await flushPromises()
+			expect(states()).toHaveLength(2)
+		})
+
+		it('takes the newest of two reads, whatever the order of the answers', async () => {
+			page = await mountPage()
+			const older = deferred()
+			const newer = deferred()
+			vmApi.list.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
+			page.socket.receive('connect')
+			page.socket.receive('connect')
+			newer.resolve(listOf([aVm({ state: 'shut-off' })]))
+			await flushPromises()
+			expect(states()).toEqual(['Off'])
+
+			older.resolve(listOf([aVm()]))
+			await flushPromises()
+			expect(states()).toEqual(['Off'])
+		})
+	})
+
+	// Nobody asked for the read that follows a connection: when it fails, the
+	// page stays as it was, and a toast with a raw English error would say nothing
+	// a person can use.
+	describe('when reading again after the bus connects fails', () => {
+		beforeEach(() => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+		})
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+		const refused = () => Object.assign(new Error('Request failed with status code 502'), { response: { status: 502 } })
+
+		it('says nothing, and tries once more a few seconds later', async () => {
+			page = await mountPage()
+			vmApi.list.mockRejectedValueOnce(refused()).mockResolvedValueOnce({ data: { data: [aVm({ state: 'shut-off' })] } })
+			page.socket.receive('connect')
+			await flushPromises()
+			expect(vmApi.list).toHaveBeenCalledTimes(2)
+			expect(toasts()).toHaveLength(0)
+			expect(states()).toEqual(['Running'])
+
+			await vi.advanceTimersByTimeAsync(5000)
+			expect(vmApi.list).toHaveBeenCalledTimes(3)
+			expect(states()).toEqual(['Off'])
+			expect(toasts()).toHaveLength(0)
+		})
+
+		it('tries only once more', async () => {
+			page = await mountPage()
+			vmApi.list.mockRejectedValue(refused())
+			page.socket.receive('connect')
+			await vi.advanceTimersByTimeAsync(60_000)
+			expect(vmApi.list).toHaveBeenCalledTimes(3)
+			expect(toasts()).toHaveLength(0)
+		})
+
+		it('does not try again once the page is closed', async () => {
+			page = await mountPage()
+			vmApi.list.mockRejectedValue(refused())
+			page.socket.receive('connect')
+			await flushPromises()
+			page.wrapper.unmount()
+			await vi.advanceTimersByTimeAsync(60_000)
+			expect(vmApi.list).toHaveBeenCalledTimes(2)
+		})
+
+		it('does not try again when the page was closed while it was reading', async () => {
+			page = await mountPage()
+			const late = deferred()
+			vmApi.list.mockReturnValue(late.promise)
+			page.socket.receive('connect')
+			await flushPromises()
+			page.wrapper.unmount()
+			late.resolve(Promise.reject(refused()))
+			await vi.advanceTimersByTimeAsync(60_000)
+			expect(vmApi.list).toHaveBeenCalledTimes(2)
+		})
+
+		it('forgets the one more try when the next connection reads fine', async () => {
+			page = await mountPage()
+			vmApi.list.mockRejectedValueOnce(refused()).mockResolvedValueOnce({ data: { data: [aVm()] } })
+			page.socket.receive('connect')
+			await flushPromises()
+			page.socket.receive('connect')
+			await vi.advanceTimersByTimeAsync(60_000)
+			expect(vmApi.list).toHaveBeenCalledTimes(3)
+		})
+
+		it('still says why when a read the person started fails', async () => {
+			page = await mountPage({ vms: [] })
+			vmApi.create.mockRejectedValue({ response: { status: 409, data: { message: 'cannot start' } } })
+			vmApi.list.mockRejectedValue({ response: { data: { message: 'the list is gone' } } })
+			await createFromTheForm()
+			expect(toasts().map(t => t.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('the list is gone')]))
+		})
 	})
 })
 

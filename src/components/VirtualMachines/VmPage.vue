@@ -95,6 +95,9 @@ import { openWithEscape } from './modalStack'
 import { applyOrder, listAddress, stateDot, stateLabel } from './vms'
 
 const ORDER_KEY = 'vm_order'
+// how long after a failed read, made when the message bus connected, the one
+// more try is made
+const RESYNC_RETRY_MS = 5000
 
 export default {
 	name: 'VmPage',
@@ -117,6 +120,8 @@ export default {
 			// How many times each VM was asked for or dropped. An answer that comes
 			// back after a later ask, or after the VM went, is not the VM any more.
 			asked: {},
+			// how many times the whole list was read: only the newest answer counts
+			listAsk: 0,
 		}
 	},
 	computed: {
@@ -130,6 +135,10 @@ export default {
 	},
 	mounted() {
 		this.load()
+	},
+	beforeUnmount() {
+		this.closed = true
+		clearTimeout(this.resyncTimer)
 	},
 	methods: {
 		listAddress,
@@ -163,17 +172,39 @@ export default {
 				this.loading = false
 			}
 		},
-		async refresh() {
+		// Every VM, from the service. Resolves to whether it could be read; the
+		// error is shown unless the person did not ask for the read.
+		async refresh({ quiet = false } = {}) {
+			// Only the newest read is taken, and a VM asked for, made or dropped
+			// since this one began is as the page has it now: the list was true
+			// when the service gave it, and can come after what the page learned.
+			const read = ++this.listAsk
+			const before = { ...this.asked }
 			try {
 				const [list, saved] = await Promise.all([
 					vmApi.list().then(res => res.data.data || []),
 					this.$api.users.getCustomStorage(ORDER_KEY).then(res => res.data.data?.data || []).catch(() => []),
 				])
-				const { sorted, order } = applyOrder(list, saved)
-				this.vms = sorted
-				this.order = order
+				if (read === this.listAsk) {
+					const moved = vm => this.asked[vm.id] !== before[vm.id]
+					const { sorted, order } = applyOrder([...this.vms.filter(moved), ...list.filter(vm => !moved(vm))], saved)
+					this.vms = sorted
+					this.order = order
+				}
+				return true
 			} catch (e) {
-				this.toastError(e)
+				if (!quiet) {
+					this.toastError(e)
+				}
+				return false
+			}
+		},
+		// What the message bus connecting asks for. Nobody asked, so a failure is
+		// not shown: the page stays as it was, and the read is tried once more.
+		async resync(again = true) {
+			clearTimeout(this.resyncTimer)
+			if (!(await this.refresh({ quiet: true })) && again && !this.closed) {
+				this.resyncTimer = setTimeout(() => this.resync(false), RESYNC_RETRY_MS)
 			}
 		},
 		// one VM, from the service, in place
@@ -222,6 +253,8 @@ export default {
 				props: { host: this.host },
 				events: {
 					created: (vm, importing) => {
+						// a list read before it was made does not have it
+						this.touch(vm.id)
 						this.replace(vm)
 						this.selectedId = vm.id
 						if (importing) {
@@ -327,7 +360,7 @@ export default {
 		// each time it connects again, the VMs are read again.
 		connect() {
 			if (!this.loading && this.available) {
-				this.refresh()
+				this.resync()
 			}
 		},
 		'vm:state-changed': function (res) {
