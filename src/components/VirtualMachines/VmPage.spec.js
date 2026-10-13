@@ -401,6 +401,17 @@ describe('the events of the message bus', () => {
 		expect(states()).toEqual(['Running'])
 	})
 
+	it('ask nothing of the service at the end of a creation for an id of dots, which no route can hold', async () => {
+		page = await mountPage()
+		for (const id of ['.', '..', '...']) {
+			page.fire('vm:create-end', { 'vm:id': id })
+		}
+		await flushPromises()
+
+		expect(vmApi.get).not.toHaveBeenCalled()
+		expect(states()).toEqual(['Running'])
+	})
+
 	it('survive an event that says nothing', async () => {
 		page = await mountPage()
 		for (const res of [null, undefined, {}, { Properties: null }, { Properties: 'vm-1' }]) {

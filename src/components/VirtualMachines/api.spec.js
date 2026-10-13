@@ -42,6 +42,35 @@ describe('the routes of the virtual machine service', () => {
 		expect(http[method].mock.calls[0][0]).toBe(route)
 	})
 
+	// A browser takes a dot segment out of a route before it is sent, and so the
+	// id is another route: no encoding keeps "." or ".." to one segment.
+	const DOTS = ['.', '..', '...']
+	const calls = [
+		id => vmApi.get(id),
+		id => vmApi.remove(id, false),
+		id => vmApi.action(id, 'start'),
+		id => vmApi.action('vm-1', id),
+		id => vmApi.resizeDisk('vm-1', id, 8),
+		id => vmApi.deleteSnapshot('vm-1', id),
+		id => vmApi.deleteDownload(id),
+		id => vmApi.consoleURL('ws:', id),
+	]
+
+	it.each(DOTS)('does not make a route of the id %j', (id) => {
+		for (const call of calls) {
+			expect(() => call(id)).toThrow()
+		}
+		for (const method of Object.values(http)) {
+			expect(method).not.toHaveBeenCalled()
+		}
+	})
+
+	// encoded, the percent sign is not one: it stays text of the segment
+	it.each([['%2e', '%252e'], ['%2e%2e', '%252e%252e'], ['.%2e', '.%252e'], ['a..', 'a..']])('keeps the id %j as one segment, %j', (id, segment) => {
+		vmApi.get(id)
+		expect(http.get).toHaveBeenCalledWith(`${P}/vms/${segment}`)
+	})
+
 	it('leaves the ids the service makes as they are', () => {
 		vmApi.get('3f2b8c1e-5d4a-4e7b-9a10-6c2d8e4f1a7b')
 		vmApi.resizeDisk('vm-1', 'vda', 8)

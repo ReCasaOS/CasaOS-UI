@@ -1,12 +1,18 @@
 // The virtual machine API (CasaOS-VirtManagement). Hand-written: a dozen routes
 // do not need a generated client.
+import { isDots } from './vms'
 import { api } from '@/service/service.js'
 
 const PREFIX = '/v2/virt_management'
 
 // What goes into a route is one segment of it: an id comes from the message bus
 // as well as from the service, and must not be able to change the route.
-const seg = encodeURIComponent
+function seg(id) {
+	if (isDots(id)) {
+		throw new Error('An id made of dots is not one segment of a route')
+	}
+	return encodeURIComponent(id)
+}
 
 const vmApi = {
 	host() {

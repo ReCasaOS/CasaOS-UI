@@ -73,6 +73,12 @@ export function allowedActions(state) {
 	}
 }
 
+// "." and ".." are dot segments: a browser takes them out of a route, as %2e
+// too, so an id made of dots cannot be one segment of it, however it is encoded.
+export function isDots(id) {
+	return /^\.+$/.test(id)
+}
+
 // The service takes images from /DATA only, wherever the disks of the VMs go:
 // what a folder under /media holds in its iso folder it refuses.
 export function isUnderData(path) {

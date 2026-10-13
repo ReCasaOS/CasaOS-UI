@@ -92,7 +92,7 @@ import VmDeleteModal from './VmDeleteModal.vue'
 import StorageSettingsModal from './StorageSettingsModal.vue'
 import VmDetail from './VmDetail.vue'
 import { openWithEscape } from './modalStack'
-import { allowedActions, applyOrder, listAddress, stateDot, stateLabel } from './vms'
+import { allowedActions, applyOrder, isDots, listAddress, stateDot, stateLabel } from './vms'
 
 const ORDER_KEY = 'vm_order'
 // how long after a failed read, made when the message bus connected, the one
@@ -422,9 +422,9 @@ export default {
 		},
 		'vm:create-end': function (res) {
 			// the VM may not be in the list yet: any name will do, as the id of a
-			// route it is encoded
+			// route it is encoded, but not dots, which no encoding keeps in one
 			const id = res?.Properties?.['vm:id']
-			if (id && typeof id === 'string') {
+			if (id && typeof id === 'string' && !isDots(id)) {
 				this.refreshOne(id)
 			}
 		},
