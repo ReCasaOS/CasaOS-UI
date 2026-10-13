@@ -117,6 +117,8 @@ export default {
 			default: 'en_us',
 		},
 	},
+	// state: the state of the report that was read ('' when there is none): the plan below it is not offered for a system that is unsupported or the latest
+	emits: ['state'],
 	data() {
 		return {
 			ICONS,
@@ -171,6 +173,7 @@ export default {
 			this.busy = true
 			this.error = ''
 			this.view = null
+			this.$emit('state', '')
 			this.showText = false
 			this.$api.sys.getOsReadiness().then((res) => {
 				if (this.gone)
@@ -182,6 +185,7 @@ export default {
 					return
 				}
 				this.view = view
+				this.$emit('state', view.state)
 				// the result is long and sits under the button: reading starts at its heading
 				this.$nextTick(() => this.$refs.result?.focus?.())
 			}).catch((error) => {
