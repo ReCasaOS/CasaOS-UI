@@ -82,7 +82,7 @@ export default {
 	props: {
 		host: { type: Object, required: true },
 	},
-	emits: ['close', 'created'],
+	emits: ['close', 'created', 'notStarted'],
 	data() {
 		return {
 			form: createDefaults(this.host),
@@ -225,7 +225,15 @@ export default {
 				this.$emit('created', res.data.data, res.status === 202)
 				this.$emit('close')
 			} catch (e) {
-				this.error = e.response?.data?.message || e.message
+				const message = e.response?.data?.message || e.message
+				if (e.response?.status === 409) {
+					// The service made the VM and could not start it. It exists: the dialog
+					// closes, or the next Create would make a second VM and a second disk.
+					this.$emit('notStarted', this.form.title.trim(), message)
+					this.$emit('close')
+				} else {
+					this.error = message
+				}
 			} finally {
 				this.busy = false
 			}

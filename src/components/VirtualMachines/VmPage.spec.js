@@ -4,13 +4,13 @@ import { join } from 'node:path'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { aVm } from './__fixtures__/vm'
-import { mountPage } from './__fixtures__/page'
+import { isOpen, mountPage } from './__fixtures__/page'
 import vmApi from './api'
 
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({
-	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder'].map(name => [name, vi.fn()])),
+	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'create', 'downloads', 'storageFolder'].map(name => [name, vi.fn()])),
 }))
 
 // Buefy renders the message of a toast as HTML.
@@ -56,6 +56,45 @@ describe('the toasts of the virtual machine page', () => {
 		page = await mountPage({ vms: [aVm({ title: HOSTILE })] })
 		expect(document.querySelector('.vm-item img')).toBeNull()
 		expect(document.querySelector('.vm-item-title').textContent).toBe(HOSTILE)
+	})
+})
+
+describe('creating a virtual machine', () => {
+	let page
+
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+	afterEach(() => {
+		page?.wrapper.unmount()
+		page = null
+	})
+
+	// the form of the real modal, named and sent
+	const createFromTheForm = async () => {
+		document.querySelector('[title="New virtual machine"]').click()
+		await flushPromises()
+		const name = document.querySelector('.vm-create input[maxlength="128"]')
+		name.value = 'Debian'
+		name.dispatchEvent(new Event('input', { bubbles: true }))
+		await flushPromises()
+		;[...document.querySelectorAll('.vm-create button')].find(b => b.textContent.trim() === 'Create').click()
+		await flushPromises()
+	}
+
+	it('reads the list again, and says why, when the VM was made and did not start', async () => {
+		page = await mountPage({ vms: [] })
+		vmApi.create.mockRejectedValue({ response: { status: 409, data: { message: `cannot start ${HOSTILE}` } } })
+		expect(vmApi.list).toHaveBeenCalledTimes(1)
+		await createFromTheForm()
+
+		expect(vmApi.create).toHaveBeenCalledTimes(1)
+		expect(vmApi.list).toHaveBeenCalledTimes(2)
+		expect(isOpen('.vm-create')).toBe(false)
+		const toast = document.querySelector('.toast')
+		expect(toast.querySelector('img')).toBeNull()
+		expect(toast.textContent).toContain(`Debian was created but could not be started: cannot start ${HOSTILE}`)
 	})
 })
 

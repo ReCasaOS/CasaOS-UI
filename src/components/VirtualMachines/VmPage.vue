@@ -211,6 +211,15 @@ export default {
 							this.$buefy.toast.open({ message: this.$t('Copying the disk image. The VM will be ready in a few minutes.'), type: 'is-info', duration: 5000 })
 						}
 					},
+					// made, and not started: it is in the service's list
+					notStarted: (name, message) => {
+						this.refresh()
+						this.$buefy.toast.open({
+							message: escape(this.$t('{name} was created but could not be started: {message}', { name, message })),
+							type: 'is-warning',
+							duration: 8000,
+						})
+					},
 				},
 			})
 		},

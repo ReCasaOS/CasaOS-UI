@@ -18,6 +18,13 @@ export function serve({ vms = [aVm()], host = HOST } = {}) {
 	vmApi.get.mockImplementation(async id => ({ data: { data: vms.find(vm => vm.id === id) } }))
 }
 
+// Whether a modal or a dialog with this inside is on screen. One that has left
+// stays in the document, hidden, until Buefy takes it away.
+export function isOpen(selector) {
+	const modal = document.querySelector(selector)?.closest('.modal')
+	return Boolean(modal) && modal.style.display !== 'none'
+}
+
 export async function mountPage(options = {}) {
 	serve(options)
 	const api = {
