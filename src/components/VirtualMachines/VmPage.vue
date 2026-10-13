@@ -282,9 +282,27 @@ export default {
 							},
 						},
 					})
+				case 'force-off':
+				case 'reset':
+					return this.confirmCut(action, vm)
 				default:
 					return this.run(vm, () => vmApi.action(vm.id, action), action === 'start')
 			}
+		},
+		// Force off and Force reset cut the guest off without shutting it down: what
+		// it has not saved is lost and its disk can be damaged. Asked first, with
+		// Cancel in focus, as Delete is.
+		confirmCut(action, vm) {
+			const off = action === 'force-off'
+			this.$buefy.dialog.confirm({
+				title: off ? this.$t('Force off {name}?', { name: vm.title }) : this.$t('Force reset {name}?', { name: vm.title }),
+				message: off ? this.$t('The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.') : this.$t('The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.'),
+				confirmText: off ? this.$t('Force off') : this.$t('Force reset'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-danger',
+				focusOn: 'cancel',
+				onConfirm: () => this.run(vm, () => vmApi.action(vm.id, action), false),
+			})
 		},
 		async run(vm, call, openAfter) {
 			this.busy = { ...this.busy, [vm.id]: true }

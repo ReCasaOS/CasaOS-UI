@@ -1107,5 +1107,9 @@
   "New virtual machines keep their disks here unless you choose another folder, and its iso folder holds the images and downloads. Virtual machines already made keep their disks where they are.": "Le nuove macchine virtuali tengono qui i loro dischi, a meno che tu non scelga un'altra cartella, e la sua cartella iso contiene le immagini e i download. Le macchine virtuali già create tengono i dischi dove sono.",
   "Shut off": "Spenta",
   "{name} was created but could not be started: {message}": "{name} è stata creata ma non è stato possibile avviarla: {message}",
-  "Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.": "Le immagini tenute lì non possono ancora essere usate dalle macchine virtuali: il servizio accetta solo immagini da /DATA."
+  "Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.": "Le immagini tenute lì non possono ancora essere usate dalle macchine virtuali: il servizio accetta solo immagini da /DATA.",
+  "Force off {name}?": "Spegnere {name} di colpo?",
+  "Force reset {name}?": "Reset forzato di {name}?",
+  "The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "La macchina virtuale viene spenta subito, come se le togliessi la corrente, senza chiudere il suo sistema. Quello che non ha salvato va perso e il suo disco può danneggiarsi.",
+  "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "La macchina virtuale viene riavviata subito, come se premessi il tasto di reset, senza chiudere il suo sistema. Quello che non ha salvato va perso e il suo disco può danneggiarsi."
 }

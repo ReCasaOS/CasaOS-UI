@@ -223,6 +223,94 @@ describe('keeping the state of the VMs true', () => {
 	})
 })
 
+describe('cutting a virtual machine off', () => {
+	let page
+
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+	afterEach(() => {
+		page?.wrapper.unmount()
+		page = null
+	})
+
+	const dialog = () => document.querySelector('.dialog')
+	const button = (text, root = document) => [...root.querySelectorAll('button, .dropdown-item')].find(b => b.textContent.trim() === text)
+	const forceOff = () => button('Force off', document.querySelector('.power-bar')).click()
+	const settle = () => flushPromises()
+
+	it('asks before Force off, and does nothing when it is cancelled', async () => {
+		page = await mountPage()
+		forceOff()
+		await settle()
+
+		expect(dialog().querySelector('.modal-card-title').textContent.trim()).toBe('Force off Debian?')
+		expect(dialog().textContent).toContain('switched off at once')
+		expect(button('Force off', dialog()).classList).toContain('is-danger')
+		expect(vmApi.action).not.toHaveBeenCalled()
+
+		button('Cancel', dialog()).click()
+		await settle()
+		expect(vmApi.action).not.toHaveBeenCalled()
+		expect(isOpen('.dialog')).toBe(false)
+	})
+
+	it('switches the VM off once Force off is confirmed', async () => {
+		page = await mountPage()
+		vmApi.action.mockResolvedValue(answer(aVm({ state: 'shut-off' })))
+		forceOff()
+		await settle()
+		button('Force off', dialog()).click()
+		await settle()
+
+		expect(vmApi.action).toHaveBeenCalledTimes(1)
+		expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'force-off')
+		expect(states()).toEqual(['Off'])
+	})
+
+	it('asks before Force reset the same way', async () => {
+		page = await mountPage()
+		vmApi.action.mockResolvedValue(answer(aVm()))
+		button('Force reset').click()
+		await settle()
+
+		expect(dialog().querySelector('.modal-card-title').textContent.trim()).toBe('Force reset Debian?')
+		expect(dialog().textContent).toContain('restarted at once')
+		expect(vmApi.action).not.toHaveBeenCalled()
+
+		button('Force reset', dialog()).click()
+		await settle()
+		expect(vmApi.action).toHaveBeenCalledWith('vm-1', 'reset')
+	})
+
+	it('puts Cancel in focus, and shows the name of the VM as text', async () => {
+		page = await mountPage({ vms: [aVm({ title: HOSTILE })] })
+		const focus = vi.spyOn(HTMLElement.prototype, 'focus')
+		forceOff()
+		await settle()
+
+		// Enter on the dialog must not be enough to cut the guest off
+		expect(focus.mock.contexts).toContain(button('Cancel', dialog()))
+		expect(focus.mock.contexts).not.toContain(button('Force off', dialog()))
+		focus.mockRestore()
+		expect(dialog().querySelector('img')).toBeNull()
+		expect(dialog().querySelector('.modal-card-title').textContent).toContain(HOSTILE)
+	})
+
+	it('leaves Shut down and Restart at one click', async () => {
+		page = await mountPage()
+		vmApi.action.mockResolvedValue(answer(aVm()))
+		button('Shut down').click()
+		await settle()
+		button('Restart').click()
+		await settle()
+
+		expect(vmApi.action.mock.calls).toEqual([['vm-1', 'shutdown'], ['vm-1', 'reboot']])
+		expect(dialog()).toBeNull()
+	})
+})
+
 // Buefy shows the message of a toast, a snackbar, a notification and a dialog as
 // HTML, and the title of a VM, an error from the service or a file name must
 // not reach it as is. This reads the sources: any new call has to say here that
@@ -245,7 +333,7 @@ describe('the messages Buefy shows as HTML', () => {
 				}
 				const message = source.slice(call.index, end).match(/\bmessage: (.+?)(?:, (?:type|title|duration|confirmText)\b|,?\r?\n)/)?.[1] ?? ''
 				found.push({ file, message })
-				expect(message, file).toMatch(/^(escape\(|this\.\$t\('[^']*'\))/)
+				expect(message, file).toMatch(/^(escape\(|(\w+ \? )?this\.\$t\('[^']*'\)( : this\.\$t\('[^']*'\))?$)/)
 			}
 		}
 		// the toasts of the page and the console, the dialogs of the snapshots
