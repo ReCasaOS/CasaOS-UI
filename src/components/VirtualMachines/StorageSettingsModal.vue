@@ -17,7 +17,7 @@
 			<p class="is-size-7 has-text-full-03">
 				{{ $t('New virtual machines keep their disks here unless you choose another folder, and its iso folder holds the images and downloads. Virtual machines already made keep their disks where they are.') }}
 			</p>
-			<b-message v-if="!isUnderData(path)" class="mt-3" size="is-small" type="is-warning">
+			<b-message v-if="path && !isUnderData(path)" class="mt-3" size="is-small" type="is-warning">
 				{{ $t('Images kept there cannot be used by virtual machines yet: the service only takes images from /DATA.') }}
 			</b-message>
 		</section>

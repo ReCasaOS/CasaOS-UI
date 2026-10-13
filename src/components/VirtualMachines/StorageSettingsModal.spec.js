@@ -27,6 +27,15 @@ describe('the settings of the virtual machines', () => {
 		expect(wrapper.text()).not.toContain(warning)
 	})
 
+	// the folder is unknown, and the service's own is under /DATA: nothing to warn of
+	it('say nothing while the folder is not known', () => {
+		open('')
+		expect(wrapper.text()).not.toContain(warning)
+		wrapper.unmount()
+		open(undefined)
+		expect(wrapper.text()).not.toContain(warning)
+	})
+
 	it('say that the images kept in a folder elsewhere cannot be used yet', () => {
 		open('/media/usb/VM')
 		expect(wrapper.text()).toContain(warning)
