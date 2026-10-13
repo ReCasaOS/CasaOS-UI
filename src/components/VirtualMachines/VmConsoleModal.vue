@@ -19,9 +19,9 @@
 				</b-button>
 			</template>
 			<b-button class="mr-1" icon-left="fullscreen" size="is-small" :title="$t('Full screen')" @click="fullscreen" />
-			<div class="close-button ml-2 is-clickable" @click="$emit('close')">
+			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa"></b-icon>
-			</div>
+			</button>
 		</header>
 
 		<div class="vm-console-screen">
@@ -280,8 +280,16 @@ export default {
 		color: white;
 	}
 
+	// a button, for the keyboard: nothing of a button's own shows
 	.close-button {
+		padding: 0;
+		border: 0;
 		color: #e8edf2;
+		background: none;
+
+		&:hover {
+			background-color: var(--casa-hover-tint);
+		}
 	}
 }
 

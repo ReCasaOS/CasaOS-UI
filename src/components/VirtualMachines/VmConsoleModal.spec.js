@@ -39,4 +39,19 @@ describe('the console of a virtual machine', () => {
 		expect(toasts[0].querySelector('img')).toBeNull()
 		expect(toasts[0].textContent).toContain(`cannot start ${HOSTILE}`)
 	})
+
+	// Escape belongs to the VM, so this is the keyboard's way out
+	it('closes from a button the keyboard can reach, and a name for it', async () => {
+		wrapper = mount(VmConsoleModal, {
+			attachTo: document.body,
+			props: { vm: aVm({ state: 'shut-off' }) },
+			global: { plugins: [Buefy, i18n], mocks: { $wsProtocol: 'ws:' } },
+		})
+		const close = wrapper.find('header button[aria-label="Close"]')
+		expect(close.exists()).toBe(true)
+		expect(close.element.tabIndex).toBe(0)
+
+		await close.trigger('click')
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
 })

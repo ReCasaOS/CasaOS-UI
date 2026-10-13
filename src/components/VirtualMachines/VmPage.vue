@@ -12,7 +12,9 @@
 			<span v-if="available" class="kvm-badge" :class="[host.kvm ? 'is-on' : 'is-off']">
 				QEMU / KVM {{ host.kvm ? $t('active') : $t('not available') }}
 			</span>
-			<b-icon class="close-button ml-2" icon="close-outline" pack="casa" @click="$emit('close')" />
+			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
+				<b-icon icon="close-outline" pack="casa" />
+			</button>
 		</header>
 
 		<section class="modal-card-body">
@@ -89,6 +91,7 @@ import VmCreateModal from './VmCreateModal.vue'
 import VmDeleteModal from './VmDeleteModal.vue'
 import StorageSettingsModal from './StorageSettingsModal.vue'
 import VmDetail from './VmDetail.vue'
+import { openWithEscape } from './modalStack'
 import { applyOrder, listAddress, stateDot, stateLabel } from './vms'
 
 const ORDER_KEY = 'vm_order'
@@ -212,12 +215,10 @@ export default {
 			this.$buefy.toast.open({ message: escape(e.response?.data?.message || e.message), type: 'is-danger', duration: 5000 })
 		},
 		create() {
-			this.$buefy.modal.open({
+			openWithEscape(this.$buefy, {
 				component: VmCreateModal,
 				hasModalCard: true,
 				trapFocus: true,
-				// it opens the picker and the download dialog: they take Escape, not this
-				canCancel: [],
 				props: { host: this.host },
 				events: {
 					created: (vm, importing) => {
@@ -240,12 +241,10 @@ export default {
 			})
 		},
 		openSettings() {
-			this.$buefy.modal.open({
+			openWithEscape(this.$buefy, {
 				component: StorageSettingsModal,
 				hasModalCard: true,
 				trapFocus: true,
-				// it opens the picker: that takes Escape, not this
-				canCancel: [],
 				props: { host: this.host },
 				events: {
 					saved: (folder) => {
@@ -366,6 +365,18 @@ export default {
 	.modal-card-body {
 		position: relative;
 		min-height: 16rem;
+	}
+
+	// the close control is a button, for the keyboard: nothing of a button's own
+	button.close-button {
+		padding: 0;
+		border: 0;
+		color: inherit;
+		background: none;
+
+		&:hover {
+			background-color: var(--casa-hover-tint);
+		}
 	}
 
 	.kvm-badge {

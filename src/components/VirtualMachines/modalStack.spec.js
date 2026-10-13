@@ -4,16 +4,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aVm } from './__fixtures__/vm'
 import { isOpen, openPage, pressEscape } from './__fixtures__/page'
 import vmApi from './api'
+import { openWithEscape } from './modalStack'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({
-	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder'].map(name => [name, vi.fn()])),
+	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder', 'consoleURL'].map(name => [name, vi.fn()])),
 }))
+// the console of a running VM connects as soon as it opens
+vi.mock('@novnc/novnc', () => ({ default: class { addEventListener() {} disconnect() {} focus() {} } }))
 
 // Buefy has no stack of modals: every one that is open and lets Escape cancel it
 // hears the key, so one press closed the picker, the form under it and the page
-// under that. Escape belongs to the one on top: the modals that open others do
-// not take it, the ones that open nothing do.
+// under that. Escape belongs to the one on top, whichever it is: the page, the
+// forms and the settings take it only while nothing is open above them.
 describe('escape in the modals of the virtual machine page', () => {
 	beforeEach(() => {
 		document.body.innerHTML = ''
@@ -95,15 +98,77 @@ describe('escape in the modals of the virtual machine page', () => {
 		expect(vmApi.action).not.toHaveBeenCalled()
 	})
 
-	it('leaves the page and the forms to their own buttons', async () => {
+	it('closes the page when it is alone', async () => {
+		await openPage()
+		await press()
+		expect(isOpen('.vm-page')).toBe(false)
+	})
+
+	it('closes the create form, and not the page under it', async () => {
 		await openPage()
 		await click('[title="New virtual machine"]')
 		await press()
-		expect(stillOpen('.vm-create', '.vm-page')).toEqual([['.vm-create', true], ['.vm-page', true]])
+		expect(stillOpen('.vm-create', '.vm-page')).toEqual([['.vm-create', false], ['.vm-page', true]])
+	})
 
-		await click('.vm-create button', 'Cancel')
-		expect(isOpen('.vm-create')).toBe(false)
+	it('closes the settings, and not the page under them', async () => {
+		await openPage()
+		await click('[title="Virtual machine settings"]')
 		await press()
-		expect(isOpen('.vm-page')).toBe(true)
+		expect(stillOpen('.vm-storage-settings', '.vm-page')).toEqual([['.vm-storage-settings', false], ['.vm-page', true]])
+	})
+
+	it('closes one dialog per press, from the picker down to the page', async () => {
+		await openPage()
+		await click('[title="New virtual machine"]')
+		await click('.vm-create button', 'Browse…')
+		const open = () => stillOpen('.vm-path-picker', '.vm-create', '.vm-page').map(([, shown]) => shown)
+
+		expect(open()).toEqual([true, true, true])
+		await press()
+		expect(open()).toEqual([false, true, true])
+		await press()
+		expect(open()).toEqual([false, false, true])
+		await press()
+		expect(open()).toEqual([false, false, false])
+	})
+
+	it('leaves the page alone while the console, which keeps Escape for the VM, is open over it', async () => {
+		await openPage()
+		await click('.vm-detail button', 'Console')
+		expect(isOpen('.vm-console')).toBe(true)
+
+		await press()
+		expect(stillOpen('.vm-console', '.vm-page')).toEqual([['.vm-console', true], ['.vm-page', true]])
+	})
+
+	it('still closes the forms from their own buttons, and the page from its own', async () => {
+		await openPage()
+		await click('[title="New virtual machine"]')
+		await click('.vm-create button', 'Cancel')
+		expect(stillOpen('.vm-create', '.vm-page')).toEqual([['.vm-create', false], ['.vm-page', true]])
+
+		await click('.vm-page header button[aria-label="Close"]')
+		expect(isOpen('.vm-page')).toBe(false)
+	})
+
+	it('has a close button the keyboard can reach, and a name for it', async () => {
+		await openPage()
+		const close = document.querySelector('.vm-page header button[aria-label="Close"]')
+		expect(close).not.toBeNull()
+		expect(close.tabIndex).toBe(0)
+	})
+
+	it('lets go of the key once the modal is closed', () => {
+		const add = vi.spyOn(document, 'addEventListener')
+		const remove = vi.spyOn(document, 'removeEventListener')
+		const modal = openWithEscape({ modal: { open: given => ({ close: () => given.onClose() }) } }, {})
+
+		const [, onKey] = add.mock.calls.find(([type]) => type === 'keyup')
+		expect(remove).not.toHaveBeenCalledWith('keyup', onKey)
+		modal.close()
+		expect(remove).toHaveBeenCalledWith('keyup', onKey)
+		add.mockRestore()
+		remove.mockRestore()
 	})
 })
