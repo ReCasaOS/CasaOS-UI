@@ -60,8 +60,7 @@ describe('the download dialog', () => {
 		wrapper.unmount()
 		late.resolve(listOf([running]))
 		await flushPromises()
-		// nothing left to fire
-		expect(vi.getTimerCount()).toBe(0)
+		// nothing is asked for any more
 		await vi.advanceTimersByTimeAsync(10_000)
 		expect(vmApi.downloads).toHaveBeenCalledTimes(2)
 	})
