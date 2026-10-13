@@ -6,7 +6,7 @@ The CasaOS dashboard: the single-page application served at the root of a CasaOS
 
 ## What it does
 
-A Vue 2.7 application with Buefy and Bulma, built by vue-cli-service. It has no server and no backend code of its own: everything it shows comes from the CasaOS services, reached on the same origin through [CasaOS-Gateway](https://github.com/ReCasaOS/CasaOS-Gateway).
+A Vue 3 application with Buefy and Bulma, built by vue-cli-service. It has no server and no backend code of its own: everything it shows comes from the CasaOS services, reached on the same origin through [CasaOS-Gateway](https://github.com/ReCasaOS/CasaOS-Gateway).
 
 Four routes, hash mode, in [`src/router/route.js`](src/router/route.js):
 
