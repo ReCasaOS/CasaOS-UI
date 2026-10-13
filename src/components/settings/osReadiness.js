@@ -32,14 +32,16 @@ function text(value, max = 300) {
  * 300 MiB or 1.5 GiB, written for a language ("1,5 Gio" in French), or '' for anything that
  * is not a size. `locale` is an Intl tag or a language-file name such as fr_fr.
  */
-export function formatSize(bytes, locale = 'en') {
+export function formatSize(bytes, locale = 'en', up = false) {
 	if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0)
 		return ''
 	const french = /^fr/i.test(String(locale))
 	const [mib, gib] = french ? ['Mio', 'Gio'] : ['MiB', 'GiB']
 	// Cut down to what is shown, never rounded up: "only 2 GiB free, and at least 2 GiB is needed" is what
 	// a refusal on 2047 MiB would say. (bytes * 10 and the division by a power of two are exact.)
-	const [value, unit] = bytes >= GIB ? [Math.floor(bytes * 10 / GIB) / 10, gib] : [Math.floor(bytes / MIB), mib]
+	// `up` is for a size that is needed: it is cut up to what is shown, so that what is lacking is never said as much as what is needed.
+	const cut = up ? Math.ceil : Math.floor
+	const [value, unit] = bytes >= GIB || (up && bytes > GIB - MIB) ? [cut(bytes * 10 / GIB) / 10, gib] : [cut(bytes / MIB), mib]
 	const options = { maximumFractionDigits: unit === gib ? 1 : 0 }
 	let number
 	try {
@@ -52,7 +54,7 @@ export function formatSize(bytes, locale = 'en') {
 }
 
 // 'YYYY-MM-DDTHH:MM:SSZ' written for a language, or '' for anything else.
-function formatMoment(iso, locale) {
+export function formatMoment(iso, locale) {
 	if (typeof iso !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(iso))
 		return ''
 	const moment = new Date(iso)

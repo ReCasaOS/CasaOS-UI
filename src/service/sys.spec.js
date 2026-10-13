@@ -120,4 +120,32 @@ describe('operating system client', () => {
 		expect(sent().data).toBeUndefined()
 		expect(sent().timeout).toBe(30000)
 	})
+
+	// The plan: its own routes, and the token in the header (the instance puts it there), never in the address.
+	it('starts the plan from its own route, sends nothing, waits 15 seconds, and puts nothing in the address', async () => {
+		await sys.startOsPlan()
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/plan')
+		expect(sent().data).toBeUndefined()
+		expect(sent().timeout).toBe(15000)
+		expect(sent().params).toBeUndefined()
+	})
+
+	it('asks how the plan is going from the same route, and sends nothing', async () => {
+		await sys.getOsPlan()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/plan')
+		expect(sent().data).toBeUndefined()
+		expect(sent().params).toBeUndefined()
+		expect(sent().timeout).toBe(30000)
+	})
+
+	it('asks for the runbook from its own route, and sends nothing', async () => {
+		await sys.getOsRunbook()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/runbook')
+		expect(sent().data).toBeUndefined()
+		expect(sent().params).toBeUndefined()
+		expect(sent().timeout).toBe(15000)
+	})
 })

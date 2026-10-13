@@ -1,0 +1,5314 @@
+{
+  "downgrade": {
+    "plan_id": "p1-8cefb2a141960f34ab1ab8a166e59334",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "downgrade",
+        "severity": "blocked",
+        "data": {
+          "names": [
+            "docker-ce"
+          ]
+        }
+      },
+      {
+        "code": "disk_short",
+        "severity": "blocked",
+        "data": {
+          "need": 536870912,
+          "path": "/",
+          "unknown": true
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 724,
+      "extra_bytes": 0
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 536871709,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1073741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 0,
+        "ok": false,
+        "unknown": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "unlisted": {
+    "plan_id": "p1-c49643c8a099471b804008e777018dbe",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "dist_kept_back",
+        "severity": "blocked",
+        "data": {
+          "names": [],
+          "unlisted": 1
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 1
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 1
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": false
+    },
+    "disk": [],
+    "disk_note": "estimates_unknown",
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "silent": {
+    "plan_id": "p1-c49643c8a099471b804008e777018dbe",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "dist_kept_back",
+        "severity": "blocked",
+        "data": {
+          "names": [
+            "osp-k"
+          ]
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 1
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": false
+    },
+    "disk": [],
+    "disk_note": "estimates_unknown",
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "lowroom": {
+    "plan_id": "p1-754232068e207b5004f720e776075952",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "disk_short",
+        "severity": "blocked",
+        "data": {
+          "free": 1073741824,
+          "need": 1523741824,
+          "path": "/usr"
+        }
+      },
+      {
+        "code": "removal_manual",
+        "severity": "needs_acceptance",
+        "data": {
+          "name": "fuse",
+          "version": "2.9.9-5"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "fuse",
+        "version": "2.9.9-5",
+        "manual": true,
+        "protected": false,
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": false
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 690870912,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 1073741824,
+        "ok": false
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "protected": {
+    "plan_id": "p1-7eca55e75657c88d9583355d123d8121",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "removal_protected",
+        "severity": "blocked",
+        "data": {
+          "name": "docker-ce",
+          "pattern": "docker-ce"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "docker-ce",
+        "version": "5:28.0.4-1~debian.11~bullseye",
+        "manual": false,
+        "protected": true,
+        "pattern": "docker-ce",
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": false
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "essential": {
+    "plan_id": "p1-3ecff56e3171a00d01f7508fa864c46d",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "removal_essential",
+        "severity": "blocked",
+        "data": {
+          "name": "libsemanage1"
+        }
+      },
+      {
+        "code": "removal_manual",
+        "severity": "needs_acceptance",
+        "data": {
+          "name": "fuse",
+          "version": "2.9.9-5"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "fuse",
+        "version": "2.9.9-5",
+        "manual": true,
+        "protected": false,
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": true
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "docker_held": {
+    "plan_id": "p1-28d0f2b70aad661594d395205b0e3af4",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "needs_acceptance",
+    "problems": [
+      {
+        "code": "removal_manual",
+        "severity": "needs_acceptance",
+        "data": {
+          "name": "fuse",
+          "version": "2.9.9-5"
+        }
+      },
+      {
+        "code": "docker_held",
+        "severity": "info",
+        "data": {
+          "names": [
+            "containerd.io",
+            "docker-ce"
+          ]
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "fuse",
+        "version": "2.9.9-5",
+        "manual": true,
+        "protected": false,
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": false
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [
+      "containerd.io",
+      "curl",
+      "docker-ce"
+    ],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": [
+        "containerd.io",
+        "docker-ce"
+      ]
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "nothing": {
+    "plan_id": "p1-cd71fd99fa6d4930e8098692085e2f3b",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "ok",
+    "problems": [],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 0,
+      "extra_bytes": 0
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 536870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1073741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "nothing_tight": {
+    "plan_id": "p1-fb04864b1a4d734a4e216bfe823b61ee",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "blocked",
+    "problems": [
+      {
+        "code": "disk_short",
+        "severity": "blocked",
+        "data": {
+          "free": 419430400,
+          "need": 536870912,
+          "path": "/var/cache/apt/archives"
+        }
+      },
+      {
+        "code": "disk_short",
+        "severity": "blocked",
+        "data": {
+          "free": 943718400,
+          "need": 1073741824,
+          "path": "/usr"
+        }
+      },
+      {
+        "code": "disk_short",
+        "severity": "blocked",
+        "data": {
+          "free": 419430400,
+          "need": 536870912,
+          "path": "/"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 0,
+      "extra_bytes": 0
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 536870912,
+        "free": 419430400,
+        "ok": false
+      },
+      {
+        "path": "/usr",
+        "need": 1073741824,
+        "free": 943718400,
+        "ok": false
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 419430400,
+        "ok": false
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "nothing_one_unneeded": {
+    "plan_id": "p1-cd71fd99fa6d4930e8098692085e2f3b",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "ok",
+    "problems": [],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 0,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 0
+      }
+    },
+    "removals": [],
+    "new_packages": [],
+    "kept_back": [],
+    "autoremovable": [
+      "osp-b"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 0,
+      "extra_bytes": 0
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 536870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1073741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      }
+    ]
+  },
+  "conf_reasons": {
+    "plan_id": "p1-5787acb2f81006785a3076312615ae6c",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "needs_acceptance",
+    "problems": [
+      {
+        "code": "removal_manual",
+        "severity": "needs_acceptance",
+        "data": {
+          "name": "fuse",
+          "version": "2.9.9-5"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "fuse",
+        "version": "2.9.9-5",
+        "manual": true,
+        "protected": false,
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": false
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 541,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "01autoremove",
+        "reason": "not_simple"
+      },
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      },
+      {
+        "file": "20auto-upgrades",
+        "reason": "not_allowed_setting"
+      },
+      {
+        "file": "80link",
+        "reason": "not_regular"
+      },
+      {
+        "file": "96osp:gpgv",
+        "reason": "not_allowed_setting"
+      },
+      {
+        "file": "97big",
+        "reason": "too_large"
+      },
+      {
+        "file": "98osp-canary-detect",
+        "reason": "proxy_auto_detect"
+      },
+      {
+        "file": "98osp-canary-incl",
+        "reason": "has_directive"
+      }
+    ]
+  },
+  "conf_many": {
+    "plan_id": "p1-5787acb2f81006785a3076312615ae6c",
+    "hop": "debian-11-12",
+    "made_at": "2026-10-12T09:30:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "verdict": "needs_acceptance",
+    "problems": [
+      {
+        "code": "removal_manual",
+        "severity": "needs_acceptance",
+        "data": {
+          "name": "fuse",
+          "version": "2.9.9-5"
+        }
+      }
+    ],
+    "counts": {
+      "dist_upgrade": {
+        "upgraded": 384,
+        "new": 75,
+        "removed": 2,
+        "kept_back": 0
+      },
+      "upgrade": {
+        "upgraded": 274,
+        "new": 0,
+        "removed": 0,
+        "kept_back": 111
+      }
+    },
+    "removals": [
+      {
+        "name": "fuse",
+        "version": "2.9.9-5",
+        "manual": true,
+        "protected": false,
+        "essential": false
+      },
+      {
+        "name": "libsemanage1",
+        "version": "3.1-1+b2",
+        "manual": false,
+        "protected": false,
+        "essential": false
+      }
+    ],
+    "new_packages": [
+      "cron-daemon-common",
+      "dbus-bin",
+      "dbus-daemon",
+      "dbus-session-bus-common",
+      "dbus-system-bus-common",
+      "firmware-linux-free",
+      "fuse3",
+      "gcc-12-base",
+      "libbpf1",
+      "libcbor0.8",
+      "libduktape207",
+      "libffi8",
+      "libfile-find-rule-perl",
+      "libfmt9",
+      "libfuse3-3",
+      "libicu72",
+      "libiscsi7",
+      "libjemalloc2",
+      "libldap-2.5-0",
+      "libldap-common",
+      "libnfs13",
+      "libntfs-3g89",
+      "libnuma1",
+      "libnumber-compare-perl",
+      "libperl5.36",
+      "libproc2-0",
+      "libpython3.11",
+      "libpython3.11-minimal",
+      "libpython3.11-stdlib",
+      "librbd1",
+      "libsemanage2",
+      "libsepol2",
+      "libsodium23",
+      "libssh-4",
+      "libssl3",
+      "libsystemd-shared",
+      "libtext-glob-perl",
+      "liburing2",
+      "linux-image-6.1.0-53-cloud-amd64",
+      "perl-modules-5.36",
+      "pkexec",
+      "polkitd",
+      "polkitd-pkla",
+      "python-babel-localedata",
+      "python3-anyio",
+      "python3-babel",
+      "python3-charset-normalizer",
+      "python3-click",
+      "python3-colorama",
+      "python3-h11",
+      "python3-h2",
+      "python3-hpack",
+      "python3-httpcore",
+      "python3-httpx",
+      "python3-hyperframe",
+      "python3-markdown-it",
+      "python3-mdurl",
+      "python3-netifaces",
+      "python3-rfc3986",
+      "python3-rfc3987",
+      "python3-rich",
+      "python3-serial",
+      "python3-sniffio",
+      "python3-tz",
+      "python3-uritemplate",
+      "python3-webcolors",
+      "python3.11",
+      "python3.11-minimal",
+      "qemu-block-extra",
+      "samba-ad-provision",
+      "sgml-base",
+      "usrmerge",
+      "util-linux-extra",
+      "xml-core",
+      "zstd"
+    ],
+    "kept_back": [],
+    "autoremovable": [
+      "libbpf0",
+      "libcbor0",
+      "libdns-export1110",
+      "libicu67",
+      "libisc-export1105",
+      "libldap-2.4-2",
+      "libmpdec3",
+      "libntfs-3g883",
+      "libperl5.32",
+      "libprocps8",
+      "libpython3.9",
+      "libpython3.9-minimal",
+      "libpython3.9-stdlib",
+      "liburing1",
+      "net-tools",
+      "perl-modules-5.32",
+      "python3.9",
+      "python3.9-minimal"
+    ],
+    "sources": {
+      "files": [
+        {
+          "file": "sources.list",
+          "action": "rewritten",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb http://deb.debian.org/debian bullseye main",
+              "after": "deb http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 2,
+              "before": "deb-src http://deb.debian.org/debian bullseye main",
+              "after": "deb-src http://deb.debian.org/debian bookworm main",
+              "why": "suite"
+            },
+            {
+              "n": 3,
+              "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 4,
+              "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+              "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+              "why": "suite,host"
+            },
+            {
+              "n": 5,
+              "before": "deb http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            },
+            {
+              "n": 6,
+              "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+              "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+              "why": "suite"
+            }
+          ]
+        },
+        {
+          "file": "docker.list",
+          "action": "paused",
+          "lines": [
+            {
+              "n": 1,
+              "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+              "after": "",
+              "why": "paused"
+            }
+          ]
+        }
+      ],
+      "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+      "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+      "dropped_backports": 0,
+      "firmware_added": 0
+    },
+    "paused": [
+      {
+        "file": "docker.list",
+        "hosts": [
+          "https://download.docker.com"
+        ],
+        "docker": true
+      }
+    ],
+    "holds": [],
+    "docker": {
+      "present": true,
+      "source_paused": true,
+      "packages_held": []
+    },
+    "estimates": {
+      "known": true,
+      "download_bytes": 140000000,
+      "extra_bytes": 300000000
+    },
+    "disk": [
+      {
+        "path": "/var/cache/apt/archives",
+        "need": 690870912,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/usr",
+        "need": 1523741824,
+        "free": 8589934592,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "need": 536870912,
+        "free": 21474836480,
+        "ok": true
+      }
+    ],
+    "sandbox": {
+      "bytes": 487,
+      "seconds_by_phase": {
+        "dist-upgrade": 0,
+        "estimate": 0,
+        "parse": 0,
+        "sources": 0,
+        "update": 0,
+        "upgrade": 0
+      }
+    },
+    "apt_conf_left_out": [
+      {
+        "file": "01autoremove",
+        "reason": "not_simple"
+      },
+      {
+        "file": "15update-stamp",
+        "reason": "not_simple"
+      },
+      {
+        "file": "20auto-upgrades",
+        "reason": "not_allowed_setting"
+      },
+      {
+        "file": "50many000",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many001",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many002",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many003",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many004",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many005",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many006",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many007",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many008",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many009",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many010",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many011",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many012",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many013",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many014",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many015",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many016",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many017",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many018",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many019",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many020",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many021",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many022",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many023",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many024",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many025",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many026",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many027",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many028",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many029",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many030",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many031",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many032",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many033",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many034",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many035",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many036",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many037",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many038",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many039",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many040",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many041",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many042",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many043",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many044",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many045",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many046",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many047",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many048",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many049",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many050",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many051",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many052",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many053",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many054",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many055",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many056",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many057",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many058",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many059",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many060",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many061",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many062",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many063",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many064",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many065",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many066",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many067",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many068",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many069",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many070",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many071",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many072",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many073",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many074",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many075",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many076",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many077",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many078",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many079",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many080",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many081",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many082",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many083",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many084",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many085",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many086",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many087",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many088",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many089",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many090",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many091",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many092",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many093",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many094",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many095",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many096",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many097",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many098",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many099",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many100",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many101",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many102",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many103",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many104",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many105",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many106",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many107",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many108",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many109",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many110",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many111",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many112",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many113",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many114",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many115",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many116",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many117",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many118",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many119",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many120",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many121",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many122",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many123",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many124",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many125",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many126",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many127",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many128",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many129",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many130",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many131",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many132",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many133",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many134",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many135",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many136",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many137",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many138",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many139",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many140",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many141",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many142",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many143",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many144",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many145",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many146",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many147",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many148",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many149",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many150",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many151",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many152",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many153",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many154",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many155",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many156",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many157",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many158",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many159",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many160",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many161",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many162",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many163",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many164",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many165",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many166",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many167",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many168",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many169",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many170",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many171",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many172",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many173",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many174",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many175",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many176",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many177",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many178",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many179",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many180",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many181",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many182",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many183",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many184",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many185",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many186",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many187",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many188",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many189",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many190",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many191",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many192",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many193",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many194",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many195",
+        "reason": "not_simple"
+      },
+      {
+        "file": "50many196",
+        "reason": "not_simple"
+      }
+    ],
+    "apt_conf_left_out_truncated": true
+  },
+  "status_unknown": {
+    "plannable": false,
+    "unknown": true,
+    "state": "idle"
+  },
+  "status_idle": {
+    "plannable": true,
+    "state": "idle"
+  },
+  "status_not_root": {
+    "plannable": false,
+    "reason": "not_root",
+    "state": "idle"
+  },
+  "status_hop_not_planned": {
+    "plannable": false,
+    "reason": "hop_not_planned",
+    "state": "idle"
+  },
+  "status_identity_unsupported": {
+    "plannable": false,
+    "reason": "identity_unsupported",
+    "state": "idle"
+  },
+  "status_running": {
+    "plannable": true,
+    "state": "running",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z"
+  },
+  "status_done": {
+    "plannable": true,
+    "state": "done",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "plan": {
+      "plan_id": "p1-5787acb2f81006785a3076312615ae6c",
+      "hop": "debian-11-12",
+      "made_at": "2026-10-12T09:30:00Z",
+      "expires_at": "2026-10-13T09:30:00Z",
+      "verdict": "needs_acceptance",
+      "problems": [
+        {
+          "code": "removal_manual",
+          "severity": "needs_acceptance",
+          "data": {
+            "name": "fuse",
+            "version": "2.9.9-5"
+          }
+        }
+      ],
+      "counts": {
+        "dist_upgrade": {
+          "upgraded": 384,
+          "new": 75,
+          "removed": 2,
+          "kept_back": 0
+        },
+        "upgrade": {
+          "upgraded": 274,
+          "new": 0,
+          "removed": 0,
+          "kept_back": 111
+        }
+      },
+      "removals": [
+        {
+          "name": "fuse",
+          "version": "2.9.9-5",
+          "manual": true,
+          "protected": false,
+          "essential": false
+        },
+        {
+          "name": "libsemanage1",
+          "version": "3.1-1+b2",
+          "manual": false,
+          "protected": false,
+          "essential": false
+        }
+      ],
+      "new_packages": [
+        "cron-daemon-common",
+        "dbus-bin",
+        "dbus-daemon",
+        "dbus-session-bus-common",
+        "dbus-system-bus-common",
+        "firmware-linux-free",
+        "fuse3",
+        "gcc-12-base",
+        "libbpf1",
+        "libcbor0.8",
+        "libduktape207",
+        "libffi8",
+        "libfile-find-rule-perl",
+        "libfmt9",
+        "libfuse3-3",
+        "libicu72",
+        "libiscsi7",
+        "libjemalloc2",
+        "libldap-2.5-0",
+        "libldap-common",
+        "libnfs13",
+        "libntfs-3g89",
+        "libnuma1",
+        "libnumber-compare-perl",
+        "libperl5.36",
+        "libproc2-0",
+        "libpython3.11",
+        "libpython3.11-minimal",
+        "libpython3.11-stdlib",
+        "librbd1",
+        "libsemanage2",
+        "libsepol2",
+        "libsodium23",
+        "libssh-4",
+        "libssl3",
+        "libsystemd-shared",
+        "libtext-glob-perl",
+        "liburing2",
+        "linux-image-6.1.0-53-cloud-amd64",
+        "perl-modules-5.36",
+        "pkexec",
+        "polkitd",
+        "polkitd-pkla",
+        "python-babel-localedata",
+        "python3-anyio",
+        "python3-babel",
+        "python3-charset-normalizer",
+        "python3-click",
+        "python3-colorama",
+        "python3-h11",
+        "python3-h2",
+        "python3-hpack",
+        "python3-httpcore",
+        "python3-httpx",
+        "python3-hyperframe",
+        "python3-markdown-it",
+        "python3-mdurl",
+        "python3-netifaces",
+        "python3-rfc3986",
+        "python3-rfc3987",
+        "python3-rich",
+        "python3-serial",
+        "python3-sniffio",
+        "python3-tz",
+        "python3-uritemplate",
+        "python3-webcolors",
+        "python3.11",
+        "python3.11-minimal",
+        "qemu-block-extra",
+        "samba-ad-provision",
+        "sgml-base",
+        "usrmerge",
+        "util-linux-extra",
+        "xml-core",
+        "zstd"
+      ],
+      "kept_back": [],
+      "autoremovable": [
+        "libbpf0",
+        "libcbor0",
+        "libdns-export1110",
+        "libicu67",
+        "libisc-export1105",
+        "libldap-2.4-2",
+        "libmpdec3",
+        "libntfs-3g883",
+        "libperl5.32",
+        "libprocps8",
+        "libpython3.9",
+        "libpython3.9-minimal",
+        "libpython3.9-stdlib",
+        "liburing1",
+        "net-tools",
+        "perl-modules-5.32",
+        "python3.9",
+        "python3.9-minimal"
+      ],
+      "sources": {
+        "files": [
+          {
+            "file": "sources.list",
+            "action": "rewritten",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb http://deb.debian.org/debian bullseye main",
+                "after": "deb http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 2,
+                "before": "deb-src http://deb.debian.org/debian bullseye main",
+                "after": "deb-src http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 3,
+                "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 4,
+                "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 5,
+                "before": "deb http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              },
+              {
+                "n": 6,
+                "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              }
+            ]
+          },
+          {
+            "file": "docker.list",
+            "action": "paused",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+                "after": "",
+                "why": "paused"
+              }
+            ]
+          }
+        ],
+        "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+        "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+        "dropped_backports": 0,
+        "firmware_added": 0
+      },
+      "paused": [
+        {
+          "file": "docker.list",
+          "hosts": [
+            "https://download.docker.com"
+          ],
+          "docker": true
+        }
+      ],
+      "holds": [],
+      "docker": {
+        "present": true,
+        "source_paused": true,
+        "packages_held": []
+      },
+      "estimates": {
+        "known": true,
+        "download_bytes": 140000000,
+        "extra_bytes": 300000000
+      },
+      "disk": [
+        {
+          "path": "/var/cache/apt/archives",
+          "need": 690870912,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/usr",
+          "need": 1523741824,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/",
+          "need": 536870912,
+          "free": 21474836480,
+          "ok": true
+        }
+      ],
+      "sandbox": {
+        "bytes": 541,
+        "seconds_by_phase": {
+          "dist-upgrade": 0,
+          "estimate": 0,
+          "parse": 0,
+          "sources": 0,
+          "update": 0,
+          "upgrade": 0
+        }
+      },
+      "apt_conf_left_out": [
+        {
+          "file": "15update-stamp",
+          "reason": "not_simple"
+        }
+      ]
+    }
+  },
+  "status_done_nothing": {
+    "plannable": true,
+    "state": "done",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "plan": {
+      "plan_id": "p1-cd71fd99fa6d4930e8098692085e2f3b",
+      "hop": "debian-11-12",
+      "made_at": "2026-10-12T09:30:00Z",
+      "expires_at": "2026-10-13T09:30:00Z",
+      "verdict": "ok",
+      "problems": [],
+      "counts": {
+        "dist_upgrade": {
+          "upgraded": 0,
+          "new": 0,
+          "removed": 0,
+          "kept_back": 0
+        },
+        "upgrade": {
+          "upgraded": 0,
+          "new": 0,
+          "removed": 0,
+          "kept_back": 0
+        }
+      },
+      "removals": [],
+      "new_packages": [],
+      "kept_back": [],
+      "autoremovable": [],
+      "sources": {
+        "files": [
+          {
+            "file": "sources.list",
+            "action": "rewritten",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb http://deb.debian.org/debian bullseye main",
+                "after": "deb http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 2,
+                "before": "deb-src http://deb.debian.org/debian bullseye main",
+                "after": "deb-src http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 3,
+                "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 4,
+                "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 5,
+                "before": "deb http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              },
+              {
+                "n": 6,
+                "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              }
+            ]
+          },
+          {
+            "file": "docker.list",
+            "action": "paused",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+                "after": "",
+                "why": "paused"
+              }
+            ]
+          }
+        ],
+        "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+        "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+        "dropped_backports": 0,
+        "firmware_added": 0
+      },
+      "paused": [
+        {
+          "file": "docker.list",
+          "hosts": [
+            "https://download.docker.com"
+          ],
+          "docker": true
+        }
+      ],
+      "holds": [],
+      "docker": {
+        "present": true,
+        "source_paused": true,
+        "packages_held": []
+      },
+      "estimates": {
+        "known": true,
+        "download_bytes": 0,
+        "extra_bytes": 0
+      },
+      "disk": [
+        {
+          "path": "/var/cache/apt/archives",
+          "need": 536870912,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/usr",
+          "need": 1073741824,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/",
+          "need": 536870912,
+          "free": 21474836480,
+          "ok": true
+        }
+      ],
+      "sandbox": {
+        "bytes": 541,
+        "seconds_by_phase": {
+          "dist-upgrade": 0,
+          "estimate": 0,
+          "parse": 0,
+          "sources": 0,
+          "update": 0,
+          "upgrade": 0
+        }
+      },
+      "apt_conf_left_out": [
+        {
+          "file": "15update-stamp",
+          "reason": "not_simple"
+        }
+      ]
+    }
+  },
+  "status_expired": {
+    "plannable": true,
+    "state": "idle",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "expired": true
+  },
+  "status_failed_left_behind": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "timeout",
+      "phase": "update",
+      "detail": "the plan took too long"
+    },
+    "sandbox_left_behind": "/var/tmp/casaos-os-plan.Qm4x7K"
+  },
+  "status_done_left_behind": {
+    "plannable": true,
+    "state": "done",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "expires_at": "2026-10-13T09:30:00Z",
+    "sandbox_left_behind": "/var/tmp/casaos-os-plan.Qm4x7K",
+    "plan": {
+      "plan_id": "p1-8cefb2a141960f34ab1ab8a166e59334",
+      "hop": "debian-11-12",
+      "made_at": "2026-10-12T09:30:00Z",
+      "expires_at": "2026-10-13T09:30:00Z",
+      "verdict": "blocked",
+      "problems": [
+        {
+          "code": "downgrade",
+          "severity": "blocked",
+          "data": {
+            "names": [
+              "docker-ce"
+            ]
+          }
+        },
+        {
+          "code": "disk_short",
+          "severity": "blocked",
+          "data": {
+            "need": 536870912,
+            "path": "/",
+            "unknown": true
+          }
+        }
+      ],
+      "counts": {
+        "dist_upgrade": {
+          "upgraded": 0,
+          "new": 0,
+          "removed": 0,
+          "kept_back": 0
+        },
+        "upgrade": {
+          "upgraded": 0,
+          "new": 0,
+          "removed": 0,
+          "kept_back": 0
+        }
+      },
+      "removals": [],
+      "new_packages": [],
+      "kept_back": [],
+      "autoremovable": [],
+      "sources": {
+        "files": [
+          {
+            "file": "sources.list",
+            "action": "rewritten",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb http://deb.debian.org/debian bullseye main",
+                "after": "deb http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 2,
+                "before": "deb-src http://deb.debian.org/debian bullseye main",
+                "after": "deb-src http://deb.debian.org/debian bookworm main",
+                "why": "suite"
+              },
+              {
+                "n": 3,
+                "before": "deb http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 4,
+                "before": "deb-src http://archive.debian.org/debian-security bullseye-security main",
+                "after": "deb-src http://deb.debian.org/debian-security bookworm-security main",
+                "why": "suite,host"
+              },
+              {
+                "n": 5,
+                "before": "deb http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              },
+              {
+                "n": 6,
+                "before": "deb-src http://deb.debian.org/debian bullseye-updates main",
+                "after": "deb-src http://deb.debian.org/debian bookworm-updates main",
+                "why": "suite"
+              }
+            ]
+          },
+          {
+            "file": "docker.list",
+            "action": "paused",
+            "lines": [
+              {
+                "n": 1,
+                "before": "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bullseye stable",
+                "after": "",
+                "why": "paused"
+              }
+            ]
+          }
+        ],
+        "hash_current": "35d17f59fd0705980471e5e52dcf6f54e2292d8b14e245051b88f45539ebcb8a",
+        "hash_generated": "b5112f83e29b14e258b0c60275b06ec2c6212a7c0fab519289ac9ba3f2624d0a",
+        "dropped_backports": 0,
+        "firmware_added": 0
+      },
+      "paused": [
+        {
+          "file": "docker.list",
+          "hosts": [
+            "https://download.docker.com"
+          ],
+          "docker": true
+        }
+      ],
+      "holds": [],
+      "docker": {
+        "present": true,
+        "source_paused": true,
+        "packages_held": []
+      },
+      "estimates": {
+        "known": true,
+        "download_bytes": 724,
+        "extra_bytes": 0
+      },
+      "disk": [
+        {
+          "path": "/var/cache/apt/archives",
+          "need": 536871709,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/usr",
+          "need": 1073741824,
+          "free": 8589934592,
+          "ok": true
+        },
+        {
+          "path": "/",
+          "need": 536870912,
+          "free": 0,
+          "ok": false,
+          "unknown": true
+        }
+      ],
+      "sandbox": {
+        "bytes": 541,
+        "seconds_by_phase": {
+          "dist-upgrade": 0,
+          "estimate": 0,
+          "parse": 0,
+          "sources": 0,
+          "update": 0,
+          "upgrade": 0
+        }
+      },
+      "apt_conf_left_out": [
+        {
+          "file": "15update-stamp",
+          "reason": "not_simple"
+        }
+      ]
+    }
+  },
+  "status_failed_update": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:1 http://deb.debian.org bookworm InRelease\nCould not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Failed to fetch http://deb.debian.org  Could not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Some index files failed to download. They have been ignored, or old ones used instead.",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "01autoremove",
+            "reason": "not_simple"
+          },
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          },
+          {
+            "file": "20auto-upgrades",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "80link",
+            "reason": "not_regular"
+          },
+          {
+            "file": "96osp:gpgv",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "97big",
+            "reason": "too_large"
+          },
+          {
+            "file": "98osp-canary-detect",
+            "reason": "proxy_auto_detect"
+          },
+          {
+            "file": "98osp-canary-incl",
+            "reason": "has_directive"
+          }
+        ],
+        "exit": 100,
+        "kind": "network"
+      }
+    }
+  },
+  "status_failed_update_many": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:1 http://deb.debian.org bookworm InRelease\nCould not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Failed to fetch http://deb.debian.org  Could not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Some index files failed to download. They have been ignored, or old ones used instead.",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "01autoremove",
+            "reason": "not_simple"
+          },
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          },
+          {
+            "file": "20auto-upgrades",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "50many000",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many001",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many002",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many003",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many004",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many005",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many006",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many007",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many008",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many009",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many010",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many011",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many012",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many013",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many014",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many015",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many016",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many017",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many018",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many019",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many020",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many021",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many022",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many023",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many024",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many025",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many026",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many027",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many028",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many029",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many030",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many031",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many032",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many033",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many034",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many035",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many036",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many037",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many038",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many039",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many040",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many041",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many042",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many043",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many044",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many045",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many046",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many047",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many048",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many049",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many050",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many051",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many052",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many053",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many054",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many055",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many056",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many057",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many058",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many059",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many060",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many061",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many062",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many063",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many064",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many065",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many066",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many067",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many068",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many069",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many070",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many071",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many072",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many073",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many074",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many075",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many076",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many077",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many078",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many079",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many080",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many081",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many082",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many083",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many084",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many085",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many086",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many087",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many088",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many089",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many090",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many091",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many092",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many093",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many094",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many095",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many096",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many097",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many098",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many099",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many100",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many101",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many102",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many103",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many104",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many105",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many106",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many107",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many108",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many109",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many110",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many111",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many112",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many113",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many114",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many115",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many116",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many117",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many118",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many119",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many120",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many121",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many122",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many123",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many124",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many125",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many126",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many127",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many128",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many129",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many130",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many131",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many132",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many133",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many134",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many135",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many136",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many137",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many138",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many139",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many140",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many141",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many142",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many143",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many144",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many145",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many146",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many147",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many148",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many149",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many150",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many151",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many152",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many153",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many154",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many155",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many156",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many157",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many158",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many159",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many160",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many161",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many162",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many163",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many164",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many165",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many166",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many167",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many168",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many169",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many170",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many171",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many172",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many173",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many174",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many175",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many176",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many177",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many178",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many179",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many180",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many181",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many182",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many183",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many184",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many185",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many186",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many187",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many188",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many189",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many190",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many191",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many192",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many193",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many194",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many195",
+            "reason": "not_simple"
+          },
+          {
+            "file": "50many196",
+            "reason": "not_simple"
+          }
+        ],
+        "apt_conf_left_out_truncated": true,
+        "exit": 100,
+        "kind": "network"
+      }
+    }
+  },
+  "status_failed_update_clean": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:1 http://deb.debian.org bookworm InRelease\nCould not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Failed to fetch http://deb.debian.org  Could not connect to 127.0.0.1:9 (127.0.0.1). - connect (111: Connection refused)\nE: Some index files failed to download. They have been ignored, or old ones used instead.",
+      "data": {
+        "exit": 100,
+        "kind": "network"
+      }
+    }
+  },
+  "status_failed_solver": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "upgrade",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_solver_failed",
+      "phase": "upgrade",
+      "detail": "E: Unable to correct problems, you have held broken packages.",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "01autoremove",
+            "reason": "not_simple"
+          },
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          },
+          {
+            "file": "20auto-upgrades",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "80link",
+            "reason": "not_regular"
+          },
+          {
+            "file": "96osp:gpgv",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "97big",
+            "reason": "too_large"
+          },
+          {
+            "file": "98osp-canary-detect",
+            "reason": "proxy_auto_detect"
+          },
+          {
+            "file": "98osp-canary-incl",
+            "reason": "has_directive"
+          }
+        ],
+        "exit": 100
+      }
+    }
+  },
+  "status_failed_half_configured": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "parse",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "plan_unparsed",
+      "phase": "parse",
+      "detail": "a package is not fully installed or removed (apt says: 1 not fully installed or removed.): run dpkg --configure -a, then ask for the plan again",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "01autoremove",
+            "reason": "not_simple"
+          },
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          },
+          {
+            "file": "20auto-upgrades",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "80link",
+            "reason": "not_regular"
+          },
+          {
+            "file": "96osp:gpgv",
+            "reason": "not_allowed_setting"
+          },
+          {
+            "file": "97big",
+            "reason": "too_large"
+          },
+          {
+            "file": "98osp-canary-detect",
+            "reason": "proxy_auto_detect"
+          },
+          {
+            "file": "98osp-canary-incl",
+            "reason": "has_directive"
+          }
+        ],
+        "line": "1 not fully installed or removed.",
+        "reason": "not_fully_installed"
+      }
+    }
+  },
+  "status_failed_half_configured_clean": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "parse",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "plan_unparsed",
+      "phase": "parse",
+      "detail": "a package is not fully installed or removed (apt says: 1 not fully installed or removed.): run dpkg --configure -a, then ask for the plan again",
+      "data": {
+        "line": "1 not fully installed or removed.",
+        "reason": "not_fully_installed"
+      }
+    }
+  },
+  "status_failed_update_unreachable": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:3 http://192.0.2.1 bookworm/main amd64 Packages\nCannot initiate the connection to 192.0.2.1:80 (192.0.2.1). - connect (101: Network is unreachable)\nE: Failed to fetch http://192.0.2.1  Cannot initiate the connection to 192.0.2.1:80 (192.0.2.1). - connect (101: Network is unreachable)\nE: Some index files failed to download. They have been ignored, or old ones used instead.",
+      "data": {
+        "exit": 100,
+        "kind": "network"
+      }
+    }
+  },
+  "status_failed_update_no_pubkey": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:1 http://deb.debian.org bookworm InRelease\nThe following signatures couldn't be verified because the public key is not available: NO_PUBKEY 0E98404D386FA1D9\nW: GPG error: http://deb.debian.org bookworm InRelease: The following signatures couldn't be verified because the public key is not available: NO_PUBKEY 0E98404D386FA1D9\nE: The repository 'http://deb.debian.org bookworm InRelease' is not signed.",
+      "data": {
+        "exit": 100,
+        "kind": "no_pubkey"
+      }
+    }
+  },
+  "status_failed_update_not_found": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "Err:2 http://deb.debian.org bullseye-backports InRelease\n404  Not Found [IP: 151.101.2.132 80]\nE: The repository 'http://deb.debian.org bullseye-backports Release' does not have a Release file.",
+      "data": {
+        "exit": 100,
+        "kind": "not_found"
+      }
+    }
+  },
+  "status_failed_update_release_change": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "E: Repository 'http://deb.debian.org bookworm InRelease' changed its 'Version' value from '12.14' to '12.15'",
+      "data": {
+        "exit": 100,
+        "kind": "release_change"
+      }
+    }
+  },
+  "status_failed_update_other": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_update_failed",
+      "phase": "update",
+      "detail": "E: Could not open file /var/lib/apt/lists/partial/x - open (28: No space left on device)",
+      "data": {
+        "exit": 100,
+        "kind": "other"
+      }
+    }
+  },
+  "status_failed_solver_dist": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "dist-upgrade",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sandbox_solver_failed",
+      "phase": "dist-upgrade",
+      "detail": "E: Unable to correct problems, you have held broken packages.",
+      "data": {
+        "exit": 100
+      }
+    }
+  },
+  "status_failed_unparsed": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "parse",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "plan_unparsed",
+      "phase": "parse",
+      "detail": "apt's summary and its lists disagree: upgraded",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          }
+        ],
+        "reason": "summary_mismatch",
+        "section": "upgraded"
+      }
+    }
+  },
+  "status_failed_unparsed_removal": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "parse",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "plan_unparsed",
+      "phase": "parse",
+      "detail": "dpkg does not know a package that apt removes",
+      "data": {
+        "apt_conf_left_out": [
+          {
+            "file": "15update-stamp",
+            "reason": "not_simple"
+          }
+        ],
+        "name": "fuse",
+        "reason": "removal_unknown"
+      }
+    }
+  },
+  "status_failed_sources_format": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_format",
+      "phase": "sources",
+      "detail": "debian.sources: a .sources file (deb822) is not read by this plan",
+      "data": {
+        "file": "debian.sources",
+        "reason": "deb822"
+      }
+    }
+  },
+  "status_failed_sources_format_undecided": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_format",
+      "phase": "sources",
+      "detail": "sources.list line 2: whether this repository is the distribution's own cannot be known from the files apt keeps of it: run apt-get update first",
+      "data": {
+        "file": "sources.list",
+        "line": 2,
+        "reason": "undecided"
+      }
+    }
+  },
+  "status_failed_sources_alias": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_alias",
+      "phase": "sources",
+      "detail": "sources.list line 1: the suite is an alias that moves with the archive: name the release",
+      "data": {
+        "file": "sources.list",
+        "line": 1,
+        "reason": "alias"
+      }
+    }
+  },
+  "status_failed_sources_target": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_target",
+      "phase": "sources",
+      "detail": "sources.list line 1: the source is already at the target release or past it (if an earlier try of the upgrade by hand rewrote the sources, the folder of that plan in /var/backups, casaos-os-upgrade-<plan id>, has restore-sources.sh: run it with sh; when that folder has begun-upgrade the upgrade has begun and only goes forward)",
+      "data": {
+        "file": "sources.list",
+        "line": 1,
+        "reason": "target"
+      }
+    }
+  },
+  "status_failed_sources_mixed_file": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_mixed_file",
+      "phase": "sources",
+      "detail": "mix.list has repositories of the distribution and of others: it cannot be put aside as a file and rewritten as a file",
+      "data": {
+        "file": "mix.list"
+      }
+    }
+  },
+  "status_failed_sources_cdrom": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "sources_cdrom",
+      "phase": "sources",
+      "detail": "sources.list line 1: a disc or a local directory cannot be upgraded from",
+      "data": {
+        "file": "sources.list",
+        "line": 1,
+        "reason": "cdrom"
+      }
+    }
+  },
+  "status_failed_timeout_solver": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "dist-upgrade",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "timeout",
+      "phase": "dist-upgrade",
+      "detail": "the plan took too long"
+    }
+  },
+  "status_failed_internal": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "dist-upgrade",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "internal",
+      "phase": "dist-upgrade",
+      "detail": "an unexpected error"
+    }
+  },
+  "status_failed_canceled": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "update",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:00Z",
+    "error": {
+      "code": "canceled",
+      "phase": "update",
+      "detail": "the plan was canceled"
+    }
+  },
+  "refusal_not_root": {
+    "error_code": "not_root",
+    "error": "the core does not run as root"
+  },
+  "refusal_hop_not_planned": {
+    "error_code": "hop_not_planned",
+    "error": "no plan is made for this hop yet",
+    "data": {
+      "hop": "debian-12-13"
+    }
+  },
+  "refusal_identity_unsupported": {
+    "error_code": "identity_unsupported",
+    "error": "this machine is not one that a plan can be made for",
+    "data": {
+      "checks": [
+        "unsupported_os"
+      ],
+      "state": "unsupported"
+    }
+  },
+  "refusal_busy": {
+    "error_code": "busy",
+    "error": "another package manager is at work: unattended-upgrades is running"
+  },
+  "refusal_busy_unknown": {
+    "error_code": "busy",
+    "error": "whether another package manager is at work could not be seen",
+    "data": {
+      "unknown": true
+    }
+  },
+  "refusal_no_room": {
+    "error_code": "no_room",
+    "error": "there is not room for the sandbox in /var/tmp",
+    "data": {
+      "free": 670040064,
+      "need": 671088640,
+      "path": "/var/tmp"
+    }
+  },
+  "refusal_no_room_unknown": {
+    "error_code": "no_room",
+    "error": "there is not room for the sandbox in /var/tmp",
+    "data": {
+      "free": 0,
+      "need": 671088640,
+      "path": "/var/tmp",
+      "unknown": true
+    }
+  }
+}

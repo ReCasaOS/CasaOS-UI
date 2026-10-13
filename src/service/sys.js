@@ -145,6 +145,31 @@ const sys = {
 		return instance.get(`/v1${PREFIX}/os/readiness`, { timeout: 30000 })
 	},
 
+	// Starts the plan of the upgrade (what apt would do, with the machine unchanged): 202 with
+	// { state: 'running', phase } when a job began, 200 with already_running when one runs, 409 with
+	// data.error_code (not_root, hop_not_planned, identity_unsupported, busy, no_room) when none can.
+	// Sends nothing, and answers at once. The token goes in the Authorization header, which the
+	// instance sets. A core older than the feature answers 404.
+	startOsPlan() {
+		return instance.post(`/v1${PREFIX}/os/upgrade/plan`, undefined, { timeout: 15000 })
+	},
+
+	// How the plan is going, or how it went: { plannable, reason?, state: idle|running|done|failed,
+	// phase, started_at, finished_at, expires_at, expired?, error?: { code, phase, detail, data },
+	// plan? }. It runs no apt and answers in milliseconds, but asks who the machine is, which the core
+	// bounds at 30 seconds.
+	getOsPlan() {
+		return instance.get(`/v1${PREFIX}/os/upgrade/plan`, { timeout: 30000 })
+	},
+
+	// The text with which to do the hop by hand, written from the plan that is there:
+	// { plan_id, hop, text, blocks: [{ id, title, reboot, point_of_no_return }] }, or 409 with
+	// data.error_code no_plan (data.data.reason) or no_runbook. It holds the lines of the machine's
+	// package sources as the files have them, so the token goes in the Authorization header.
+	getOsRunbook() {
+		return instance.get(`/v1${PREFIX}/os/upgrade/runbook`, { timeout: 15000 })
+	},
+
 	// stop casaos
 	stopCasaOS() {
 		return api.post(`${PREFIX}/stop`)

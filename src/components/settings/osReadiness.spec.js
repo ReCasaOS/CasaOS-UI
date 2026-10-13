@@ -672,6 +672,21 @@ describe('the size', () => {
 	it.each([-1, Number.NaN, Infinity, '12', null, undefined, {}])('writes nothing for %j', (bytes) => {
 		expect(formatSize(bytes, 'en_us')).toBe('')
 	})
+
+	// a size that is needed is cut up to what is shown, so that what is lacking is never said as much as what is needed
+	it.each([
+		[2146435072, 'en_us', '2 GiB'],
+		[2147483649, 'en_us', '2.1 GiB'],
+		[2147483648, 'en_us', '2 GiB'],
+		[1073741823, 'en_us', '1 GiB'],
+		[1072693249, 'en_us', '1 GiB'],
+		[1048577, 'en_us', '2 MiB'],
+		[1048576, 'en_us', '1 MiB'],
+		[690870912, 'en_us', '659 MiB'],
+		[1610612737, 'fr_fr', '1,6 Gio'],
+	])('writes %d bytes needed in %s as "%s"', (bytes, locale, expected) => {
+		expect(formatSize(bytes, locale, true)).toBe(expected)
+	})
 })
 
 // What the final core (pkg/osreadiness/checks_*.go) really puts in `data`, code by code: a sample of each, as it
