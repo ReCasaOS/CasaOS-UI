@@ -550,7 +550,9 @@ export default {
 
 		// a block of the runbook, by the number the text of the runbook gives it: `Block 3: write the sources of Debian 12, ...`
 		blockTitle(block) {
-			return this.$t(DETAIL_FORMAT, { name: this.$t('Block {n}', { n: String(block.number) }), value: block.title })
+			// the core writes the titles in English: a language that has the sentence says it, the others keep the core's words
+			const title = this.$te(block.title) ? this.$t(block.title) : block.title
+			return this.$t(DETAIL_FORMAT, { name: this.$t('Block {n}', { n: String(block.number) }), value: title })
 		},
 
 		// One ask of the core: what it said, read, or null when it did not answer or said what cannot be read.

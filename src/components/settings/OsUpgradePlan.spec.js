@@ -1223,6 +1223,26 @@ describe('the same, in French', () => {
 		expect(text('.os-plan-place')).toBe('Fichier sources.list, ligne 1')
 	})
 
+	it('says the titles of the nine blocks of the runbook, and keeps the words of the core for a title it does not know', async () => {
+		getOsRunbook.mockReturnValueOnce(answer(runbook({ blocks: [...BLOCKS.slice(0, 8), { ...BLOCKS[8], title: 'a title of a later core' }] })))
+		await open(done(), { props: { locale: 'fr_fr' } })
+		await openRunbook()
+
+		const titles = texts('.os-plan-block')
+		expect(titles).toHaveLength(9)
+		expect(titles[0]).toContain('Bloc 0 : vérifier que c\'est bien la machine du plan, et qu\'elle est prête')
+		expect(titles[5]).toContain('LE POINT DE NON-RETOUR : la mise à niveau minimale, puis les paquets protégés')
+		expect(titles[8]).toContain('Bloc 8 : a title of a later core')
+	})
+
+	it('has a French sentence for each title that the core sends, and the English one beside it', () => {
+		for (const block of BLOCKS) {
+			expect(en[block.title], block.title).toBe(block.title)
+			expect(fr[block.title], block.title).toBeTruthy()
+			expect(fr[block.title], block.title).not.toBe(block.title)
+		}
+	})
+
 	it('says a box with nothing to do, with its zero sizes', async () => {
 		await open(done(core.nothing), { props: { locale: 'fr_fr' } })
 

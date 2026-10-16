@@ -1671,5 +1671,14 @@
   "Force off {name}?": "Force off {name}?",
   "Force reset {name}?": "Force reset {name}?",
   "The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.",
-  "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged."
+  "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.",
+  "check that this is the machine of the plan, and that it is ready": "check that this is the machine of the plan, and that it is ready",
+  "stop the timers of apt and unattended-upgrades": "stop the timers of apt and unattended-upgrades",
+  "write down the state of the machine": "write down the state of the machine",
+  "write the sources of Debian 12, and read the plan again": "write the sources of Debian 12, and read the plan again",
+  "download the packages of the minimal upgrade, while the applications run": "download the packages of the minimal upgrade, while the applications run",
+  "THE POINT OF NO RETURN: the minimal upgrade, then the protected packages": "THE POINT OF NO RETURN: the minimal upgrade, then the protected packages",
+  "the full upgrade, and until nothing is left to do": "the full upgrade, and until nothing is left to do",
+  "check that the machine will start, then restart it yourself": "check that the machine will start, then restart it yourself",
+  "after the restart: look at the machine, then put the sources and the timers back": "after the restart: look at the machine, then put the sources and the timers back"
 }
