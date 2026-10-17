@@ -75,6 +75,16 @@ function own(table, key) {
 
 const isPlain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const list = value => Array.isArray(value) ? value : []
+
+// The sentence of a table that depends on what the server offers: a key, or a list of { needs, key } of which the first whose `needs` are all
+// in `facts` is said. null when none is.
+function pick(options, facts) {
+	if (!Array.isArray(options))
+		return options ?? null
+	return options.find(option => list(option.needs).every(name => facts.has(name)))?.key ?? null
+}
+// Every key a sentence of a table can be.
+const keysOf = options => (Array.isArray(options) ? options.map(option => option.key) : [options]).filter(Boolean)
 const msg = (key, params = {}) => ({ key, params })
 
 // How much of a line is looked at for an address: scrub takes time that grows with the square of a text of this kind.
@@ -173,6 +183,7 @@ export const TEXT = {
 	lists: {
 		barrier: 'Before the restart',
 		barrierBlocked: 'The restart is not offered until this is mended.',
+		barrierPending: 'Checking the machine before the restart…',
 		findings: 'What the check found',
 		notJudged: 'Not judged, because the machine could not be asked',
 		notReturned: 'Containers that did not come back',
@@ -198,7 +209,7 @@ export const TEXT = {
 	},
 	word: {
 		label: 'The word that closes this run',
-		help: 'Closing a machine that is half upgraded or needs attention lets backups and automatic updates go on. Type this word to say you looked at it:',
+		help: 'Closing this run lets backups and automatic updates go on, although the machine is half upgraded or needs attention. Type this word to say you looked at it:',
 		input: 'Type the word here',
 	},
 	runbook: {
@@ -270,6 +281,10 @@ export const TEXT = {
 
 // What each state of the run says (the core's osrun.States), with the group it belongs to and the colour of the group. `what` is what it is
 // and `next` what the person does, in the words of the core's own documentation of the beta. The buttons are the server's.
+//
+// `what` and `next` are a key, or a list of options: the first whose `needs` are all there is said (a button the server offers, by its name,
+// or one of the flags `pnr` and `half_upgraded`), and the last has none. A sentence that sends the person to a button that is not there, or
+// speaks of a machine that is not in the state it describes, would be a false one.
 export const STATE_TABLE = {
 	idle: {
 		group: 'idle',
@@ -283,7 +298,10 @@ export const STATE_TABLE = {
 		tone: 'is-info',
 		title: 'Refreshing the current release',
 		what: 'The current release is being brought to its latest state. Nothing is removed.',
-		next: 'Wait, and do not run apt yourself. You can stop it until it begins to upgrade packages.',
+		next: [
+			{ needs: ['abort'], key: 'Wait, and do not run apt yourself. You can stop it until it begins to upgrade packages.' },
+			{ key: 'Wait, and do not run apt yourself.' },
+		],
 	},
 	reboot_first: {
 		group: 'waiting',
@@ -304,7 +322,10 @@ export const STATE_TABLE = {
 		tone: 'is-info',
 		title: 'Rehearsal running',
 		what: 'The half of the upgrade that can be undone is running: the checks, the notes of the machine and the download of the packages.',
-		next: 'Wait, and do not run apt or restart the machine. You can stop it.',
+		next: [
+			{ needs: ['abort'], key: 'Wait, and do not run apt or restart the machine. You can stop it.' },
+			{ key: 'Wait, and do not run apt or restart the machine.' },
+		],
 	},
 	rehearsed: {
 		group: 'waiting',
@@ -325,7 +346,10 @@ export const STATE_TABLE = {
 		tone: 'is-info',
 		title: 'Upgrade running',
 		what: 'The upgrade is running.',
-		next: 'Wait, and do not run apt or restart the machine. You can stop it until the point of no return.',
+		next: [
+			{ needs: ['abort'], key: 'Wait, and do not run apt or restart the machine. You can stop it until the point of no return.' },
+			{ key: 'Wait, and do not run apt or restart the machine.' },
+		],
 	},
 	unwinding: {
 		group: 'working',
@@ -346,7 +370,11 @@ export const STATE_TABLE = {
 		tone: 'is-warning',
 		title: 'Waiting for the restart',
 		what: 'Every step is done and the machine waits for its restart. ReCasaOS never restarts it by itself.',
-		next: 'Restart the machine when the checks are green, or take the run over to finish by hand.',
+		next: [
+			{ needs: ['reboot'], key: 'Restart the machine when you are ready, or take the run over to finish by hand. The checks before the restart do not look at the names of the network cards: write them down first (ip -br link).' },
+			{ needs: ['takeover'], key: 'The restart is not offered yet. Wait, or take the run over to finish by hand.' },
+			{ key: 'Wait.' },
+		],
 	},
 	rebooting: {
 		group: 'working',
@@ -360,7 +388,10 @@ export const STATE_TABLE = {
 		tone: 'is-danger',
 		title: 'The restart is late',
 		what: 'The restart was asked for more than 15 minutes ago and the machine has not come back.',
-		next: 'Look at the screen of the machine. You can ask for the restart again.',
+		next: [
+			{ needs: ['reboot'], key: 'Look at the screen of the machine. You can ask for the restart again.' },
+			{ key: 'Look at the screen of the machine.' },
+		],
 	},
 	resuming: {
 		group: 'working',
@@ -388,14 +419,20 @@ export const STATE_TABLE = {
 		tone: 'is-warning',
 		title: 'Upgrade done, with things to look at',
 		what: 'The operating system was upgraded, and the check found things for you to look at.',
-		next: 'Read what the check found. Once you have mended what you could, ask for the check again, then close this run.',
+		next: [
+			{ needs: ['resume'], key: 'Read what the check found. Once you have mended what you could, ask for the check again, then close this run.' },
+			{ key: 'Read what the check found, then close this run.' },
+		],
 	},
 	failed: {
 		group: 'stopped',
 		tone: 'is-danger',
 		title: 'The upgrade stopped',
 		what: 'A step stopped before the point of no return, and the machine was put back as it was.',
-		next: 'Read why below, then close this run or drop the plan.',
+		next: [
+			{ needs: ['discard'], key: 'Read why below, then close this run or drop the plan.' },
+			{ key: 'Read why below, then close this run.' },
+		],
 	},
 	interrupted: {
 		group: 'stopped',
@@ -409,14 +446,21 @@ export const STATE_TABLE = {
 		tone: 'is-danger',
 		title: 'The upgrade stopped half way',
 		what: 'A step stopped after the point of no return. The machine is half upgraded.',
-		next: 'Read why below. Go on if it can be gone on from, or take the run over.',
+		next: [
+			{ needs: ['resume', 'takeover'], key: 'Read why below. Go on if it can be gone on from, or take the run over.' },
+			{ needs: ['takeover'], key: 'Read why below, then take the run over or close this run.' },
+			{ key: 'Read why below, then close this run.' },
+		],
 	},
 	needs_attention: {
 		group: 'attention',
 		tone: 'is-danger',
 		title: 'The upgrade needs you',
 		what: 'What the upgrade is doing cannot be told.',
-		next: 'Look at the machine, then take the run over or close it with the word.',
+		next: [
+			{ needs: ['takeover'], key: 'Look at the machine, then take the run over or close it with the word.' },
+			{ key: 'Look at the machine, then close this run with the word.' },
+		],
 	},
 	manual: {
 		group: 'manual',
@@ -462,29 +506,49 @@ export const STATE_VARIANTS = {
 		group: 'stopped',
 		tone: 'is-danger',
 		title: 'The upgrade could not go on',
-		what: 'The next step could not be started, and the machine is half upgraded.',
-		next: 'Go on, or take the run over.',
+		what: [
+			{ needs: ['half_upgraded'], key: 'The next step could not be started, and the machine is half upgraded.' },
+			{ key: 'The next step could not be started.' },
+		],
+		next: [
+			{ needs: ['resume', 'takeover'], key: 'Go on, or take the run over.' },
+			{ needs: ['takeover'], key: 'Take the run over.' },
+			{ key: 'Look at the machine.' },
+		],
 	},
 	failed_verify: {
 		group: 'stopped',
 		tone: 'is-danger',
 		title: 'The check found something wrong',
 		what: 'The machine restarted, and the check afterwards found an error, or one of its steps stopped.',
-		next: 'Read what it found below. Ask for the check again once you have mended it, take the run over, or close this run.',
+		next: [
+			{ needs: ['resume'], key: 'Read what it found below. Ask for the check again once you have mended it, take the run over, or close this run.' },
+			{ needs: ['takeover'], key: 'Read what it found below, then take the run over or close this run.' },
+			{ key: 'Read why below, then close this run.' },
+		],
 	},
 	failed_half: {
 		group: 'stopped',
 		tone: 'is-danger',
 		title: 'The upgrade could not be finished by itself',
 		what: 'ReCasaOS tried to repair the upgrade by itself and could not. The machine is half upgraded.',
-		next: 'Go on, or take the run over.',
+		next: [
+			{ needs: ['resume', 'takeover'], key: 'Go on, or take the run over.' },
+			{ needs: ['takeover'], key: 'Take the run over.' },
+			{ key: 'Look at the machine.' },
+		],
 	},
 	interrupted_after: {
 		group: 'stopped',
 		tone: 'is-danger',
 		title: 'The upgrade was interrupted half way',
 		what: 'The upgrade stopped running without saying why, after the point of no return. The machine is half upgraded.',
-		next: 'Go on, take the run over, or close this run with the word.',
+		next: [
+			{ needs: ['resume', 'takeover'], key: 'Go on, take the run over, or close this run with the word.' },
+			{ needs: ['takeover'], key: 'Take the run over, or close this run with the word.' },
+			{ needs: ['acknowledge'], key: 'Close this run with the word.' },
+			{ key: 'Look at the machine.' },
+		],
 	},
 	needs_attention_systemd_silent: {
 		group: 'attention',
@@ -498,14 +562,20 @@ export const STATE_VARIANTS = {
 		tone: 'is-danger',
 		title: 'The machine was only partly put back',
 		what: 'Putting the machine back was only partly done. The folder of the backup is where it was.',
-		next: 'From a console, put back the sources and the timers with the commands below. Then take the run over or close this run with the word.',
+		next: [
+			{ needs: ['takeover'], key: 'From a console, put back the sources and the timers with the commands below. Then take the run over or close this run with the word.' },
+			{ key: 'From a console, put back the sources and the timers with the commands below. Then close this run with the word.' },
+		],
 	},
 	needs_attention_run_damaged: {
 		group: 'attention',
 		tone: 'is-danger',
 		title: 'The run cannot be read',
 		what: 'The log and the files of the run are not what ReCasaOS wrote, or the run cannot be placed. The sources of the next release may still be in place, with the timers stopped.',
-		next: 'Look at the machine first. Then take the run over, or close this run with the word.',
+		next: [
+			{ needs: ['takeover'], key: 'Look at the machine first. Then take the run over, or close this run with the word.' },
+			{ key: 'Look at the machine first. Then close this run with the word.' },
+		],
 	},
 }
 
@@ -555,111 +625,127 @@ function variantOf(raw) {
 
 // ---- why a run stopped --------------------------------------------------------------------------------------------------
 
-// The classes of a stop (osrun.Classes), and the reasons that stand in for a class when a failed run has none (osrun.Reason*): what it is,
-// and what the person does about it. The buttons are the server's: `resume` is there only for the classes that can be gone on from.
+// The classes of a stop (osrun.Classes), and the reasons that stand in for a class when a failed run has none (osrun.Reason*): what it is, and
+// what the person mends (`fix`). What they do after it depends on the buttons the server offers and not on the class: see `routeOf`. A reason
+// (`route: false`) is told by the state it comes with, and has no fix of its own.
 export const CLASS_TABLE = {
 	busy: {
 		what: 'Another package manager was running, or its lock was held.',
-		next: 'Wait until it ends, then go on.',
+		fix: 'Wait until the other package manager ends.',
 	},
 	network: {
 		what: 'A download or an update did not go through.',
-		next: 'Check the network and the name server of the machine, then go on.',
+		fix: 'Check the network and the name server of the machine.',
 	},
 	apt_failed: {
 		what: 'apt stopped with an error.',
-		next: 'Read the line below and the end of the output, then go on.',
+		fix: 'Read the line below and the end of the output.',
 	},
 	dpkg_broken: {
 		what: 'dpkg stopped with a package half done.',
-		next: 'Read the line below. Going on first mends what dpkg left half done.',
+		fix: 'Read the line below.',
 	},
 	unknown: {
 		what: 'The step stopped for a reason nobody foresaw.',
-		next: 'Read the line below and the end of the output, then go on or take the run over.',
+		fix: 'Read the line below and the end of the output.',
 	},
 	disk: {
 		what: 'There was not enough room on the disk.',
-		next: 'Make room, then go on.',
+		fix: 'Make room.',
 	},
 	plan: {
-		what: 'The machine no longer matches the plan.',
-		next: 'Take the run over: the plan can no longer be trusted.',
+		what: 'The machine no longer matches the plan, so the plan can no longer be trusted.',
+		fix: null,
 	},
 	guard: {
 		what: 'A safety check stopped the repair.',
-		next: 'Take the run over, and do not go on.',
+		fix: null,
 	},
 	converge: {
 		what: 'The repair could not bring the packages to a steady state.',
-		next: 'Take the run over.',
+		fix: null,
 	},
 	barrier_kernel: {
 		what: 'The kernel that will start next is not as it must be.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	barrier_initrd: {
 		what: 'The initramfs of the new kernel is missing or not as it must be.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	barrier_grub: {
 		what: 'The boot loader is not ready for the restart.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	barrier_sshd: {
 		what: 'The configuration of the ssh server does not pass its own test.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	barrier_resolver: {
 		what: 'The machine would start without a working name resolver.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	barrier_other: {
 		what: 'Something that stands before the restart is not as it must be.',
-		next: 'Mend what the line below says, then go on.',
+		fix: 'Mend what the line below says.',
 	},
 	identity: {
 		what: 'The machine is not the one that this step expects.',
-		next: 'Look at what the line below says, then go on.',
+		fix: 'Look at what the line below says.',
 	},
 	tools: {
 		what: 'A tool that this step needs is missing.',
-		next: 'Install it, then go on.',
+		fix: 'Install the tool that is missing.',
 	},
 	unit: {
 		what: 'The program that runs the steps did not behave as expected.',
-		next: 'Take the run over.',
+		fix: null,
 	},
 	integrity: {
 		what: 'The files of the run are not what ReCasaOS wrote.',
-		next: 'Take the run over.',
+		fix: null,
 	},
 	abort: {
 		what: 'You stopped the upgrade.',
-		next: 'Nothing more to do: close this run.',
+		fix: null,
 	},
 	// the reasons
 	start: {
 		what: 'This step could not be started.',
-		next: null,
+		fix: null,
+		route: false,
 	},
 	verify: {
 		what: 'The check after the restart did not pass.',
-		next: null,
+		fix: null,
+		route: false,
 	},
 	half: {
 		what: 'The repairs that ReCasaOS tries by itself did not succeed.',
-		next: null,
+		fix: null,
+		route: false,
 	},
 	interrupted_power: {
 		what: 'The machine lost power or restarted while the upgrade was working.',
-		next: null,
+		fix: null,
+		route: false,
 	},
 	interrupted_killed: {
 		what: 'The upgrade was stopped before it ended.',
-		next: null,
+		fix: null,
+		route: false,
 	},
 }
+// What the person does after a stop, from the buttons the server offers: going on only when `resume` is offered (a stop before the point of
+// no return was undone and has nothing to go on from), the run taken over when that is what is offered, else the run closed.
+export const ROUTES = {
+	goOn: 'Then go on.',
+	takeOver: 'Take the run over.',
+	retry: 'Close this run, then try again.',
+	close: 'Close this run.',
+}
+// A refresh whose download of the security updates of Debian 11 did not go through: the repository moved (seen for real on 2026-10-14).
+export const REFRESH_NETWORK_NOTE = 'If your package sources still name security.debian.org for Debian 11, change it to archive.debian.org/debian-security: the security updates of Debian 11 have moved there.'
 export const CLASS_UNKNOWN = 'The step stopped for a reason this page does not know: {code}.'
 
 // What a hint of the status says (HINT: the unit that runs and is quiet, a putting back that was partial), and what a failure's hint says.
@@ -800,6 +886,16 @@ export const BUTTONS = {
 			ok: 'Restart now',
 			danger: true,
 		},
+		// the restart that a refresh asks for brings back the same release, brought up to date
+		confirmRefresh: {
+			title: 'Restart the machine now?',
+			body: [
+				'The machine restarts and comes back on the same release, with the packages that were just brought up to date: nothing is upgraded to a new release. It is away for a few minutes, and this page goes on by itself when it is back.',
+				'Be where you can see the screen of the machine: a machine that does not come back cannot show this page.',
+			],
+			ok: 'Restart now',
+			danger: true,
+		},
 	},
 	resume: {
 		call: 'resumeOsUpgrade',
@@ -827,6 +923,7 @@ export const BUTTONS = {
 			body: [
 				'ReCasaOS stops acting on this run: nothing is launched from now on.',
 				'The text of the run becomes yours: you read it and paste it into a console, one block at a time, and you close the run when you are done.',
+				'This cannot be undone. To close the run afterwards you will have to type a word that this page gives you.',
 			],
 			ok: 'Take the run over',
 			danger: true,
@@ -865,7 +962,7 @@ function buttonsOf(raw, known, wordNeeded) {
 			call: entry.call,
 			ack: entry.ack ?? '',
 			label: labelOf(action, raw),
-			confirm: entry.confirm,
+			confirm: action === 'reboot' && raw.kind === 'refresh' ? entry.confirmRefresh : entry.confirm,
 			// only the word that closes a run is typed: taking over and dropping are not asked for it
 			needsWord: wordNeeded && action === 'acknowledge',
 		})
@@ -1257,7 +1354,19 @@ function hintOf(raw) {
 	}
 }
 
-function failureView(raw) {
+// What the person does after a stop: what they mend, then where the buttons the server offers lead. Nothing for a stop this page does not
+// know, and nothing for a reason (the state says it).
+function routeOf(entry, facts) {
+	if (facts.has('resume'))
+		return entry.fix ? ROUTES.goOn : null
+	if (facts.has('takeover'))
+		return ROUTES.takeOver
+	if (facts.has('acknowledge') || facts.has('discard'))
+		return facts.has('pnr') ? ROUTES.close : ROUTES.retry
+	return null
+}
+
+function failureView(raw, run, facts) {
 	if (!isPlain(raw))
 		return null
 	const code = clean(raw.class, 40)
@@ -1265,6 +1374,7 @@ function failureView(raw) {
 	const hint = own(FAILURE_HINTS, raw.hint)
 	const detail = shown(raw.detail_line, 400)
 	const rc = Number.isInteger(raw.rc) ? raw.rc : null
+	const route = entry && entry.route !== false ? routeOf(entry, facts) : null
 	return {
 		code,
 		stage: clean(raw.stage, 40),
@@ -1272,7 +1382,9 @@ function failureView(raw) {
 		rc: rc !== null && (rc !== 0 || detail) ? rc : null,
 		detail,
 		what: entry ? msg(entry.what) : msg(CLASS_UNKNOWN, { code: code || '?' }),
-		next: entry && entry.next ? msg(entry.next) : null,
+		next: [entry?.fix, route].filter(Boolean).map(key => msg(key)),
+		// a refresh whose downloads of the security updates did not go through: the repository of Debian 11 moved
+		note: run.kind === 'refresh' && code === 'network' ? msg(REFRESH_NETWORK_NOTE) : null,
 		hintCode: hint ? raw.hint : '',
 		hint: hint ? msg(hint[0]) : null,
 	}
@@ -1290,6 +1402,8 @@ function causeOf(raw) {
 // ---- the status ---------------------------------------------------------------------------------------------------------
 
 const MAX_LOG_LINES = 200
+const SUCCEEDED = ['succeeded', 'succeeded_with_findings']
+const WAITING_FOR_RESTART = ['awaiting_reboot', 'reboot_stalled']
 
 /**
  * The view of GET /v1/sys/os/upgrade/status, or null for an answer that is not a status. A state this page does not know is a view too: it
@@ -1305,7 +1419,10 @@ export function statusView(raw, locale = 'en_us') {
 	const runId = clean(raw.run_id, 40)
 	const open = raw.state !== 'idle' || runId !== ''
 	const word = typeof raw.ack_word === 'string' ? raw.ack_word : ''
-	const failure = failureView(raw.failure)
+	const buttons = buttonsOf(raw, known, word !== '')
+	// what the server offers, and the two flags that sentences depend on
+	const facts = new Set([...buttons.map(button => button.action), ...raw.pnr === true ? ['pnr'] : [], ...raw.half_upgraded === true ? ['half_upgraded'] : []])
+	const failure = failureView(raw.failure, raw, facts)
 	const block = blockOf(raw.block)
 	const { progress, step } = progressOf(clean(raw.phase, 20), block)
 	const notReturned = notReturnedOf(raw.not_returned)
@@ -1321,8 +1438,8 @@ export function statusView(raw, locale = 'en_us') {
 		groupLabel: TEXT.groups[entry.group],
 		tone: entry.tone,
 		title: entry.title,
-		what: entry.what,
-		next: entry.next,
+		what: pick(entry.what, facts),
+		next: pick(entry.next, facts),
 		cause: causeOf(raw),
 		kind: { code: clean(raw.kind, 20), label: own(TEXT.kinds, raw.kind) ?? '' },
 		hop: clean(raw.hop, 40),
@@ -1334,13 +1451,16 @@ export function statusView(raw, locale = 'en_us') {
 		lastActivity: formatMoment(raw.last_activity_at, locale),
 		expiresAt: formatMoment(raw.expires_at, locale),
 		banners: [
-			raw.pnr === true && { id: 'pnr', key: TEXT.banners.pnr, tone: 'is-danger' },
+			// a run that ended well is no longer between the point of no return and the end
+			raw.pnr === true && !SUCCEEDED.includes(raw.state) && { id: 'pnr', key: TEXT.banners.pnr, tone: 'is-danger' },
 			raw.half_upgraded === true && { id: 'half_upgraded', key: TEXT.banners.halfUpgraded, tone: 'is-danger' },
 			raw.busy === true && { id: 'busy', key: TEXT.banners.busy, tone: 'is-warning' },
 		].filter(Boolean),
 		failure,
 		hint: hintOf(raw.hint),
 		barrier: barrierOf(raw.barrier),
+		// the machine waits for its restart, the restart is not offered, and the checks that hold it back were not made yet
+		barrierPending: WAITING_FOR_RESTART.includes(raw.state) && !isPlain(raw.barrier) && !facts.has('reboot'),
 		findings: findingsOf(raw.findings, notReturned.length > 0),
 		notJudged: notJudgedOf(raw.not_judged),
 		notReturned,
@@ -1351,7 +1471,7 @@ export function statusView(raw, locale = 'en_us') {
 		// the word that closes a run, as the core spells it: a word that is not made as the core makes them is not typed, and the button stays shut
 		wordNeeded: word !== '',
 		ackWord: WORD.test(word) ? word : '',
-		buttons: buttonsOf(raw, known, word !== ''),
+		buttons,
 		// the text of the run is asked for when the run is taken over, and when the person asks for it; a refresh has none to run by hand (the core
 		// answers no_run)
 		runbook: { auto: raw.state === 'manual' || raw.state === 'manual_done', available: known && open && raw.kind !== 'refresh' },
@@ -1585,7 +1705,7 @@ function strings(value) {
 	if (Array.isArray(value))
 		return value.flatMap(strings)
 	if (isPlain(value))
-		return Object.entries(value).filter(([name]) => name !== 'by').flatMap(([, item]) => strings(item))
+		return Object.entries(value).filter(([name]) => name !== 'by' && name !== 'needs').flatMap(([, item]) => strings(item))
 	return []
 }
 
@@ -1595,11 +1715,13 @@ function strings(value) {
  */
 export const UPGRADE_KEYS = [...new Set([
 	...strings(TEXT),
-	...[STATE_TABLE, STATE_VARIANTS].flatMap(table => Object.values(table)).flatMap(entry => [entry.title, entry.what, entry.next]),
+	...[STATE_TABLE, STATE_VARIANTS].flatMap(table => Object.values(table)).flatMap(entry => [entry.title, ...keysOf(entry.what), ...keysOf(entry.next)]),
 	STATE_UNKNOWN.title,
 	STATE_UNKNOWN.what,
 	STATE_UNKNOWN.next,
-	...Object.values(CLASS_TABLE).flatMap(entry => [entry.what, entry.next]).filter(Boolean),
+	...Object.values(CLASS_TABLE).flatMap(entry => [entry.what, entry.fix]).filter(Boolean),
+	...strings(ROUTES),
+	REFRESH_NETWORK_NOTE,
 	CLASS_UNKNOWN,
 	...strings(HINTS),
 	HINT_UNKNOWN,
@@ -1614,7 +1736,7 @@ export const UPGRADE_KEYS = [...new Set([
 	...strings(NOT_JUDGED),
 	NOT_JUDGED_NOTE,
 	NOT_JUDGED_UNKNOWN,
-	...Object.values(BUTTONS).flatMap(entry => [entry.label, ...(entry.confirm ? [entry.confirm.title, ...entry.confirm.body, entry.confirm.ok] : [])]),
+	...Object.values(BUTTONS).flatMap(entry => [entry.label, ...[entry.confirm, entry.confirmRefresh].flatMap(confirm => confirm ? [confirm.title, ...confirm.body, confirm.ok] : [])]),
 	...strings(BUTTON_LABELS),
 	...strings(REFUSALS),
 	REFUSAL_UNKNOWN,

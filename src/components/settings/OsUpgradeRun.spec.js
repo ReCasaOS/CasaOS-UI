@@ -340,10 +340,63 @@ describe('the state card', () => {
 
 		expect(text('.os-run-failure-title')).toBe('Why it stopped')
 		expect(text('.os-run-failure-what')).toBe('A download or an update did not go through.')
-		expect(text('.os-run-failure-next')).toBe('What you do: Check the network and the name server of the machine, then go on.')
+		expect(text('.os-run-failure-next')).toBe('What you do: Check the network and the name server of the machine. Close this run, then try again.')
 		expect(text('.os-run-failure-stage')).toBe('Stopped in: download')
 		expect(text('.os-run-failure-rc')).toBe('Exit status: 100')
 		expect(text('.os-run-failure-detail')).toBe('The line of the output of the upgrade that says why: STOP: could not download')
+	})
+
+	it('tells a stop after the point of no return to be gone on from only when the server offers to', async () => {
+		await open(caseOf('stopped_at_waypoint'))
+		expect(text('.os-run-failure-next')).toBe('What you do: Make room. Then go on.')
+		expect(text('.os-run-next')).toBe('What you do: Read why below. Go on if it can be gone on from, or take the run over.')
+		close()
+
+		await open(caseOf('stopped_at_waypoint', { actions: ['acknowledge', 'takeover'] }))
+		expect(text('.os-run-failure-next')).toBe('What you do: Make room. Take the run over.')
+		expect(text('.os-run-next')).toBe('What you do: Read why below, then take the run over or close this run.')
+	})
+
+	it('does not tell a run that cannot be stopped that it can', async () => {
+		await open(caseOf('running'))
+		expect(text('.os-run-next')).toBe('What you do: Wait, and do not run apt or restart the machine.')
+		close()
+
+		await open(caseOf('running', { actions: ['abort'], pnr: false, half_upgraded: false }))
+		expect(text('.os-run-next')).toContain('You can stop it until the point of no return.')
+	})
+
+	it('says the move of the security updates of Debian 11 to a refresh that could not download', async () => {
+		await open(caseOf('failed', { kind: 'refresh', failure: { stage: 'rsources', class: 'network', rc: 100, detail_line: 'STOP: E: Failed to fetch' } }))
+		expect(text('.os-run-failure-note')).toContain('archive.debian.org/debian-security')
+		close()
+
+		await open(caseOf('failed'))
+		expect(wrapper.find('.os-run-failure-note').exists()).toBe(false)
+	})
+
+	it('says that the checks before the restart are not made yet, when the restart is not offered and there is no reason to give', async () => {
+		await open(caseOf('awaiting_reboot', { actions: ['takeover'], barrier: undefined }))
+		expect(text('.os-run-barrier-pending')).toBe('Checking the machine before the restart…')
+		expect(wrapper.find('.os-run-button.is-reboot').exists()).toBe(false)
+		expect(wrapper.find('.os-run-barrier').exists()).toBe(false)
+		close()
+
+		await open(caseOf('awaiting_reboot'))
+		expect(wrapper.find('.os-run-barrier-pending').exists()).toBe(false)
+	})
+
+	it('does not show the point of no return as a danger on a run that ended well', async () => {
+		await open(caseOf('succeeded'))
+		expect(wrapper.find('.os-run-banner.is-pnr').exists()).toBe(false)
+		close()
+
+		await open(caseOf('succeeded_with_findings'))
+		expect(wrapper.find('.os-run-banner.is-pnr').exists()).toBe(false)
+		close()
+
+		await open(caseOf('manual_done'))
+		expect(wrapper.find('.os-run-banner.is-pnr').exists()).toBe(true)
 	})
 
 	it('does not say an exit status when no block exited', async () => {
@@ -536,6 +589,7 @@ describe('the buttons', () => {
 		const button = () => wrapper.find('.os-run-button.is-acknowledge')
 
 		expect(text('.os-run-word-help')).toContain(ACK_WORD)
+		expect(text('.os-run-word-help')).toMatch(/^Closing this run lets backups and automatic updates go on/)
 		expect(button().attributes('disabled')).toBeDefined()
 		for (const wrong of ['', 'i-know-this-machine-is-half-upgraded', `${ACK_WORD}-`, 'I-KNOW']) {
 			await wrapper.find('.os-run-word-input').setValue(wrong)
@@ -853,6 +907,24 @@ describe('the confirmation windows', () => {
 		expect(text('.os-run-dialog .os-run-call-items')).toContain('A disk or partition listed in /etc/fstab cannot be found')
 		// said once, in the window
 		expect(wrapper.findAll('.os-run-call-sentence')).toHaveLength(1)
+	})
+
+	it('say, for the restart that a refresh asks for, that the machine comes back on the same release', async () => {
+		await open(caseOf('reboot_first'))
+		await press('.os-run-button.is-reboot')
+
+		expect(texts('.os-run-dialog-line')[0]).toContain('comes back on the same release')
+		expect(texts('.os-run-dialog-line').join(' ')).not.toContain('into the new release')
+		await press('.os-run-dialog-ok')
+		expect(calls.rebootOsUpgrade).toHaveBeenCalledTimes(1)
+	})
+
+	it('say that a take-over cannot be undone, and that closing the run afterwards needs the word', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-takeover')
+
+		expect(texts('.os-run-dialog-line')).toHaveLength(3)
+		expect(texts('.os-run-dialog-line')[2]).toBe('This cannot be undone. To close the run afterwards you will have to type a word that this page gives you.')
 	})
 
 	it('say what an abort puts back, and a take-over that ReCasaOS stops acting', async () => {

@@ -12,9 +12,11 @@ import {
 	PAUSE_GAP_MS,
 	POLL_MS,
 	PREREBOOT_WORDS,
+	REFRESH_NETWORK_NOTE,
 	REFUSALS,
 	REFUSAL_UNKNOWN,
 	RESTART_LOOK_AFTER_MS,
+	ROUTES,
 	SAFETY_NETS,
 	SAFETY_NET_TEXTS,
 	START_ACKS,
@@ -250,7 +252,7 @@ describe('the tables, and the core\'s words', () => {
 	it('has each key once, and a good many', () => {
 		expect(new Set(UPGRADE_KEYS).size).toBe(UPGRADE_KEYS.length)
 		expect(UPGRADE_KEYS.length).toBeGreaterThan(300)
-		for (const key of [STATE_TABLE.awaiting_reboot.what, STATE_VARIANTS.failed_verify.next, CLASS_TABLE.barrier_sshd.what, FINDINGS.kernel_unexpected, REFUSALS.hostname_mismatch[0], BUTTONS.reboot.confirm.title, TEXT.banners.pnr, TEXT.outage.restarting, CALL_ERRORS.signin, ACK_TEXTS.no_way_back])
+		for (const key of [STATE_TABLE.awaiting_reboot.what, STATE_VARIANTS.failed_verify.next[0].key, CLASS_TABLE.barrier_sshd.what, FINDINGS.kernel_unexpected, REFUSALS.hostname_mismatch[0], BUTTONS.reboot.confirm.title, TEXT.banners.pnr, TEXT.outage.restarting, CALL_ERRORS.signin, ACK_TEXTS.no_way_back])
 			expect(UPGRADE_KEYS).toContain(key)
 	})
 })
@@ -359,9 +361,11 @@ describe('the view of each state', () => {
 
 	it('says a class of stop for each class and each reason the core has', () => {
 		for (const code of [...CLASSES, ...FAILED_REASONS]) {
-			const v = view({ state: 'stopped_at_waypoint', pnr: true, failure: { stage: 'full', class: code, rc: 1 } })
+			const v = view({ state: 'stopped_at_waypoint', pnr: true, actions: ['resume', 'acknowledge', 'takeover'], failure: { stage: 'full', class: code, rc: 1 } })
 			expect(v.failure.what.key, code).toBe(CLASS_TABLE[code].what)
-			expect(v.failure.next?.key ?? null, code).toBe(CLASS_TABLE[code].next)
+			// what to mend, then where the buttons lead: a reason is told by its state, and has neither
+			const route = CLASS_TABLE[code].route === false ? [] : CLASS_TABLE[code].fix ? [ROUTES.goOn] : []
+			expect(v.failure.next.map(message => message.key), code).toEqual([...CLASS_TABLE[code].route === false || !CLASS_TABLE[code].fix ? [] : [CLASS_TABLE[code].fix], ...route])
 			expect(v.failure.code).toBe(code)
 		}
 		const unknown = view({ state: 'failed', failure: { stage: 'full', class: 'something_new', rc: 1 } })
@@ -426,6 +430,191 @@ describe('a state this page does not know', () => {
 
 	it.each([null, undefined, 42, true, 'running', [], [{ state: 'idle' }], {}, { state: null }, { state: 42 }, { state: '' }, { state: [] }, { state: {} }])('is not a status: %j', (raw) => {
 		expect(statusView(raw)).toBeNull()
+	})
+})
+
+// ---- what to do follows the buttons -----------------------------------------------------------------------------------------
+
+describe('what the person is told to do follows the buttons the server offers', () => {
+	const next = (state, actions, extra = {}) => statusView(caseOf(state, { actions, ...extra })).next
+	const todo = (state, cls, actions, extra = {}) => statusView(caseOf(state, { actions, failure: { stage: 'full', class: cls, rc: 1 }, ...extra })).failure.next.map(sayEnglish)
+
+	it('does not say "stop it" when there is no button that stops it', () => {
+		for (const state of ['refreshing', 'rehearsing', 'running']) {
+			expect(next(state, ['abort']), state).toContain('You can stop it')
+			expect(next(state, []), state).not.toMatch(/stop/)
+			expect(next(state, [])).toMatch(/^Wait, and do not run apt/)
+		}
+		// past the point of no return, the unit that runs cannot be called off
+		expect(next('running', [], { pnr: true })).toBe('Wait, and do not run apt or restart the machine.')
+	})
+
+	it('does not say "take the run over" or "drop the plan" when the server offers neither', () => {
+		expect(next('needs_attention', ['acknowledge', 'takeover'], { reason: 'run_damaged' })).toBe('Look at the machine first. Then take the run over, or close this run with the word.')
+		expect(next('needs_attention', ['acknowledge'], { reason: 'run_damaged' })).toBe('Look at the machine first. Then close this run with the word.')
+		expect(next('needs_attention', ['acknowledge'], { reason: 'unwind_partial' })).not.toMatch(/take the run over/)
+		expect(next('needs_attention', ['acknowledge'], { reason: 'unwind_partial' })).toMatch(/close this run with the word/)
+		expect(next('needs_attention', ['acknowledge'], { reason: '' })).toBe('Look at the machine, then close this run with the word.')
+		expect(next('needs_attention', ['acknowledge', 'takeover'], { reason: '' })).toMatch(/take the run over/)
+		expect(next('failed', ['acknowledge', 'discard'])).toBe('Read why below, then close this run or drop the plan.')
+		expect(next('failed', ['acknowledge'])).toBe('Read why below, then close this run.')
+		expect(next('stopped_at_waypoint', ['resume', 'acknowledge', 'takeover'])).toMatch(/Go on if it can be gone on from, or take the run over/)
+		expect(next('stopped_at_waypoint', ['acknowledge', 'takeover'])).toBe('Read why below, then take the run over or close this run.')
+		expect(next('stopped_at_waypoint', ['acknowledge'])).toBe('Read why below, then close this run.')
+	})
+
+	it('does not say "go on" when the server does not offer to go on', () => {
+		expect(next('failed', ['acknowledge', 'takeover'], { reason: 'start', pnr: true })).toBe('Take the run over.')
+		expect(next('failed', ['resume', 'takeover'], { reason: 'start', pnr: true })).toBe('Go on, or take the run over.')
+		expect(next('failed', ['acknowledge', 'takeover'], { reason: 'half', pnr: true })).toBe('Take the run over.')
+		expect(next('failed', ['acknowledge', 'takeover'], { reason: 'verify', pnr: true })).not.toMatch(/ask for the check again/)
+		expect(next('failed', ['resume', 'acknowledge', 'takeover'], { reason: 'verify', pnr: true })).toMatch(/Ask for the check again/)
+		expect(next('interrupted', ['acknowledge', 'takeover'], { pnr: true })).toBe('Take the run over, or close this run with the word.')
+		expect(next('interrupted', ['acknowledge'], { pnr: true })).toBe('Close this run with the word.')
+		expect(next('succeeded_with_findings', ['acknowledge'])).toBe('Read what the check found, then close this run.')
+		expect(next('succeeded_with_findings', ['resume', 'acknowledge'])).toMatch(/ask for the check again/)
+	})
+
+	it('does not say "restart" when the restart is not offered, and says what is awaited', () => {
+		expect(next('awaiting_reboot', ['reboot', 'takeover'])).toMatch(/^Restart the machine when you are ready/)
+		expect(next('awaiting_reboot', ['takeover'])).toBe('The restart is not offered yet. Wait, or take the run over to finish by hand.')
+		expect(next('awaiting_reboot', [])).toBe('Wait.')
+		expect(next('reboot_stalled', ['reboot', 'takeover'])).toMatch(/ask for the restart again/)
+		expect(next('reboot_stalled', ['takeover'])).toBe('Look at the screen of the machine.')
+	})
+
+	it('does not imply that the checks before the restart look at the network', () => {
+		const sentence = next('awaiting_reboot', ['reboot', 'takeover'])
+		expect(sentence).not.toMatch(/checks are green/)
+		expect(sentence).toContain('do not look at the names of the network cards')
+		expect(sentence).toContain('ip -br link')
+	})
+
+	it('does not say that the machine is half upgraded when it is not', () => {
+		const what = extra => statusView(caseOf('failed', { reason: 'start', pnr: true, actions: ['takeover'], ...extra })).what
+		expect(what({ half_upgraded: true })).toBe('The next step could not be started, and the machine is half upgraded.')
+		expect(what({ half_upgraded: false })).toBe('The next step could not be started.')
+		expect(what({})).toBe('The next step could not be started.')
+	})
+
+	it('has a sentence for every state and every set of buttons, in both languages', () => {
+		const sets = [[], ACTION_NAMES, ['abort'], ['reboot'], ['takeover'], ['acknowledge'], ['resume'], ['discard'], ['resume', 'takeover'], ['acknowledge', 'takeover'], ['reboot', 'takeover']]
+		const extras = [{}, { pnr: true }, { half_upgraded: true }, { reason: 'start', pnr: true }, { reason: 'verify', pnr: true }, { reason: 'half', pnr: true }, { reason: 'run_damaged' }, { reason: 'unwind_partial' }, { reason: 'systemd_silent' }]
+		for (const state of STATES) {
+			for (const actions of sets) {
+				for (const extra of extras) {
+					const v = statusView(caseOf(state, { actions, ...extra }))
+					for (const key of [v.what, v.next].filter(Boolean)) {
+						expect(UPGRADE_KEYS, `${state} ${actions} ${JSON.stringify(extra)}: ${key}`).toContain(key)
+						expect(fr[key]).not.toBe(key)
+					}
+					expect(v.what, `${state} ${JSON.stringify(extra)}`).toBeTruthy()
+				}
+			}
+		}
+	})
+
+	describe('after a stop', () => {
+		it('tells a stop before the point of no return to be closed and tried again, with what is to be mended', () => {
+			expect(todo('failed', 'disk', ['acknowledge', 'discard'])).toEqual(['Make room.', 'Close this run, then try again.'])
+			expect(todo('failed', 'network', ['acknowledge', 'discard'])).toEqual(['Check the network and the name server of the machine.', 'Close this run, then try again.'])
+			// nothing to mend: the machine was put back
+			expect(todo('failed', 'plan', ['acknowledge', 'discard'])).toEqual(['Close this run, then try again.'])
+			expect(todo('failed', 'abort', ['acknowledge', 'discard'])).toEqual(['Close this run, then try again.'])
+			// and never "go on" or "take the run over" that the buttons do not offer
+			for (const cls of CLASSES) {
+				const said = todo('failed', cls, ['acknowledge', 'discard']).join(' ')
+				expect(said, cls).not.toMatch(/go on|take the run over/i)
+				expect(said, cls).toMatch(/Close this run, then try again\.$/)
+			}
+		})
+
+		it('tells a stop after it to be gone on from when the server offers to, and only then', () => {
+			expect(todo('stopped_at_waypoint', 'disk', ['resume', 'acknowledge', 'takeover'], { pnr: true })).toEqual(['Make room.', 'Then go on.'])
+			expect(todo('stopped_at_waypoint', 'busy', ['resume', 'acknowledge', 'takeover'], { pnr: true })).toEqual(['Wait until the other package manager ends.', 'Then go on.'])
+			expect(todo('stopped_at_waypoint', 'guard', ['acknowledge', 'takeover'], { pnr: true })).toEqual(['Take the run over.'])
+			expect(todo('stopped_at_waypoint', 'plan', ['acknowledge', 'takeover'], { pnr: true })).toEqual(['Take the run over.'])
+			expect(todo('stopped_at_waypoint', 'network', ['acknowledge', 'takeover'], { pnr: true })).toEqual(['Check the network and the name server of the machine.', 'Take the run over.'])
+			expect(todo('stopped_at_waypoint', 'network', ['acknowledge'], { pnr: true })).toEqual(['Check the network and the name server of the machine.', 'Close this run.'])
+			expect(todo('stopped_at_waypoint', 'network', [], { pnr: true })).toEqual(['Check the network and the name server of the machine.'])
+		})
+
+		it('says nothing to do about a stop it does not know, and none for a reason, which its state tells', () => {
+			expect(todo('stopped_at_waypoint', 'something_new', ['resume', 'takeover'], { pnr: true })).toEqual([])
+			for (const reason of FAILED_REASONS)
+				expect(todo('failed', reason, ['acknowledge', 'takeover'], { pnr: true }), reason).toEqual([])
+		})
+
+		it('has the fix and the route of every class in the language files', () => {
+			for (const entry of Object.values(CLASS_TABLE)) {
+				for (const key of [entry.what, entry.fix].filter(Boolean))
+					expect(UPGRADE_KEYS).toContain(key)
+			}
+			for (const key of Object.values(ROUTES))
+				expect(UPGRADE_KEYS).toContain(key)
+		})
+
+		it('says the move of the security updates of Debian 11 to a refresh whose download did not go through, and to no other run', () => {
+			const note = (kind, cls) => statusView(caseOf('failed', { kind, failure: { stage: 'rsources', class: cls, rc: 100 } })).failure.note
+			expect(note('refresh', 'network')).toEqual({ key: REFRESH_NETWORK_NOTE, params: {} })
+			expect(REFRESH_NETWORK_NOTE).toContain('archive.debian.org/debian-security')
+			expect(note('hop', 'network')).toBeNull()
+			expect(note('rehearsal', 'network')).toBeNull()
+			expect(note('refresh', 'disk')).toBeNull()
+			expect(UPGRADE_KEYS).toContain(REFRESH_NETWORK_NOTE)
+		})
+	})
+
+	describe('the restart of a refresh', () => {
+		const confirm = kind => statusView(caseOf('awaiting_reboot', { kind, actions: ['reboot'] })).buttons[0].confirm
+
+		it('comes back on the same release, and the restart of the upgrade comes back on the new one', () => {
+			const refresh = statusView(caseOf('reboot_first', { actions: ['reboot'] })).buttons[0].confirm
+			expect(refresh.body.join(' ')).toContain('same release')
+			expect(refresh.body.join(' ')).not.toMatch(/into the new release/)
+			expect(refresh.danger).toBe(true)
+			expect(confirm('hop').body[0]).toContain('into the new release')
+			expect(confirm('hop').body[0]).not.toContain('same release')
+			// keys the language files have
+			for (const key of [refresh.title, ...refresh.body, refresh.ok]) {
+				expect(UPGRADE_KEYS).toContain(key)
+				expect(fr[key]).not.toBe(key)
+			}
+			// a status with no kind is the upgrade's
+			expect(confirm(undefined).body[0]).toContain('into the new release')
+		})
+	})
+
+	describe('the banner of the point of no return', () => {
+		const banners = (state, extra = {}) => statusView(caseOf(state, { pnr: true, ...extra })).banners.map(banner => banner.id)
+
+		it('is not on a run that ended well', () => {
+			expect(banners('succeeded')).not.toContain('pnr')
+			expect(banners('succeeded_with_findings')).not.toContain('pnr')
+		})
+
+		it('is on the others', () => {
+			for (const state of STATES.filter(state => !['idle', 'succeeded', 'succeeded_with_findings'].includes(state)))
+				expect(banners(state), state).toContain('pnr')
+		})
+	})
+
+	describe('the machine that waits for its restart', () => {
+		const pending = (state, extra = {}) => statusView(caseOf(state, extra)).barrierPending
+
+		it('says that the checks are not made yet when the restart is not offered and the status carries none', () => {
+			expect(pending('awaiting_reboot', { actions: ['takeover'], barrier: undefined })).toBe(true)
+			expect(pending('reboot_stalled', { actions: ['takeover'], barrier: null })).toBe(true)
+			expect(UPGRADE_KEYS).toContain(TEXT.lists.barrierPending)
+		})
+
+		it('does not, when the restart is offered, when the checks are there, or in another state', () => {
+			expect(pending('awaiting_reboot', { actions: ['reboot', 'takeover'], barrier: undefined })).toBe(false)
+			expect(pending('awaiting_reboot', { actions: ['takeover'], barrier: barrierRed })).toBe(false)
+			expect(pending('awaiting_reboot', { actions: ['takeover'], barrier: barrierOk })).toBe(false)
+			expect(pending('running', { actions: [], barrier: undefined })).toBe(false)
+			expect(pending('rebooting', { actions: [], barrier: undefined })).toBe(false)
+		})
 	})
 })
 

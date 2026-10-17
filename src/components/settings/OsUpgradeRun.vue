@@ -121,8 +121,11 @@
 					<p class="os-run-failure-what mt-1">
 						{{ say(view.failure.what) }}
 					</p>
-					<p v-if="view.failure.next" class="os-run-failure-next mt-1">
-						{{ fact(TEXT.failure.todo, say(view.failure.next)) }}
+					<p v-if="view.failure.next.length" class="os-run-failure-next mt-1">
+						{{ fact(TEXT.failure.todo, view.failure.next.map(message => say(message)).join(' ')) }}
+					</p>
+					<p v-if="view.failure.note" class="os-run-failure-note mt-1">
+						{{ say(view.failure.note) }}
 					</p>
 					<p v-if="view.failure.hint" class="os-run-failure-hint mt-1">
 						{{ say(view.failure.hint) }}
@@ -173,6 +176,11 @@
 						{{ $t(TEXT.lists.barrierBlocked) }}
 					</p>
 				</section>
+
+				<!-- the machine waits for its restart and the button is not there: the checks that hold it back are not made yet -->
+				<p v-if="view.barrierPending" class="os-run-barrier-pending mt-3" role="status">
+					{{ $t(TEXT.lists.barrierPending) }}
+				</p>
 
 				<section v-if="view.findings.length" class="os-run-findings mt-3">
 					<h5 class="os-run-list-title has-text-weight-semibold">
