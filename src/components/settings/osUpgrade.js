@@ -241,6 +241,12 @@ export const TEXT = {
 			'Accept it only if you know and expect that change: the refresh will then take it, and change nothing else about how apt asks.',
 		],
 		acceptOk: 'Run it and accept',
+		confirmTitle: 'Bring the current release up to date?',
+		confirmBody: [
+			'The packages of the release the machine runs now are brought up to date (apt-get update and a full upgrade). Nothing is removed.',
+			'When it ends, the machine may ask for a restart. Backups and automatic updates are held while it works.',
+		],
+		confirmOk: 'Bring it up to date',
 	},
 	start: {
 		rehearsalButton: 'Start a rehearsal',
@@ -250,11 +256,13 @@ export const TEXT = {
 		rehearsalIntro: 'A rehearsal runs the half of the upgrade that can be undone: the checks, the notes of the machine, the sources of the next release and the download of the packages. It stops with the sources of the next release in place for at most 30 minutes, then puts everything back. It needs no safety net.',
 		hopIntro: 'The upgrade changes the packages of the machine and ends with a restart. From its point of no return there is no way back except your snapshot (or a console to repair the machine from). A rehearsal first is recommended.',
 		console: 'Be at the console of the machine when it restarts: a machine that does not come back cannot show this page.',
+		waits: 'When the work is done, the machine waits for you to restart it: ReCasaOS never does it by itself. Backups and automatic updates stay held until you do, and that can last days if you leave it waiting.',
+		network: 'Write down the names of the network cards before you start (the command ip -br link): nothing checks them before the restart, and a card that the new kernel names otherwise leaves the machine without a network.',
 		safetyNet: 'What you have in case the machine does not come back',
-		hostname: 'Type the name of this machine again',
-		hostnameHelp: 'It must be the name of this machine, as it is known on the network: it says you mean this one.',
+		hostname: 'Type the name of this machine',
+		hostnameHelp: 'It must be the name of this machine, as it is known on the network: it says you mean this one. To read it, run the command hostname at a console of the machine.',
 		removals: 'Packages the upgrade removes',
-		paused: 'Package sources put aside while it runs',
+		paused: 'Package sources put aside while it runs, and kept aside after it until you put them back',
 		none: 'none',
 		rehearsalOk: 'Start the rehearsal',
 		hopOk: 'Start the upgrade',
@@ -998,7 +1006,7 @@ export const START_ACKS = ['no_interruption', 'no_way_back', 'sources_paused', '
 export const ACK_TEXTS = {
 	no_interruption: 'I will not restart the machine, switch it off or run apt while the upgrade works.',
 	no_way_back: 'I understand that from the point of no return there is no way back except my snapshot or a console to repair the machine from.',
-	sources_paused: 'I understand that the package sources listed below are put aside while the upgrade runs.',
+	sources_paused: 'I understand that the package sources listed below are put aside while the upgrade runs, and stay paused after it until I put them back.',
 	removals_read: 'I have read the packages listed below, and I accept that the upgrade removes them.',
 }
 

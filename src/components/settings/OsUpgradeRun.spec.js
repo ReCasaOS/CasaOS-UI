@@ -658,23 +658,36 @@ describe('the buttons', () => {
 		expect(wrapper.find('.os-run-button.is-resume').attributes('disabled')).toBeUndefined()
 	})
 
-	it('make one call for a second click on the refresh and on the switch, which have no window to ask first', async () => {
+	it('make one call for a second click on the switch, which has no window to ask first, and on the refresh once it is confirmed', async () => {
 		await open(status())
 		const out = deferred()
-		calls.startOsRefresh.mockReturnValue(out.promise)
-		const refresh = wrapper.find('.os-run-refresh-button').element
-		refresh.click()
-		refresh.click()
-		// and the switch, in the same breath, is not another call
-		wrapper.find('.os-run-beta-switch').element.click()
+		calls.setOsUpgradeBeta.mockReturnValue(out.promise)
+		const off = wrapper.find('.os-run-beta-switch').element
+		off.click()
+		off.click()
+		// and the refresh, in the same breath, is not another call, nor another window
+		wrapper.find('.os-run-refresh-button').element.click()
 		await tick()
 
-		expect(calls.startOsRefresh).toHaveBeenCalledTimes(1)
-		expect(calls.setOsUpgradeBeta).not.toHaveBeenCalled()
-		expect(wrapper.find('.os-run-refresh-button').classes()).toContain('is-loading')
+		expect(calls.setOsUpgradeBeta).toHaveBeenCalledTimes(1)
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.find('.os-run-beta-switch').classes()).toContain('is-loading')
 		out.resolve({ data: { data: {} } })
 		await tick()
-		expect(wrapper.find('.os-run-refresh-button').classes()).not.toContain('is-loading')
+		expect(wrapper.find('.os-run-beta-switch').classes()).not.toContain('is-loading')
+
+		const refresh = deferred()
+		calls.startOsRefresh.mockReturnValue(refresh.promise)
+		await press('.os-run-refresh-button')
+		const ok = wrapper.find('.os-run-dialog-ok').element
+		ok.click()
+		ok.click()
+		await tick()
+		expect(calls.startOsRefresh).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('.os-run-dialog-ok').classes()).toContain('is-loading')
+		refresh.resolve({ data: { data: {} } })
+		await tick()
+		expect(dialog().exists()).toBe(false)
 	})
 
 	it('stay shut after a call until the status that follows it is in, so that the old state cannot be acted on twice', async () => {
@@ -1157,14 +1170,37 @@ describe('the switch and the refresh', () => {
 		expect(text('.os-run-dialog .os-run-call-sentence')).toBe('An upgrade is open. Finish it or close it first.')
 	})
 
-	it('offers the refresh when nothing is open, and starts it without the option', async () => {
+	it('offers the refresh when nothing is open, asks before it starts it, and starts it without the option', async () => {
 		await open(status())
 		expect(text('.os-run-refresh-about')).toContain('apt-get update')
 		expect(wrapper.find('.os-run-refresh-accept').exists()).toBe(false)
 		await press('.os-run-refresh-button')
 
+		// one click does not start a real upgrade of the packages: it says what it does first
+		expect(calls.startOsRefresh).not.toHaveBeenCalled()
+		expect(text('.os-run-dialog-title')).toBe('Bring the current release up to date?')
+		expect(texts('.os-run-dialog-line').join(' ')).toContain('Nothing is removed')
+		expect(texts('.os-run-dialog-line').join(' ')).toContain('may ask for a restart')
+		expect(document.activeElement).toBe(wrapper.find('.os-run-dialog-title').element)
+		await press('.os-run-dialog-cancel')
+		expect(calls.startOsRefresh).not.toHaveBeenCalled()
+
+		await press('.os-run-refresh-button')
+		await press('.os-run-dialog-ok')
 		expect(calls.startOsRefresh).toHaveBeenCalledTimes(1)
 		expect(calls.startOsRefresh).toHaveBeenCalledWith(false)
+		expect(dialog().exists()).toBe(false)
+	})
+
+	it('closes the window of the refresh when a run is open by the time it is read, and says so', async () => {
+		await open(status())
+		await press('.os-run-refresh-button')
+		serve(caseOf('refreshing'))
+		await tick(POLL_MS.idle)
+
+		expect(dialog().exists()).toBe(false)
+		expect(text('.os-run-call-sentence')).toBe('An upgrade is open. Finish it or close it first.')
+		expect(calls.startOsRefresh).not.toHaveBeenCalled()
 	})
 
 	it('offers the option of a changed release information only to a refresh that stopped for it, and asks first', async () => {
@@ -1218,8 +1254,15 @@ describe('the start of a rehearsal and of the upgrade', () => {
 		await press('.os-run-hop')
 
 		expect(text('.os-run-dialog-title')).toBe('Start the upgrade')
-		expect(texts('.os-run-dialog-line')).toHaveLength(2)
+		expect(texts('.os-run-dialog-line')).toHaveLength(4)
 		expect(texts('.os-run-dialog-line')[1]).toContain('Be at the console of the machine')
+		// the machine waits for the restart of the person, with backups and updates held, and nothing checks the network cards
+		expect(texts('.os-run-dialog-line')[2]).toContain('waits for you to restart it')
+		expect(texts('.os-run-dialog-line')[2]).toContain('can last days')
+		expect(texts('.os-run-dialog-line')[3]).toContain('ip -br link')
+		expect(text('label[for="os-run-hostname"]')).toBe('Type the name of this machine')
+		expect(text('#os-run-hostname-help')).toContain('run the command hostname at a console')
+		expect(text('.os-run-paused p')).toBe('Package sources put aside while it runs, and kept aside after it until you put them back')
 		expect(texts('.os-run-radio')).toEqual(Object.values(SAFETY_NET_TEXTS))
 		expect(texts('.os-run-ack')).toEqual([ACK_TEXTS.no_interruption, ACK_TEXTS.no_way_back, ACK_TEXTS.sources_paused, ACK_TEXTS.removals_read])
 		expect(texts('.os-run-removals li')).toEqual(['fuse'])
@@ -1295,6 +1338,8 @@ describe('the start of a rehearsal and of the upgrade', () => {
 		await press('.os-run-rehearsal')
 
 		expect(text('.os-run-dialog-title')).toBe('Start a rehearsal')
+		// a rehearsal does not restart the machine: nothing of the restart is said
+		expect(texts('.os-run-dialog-line')).toHaveLength(1)
 		expect(wrapper.find('input[name="os-run-safety-net"]').exists()).toBe(false)
 		expect(texts('.os-run-ack')).toEqual([ACK_TEXTS.no_interruption])
 		expect(wrapper.find('.os-run-removals').exists()).toBe(false)

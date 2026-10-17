@@ -311,7 +311,7 @@
 							:label="$t(TEXT.refresh.button)"
 							:loading="acting === 'refresh'"
 							rounded
-							@click="callAction('startOsRefresh', false, 'refresh')" />
+							@click="pressRefresh" />
 						<b-button v-if="view.launch.acceptChange"
 							class="os-run-refresh-accept"
 							:disabled="Boolean(acting) || stale"
@@ -847,6 +847,7 @@ export default {
 				case 'button': return view.buttons.some(button => button.action === dialog.button.action)
 				case 'beta': return view.launch.switch
 				case 'accept': return view.launch.acceptChange
+				case 'refresh': return view.launch.refresh && !view.open
 				default: return view.launch.start
 			}
 		},
@@ -883,6 +884,11 @@ export default {
 			}
 			this.openDialog({ kind: 'beta', key: 'beta', title: TEXT.beta.confirmTitle, body: TEXT.beta.confirmBody, ok: TEXT.beta.confirmOk, danger: false }, event)
 		},
+		pressRefresh(event) {
+			if (this.acting)
+				return
+			this.openDialog({ kind: 'refresh', key: 'refresh', title: TEXT.refresh.confirmTitle, body: TEXT.refresh.confirmBody, ok: TEXT.refresh.confirmOk, danger: false }, event)
+		},
 		pressAccept(event) {
 			if (this.acting)
 				return
@@ -897,7 +903,7 @@ export default {
 				rehearsal,
 				planId: this.planNeeds.planId,
 				title: rehearsal ? TEXT.start.rehearsalTitle : TEXT.start.hopTitle,
-				body: rehearsal ? [TEXT.start.rehearsalIntro] : [TEXT.start.hopIntro, TEXT.start.console],
+				body: rehearsal ? [TEXT.start.rehearsalIntro] : [TEXT.start.hopIntro, TEXT.start.console, TEXT.start.waits, TEXT.start.network],
 				ok: rehearsal ? TEXT.start.rehearsalOk : TEXT.start.hopOk,
 				danger: !rehearsal,
 			}, event)
@@ -917,6 +923,9 @@ export default {
 					break
 				case 'accept':
 					done = await this.callAction('startOsRefresh', true, 'refresh')
+					break
+				case 'refresh':
+					done = await this.callAction('startOsRefresh', false, 'refresh')
 					break
 				default:
 					done = await this.callAction('startOsUpgrade', this.startResult.body, 'start')

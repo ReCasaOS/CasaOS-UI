@@ -618,6 +618,44 @@ describe('what the person is told to do follows the buttons the server offers', 
 	})
 })
 
+// ---- the words of the start and of the refresh --------------------------------------------------------------------------------
+
+describe('the words of the start', () => {
+	it('say that the sources put aside stay paused after the upgrade, until they are put back', () => {
+		expect(ACK_TEXTS.sources_paused).toContain('stay paused after it until I put them back')
+		expect(TEXT.start.paused).toContain('after it until you put them back')
+		// the same thing the plan section says: they are not put back by the upgrade
+		expect(TEXT.start.paused).not.toBe('Package sources put aside while it runs')
+	})
+
+	it('ask the name of the machine without saying "again", and say where to read it', () => {
+		expect(TEXT.start.hostname).toBe('Type the name of this machine')
+		expect(TEXT.start.hostnameHelp).toContain('run the command hostname at a console')
+	})
+
+	it('say that the machine waits for the restart, that backups and updates stay held, and that it can last days', () => {
+		expect(TEXT.start.waits).toMatch(/waits for you to restart it/)
+		expect(TEXT.start.waits).toMatch(/Backups and automatic updates stay held/)
+		expect(TEXT.start.waits).toMatch(/days/)
+	})
+
+	it('say to write down the names of the network cards, because nothing checks them', () => {
+		expect(TEXT.start.network).toContain('ip -br link')
+		expect(TEXT.start.network).toMatch(/nothing checks them before the restart/)
+	})
+
+	it('are all in the language files', () => {
+		for (const key of [TEXT.start.waits, TEXT.start.network, TEXT.start.hostname, TEXT.start.hostnameHelp, TEXT.start.paused, ACK_TEXTS.sources_paused, TEXT.refresh.confirmTitle, ...TEXT.refresh.confirmBody, TEXT.refresh.confirmOk])
+			expect(UPGRADE_KEYS).toContain(key)
+	})
+
+	it('say what the refresh does before it is started: the packages of this release, nothing removed, a restart that may be asked for', () => {
+		expect(TEXT.refresh.confirmBody.join(' ')).toMatch(/brought up to date/)
+		expect(TEXT.refresh.confirmBody.join(' ')).toMatch(/Nothing is removed/)
+		expect(TEXT.refresh.confirmBody.join(' ')).toMatch(/may ask for a restart/)
+	})
+})
+
 // ---- the buttons ---------------------------------------------------------------------------------------------------------
 
 describe('the buttons are the server\'s list', () => {
