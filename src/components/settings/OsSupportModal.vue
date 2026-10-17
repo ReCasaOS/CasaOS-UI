@@ -31,7 +31,8 @@
 				<p class="os-next mt-3">
 					{{ $t('{name} is the next release.', { name: nextName }) }}
 				</p>
-				<p class="os-cannot mt-1">
+				<!-- true while nothing below can do it: not said above a section that can -->
+				<p v-if="!runUsable" class="os-cannot mt-1">
 					{{ $t('ReCasaOS cannot upgrade the operating system for you yet.') }}
 				</p>
 				<p class="os-snapshot mt-1">
@@ -47,7 +48,7 @@
 			</template>
 
 			<!-- the run that drives the upgrade: outside the block above, because the run that ended still has to be read and closed after the upgrade, when the next release is another one -->
-			<os-upgrade-run :can-check="canCheck" :locale="locale" :plan="plan" />
+			<os-upgrade-run :can-check="canCheck" :locale="locale" :plan="plan" @usable="runUsable = $event" />
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -80,6 +81,8 @@ export default {
 			readinessState: '',
 			// the plan that the plan section shows, as the core sent it, or null: the section that runs the upgrade starts it from this one
 			livePlan: null,
+			// whether the section that runs the upgrade has read the state and offers something to do
+			runUsable: false,
 		}
 	},
 	computed: {

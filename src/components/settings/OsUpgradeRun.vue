@@ -533,6 +533,7 @@ export default {
 			default: null,
 		},
 	},
+	emits: ['usable'],
 	data() {
 		return {
 			TEXT,
@@ -583,6 +584,10 @@ export default {
 			if (this.view)
 				return this.view.open || this.canCheck
 			return Boolean(this.failure) && this.canCheck
+		},
+		// said, and the state was read: there is something to do here, and the window around it does not say that nothing can be done
+		usable() {
+			return this.visible && Boolean(this.view)
 		},
 		// what is on the screen is the last good answer, and the last ask failed
 		stale() {
@@ -661,6 +666,12 @@ export default {
 		},
 	},
 	watch: {
+		usable: {
+			immediate: true,
+			handler(usable) {
+				this.$emit('usable', usable)
+			},
+		},
 		// the plan that was read is not the one on the screen any more: the window that was to start it is closed, and says so
 		planId(id) {
 			if (this.dialog?.kind !== 'start' || id === this.dialog.planId)

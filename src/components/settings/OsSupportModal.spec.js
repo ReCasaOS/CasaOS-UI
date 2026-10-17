@@ -522,6 +522,65 @@ describe('the run section of the operating system window', () => {
 		expect(wrapper.find('.os-run-start-hint').exists()).toBe(false)
 	})
 
+	// the sentence is true while nothing can be done: it is not said above a section that does it
+	it('no longer says that ReCasaOS cannot upgrade when the run section is there to start the upgrade', async () => {
+		await openWith(BULLSEYE, IDLE)
+
+		expect(wrapper.find('.os-run-hop').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+		// the rest of what the window says of the next release stays
+		expect(wrapper.find('.os-next').text()).toBe('Debian 12 (bookworm) is the next release.')
+		expect(wrapper.find('.os-snapshot').exists()).toBe(true)
+	})
+
+	it('no longer says it either when the upgrade is switched off and the section offers to switch it on', async () => {
+		await openWith(BULLSEYE, { ...IDLE, beta_enabled: false })
+
+		expect(wrapper.find('.os-run-beta-switch').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+	})
+
+	it('still says it when the core does not have the upgrade', async () => {
+		const api = {
+			getOsUpgradeStatus: vi.fn().mockImplementation(() => Promise.reject(Object.assign(new Error('not found'), { response: { status: 404 } }))),
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: true, state: 'idle' })),
+			getOsReadiness: vi.fn(),
+			startOsPlan: vi.fn(),
+		}
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		await vi.waitFor(() => expect(api.getOsUpgradeStatus).toHaveBeenCalled())
+		await flushPromises()
+
+		expect(wrapper.find('.os-run').exists()).toBe(false)
+		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS cannot upgrade the operating system for you yet.')
+	})
+
+	it('still says it while the core has not answered, and when it does not answer', async () => {
+		const api = {
+			getOsUpgradeStatus: vi.fn().mockImplementation(() => Promise.reject(new Error('Network Error'))),
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: true, state: 'idle' })),
+			getOsReadiness: vi.fn(),
+			startOsPlan: vi.fn(),
+		}
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+		await vi.waitFor(() => expect(api.getOsUpgradeStatus).toHaveBeenCalled())
+		await flushPromises()
+
+		expect(wrapper.find('.os-run-outage-message').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+	})
+
+	it('says it again if the section stops being usable', async () => {
+		const api = await openWith(BULLSEYE, IDLE)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+
+		section().vm.$emit('usable', false)
+		await flushPromises()
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+		expect(api.getOsUpgradeStatus).toHaveBeenCalled()
+	})
+
 	it('has no plan to start from before one is made, and again while a new one is being made', async () => {
 		const api = await openWith(BULLSEYE, IDLE, done)
 		expect(section().props('plan')).toEqual(PLAN)
