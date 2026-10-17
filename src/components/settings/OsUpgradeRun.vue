@@ -767,6 +767,8 @@ export default {
 							this.fail('failed')
 					}
 				} while (this.again && !this.gone)
+			} catch {
+				// not even that could be said: the asks go on, and nobody who waits for them is left with a failure of their own
 			} finally {
 				this.inFlight = false
 				this.schedule()

@@ -1715,6 +1715,26 @@ describe('how long the core has been silent', () => {
 		expect(wrapper.find('.os-run-after').exists()).toBe(false)
 	})
 
+	it('goes on asking when even saying that it could not read goes wrong, and fails nobody who waits for the asks', async () => {
+		await open(caseOf('running'))
+		const hostile = new Proxy({}, { get() {
+			throw new Error('unreadable')
+		} })
+		getStatus.mockImplementation(() => answer(hostile))
+		// the clock is the first thing the failure reads: it breaks once
+		const clock = vi.spyOn(Date, 'now').mockImplementationOnce(() => {
+			throw new Error('clock')
+		})
+		const asked = getStatus.mock.calls.length
+		await tick(POLL_MS.open)
+		clock.mockRestore()
+
+		expect(getStatus.mock.calls.length).toBe(asked + 1)
+		await tick(POLL_MS.error)
+		expect(getStatus.mock.calls.length).toBe(asked + 2)
+		await expect(wrapper.vm.poll()).resolves.toBeUndefined()
+	})
+
 	it('goes on asking, and says it could not read, when it cannot make sense of an answer', async () => {
 		await open(caseOf('running'))
 		// a value that throws when it is read: the page has to survive what it is given
