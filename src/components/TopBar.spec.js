@@ -559,3 +559,53 @@ describe('the system support badge', () => {
 		wrapper.unmount()
 	})
 })
+
+// The restart and the shutdown of the bar, while an upgrade of the operating system works on the machine: the core refuses, and the bar says why in a sentence
+// of its own language files.
+describe('the restart and the shutdown while an upgrade works on the machine', () => {
+	const refusal = (error_code, data = {}) => ({ response: { status: 409, data: { success: 409, message: 'a sentence of the core <b>in English</b>', data: { error_code, error: 'x', data } } } })
+
+	// the bar after the first click, which asks "Are you sure?"
+	function bar(power) {
+		const vm = {
+			restart: 'Are you sure?',
+			shutdown: 'Are you sure?',
+			showPower: false,
+			$t: key => key,
+			$api: { sys: { power } },
+			$buefy: { toast: { open: vi.fn() } },
+			$messageBus: vi.fn(),
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		vm.resetPower = TopBar.methods.resetPower.bind(vm)
+		vm.power = TopBar.methods.power.bind(vm)
+		return vm
+	}
+
+	it.each([
+		['Restart', 'restart', 'os_upgrade_open', 'An upgrade of the operating system is changing the machine: it cannot be restarted or switched off until the upgrade stops or asks for it.'],
+		['Shutdown', 'off', 'os_upgrade_open', 'An upgrade of the operating system is changing the machine: it cannot be restarted or switched off until the upgrade stops or asks for it.'],
+		['Restart', 'restart', 'barrier_failed', 'Something that stands before the restart is not well. Mend it first.'],
+	])('says the refusal of %s (%s, %s) in a sentence of the language files, never in the words of the core', async (key, path, code, sentence) => {
+		const power = vi.fn(() => Promise.reject(refusal(code)))
+		const vm = bar(power)
+
+		vm.power(key)
+		await flushPromises()
+
+		expect(power).toHaveBeenCalledWith(path)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith({ message: sentence, type: 'is-danger' })
+		expect(vm.showPower).toBe(false)
+		expect(vm.restart).toBe('Restart')
+		expect(vm.shutdown).toBe('Shutdown')
+	})
+
+	it('keeps what it said for any other failure', async () => {
+		const vm = bar(vi.fn(() => Promise.reject(refusal('not_terminal'))))
+
+		vm.power('Restart')
+		await flushPromises()
+
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith({ message: 'a sentence of the core <b>in English</b>', type: 'is-danger' })
+	})
+})
