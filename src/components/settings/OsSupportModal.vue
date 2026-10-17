@@ -43,8 +43,11 @@
 				<!-- a read-only report: it asks the core, and changes nothing on the machine -->
 				<os-upgrade-readiness v-if="canCheck" :locale="locale" @state="readinessState = $event" />
 				<!-- what apt would do and the text to do it by hand: it asks the core, shows itself only for a machine that can be planned, and changes nothing on the machine -->
-				<os-upgrade-plan v-if="canCheck" :locale="locale" :readiness-state="readinessState" />
+				<os-upgrade-plan v-if="canCheck" :locale="locale" :readiness-state="readinessState" @plan="livePlan = $event" />
 			</template>
+
+			<!-- the run that drives the upgrade: outside the block above, because the run that ended still has to be read and closed after the upgrade, when the next release is another one -->
+			<os-upgrade-run :can-check="canCheck" :locale="locale" :plan="plan" />
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -56,12 +59,13 @@
 <script>
 import OsUpgradePlan from './OsUpgradePlan.vue'
 import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
+import OsUpgradeRun from './OsUpgradeRun.vue'
 import { canCheckReadiness } from './osReadiness'
 import { extendedSentence, releaseLink, releaseName, supportSentence } from './osSupport'
 
 export default {
 	name: 'OsSupportModal',
-	components: { OsUpgradePlan, OsUpgradeReadiness },
+	components: { OsUpgradePlan, OsUpgradeReadiness, OsUpgradeRun },
 	props: {
 		// GET /v1/sys/os, as the top bar read it.
 		os: {
@@ -74,6 +78,8 @@ export default {
 		return {
 			// the state of the readiness report once it was asked ('' before): the plan is not offered below a system it calls unsupported or the latest
 			readinessState: '',
+			// the plan that the plan section shows, as the core sent it, or null: the section that runs the upgrade starts it from this one
+			livePlan: null,
 		}
 	},
 	computed: {
@@ -103,6 +109,9 @@ export default {
 		},
 		canCheck() {
 			return canCheckReadiness(this.os)
+		},
+		plan() {
+			return this.canCheck ? this.livePlan : null
 		},
 	},
 	// The window opens with the reader on its heading. Buefy's own autoFocus is off

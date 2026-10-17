@@ -411,6 +411,7 @@ export default {
 			default: '',
 		},
 	},
+	emits: ['plan'],
 	data() {
 		return {
 			ICONS,
@@ -468,6 +469,10 @@ export default {
 		plan() {
 			return this.status?.state === 'done' && !this.outdated ? this.status.plan : null
 		},
+		// the plan that is offered on the screen, as the core sent it, for the section below that starts the upgrade from it; null when none is
+		offered() {
+			return this.visible && this.plan ? this.status.raw : null
+		},
 		// why the job failed, or why the request that would have started it was refused
 		failure() {
 			return this.refusal ?? (this.status?.state === 'failed' ? this.status.error : null)
@@ -499,6 +504,11 @@ export default {
 				['removed', 'Removed'],
 				['keptBack', 'Kept back'],
 			].map(([key, label]) => ({ key, label: this.$t(label), full: say(full[key]), first: say(first[key]) }))
+		},
+	},
+	watch: {
+		offered(raw) {
+			this.$emit('plan', raw)
 		},
 	},
 	async mounted() {
