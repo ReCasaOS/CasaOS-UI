@@ -151,11 +151,12 @@ const CASES = {
 }
 const caseOf = (state, extra = {}) => status({ state, run_id: state === 'idle' ? '' : RUN, ...CASES[state].extra, actions: CASES[state].actions, ...extra })
 
-// the control characters but the end of a line and the tab, and the marks that turn a text round
+// the control characters but the end of a line and the tab, the marks that turn a text round and the marks that show nothing
 function unsafeIn(text) {
 	return [...text].filter((char) => {
 		const code = char.codePointAt(0)
 		return (code < 32 && char !== '\n' && char !== '\t') || (code >= 127 && code <= 159) || (code >= 0x202A && code <= 0x202E) || (code >= 0x2066 && code <= 0x2069)
+			|| (code >= 0x200B && code <= 0x200F) || code === 0x061C || code === 0x2060 || code === 0xFEFF || code === 0x2028 || code === 0x2029 || code === 0xAD || (code >= 0xE0000 && code <= 0xE007F)
 	})
 }
 
@@ -346,6 +347,16 @@ describe('the view of each state', () => {
 		expect(view({ state: 'running' }).cause).toBeNull()
 	})
 
+	it('lists each code once for support, whatever the core repeats', () => {
+		const v = view({ state: 'failed', reason: 'network', failure: { stage: 'download', class: 'network', rc: 100 } })
+		expect(v.codes).toEqual(['failed', 'network', 'download'])
+		expect(view({ state: 'failed', reason: 'full', failure: { stage: 'full', class: 'full' } }).codes).toEqual(['failed', 'full'])
+		for (const state of STATES) {
+			const codes = statusView(caseOf(state)).codes
+			expect(new Set(codes).size, state).toBe(codes.length)
+		}
+	})
+
 	it('says a class of stop for each class and each reason the core has', () => {
 		for (const code of [...CLASSES, ...FAILED_REASONS]) {
 			const v = view({ state: 'stopped_at_waypoint', pnr: true, failure: { stage: 'full', class: code, rc: 1 } })
@@ -358,6 +369,19 @@ describe('the view of each state', () => {
 		expect(sayEnglish(unknown.failure.what)).toBe('The step stopped for a reason this page does not know: something_new.')
 		for (const name of ['constructor', '__proto__', 'toString', ''])
 			expect(view({ state: 'failed', failure: { class: name } }).failure.what.key).toBe(('The step stopped for a reason this page does not know: {code}.'))
+	})
+
+	it('says the exit status only when it tells something: the core sends 0 when no block exited', () => {
+		const rc = failure => view({ state: 'failed', failure: { stage: 'full', class: 'network', ...failure } }).failure.rc
+		expect(rc({ rc: 100 })).toBe(100)
+		expect(rc({ rc: 1, detail_line: 'STOP: x' })).toBe(1)
+		// a check that failed, a run that did not start: there is no status of a block to say
+		expect(rc({ rc: 0 })).toBeNull()
+		expect(rc({})).toBeNull()
+		expect(rc({ rc: 0, detail_line: '   ' })).toBeNull()
+		// a line that says why makes the 0 a thing that was said
+		expect(rc({ rc: 0, detail_line: 'STOP: the block ended with no error' })).toBe(0)
+		expect(rc({ rc: -1 })).toBe(-1)
 	})
 
 	it('says the line that stopped it as text, and the hint that goes with it', () => {
@@ -767,6 +791,12 @@ describe('the states whose run is taken over', () => {
 			expect(statusView(caseOf(state)).runbook.auto, state).toBe(false)
 		expect(statusView(caseOf('idle')).runbook.available).toBe(false)
 		expect(statusView(caseOf('failed')).runbook.available).toBe(true)
+		// a refresh has no text to run by hand: the core answers no_run, so the page does not offer it
+		for (const state of ['refreshing', 'reboot_first', 'refreshed'])
+			expect(statusView(caseOf(state)).runbook, state).toEqual({ auto: false, available: false })
+		expect(view({ state: 'failed', kind: 'refresh' }).runbook.available).toBe(false)
+		expect(view({ state: 'failed', kind: 'rehearsal' }).runbook.available).toBe(true)
+		expect(view({ state: 'failed', kind: 'hop' }).runbook.available).toBe(true)
 		expect(view({ state: 'a_state_of_a_later_core' }).runbook.available).toBe(false)
 	})
 
@@ -922,6 +952,22 @@ describe('what the core sends is text', () => {
 			expect(commandsOf(['ls\nrm -rf /', 'ls\rwhoami', 'ls\tx', 'ls\u0000', 'ls‮x', 'good'])).toEqual(['good'])
 		})
 
+		it('keeps a command once, however many times the core says it', () => {
+			expect(commandsOf(['ls', 'pwd', 'ls', '  pwd ', 'ls -la'])).toEqual(['ls', 'pwd', 'ls -la'])
+			// twelve different ones, and not twelve of one
+			expect(commandsOf(Array.from({ length: 30 }, (_, i) => `echo ${i % 14}`))).toHaveLength(12)
+			expect(commandsOf(Array.from({ length: 30 }, () => 'echo 1'))).toEqual(['echo 1'])
+		})
+
+		it('drops a command that holds a mark that shows nothing or turns the text round, at the edge of each range', () => {
+			const marks = [0xAD, 0x061C, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2028, 0x2029, 0x2060, 0xFEFF, 0x202A, 0x202E, 0x2066, 0x2069, 0xE0000, 0xE0041, 0xE007F]
+			for (const code of marks)
+				expect(commandsOf([`ls${String.fromCodePoint(code)}-la`, 'ok']), code.toString(16)).toEqual(['ok'])
+			// the characters beside them are commands' own
+			for (const code of [0xAC, 0xAE, 0x200A, 0x2010, 0x205F, 0xFEFE, 0xE0080])
+				expect(commandsOf([`ls${String.fromCodePoint(code)}x`]), code.toString(16)).toHaveLength(1)
+		})
+
 		it('drops what is not a command, and keeps at most twelve', () => {
 			expect(commandsOf(['ls', 7, null, {}, ['x'], '', '   '])).toEqual(['ls'])
 			expect(commandsOf(Array.from({ length: 100 }, (_, i) => `echo ${i}`))).toHaveLength(12)
@@ -934,6 +980,11 @@ describe('what the core sends is text', () => {
 			expect(block8('# block\r\necho "$x"\r\n\tindented\r\n')).toBe('# block\necho "$x"\n\tindented')
 			expect(block8('echo a\u001B[31m')).toBe('')
 			expect(block8('echo a\u0000b')).toBe('')
+			// a mark that shows nothing, or turns the text round, is not in the script that the core wrote
+			for (const code of [0xAD, 0x061C, 0x200B, 0x200D, 0x200E, 0x200F, 0x2028, 0x2029, 0x2060, 0xFEFF, 0x202A, 0x202E, 0x2066, 0x2069, 0xE0000, 0xE0041, 0xE007F])
+				expect(block8(`echo a${String.fromCodePoint(code)}b`), code.toString(16)).toBe('')
+			for (const code of [0xAC, 0xAE, 0x200A, 0x2010, 0x205F, 0xFEFE, 0xE0080])
+				expect(block8(`echo a${String.fromCodePoint(code)}b`), code.toString(16)).not.toBe('')
 			expect(block8('x'.repeat(64001))).toBe('')
 			expect(block8('x'.repeat(64000))).toHaveLength(64000)
 			for (const value of [undefined, null, 7, {}, []])

@@ -63,7 +63,7 @@
  *     BLOCK_TITLES, UPGRADE_KEYS (every key the tables say, for the language files' test), POLL_MS, RESTART_LOOK_AFTER_MS
  */
 
-import { clean, paramsOf, planView, scrub, sentenceFor } from './osPlan'
+import { MARKS, classOf, clean, paramsOf, planView, scrub, sentenceFor } from './osPlan'
 import { READINESS_CHECKS, formatMoment } from './osReadiness'
 
 // ---- small tools ----------------------------------------------------------------------------------------------------
@@ -89,9 +89,9 @@ function shown(value, max = 400) {
 }
 
 // A text of several lines that is copied and run (the last block of the check): the controls but the end of a line and the tab, and the
-// marks that turn a text round, by their numbers (a mark of that kind is not to be written in a source file). It is kept whole or not at
-// all: a script that was cut, or cleaned, is not the one the core wrote.
-const UNSAFE_BLOCK = new RegExp(`[${[[0, 8], [11, 31], [127, 159], [0x202A, 0x202E], [0x2066, 0x2069]].map(range => range.map(code => String.fromCharCode(code)).join('-')).join('')}]`)
+// marks that turn a text round or show nothing (osPlan.js MARKS), by their numbers (a mark of that kind is not to be written in a source
+// file). It is kept whole or not at all: a script that was cut, or cleaned, is not the one the core wrote.
+const UNSAFE_BLOCK = new RegExp(`[${classOf([[0, 8], [11, 31], [127, 159], ...MARKS])}]`, 'u')
 const MAX_BLOCK = 64000
 function blockText(value) {
 	if (typeof value !== 'string' || value.length > MAX_BLOCK)
@@ -105,11 +105,12 @@ function blockText(value) {
 const MAX_COMMAND = 400
 const MAX_COMMANDS = 12
 function commandsOf(value) {
-	return list(value)
+	const commands = list(value)
 		.filter(item => typeof item === 'string')
 		.filter(item => item.trim() && item.trim().length <= MAX_COMMAND && clean(item, MAX_COMMAND + 1) === item.trim())
 		.map(item => item.trim())
-		.slice(0, MAX_COMMANDS)
+	// each once: a command the core says twice is one command to copy
+	return [...new Set(commands)].slice(0, MAX_COMMANDS)
 }
 
 const MAX_NAMES = 20
@@ -1262,11 +1263,14 @@ function failureView(raw) {
 	const code = clean(raw.class, 40)
 	const entry = own(CLASS_TABLE, code)
 	const hint = own(FAILURE_HINTS, raw.hint)
+	const detail = shown(raw.detail_line, 400)
+	const rc = Number.isInteger(raw.rc) ? raw.rc : null
 	return {
 		code,
 		stage: clean(raw.stage, 40),
-		rc: Number.isInteger(raw.rc) ? raw.rc : null,
-		detail: shown(raw.detail_line, 400),
+		// the core always sends a status, 0 when no block exited (a check that failed, a run that did not start): it is said when it tells something
+		rc: rc !== null && (rc !== 0 || detail) ? rc : null,
+		detail,
 		what: entry ? msg(entry.what) : msg(CLASS_UNKNOWN, { code: code || '?' }),
 		next: entry && entry.next ? msg(entry.next) : null,
 		hintCode: hint ? raw.hint : '',
@@ -1348,8 +1352,9 @@ export function statusView(raw, locale = 'en_us') {
 		wordNeeded: word !== '',
 		ackWord: WORD.test(word) ? word : '',
 		buttons: buttonsOf(raw, known, word !== ''),
-		// the text of the run is asked for when the run is taken over, and when the person asks for it
-		runbook: { auto: raw.state === 'manual' || raw.state === 'manual_done', available: known && open },
+		// the text of the run is asked for when the run is taken over, and when the person asks for it; a refresh has none to run by hand (the core
+		// answers no_run)
+		runbook: { auto: raw.state === 'manual' || raw.state === 'manual_done', available: known && open && raw.kind !== 'refresh' },
 		// what begins something: the switch, the refresh, the rehearsal and the upgrade are offered when no run is open, and the refresh again
 		// (with the change accepted) for a refresh that apt stopped for a repository whose release information changed
 		launch: {
@@ -1363,7 +1368,7 @@ export function statusView(raw, locale = 'en_us') {
 		runId: /^[0-9a-f-]{36}$/.test(runId) ? runId : '',
 	}
 	// the codes that the sentences are about, shown small beside them as text, for support
-	view.codes = [view.state, view.reason, failure?.code, failure?.stage].filter(Boolean)
+	view.codes = [...new Set([view.state, view.reason, failure?.code, failure?.stage].filter(Boolean))]
 	view.changeKey = changeKey(view)
 	return view
 }

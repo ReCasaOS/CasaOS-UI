@@ -149,11 +149,12 @@ function close() {
 	wrapper = null
 }
 
-// the control characters but the end of a line and the tab, and the marks that turn a text round
+// the control characters but the end of a line and the tab, the marks that turn a text round and the marks that show nothing
 function unsafeIn(value) {
 	return [...value].filter((char) => {
 		const code = char.codePointAt(0)
 		return (code < 32 && char !== String.fromCharCode(10) && char !== String.fromCharCode(9)) || (code >= 127 && code <= 159) || (code >= 0x202A && code <= 0x202E) || (code >= 0x2066 && code <= 0x2069)
+			|| (code >= 0x200B && code <= 0x200F) || code === 0x061C || code === 0x2060 || code === 0xFEFF || code === 0x2028 || code === 0x2029 || code === 0xAD || (code >= 0xE0000 && code <= 0xE007F)
 	})
 }
 
@@ -343,6 +344,36 @@ describe('the state card', () => {
 		expect(text('.os-run-failure-stage')).toBe('Stopped in: download')
 		expect(text('.os-run-failure-rc')).toBe('Exit status: 100')
 		expect(text('.os-run-failure-detail')).toBe('The line of the output of the upgrade that says why: STOP: could not download')
+	})
+
+	it('does not say an exit status when no block exited', async () => {
+		await open(caseOf('failed', { reason: 'verify', pnr: true, failure: { stage: 'after', class: 'verify', rc: 0 } }))
+		expect(text('.os-run-failure-what')).toBe('The check after the restart did not pass.')
+		expect(wrapper.find('.os-run-failure-rc').exists()).toBe(false)
+		close()
+
+		await open(caseOf('failed', { failure: { stage: 'download', class: 'network', rc: 0, detail_line: 'STOP: could not download' } }))
+		expect(text('.os-run-failure-rc')).toBe('Exit status: 0')
+	})
+
+	it('lists each code and each command once when the core says one twice', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		await open(caseOf('failed', { reason: 'network', failure: { stage: 'download', class: 'network', rc: 100 }, hint: { code: 'unit_quiet', quiet_seconds: 1800, commands: ['ls', 'ls', 'pwd'] } }))
+
+		expect(texts('.os-run-codes code')).toEqual(['failed', 'network', 'download'])
+		expect(texts('.os-run-hint .os-copy-text')).toEqual(['ls', 'pwd'])
+		expect(warn.mock.calls.filter(([message]) => String(message).includes('Duplicate'))).toEqual([])
+		warn.mockRestore()
+	})
+
+	it('does not offer the text of a refresh, which has none', async () => {
+		await open(caseOf('refreshed'))
+		expect(wrapper.find('.os-run-runbook').exists()).toBe(false)
+		expect(calls.getOsUpgradeRunbook).not.toHaveBeenCalled()
+		close()
+
+		await open(caseOf('failed', { kind: 'hop' }))
+		expect(wrapper.find('.os-run-runbook').exists()).toBe(true)
 	})
 
 	it('lists the checks that stand before the restart, and holds the restart back in words', async () => {

@@ -21,10 +21,15 @@ function own(table, key) {
 
 const isPlain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-// What a name or a line from the machine is shown as: the control characters and the ones that turn the text round are
-// spaces, and it is cut. The ranges are the C0 and C1 controls (0 to 31, 127 to 159) and the marks that set the direction of a text
-// (0x202A to 0x202E, 0x2066 to 0x2069), by their numbers: a mark of that kind is not to be written in a source file.
-const UNSAFE = new RegExp(`[${[[0, 31], [127, 159], [0x202A, 0x202E], [0x2066, 0x2069]].map(range => range.map(code => String.fromCharCode(code)).join('-')).join('')}]`, 'g')
+// What a name or a line from the machine is shown as: the control characters and the marks that turn the text round or show nothing are
+// spaces, and it is cut. The ranges are the C0 and C1 controls (0 to 31, 127 to 159) and, in MARKS, the marks that set the direction of a
+// text (0x202A to 0x202E, 0x2066 to 0x2069, 0x200E, 0x200F, 0x061C), the ones that show nothing (the zero-width marks 0x200B to 0x200D, the
+// word joiner 0x2060, the soft hyphen 0xAD, the byte order mark 0xFEFF, the line and paragraph separators 0x2028 and 0x2029) and the tag
+// characters (0xE0000 to 0xE007F), by their numbers: a mark of that kind is not to be written in a source file.
+export const MARKS = [[0xAD, 0xAD], [0x061C, 0x061C], [0x200B, 0x200F], [0x2028, 0x2029], [0x202A, 0x202E], [0x2060, 0x2060], [0x2066, 0x2069], [0xFEFF, 0xFEFF], [0xE0000, 0xE007F]]
+/** The inside of a character class for the ranges of code points [first, last]. */
+export const classOf = ranges => ranges.map(range => range.map(code => String.fromCodePoint(code)).join('-')).join('')
+const UNSAFE = new RegExp(`[${classOf([[0, 31], [127, 159], ...MARKS])}]`, 'gu')
 export function clean(value, max = 300) {
 	return typeof value === 'string' ? value.replace(UNSAFE, ' ').trim().slice(0, max) : ''
 }
