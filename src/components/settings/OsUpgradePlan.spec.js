@@ -2703,3 +2703,45 @@ describe('the language files', () => {
 		expect(fr[key]).not.toMatch(/[^\s%]%/)
 	})
 })
+
+// The plan that the section which starts the upgrade is handed: the one on the screen, as the core sent it, and none when there is none
+describe('the plan handed to the section that starts the upgrade', () => {
+	const handed = () => (wrapper.emitted('plan') ?? []).map(args => args[0])
+
+	it('is nothing until a plan is on the screen, and then the plan as the core sent it', async () => {
+		await open()
+		await start(running('parse'))
+		expect(handed()).toEqual([])
+
+		getOsPlan.mockReturnValueOnce(answer(done()))
+		await tick(1000)
+		expect(handed()).toEqual([real])
+	})
+
+	it('is the plan of a window that opens on one', async () => {
+		await opened()
+
+		expect(handed()).toEqual([real])
+	})
+
+	it('is none again while a new plan is being made', async () => {
+		await opened()
+		await start(running('sources'))
+
+		expect(handed()).toEqual([real, null])
+	})
+
+	it('is none once the plan has run out, by the clock of this machine and the word of the core', async () => {
+		await opened()
+		await tick(25 * HOUR)
+
+		expect(handed()).toEqual([real, null])
+	})
+
+	it('is none when the readiness report says that there is no plan to offer', async () => {
+		await opened()
+		await wrapper.setProps({ readinessState: 'latest' })
+
+		expect(handed()).toEqual([real, null])
+	})
+})
