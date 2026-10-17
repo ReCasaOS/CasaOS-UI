@@ -592,6 +592,70 @@ describe('the buttons', () => {
 		expect(wrapper.find('.os-run-refresh-button').classes()).not.toContain('is-loading')
 	})
 
+	it('stay shut after a call until the status that follows it is in, so that the old state cannot be acted on twice', async () => {
+		await open(caseOf('stopped_at_waypoint', { ack_word: '' }))
+		const followUp = deferred()
+		getStatus.mockImplementationOnce(() => followUp.promise)
+		await press('.os-run-button.is-resume')
+
+		// the call is done, the status is not: the page still shows the old state, and its buttons are shut
+		expect(calls.resumeOsUpgrade).toHaveBeenCalledTimes(1)
+		const resume = wrapper.find('.os-run-button.is-resume')
+		expect(resume.attributes('disabled')).toBeDefined()
+		expect(wrapper.find('.os-run-button.is-takeover').attributes('disabled')).toBeDefined()
+		resume.element.click()
+		await tick()
+		expect(calls.resumeOsUpgrade).toHaveBeenCalledTimes(1)
+
+		followUp.resolve({ data: { data: caseOf('resuming') } })
+		await tick()
+		expect(wrapper.find('.os-run-button').exists()).toBe(false)
+		expect(text('.os-run-state-title')).toBe('Getting ready to check')
+	})
+
+	it('keep the window of a confirmation open, with its button busy, until the status that follows is in', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-reboot')
+		const followUp = deferred()
+		getStatus.mockImplementationOnce(() => followUp.promise)
+		await press('.os-run-dialog-ok')
+
+		expect(calls.rebootOsUpgrade).toHaveBeenCalledTimes(1)
+		expect(dialog().exists()).toBe(true)
+		expect(wrapper.find('.os-run-dialog-ok').classes()).toContain('is-loading')
+		wrapper.find('.os-run-dialog-ok').element.click()
+		await tick()
+		expect(calls.rebootOsUpgrade).toHaveBeenCalledTimes(1)
+
+		followUp.resolve({ data: { data: caseOf('rebooting') } })
+		await tick()
+		expect(dialog().exists()).toBe(false)
+		expect(calls.rebootOsUpgrade).toHaveBeenCalledTimes(1)
+	})
+
+	it('give back the promise of the whole of the asks when they only ask to be followed', async () => {
+		await open(caseOf('running'))
+		const out = deferred()
+		const again = deferred()
+		getStatus.mockReturnValueOnce(out.promise).mockReturnValueOnce(again.promise)
+		await tick(POLL_MS.open)
+		let done = false
+		wrapper.vm.poll().then(() => {
+			done = true
+		})
+		await tick()
+		expect(done).toBe(false)
+
+		// the ask that was out comes back, and the one that was asked for after it is out in its turn
+		out.resolve({ data: { data: caseOf('running') } })
+		await tick()
+		expect(done).toBe(false)
+		expect(getStatus).toHaveBeenCalledTimes(3)
+		again.resolve({ data: { data: caseOf('running') } })
+		await tick()
+		expect(done).toBe(true)
+	})
+
 	it('open no window for a click that comes while a call is out', async () => {
 		await open(caseOf('stopped_at_waypoint', { ack_word: '', actions: ['resume', 'takeover'] }))
 		calls.resumeOsUpgrade.mockReturnValue(deferred().promise)
@@ -755,6 +819,27 @@ describe('the confirmation windows', () => {
 		expect(dialog().exists()).toBe(false)
 		expect(wrapper.find('.os-run-button').exists()).toBe(false)
 		expect(document.activeElement).toBe(wrapper.find('.os-run-state-title').element)
+	})
+
+	it('keep their button shut while the state on the screen is an old one, and say why', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-reboot')
+		expect(wrapper.find('.os-run-dialog-stale').exists()).toBe(false)
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open)
+
+		expect(dialog().exists()).toBe(true)
+		expect(wrapper.find('.os-run-dialog-ok').attributes('disabled')).toBeDefined()
+		expect(text('.os-run-dialog-stale')).toBe('This is the last state that was read. It may be out of date.')
+		wrapper.find('.os-run-dialog-ok').element.click()
+		await tick()
+		expect(calls.rebootOsUpgrade).not.toHaveBeenCalled()
+
+		// and opens again when the core answers
+		serve(caseOf('awaiting_reboot'))
+		await tick(POLL_MS.error)
+		expect(wrapper.find('.os-run-dialog-ok').attributes('disabled')).toBeUndefined()
+		expect(wrapper.find('.os-run-dialog-stale').exists()).toBe(false)
 	})
 
 	it('close by themselves when the step is not offered any more', async () => {
@@ -1074,12 +1159,13 @@ describe('a core that stops answering', () => {
 		await tick(POLL_MS.open)
 
 		expect(text('.os-run-outage-message')).toBe('The machine is restarting. This page goes on by itself.')
-		expect(text('.os-run-outage-elapsed')).toBe('No answer for 5 s.')
+		// the clock begins at the first ask that failed: there is nothing to say of the time yet
+		expect(wrapper.find('.os-run-outage-elapsed').exists()).toBe(false)
 		expect(text('.os-run-stale')).toBe('This is the last state that was read. It may be out of date.')
 		expect(text('.os-run-state-title')).toBe('Restarting')
 		// the next try is 10 seconds later
 		await tick(POLL_MS.error)
-		expect(text('.os-run-outage-elapsed')).toBe('No answer for 15 s.')
+		expect(text('.os-run-outage-elapsed')).toBe('No answer for 10 s.')
 	})
 
 	it('shuts the buttons while the state on the screen is an old one', async () => {
@@ -1155,6 +1241,144 @@ describe('a core that stops answering', () => {
 		await tick(RESTART_LOOK_AFTER_MS)
 		expect(heard).toHaveLength(2)
 		expect(heard[1]).toMatch(/^The machine has not answered for 1\d min \d\d s\. Look at its screen/)
+	})
+})
+
+// ---- the clock of an outage -----------------------------------------------------------------------------------------------------
+
+describe('how long the core has been silent', () => {
+	const RESTARTING = 'The machine is restarting. This page goes on by itself.'
+	const UNREADABLE = 'The state of the upgrade could not be read just now. This page tries again by itself.'
+	const hide = (hidden) => {
+		if (hidden)
+			Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+		else
+			delete document.hidden
+		document.dispatchEvent(new Event('visibilitychange'))
+	}
+	const offline = (value) => {
+		Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value })
+	}
+	afterEach(() => {
+		delete navigator.onLine
+	})
+
+	it('counts from the page being shown again, and not from the last answer, when the tab was hidden while the core went away', async () => {
+		await open(caseOf('rebooting'))
+		hide(true)
+		await tick(20 * 60_000)
+		expect(getStatus).toHaveBeenCalledTimes(1)
+		getStatus.mockImplementation(failure({}))
+		hide(false)
+		await tick()
+
+		expect(text('.os-run-outage-message')).toBe(RESTARTING)
+		expect(wrapper.find('.os-run-outage-elapsed').exists()).toBe(false)
+		// the 15 minutes are counted from there
+		await tick(14 * 60_000)
+		expect(text('.os-run-outage-message')).toBe(RESTARTING)
+		await tick(2 * 60_000)
+		expect(text('.os-run-outage-message')).toMatch(/^The machine has not answered for 1[56] min/)
+	})
+
+	it('counts again when the page was not asking for a long while and the document was not hidden: a closed lid', async () => {
+		await open(caseOf('rebooting'))
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open)
+		expect(text('.os-run-outage-message')).toBe(RESTARTING)
+		vi.setSystemTime(new Date(Date.now() + 30 * 60_000))
+		await tick(POLL_MS.error)
+
+		expect(text('.os-run-outage-message')).toBe(RESTARTING)
+		expect(wrapper.find('.os-run-outage-elapsed').exists()).toBe(false)
+	})
+
+	it('counts from the first ask that failed, and starts a new clock for a new outage', async () => {
+		await open(caseOf('rebooting'))
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open + POLL_MS.error * 60)
+		expect(text('.os-run-outage-elapsed')).toMatch(/^No answer for 10 min/)
+
+		serve(caseOf('rebooting'))
+		await tick(POLL_MS.error)
+		expect(wrapper.find('.os-run-outage').exists()).toBe(false)
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open)
+		expect(wrapper.find('.os-run-outage-elapsed').exists()).toBe(false)
+		await tick(POLL_MS.error)
+		expect(text('.os-run-outage-elapsed')).toBe('No answer for 10 s.')
+	})
+
+	it.each([
+		['an answer that is not a status', () => answer('<html>Sign in to the gateway</html>')],
+		['a 403', failure({ response: { status: 403 } })],
+		['a 400', failure(refused('bad_request', {}, 400))],
+	])('sends the person to the machine after 15 minutes of %s while a run is open, on the same clock', async (_, answerWith) => {
+		await open(caseOf('rebooting'))
+		getStatus.mockImplementation(answerWith)
+		await tick(RESTART_LOOK_AFTER_MS - 60_000)
+		// not a core that is away: it is not said to restart
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+
+		await tick(120_000)
+		expect(text('.os-run-outage-message')).toMatch(/^The machine has not answered for 1[56] min \d\d s\. Look at its screen or console/)
+		expect(text('.os-run-after-folder')).toBe(`Backup folder: ${BK}`)
+	})
+
+	it('does not send the person to the machine for an idle one that cannot be read', async () => {
+		await open(status())
+		getStatus.mockImplementation(failure({ response: { status: 403 } }))
+		await tick(RESTART_LOOK_AFTER_MS + 120_000)
+
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+	})
+
+	it('does not call the person\'s own network loss a machine that restarts', async () => {
+		await open(caseOf('rebooting'))
+		offline(false)
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open)
+
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+		await tick(POLL_MS.error * 3)
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+		// and it is the person's to go and look, all the same, when it lasts
+		await tick(RESTART_LOOK_AFTER_MS)
+		expect(text('.os-run-outage-message')).toMatch(/^The machine has not answered for/)
+	})
+
+	it('sends the person to the machine after 15 minutes when the page was loaded while the core was away', async () => {
+		getStatus.mockImplementation(failure({}))
+		await open(null)
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+
+		await tick(RESTART_LOOK_AFTER_MS - 60_000)
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+		await tick(120_000)
+		expect(text('.os-run-outage-message')).toMatch(/^The machine has not answered for 1[56] min \d\d s\. Look at its screen or console/)
+		// it read nothing, so it has nothing more to say
+		expect(wrapper.find('.os-run-after').exists()).toBe(false)
+	})
+
+	it('goes on asking, and says it could not read, when it cannot make sense of an answer', async () => {
+		await open(caseOf('running'))
+		// a value that throws when it is read: the page has to survive what it is given
+		const hostile = new Proxy({}, { get() {
+			throw new Error('unreadable')
+		} })
+		getStatus.mockImplementation(() => answer(hostile))
+		await tick(POLL_MS.open)
+
+		expect(text('.os-run-outage-message')).toBe(UNREADABLE)
+		expect(text('.os-run-state-title')).toBe('Upgrade running')
+		const asked = getStatus.mock.calls.length
+		await tick(POLL_MS.error)
+		expect(getStatus.mock.calls.length).toBe(asked + 1)
+
+		serve(caseOf('succeeded'))
+		await tick(POLL_MS.error)
+		expect(wrapper.find('.os-run-outage').exists()).toBe(false)
+		expect(text('.os-run-state-title')).toBe('Upgrade done')
 	})
 })
 

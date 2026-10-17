@@ -374,6 +374,10 @@
 					<p v-for="(line, index) in dialogBody" :key="index" class="os-run-dialog-line" :class="{ 'mt-2': index }">
 						{{ line }}
 					</p>
+					<!-- why the button is shut -->
+					<p v-if="stale" class="os-run-dialog-stale is-size-7 mt-2" role="status">
+						{{ $t(TEXT.stale) }}
+					</p>
 
 					<template v-if="needs">
 						<fieldset v-if="needs.safetyNet" class="os-run-field mt-3">
@@ -484,6 +488,7 @@ import {
 	buttonBody,
 	failureOf,
 	nextPoll,
+	outageStart,
 	outageView,
 	startBody,
 	startNeeds,
@@ -526,9 +531,11 @@ export default {
 			view: null,
 			// the scheduler's word for the last ask: 'none', 'ok' or 'error'
 			last: 'none',
-			// why the last ask failed ('' when it did not), and when the last good answer came
+			// why the last ask failed ('' when it did not); when the outage began (0 when there is none), when the ask before the last one was made,
+			// and how long the core has been silent as of the last ask that failed
 			failure: '',
-			lastGoodAt: 0,
+			outageSince: 0,
+			askedAt: 0,
 			elapsedMs: 0,
 			lastLevel: '',
 			announced: '',
@@ -550,6 +557,8 @@ export default {
 			refocus: false,
 			timer: null,
 			inFlight: false,
+			// the asks that are out, so that whoever asked for another one can wait for the whole of them
+			pending: null,
 			again: false,
 			gone: false,
 		}
@@ -629,8 +638,9 @@ export default {
 		dialogOk() {
 			return this.dialog ? this.$t(this.dialog.ok) : ''
 		},
+		// what a window asks for is there, and the state on the screen is not an old one: a step is not confirmed on a state that may have moved on
 		dialogReady() {
-			if (!this.dialog)
+			if (!this.dialog || this.stale)
 				return false
 			return this.dialog.kind === 'start' ? Boolean(this.startResult?.ok) : true
 		},
@@ -702,29 +712,42 @@ export default {
 				this.timer = null
 				return
 			}
+			// the page was not asking while it was hidden: as far as it knows, the core has not been silent for that long
+			this.outageSince = 0
+			this.elapsedMs = 0
 			this.last = 'none'
 			this.schedule()
 		},
 		// One ask of the core. An ask that comes while one is out is made once that one is done, so that a call that changed something is
-		// followed by an answer that came after it.
-		async poll() {
+		// followed by an answer that came after it. What it returns is the whole of the asks that are out, whether it began them or only asked to be followed.
+		poll() {
 			if (this.gone)
-				return
+				return Promise.resolve()
 			if (this.inFlight) {
 				this.again = true
-				return
+				return this.pending
 			}
 			clearTimeout(this.timer)
 			this.inFlight = true
+			this.pending = this.ask()
+			return this.pending
+		},
+		async ask() {
 			try {
 				do {
 					this.again = false
-					await this.readStatus()
+					try {
+						await this.readStatus()
+					} catch {
+						// whatever the page could not make sense of: it says that it could not read, and asks again
+						if (!this.gone)
+							this.fail('failed')
+					}
 				} while (this.again && !this.gone)
 			} finally {
 				this.inFlight = false
+				this.schedule()
 			}
-			this.schedule()
 		},
 		async readStatus() {
 			let raw
@@ -759,7 +782,8 @@ export default {
 			this.last = 'ok'
 			this.failure = ''
 			this.lastLevel = ''
-			this.lastGoodAt = Date.now()
+			this.outageSince = 0
+			this.askedAt = Date.now()
 			// a window for a step that is not offered any more is closed
 			if (this.dialog && !this.dialogOffered(view))
 				this.closeDialog()
@@ -771,7 +795,11 @@ export default {
 			this.last = 'error'
 			// a core that has no such route while a run is open is a core that is away (a gateway without its route), not one that lacks the feature
 			this.failure = kind === 'unavailable' && this.view?.open ? 'down' : kind
-			this.elapsedMs = this.lastGoodAt ? Date.now() - this.lastGoodAt : 0
+			// the silence is counted from the first ask that failed, and from the page being asked again after it was paused
+			const now = Date.now()
+			this.outageSince = outageStart(this.outageSince, this.askedAt, now)
+			this.askedAt = now
+			this.elapsedMs = now - this.outageSince
 			const outage = this.outage
 			if (outage?.message && outage.level !== this.lastLevel) {
 				this.lastLevel = outage.level
@@ -876,13 +904,18 @@ export default {
 			}
 			if (this.gone)
 				return false
-			this.acting = ''
 			if (failure)
 				this.callError = failure
 			else
 				this.typed = ''
 			this.refocus = true
-			this.poll()
+			// the buttons stay shut until the status that follows is in: they would be those of the state the call has just changed
+			try {
+				await this.poll()
+			} finally {
+				if (!this.gone)
+					this.acting = ''
+			}
 			return !failure
 		},
 
