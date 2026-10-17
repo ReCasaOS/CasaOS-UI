@@ -30,12 +30,15 @@
  *                                                                   with `known: false`, its raw state as text, and no button
  *       view: { known, state, reason, open, group, groupLabel, tone, title, what, next, cause, kind: { code, label }, hop, attempt,
  *               block: { index, id, number, title, titleKey } | null, step, progress: { value, max, label } | null, since, lastActivity,
- *               expiresAt, banners: [{ id, key, tone }], failure: { code, stage, rc, detail, what, next, hint, hintCode } | null,
- *               hint: { code, message, commands } | null, barrier: { blocked, red, warnings } | null, findings, notJudged, notReturned,
+ *               expiresAt, banners: [{ id, key, tone }], failure: { code, stage, rc, detail, what, next: [message], note, hint, hintCode } | null,
+ *               hint: { code, message, commands } | null, barrier: { blocked, red, warnings } | null, barrierPending, findings, notJudged, notReturned,
  *               manual: { done, next, pnr, backupFolder } | null, afterRebootHint: { backupFolder, log, commands, block8 } | null,
  *               logTail: [string], reboot: { stalled } | null, wordNeeded, ackWord, buttons, runbook: { auto, available },
  *               launch: { betaEnabled, switch, refresh, acceptChange, start }, planId, runId, codes, changeKey }
  *       `open` is a run that is open (the state is not idle, or a run is on its way): the section shows itself, and the polling is fast.
+ *       `what` and `next` of the state are keys that follow the buttons the server offers (see STATE_TABLE); `failure.next` is what to mend,
+ *       then where the buttons lead (see CLASS_TABLE and ROUTES); `barrierPending` says that the machine waits for a restart that is not
+ *       offered while the checks that hold it back were not made yet.
  *     announcement(previous, next) -> { key, params } | null       the sentence for the live region when the state changed (one per change,
  *                                                                   not per poll); null when nothing changed or before the first view
  *     changeKey(view) -> string                                   what makes two views the same change for `announcement`
@@ -49,18 +52,22 @@
  *     startBody(plan, input) -> { ok, body, missing }              input: { rehearsal, safetyNet, hostname, acks }; body is for sys.startOsUpgrade
  *     hostnameOk(text) -> boolean
  *   When a call fails
- *     failureOf(error, locale) -> { kind, status, code, message, items }   kind: refusal | signin | unavailable | timeout | failed;
- *                                                                   items: [{ code, message | null }] (the things a refusal names)
+ *     failureOf(error, locale, { read }) -> { kind, status, code, message, items }   kind: refusal | signin | unavailable | timeout | failed;
+ *                                                                   items: [{ code, message | null }] (the things a refusal names); a call that
+ *                                                                   changed something and got no answer at all is a `timeout`, a read is `failed`
  *     powerRefusal(error) -> { key, params } | null                the sentence of the two refusals that the restart and the shutdown of the top bar can meet
  *   Polling, and a core that does not answer
  *     nextPoll(last, { hidden, runOpen }) -> milliseconds | null   last: 'none' | 'ok' | 'error'; null means do not ask
- *     statusFailure(error) -> 'signin' | 'unavailable' | 'down' | 'failed'
+ *     statusFailure(error) -> 'signin' | 'unavailable' | 'down' | 'failed'   'failed' for no answer at all from a browser that is offline
+ *     outageStart(since, previousAt, now) -> milliseconds           when the outage on the screen began: the first ask that failed, and again
+ *                                                                   after a pause longer than PAUSE_GAP_MS
  *     outageView({ kind, elapsedMs, last }) -> { level, message, elapsed, hint }   level: restarting | look | unreadable | signin | unavailable
  *     formatElapsed(ms) -> string                                  "4 min 05 s", the same in every language
  *   The tables, for the component and the tests
  *     TEXT (the headings, labels, confirmations and the form of the start), SAFETY_NETS, SAFETY_NET_TEXTS, START_ACKS, ACK_TEXTS,
- *     STATE_TABLE, STATE_VARIANTS, CLASS_TABLE, FINDINGS, BARRIER_CHECKS, PREREBOOT_WORDS, NOT_JUDGED, REFUSALS, CALL_ERRORS, BUTTONS,
- *     BLOCK_TITLES, UPGRADE_KEYS (every key the tables say, for the language files' test), POLL_MS, RESTART_LOOK_AFTER_MS
+ *     STATE_TABLE, STATE_VARIANTS, CLASS_TABLE, ROUTES, REFRESH_NETWORK_NOTE, FINDINGS, BARRIER_CHECKS, PREREBOOT_WORDS, NOT_JUDGED,
+ *     REFUSALS, CALL_ERRORS, BUTTONS, BLOCK_TITLES, UPGRADE_KEYS (every key the tables say, for the language files' test), POLL_MS,
+ *     RESTART_LOOK_AFTER_MS, PAUSE_GAP_MS
  */
 
 import { MARKS, classOf, clean, paramsOf, planView, scrub, sentenceFor } from './osPlan'
