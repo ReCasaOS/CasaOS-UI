@@ -1453,6 +1453,15 @@ describe('the text of the run', () => {
 		expect(wrapper.find('pre.os-copy-text').exists()).toBe(true)
 	})
 
+	it('tells a read that got no answer at all to be tried again: nothing was changed, so nothing may have gone through', async () => {
+		calls.getOsUpgradeRunbook.mockImplementationOnce(failure({ message: 'Network Error' }))
+		await open(caseOf('manual'))
+		await tick()
+
+		expect(text('.os-run-runbook-failure')).toContain('The request could not be completed. Try again.')
+		expect(text('.os-run-runbook-failure')).not.toContain('may have gone through')
+	})
+
 	it('shows the text selected, and says so, when the browser does not allow copying', async () => {
 		calls.getOsUpgradeRunbook.mockImplementation(runbook)
 		copy.mockImplementation(() => Promise.reject(new Error('denied')))
