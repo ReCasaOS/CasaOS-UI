@@ -750,7 +750,7 @@ describe('what the check found', () => {
 })
 
 describe('the states whose run is taken over', () => {
-	it('says where the owner stands: the blocks done, the next one, the point of no return, the folder', () => {
+	it('says where the person stands: the blocks done, the next one, the point of no return, the folder', () => {
 		const v = statusView(caseOf('manual'))
 		expect(v.manual.done).toEqual([{ id: 'verify', number: 0 }, { id: 'timers', number: 1 }])
 		expect(v.manual.next).toEqual({ id: 'snapshot', number: 2 })
@@ -892,6 +892,9 @@ describe('what the core sends is text', () => {
 		expect(view({ state: 'succeeded_with_findings', findings }).findings).toHaveLength(100)
 		expect(view({ state: 'succeeded_with_findings', not_judged: Array.from({ length: 5000 }, (_, i) => `f${i}`) }).notJudged).toHaveLength(30)
 		expect(view({ state: 'awaiting_reboot', barrier: { ok: false, checks: Array.from({ length: 5000 }, () => ({ code: 'fstab_network', ok: false })) } }).barrier.red).toHaveLength(30)
+		expect(view({ state: 'manual', manual: { blocks_done: Array.from({ length: 5000 }, (_, i) => `b${i}`), pnr: false, bk_path: BK } }).manual.done).toHaveLength(20)
+		const apps = Array.from({ length: 5000 }, (_, i) => `app${i}`)
+		expect(view({ state: 'succeeded_with_findings', findings: [{ code: 'mounts_missing', severity: 'error', apps }] }).findings[0].apps).toHaveLength(20)
 	})
 
 	// the commands are copied into a console that is root's: kept whole or not at all
@@ -906,6 +909,11 @@ describe('what the core sends is text', () => {
 			const long = `echo ${'a'.repeat(500)}`
 			expect(commandsOf(['ls', long, 'pwd'])).toEqual(['ls', 'pwd'])
 			expect(commandsOf([`rm -rf ${'/x'.repeat(250)}`])).toEqual([])
+		})
+
+		it('keeps a command of 400 characters and drops one of 401', () => {
+			expect(commandsOf([`${'a'.repeat(400)}`])).toEqual(['a'.repeat(400)])
+			expect(commandsOf([`${'a'.repeat(401)}`])).toEqual([])
 		})
 
 		it('drops a command that holds a control character, a second command after a line end included', () => {
@@ -1112,7 +1120,7 @@ describe('the plan that a start is made from', () => {
 		expect(needs.paused).toEqual(['docker.list', 'sources.list:12', 'sources.list:3', 'weird name.list'])
 	})
 
-	it('never sends what the owner ticked in place of the plan\'s lists', () => {
+	it('never sends what the person ticked in place of the plan\'s lists', () => {
 		const built = startBody(plan(), { ...INPUT, acks: START_ACKS, accept_removals: ['evil'], acceptRemovals: ['evil'], paused_sources: ['evil'], pausedSources: ['evil'], plan_id: 'evil', planId: 'evil' })
 		expect(built.body.accept_removals).toEqual(['fuse'])
 		expect(built.body.paused_sources).toEqual(['docker.list'])
@@ -1168,7 +1176,7 @@ describe('the plan that a start is made from', () => {
 		expect(startBody(plan(), { hostname: 'box', safetyNet: 'nonsense', rehearsal: true, acks: START_ACKS }).ok).toBe(true)
 	})
 
-	it('builds nothing for a plan that blocks, whatever the owner says', () => {
+	it('builds nothing for a plan that blocks, whatever the person says', () => {
 		const blocked = plan({ verdict: 'blocked', problems: [...real.problems, { code: 'removal_protected', severity: 'blocked', data: { name: 'sudo' } }] })
 		expect(startNeeds(blocked, false).blocked).toBe(true)
 		expect(startBody(blocked, { ...INPUT, acks: START_ACKS })).toEqual({ ok: false, body: null, missing: ['plan'] })

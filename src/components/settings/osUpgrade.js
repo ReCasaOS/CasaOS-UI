@@ -12,38 +12,54 @@
  * query of an address) and cut, and the component shows it as text nodes, never as HTML, never in a toast, never in an attribute
  * that is interpreted.
  *
- * Fail closed, here as in the core: the buttons are the server's list and nothing else, a state this module does not know has none,
- * and a restart that a check holds back is not offered whatever the list says (it does not say it: the server takes it out).
+ * Fail closed, here as in the core: the buttons are the server's list, in its order, and nothing else (a state this module does not know
+ * has none), a barrier that is not plainly ok holds the restart back, a weight it does not know is a warning, and a plan whose verdict it
+ * does not know blocks a start.
  *
  * The lists of codes below (states, actions, classes, reasons, findings, barrier checks, refusals, blocks) MIRROR the core:
  * pkg/osrun/vocab.go, pkg/osrun/action.go, pkg/osverify/judge.go, service/system_os_upgrade*.go, pkg/osplan/auto.go. A code
  * added to the core without a sentence here is noticed by osUpgrade.spec.js, which pins the core's lists.
+ *
+ * A sentence is { key, params }: the component says $t(key, params). A few fields are keys alone (title, what, next, label, groupLabel,
+ * banners[].key, block.titleKey). Text from the core (hop, block.title, failure.detail, arg, names, log lines) is a plain string.
  *
  * EXPORTS
  *
  *   The view of the status
  *     statusView(raw, locale = 'en_us') -> view | null            null for what is not a status; a state it does not know is a view
  *                                                                   with `known: false`, its raw state as text, and no button
- *     announcement(previous, next) -> { key, params } | null       the sentence to put in the live region when the state changed (one
- *                                                                   per change, not per poll); null when nothing changed or before the first
+ *       view: { known, state, reason, open, group, groupLabel, tone, title, what, next, cause, kind: { code, label }, hop, attempt,
+ *               block: { index, id, number, title, titleKey } | null, step, progress: { value, max, label } | null, since, lastActivity,
+ *               expiresAt, banners: [{ id, key, tone }], failure: { code, stage, rc, detail, what, next, hint, hintCode } | null,
+ *               hint: { code, message, commands } | null, barrier: { blocked, red, warnings } | null, findings, notJudged, notReturned,
+ *               manual: { done, next, pnr, backupFolder } | null, afterRebootHint: { backupFolder, log, commands, block8 } | null,
+ *               logTail: [string], reboot: { stalled } | null, wordNeeded, ackWord, buttons, runbook: { auto, available },
+ *               launch: { betaEnabled, switch, refresh, acceptChange, start }, planId, runId, codes, changeKey }
+ *       `open` is a run that is open (the state is not idle, or a run is on its way): the section shows itself, and the polling is fast.
+ *     announcement(previous, next) -> { key, params } | null       the sentence for the live region when the state changed (one per change,
+ *                                                                   not per poll); null when nothing changed or before the first view
  *     changeKey(view) -> string                                   what makes two views the same change for `announcement`
- *   The buttons (view.buttons is the server's `actions`, in its order, and nothing else)
+ *   The buttons (view.buttons is the server's `actions`, in its order, each once, and nothing else)
+ *       button: { action, call, ack, label, confirm: { title, body: [key], ok, danger } | null, needsWord }
+ *       a click makes sys[button.call](buttonBody(button, typedWord)): `call` is the name of the sys.js method
  *     buttonBody(button, word = '') -> object                      the body of the ack call of a button ({} for the others)
  *     wordOk(typed, ackWord) -> boolean                            whether the typed text is the word the status asks for
- *   Starting
- *     startNeeds(plan, rehearsal) -> object | null                 what a start of this plan asks of the owner
- *     startBody(plan, input) -> { ok, body, missing }              the request of the start, or what is missing from it
+ *   Starting (the plan is the core's own plan, as OsUpgradePlan has it in status.raw)
+ *     startNeeds(plan, rehearsal) -> { planId, blocked, safetyNet, acks, removals, paused } | null
+ *     startBody(plan, input) -> { ok, body, missing }              input: { rehearsal, safetyNet, hostname, acks }; body is for sys.startOsUpgrade
  *     hostnameOk(text) -> boolean
  *   When a call fails
- *     failureOf(error, locale) -> { kind, status, code, message, items }   a sentence for a refusal, or for a call that did not go through
+ *     failureOf(error, locale) -> { kind, status, code, message, items }   kind: refusal | signin | unavailable | timeout | failed;
+ *                                                                   items: [{ code, message | null }] (the things a refusal names)
  *     powerRefusal(error) -> { key, params } | null                the sentence of the two refusals that the restart and the shutdown of the top bar can meet
  *   Polling, and a core that does not answer
- *     nextPoll(last, { hidden, runOpen }) -> milliseconds | null   when to ask for the status again
+ *     nextPoll(last, { hidden, runOpen }) -> milliseconds | null   last: 'none' | 'ok' | 'error'; null means do not ask
  *     statusFailure(error) -> 'signin' | 'unavailable' | 'down' | 'failed'
- *     outageView({ kind, elapsedMs, last }) -> object              what to say while the status cannot be read
+ *     outageView({ kind, elapsedMs, last }) -> { level, message, elapsed, hint }   level: restarting | look | unreadable | signin | unavailable
  *     formatElapsed(ms) -> string                                  "4 min 05 s", the same in every language
  *   The tables, for the component and the tests
- *     TEXT, STATE_TABLE, STATE_VARIANTS, CLASS_TABLE, FINDINGS, BARRIER_CHECKS, PREREBOOT_WORDS, NOT_JUDGED, REFUSALS, CALL_ERRORS, BUTTONS,
+ *     TEXT (the headings, labels, confirmations and the form of the start), SAFETY_NETS, SAFETY_NET_TEXTS, START_ACKS, ACK_TEXTS,
+ *     STATE_TABLE, STATE_VARIANTS, CLASS_TABLE, FINDINGS, BARRIER_CHECKS, PREREBOOT_WORDS, NOT_JUDGED, REFUSALS, CALL_ERRORS, BUTTONS,
  *     BLOCK_TITLES, UPGRADE_KEYS (every key the tables say, for the language files' test), POLL_MS, RESTART_LOOK_AFTER_MS
  */
 
@@ -84,7 +100,7 @@ function blockText(value) {
 	return UNSAFE_BLOCK.test(text) ? '' : text.trim()
 }
 
-// The commands that the owner copies into a console: kept whole or dropped. A command that was cut, or that held a control character
+// The commands that the person copies into a console: kept whole or dropped. A command that was cut, or that held a control character
 // (a second command after a line end, say), is not the one the core wrote.
 const MAX_COMMAND = 400
 const MAX_COMMANDS = 12
@@ -252,7 +268,7 @@ export const TEXT = {
 // ---- the states ---------------------------------------------------------------------------------------------------------
 
 // What each state of the run says (the core's osrun.States), with the group it belongs to and the colour of the group. `what` is what it is
-// and `next` what the owner does, in the words of the guide's table. The buttons are the server's.
+// and `next` what the person does, in the words of the core's own documentation of the beta. The buttons are the server's.
 export const STATE_TABLE = {
 	idle: {
 		group: 'idle',
@@ -539,7 +555,7 @@ function variantOf(raw) {
 // ---- why a run stopped --------------------------------------------------------------------------------------------------
 
 // The classes of a stop (osrun.Classes), and the reasons that stand in for a class when a failed run has none (osrun.Reason*): what it is,
-// and what the owner does about it. The buttons are the server's: `resume` is there only for the classes that can be gone on from.
+// and what the person does about it. The buttons are the server's: `resume` is there only for the classes that can be gone on from.
 export const CLASS_TABLE = {
 	busy: {
 		what: 'Another package manager was running, or its lock was held.',
@@ -718,7 +734,7 @@ export const FINDING_UNKNOWN = 'A finding this page does not know: {code}.'
 export const SEVERITY_RANK = { error: 0, warn: 1, info: 2 }
 export const SEVERITY_TONES = { error: 'is-danger', warn: 'is-warning', info: 'is-info' }
 
-// What block 7 warns of before the restart (the word in `arg`): a check that passes and that the owner is to read.
+// What block 7 warns of before the restart (the word in `arg`): a check that passes and that the person is to read.
 export const PREREBOOT_WORDS = {
 	initrd_small: 'The initramfs of the new kernel is under 5 MiB. That is right on a machine set up with few modules and wrong on one whose initramfs is cut short: check that it holds the driver of your disk and of your network card.',
 	grub_cfg_missing: 'There is no /boot/grub/grub.cfg to look at, so whether the boot loader names the new kernel was not checked. A machine that starts with another boot loader was not tried.',
@@ -856,7 +872,7 @@ function buttonsOf(raw, known, wordNeeded) {
 	return buttons
 }
 
-/** The body of the ack call of a button: the word it says and the word the owner typed (only the one that closes a run takes it). {} for the other buttons. */
+/** The body of the ack call of a button: the word it says and the word the person typed (only the one that closes a run takes it). {} for the other buttons. */
 export function buttonBody(button, word = '') {
 	if (!button || !button.ack)
 		return {}
@@ -871,7 +887,7 @@ export function wordOk(typed, ackWord) {
 	return typeof typed === 'string' && typeof ackWord === 'string' && WORD.test(ackWord) && typed.trim() === ackWord
 }
 
-/** What the owner says stands between them and a machine that does not come back (the core's: service/system_os_upgrade.go). */
+/** What the person says stands between them and a machine that does not come back (the core's: service/system_os_upgrade.go). */
 export const SAFETY_NETS = ['snapshot', 'console_and_backup', 'reinstall_ok']
 export const SAFETY_NET_TEXTS = {
 	snapshot: 'I took a snapshot of the machine',
@@ -1006,7 +1022,7 @@ export const CALL_ERRORS = {
 	failed: 'The request could not be completed. Try again.',
 }
 
-// the codes of the refusals that name things the owner can read: the checks of the readiness report, those before the restart, the boxes of the start form
+// the codes of the refusals that name things the person can read: the checks of the readiness report, those before the restart, the boxes of the start form
 const ITEMS = {
 	readiness_refuses: (data) => {
 		const checks = list(data.checks).filter(isPlain).map(check => clean(check.code, 60)).filter(Boolean)
@@ -1038,7 +1054,7 @@ function refusalParams(data, locale) {
  * What a call that failed says. A refusal of the core (400, 409 or 500 with `data.error_code`) is the sentence of its code, with the things it
  * names as `items`; a code this page does not know is said as one, with the code as text. Anything else is a call that did not go through: a
  * session that ended, a core that does not have the feature, an answer that did not come, or one that could not be completed. `kind` tells
- * which. Never the core's own words (`data.error`): they are English, and they are only ever the owner's to read in the raw answer.
+ * which. Never the core's own words (`data.error`): they are English, and they are only ever the person's to read in the raw answer.
  */
 export function failureOf(error, locale = 'en_us') {
 	const response = error?.response
@@ -1097,7 +1113,7 @@ function barrierOf(raw) {
 		return null
 	const checks = list(raw.checks).filter(isPlain).slice(0, MAX_ITEMS).map((check) => {
 		const item = barrierItem(check)
-		// a warning of block 7 is a check that passes, and the owner's to read: a code that says nothing of it is not one
+		// a warning of block 7 is a check that passes, and the person's to read: a code that says nothing of it is not one
 		const word = item.code === 'prereboot_warning' ? shown(check.arg, 80) : ''
 		return { ...item, tone: item.ok ? 'is-info' : 'is-danger', arg: item.code === 'prereboot_warning' && own(PREREBOOT_WORDS, word) ? '' : shown(check.arg, 80) }
 	})
@@ -1324,7 +1340,7 @@ export function statusView(raw, locale = 'en_us') {
 		wordNeeded: word !== '',
 		ackWord: WORD.test(word) ? word : '',
 		buttons: buttonsOf(raw, known, word !== ''),
-		// the text of the run is asked for when the run is taken over, and when the owner asks for it
+		// the text of the run is asked for when the run is taken over, and when the person asks for it
 		runbook: { auto: raw.state === 'manual' || raw.state === 'manual_done', available: known && open },
 		// what begins something: the switch, the refresh, the rehearsal and the upgrade are offered when no run is open, and the refresh again
 		// (with the change accepted) for a refresh that apt stopped for a repository whose release information changed
@@ -1388,7 +1404,7 @@ export function statusFailure(error) {
 		return 'signin'
 	if (status === 404)
 		return 'unavailable'
-	if (!error?.response || error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || (Number.isInteger(status) && status >= 500))
+	if (!error?.response || (Number.isInteger(status) && status >= 500))
 		return 'down'
 	return 'failed'
 }
@@ -1440,7 +1456,7 @@ export function hostnameOk(text) {
 	return typeof text === 'string' && HOSTNAME.test(text.trim())
 }
 
-// the removals that the owner is asked to accept and the sources that are put aside, as the core compares them to what it has (it reads the same
+// the removals that the person is asked to accept and the sources that are put aside, as the core compares them to what it has (it reads the same
 // two places of its plan): the names of the problems `removal_manual`, and the files of the paused sources with their line when they have one.
 // Exactly as the plan lists them, sorted, each once; nothing is cleaned, so that what is sent is what the core compares.
 function removalNames(plan) {
@@ -1453,10 +1469,10 @@ function pausedNames(plan) {
 }
 
 /**
- * What a start of this plan asks of the owner, from the plan as the core sent it: the id of the plan, whether it blocks (a start of a blocked
+ * What a start of this plan asks of the person, from the plan as the core sent it: the id of the plan, whether it blocks (a start of a blocked
  * plan is refused), the acknowledgements it needs (`no_interruption` always, `no_way_back` for the upgrade and not for a rehearsal,
  * `sources_paused` when it puts sources aside, `removals_read` when it has removals to accept), whether it needs a safety net, and the
- * removals and sources the owner accepts, as the plan lists them. null for something that is not a plan.
+ * removals and sources the person accepts, as the plan lists them. null for something that is not a plan.
  */
 export function startNeeds(plan, rehearsal = false) {
 	if (!isPlain(plan))
@@ -1475,13 +1491,13 @@ export function startNeeds(plan, rehearsal = false) {
 		needed.push('sources_paused')
 	if (removals.length)
 		needed.push('removals_read')
-	return { planId: view.id, blocked: view.verdict === 'blocked', safetyNet: !rehearsal, acks: START_ACKS.filter(ack => needed.includes(ack)), removals, paused }
+	return { planId: view.id, blocked: view.verdict === 'blocked', safetyNet: !rehearsal, acks: needed, removals, paused }
 }
 
 /**
- * The request of a start, or what is missing from it. `plan` is the plan as the core sent it; `input` is what the owner said: { rehearsal,
+ * The request of a start, or what is missing from it. `plan` is the plan as the core sent it; `input` is what the person said: { rehearsal,
  * safetyNet, hostname, acks } (the acknowledgements ticked, as a list or a Set). The body has exactly the fields the core knows, spelled as it
- * spells them; `accept_removals` and `paused_sources` are the plan's own lists, never what the owner ticked; a rehearsal sends no safety net
+ * spells them; `accept_removals` and `paused_sources` are the plan's own lists, never what the person ticked; a rehearsal sends no safety net
  * (an empty one, which the core takes) and needs neither that nor `no_way_back`. `missing` names what is not there, in the order of the form:
  * `plan`, `safety_net`, `hostname`, then the acknowledgements by their names. There is no body while anything is missing.
  */
