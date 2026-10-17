@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
 	ACK_TEXTS,
 	BARRIER_CHECKS,
@@ -9,6 +9,7 @@ import {
 	CLASS_TABLE,
 	FINDINGS,
 	NOT_JUDGED,
+	PAUSE_GAP_MS,
 	POLL_MS,
 	PREREBOOT_WORDS,
 	REFUSALS,
@@ -28,6 +29,7 @@ import {
 	formatElapsed,
 	hostnameOk,
 	nextPoll,
+	outageStart,
 	outageView,
 	powerRefusal,
 	startBody,
@@ -1417,6 +1419,30 @@ describe('why the status could not be read', () => {
 	])('reads %j as %s', (error, kind) => {
 		expect(statusFailure(error)).toBe(kind)
 	})
+
+	describe('when the browser itself is offline', () => {
+		const online = (value) => {
+			Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => value })
+		}
+		afterEach(() => {
+			delete navigator.onLine
+		})
+
+		it('does not call the person\'s own network loss a core that is away', () => {
+			online(false)
+			expect(statusFailure({ message: 'Network Error' })).toBe('failed')
+			expect(statusFailure({ code: 'ECONNABORTED' })).toBe('failed')
+			expect(statusFailure(undefined)).toBe('failed')
+			// an answer is an answer, whatever the browser thinks of its network
+			expect(statusFailure({ response: { status: 502 } })).toBe('down')
+			expect(statusFailure({ response: { status: 401 } })).toBe('signin')
+		})
+
+		it('calls it a core that is away when the browser is online', () => {
+			online(true)
+			expect(statusFailure({ message: 'Network Error' })).toBe('down')
+		})
+	})
 })
 
 describe('a core that does not answer', () => {
@@ -1426,7 +1452,7 @@ describe('a core that does not answer', () => {
 	const idle = statusView(caseOf('idle'))
 
 	it('says the machine is restarting, with the time, for fifteen minutes', () => {
-		for (const elapsedMs of [0, 1000, 5 * MIN, 14 * MIN, RESTART_LOOK_AFTER_MS - 1]) {
+		for (const elapsedMs of [1000, 5 * MIN, 14 * MIN, RESTART_LOOK_AFTER_MS - 1]) {
 			const out = outageView({ kind: 'down', elapsedMs, last: rebooting })
 			expect(out.level, String(elapsedMs)).toBe('restarting')
 			expect(sayEnglish(out.message)).toBe('The machine is restarting. This page goes on by itself.')
@@ -1453,15 +1479,48 @@ describe('a core that does not answer', () => {
 		expect(out.hint).toBeNull()
 	})
 
-	it('does not say the machine restarts when no run is open, or when nothing was read before', () => {
-		for (const last of [idle, null, undefined]) {
-			for (const elapsedMs of [0, 20 * MIN]) {
-				const out = outageView({ kind: 'down', elapsedMs, last })
-				expect(out.level).toBe('unreadable')
-				expect(sayEnglish(out.message)).toBe('The state of the upgrade could not be read just now. This page tries again by itself.')
-			}
+	it('does not say the machine restarts when no run is open', () => {
+		for (const elapsedMs of [0, 20 * MIN]) {
+			const out = outageView({ kind: 'down', elapsedMs, last: idle })
+			expect(out.level).toBe('unreadable')
+			expect(sayEnglish(out.message)).toBe('The state of the upgrade could not be read just now. This page tries again by itself.')
 		}
-		expect(outageView({ kind: 'failed', elapsedMs: 0, last: rebooting }).level).toBe('unreadable')
+	})
+
+	it('does not say the machine restarts when nothing was read before: a page cannot tell that a run is open', () => {
+		for (const last of [null, undefined]) {
+			const out = outageView({ kind: 'down', elapsedMs: 5 * MIN, last })
+			expect(out.level).toBe('unreadable')
+			expect(sayEnglish(out.message)).toBe('The state of the upgrade could not be read just now. This page tries again by itself.')
+		}
+	})
+
+	it('says to look at the machine after fifteen minutes to a page that read nothing: it was opened while the core was away', () => {
+		for (const last of [null, undefined]) {
+			const out = outageView({ kind: 'down', elapsedMs: RESTART_LOOK_AFTER_MS, last })
+			expect(out.level).toBe('look')
+			expect(sayEnglish(out.message)).toMatch(/^The machine has not answered for 15 min 00 s\. Look at its screen or console/)
+			expect(out.hint).toBeNull()
+		}
+	})
+
+	it('runs the same clock for any failure while a run is open, and says "restarting" only of a core that is away', () => {
+		for (const kind of ['failed', 'something_else', undefined]) {
+			const early = outageView({ kind, elapsedMs: 14 * MIN, last: rebooting })
+			expect(early.level, String(kind)).toBe('unreadable')
+			expect(early.elapsed).toBeNull()
+			const late = outageView({ kind, elapsedMs: RESTART_LOOK_AFTER_MS, last: rebooting })
+			expect(late.level, String(kind)).toBe('look')
+			expect(late.hint.backupFolder).toBe(BK)
+			// no run open: nothing to look at
+			expect(outageView({ kind, elapsedMs: 3 * 60 * MIN, last: idle }).level).toBe('unreadable')
+		}
+	})
+
+	it('says nothing of the time before there is any', () => {
+		expect(outageView({ kind: 'down', elapsedMs: 0, last: rebooting })).toMatchObject({ level: 'restarting', elapsed: null })
+		expect(outageView({ kind: 'down', elapsedMs: 999, last: rebooting }).elapsed).toBeNull()
+		expect(sayEnglish(outageView({ kind: 'down', elapsedMs: 1000, last: rebooting }).elapsed)).toBe('No answer for 1 s.')
 	})
 
 	it('does not take a session that ended for a restart', () => {
@@ -1480,6 +1539,30 @@ describe('a core that does not answer', () => {
 	it('survives no argument', () => {
 		expect(outageView({}).level).toBe('unreadable')
 		expect(outageView({ kind: 'down' }).level).toBe('unreadable')
+	})
+
+	describe('the beginning of an outage', () => {
+		const T = 1_000_000_000
+
+		it('begins at the first failed ask, and stays where it began while the asks go on in step', () => {
+			expect(outageStart(0, 0, T)).toBe(T)
+			expect(outageStart(0, T - 10_000, T)).toBe(T)
+			expect(outageStart(T - 40_000, T - 10_000, T)).toBe(T - 40_000)
+			expect(outageStart(T - 40_000, T - PAUSE_GAP_MS, T)).toBe(T - 40_000)
+		})
+
+		it('begins again when the page was not asking for longer than the asks are apart: a tab that slept, a lid that was closed', () => {
+			expect(outageStart(T - 20 * 60_000, T - 20 * 60_000, T)).toBe(T)
+			expect(outageStart(T - 20 * 60_000, T - PAUSE_GAP_MS - 1, T)).toBe(T)
+			// the gap is far larger than the longest wait between two asks
+			expect(PAUSE_GAP_MS).toBeGreaterThan(2 * POLL_MS.idle)
+		})
+
+		it('is not fooled by a clock that went back, or by what is not a time', () => {
+			expect(outageStart(T + 5000, T + 5000, T)).toBe(T + 5000)
+			for (const value of [undefined, null, 'x', Number.NaN, -3])
+				expect(outageStart(value, value, T)).toBe(T)
+		})
 	})
 
 	it.each([

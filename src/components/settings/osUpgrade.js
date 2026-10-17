@@ -1396,7 +1396,7 @@ export function nextPoll(last, options = {}) {
 /**
  * Why the status could not be read, from the error of the call: a session that ended ('signin'), a core that does not have the feature
  * ('unavailable'), a core that does not answer or whose gateway says it is gone ('down': no answer, a timeout, a 5xx), or something else
- * ('failed').
+ * ('failed': an answer that is not a status, a refusal, or no answer at all from a browser that is offline).
  */
 export function statusFailure(error) {
 	const status = error?.response?.status
@@ -1404,13 +1404,35 @@ export function statusFailure(error) {
 		return 'signin'
 	if (status === 404)
 		return 'unavailable'
-	if (!error?.response || (Number.isInteger(status) && status >= 500))
+	// no answer at all while the browser itself is offline is the person's own network, and not a core that restarts
+	if (!error?.response)
+		return typeof navigator !== 'undefined' && navigator.onLine === false ? 'failed' : 'down'
+	if (Number.isInteger(status) && status >= 500)
 		return 'down'
 	return 'failed'
 }
 
 /** After how long without an answer the page stops saying that the machine is restarting and says to look at its screen. */
 export const RESTART_LOOK_AFTER_MS = 15 * 60 * 1000
+
+/**
+ * How much longer than the asks are apart a silence has to be for the page to know that it was the one that was paused (a tab put to sleep,
+ * a closed lid) and not the core that was away: the longest wait between two asks is 15 seconds, and an ask that gets no answer waits 10.
+ */
+export const PAUSE_GAP_MS = 60 * 1000
+
+/**
+ * When the outage that is on the screen began, in milliseconds: at the first ask that failed after an answer, and again when the page was
+ * not asking for longer than the asks are apart. `since` is when it began (0 for none), `previousAt` when the ask before this one was made
+ * (0 for none) and `now` when this one failed. The page says how long the core has not answered from here, so that a tab that was hidden
+ * for twenty minutes does not tell the person that the machine has been silent for twenty minutes.
+ */
+export function outageStart(since, previousAt, now) {
+	const began = Number.isFinite(since) && since > 0 ? since : 0
+	if (!began)
+		return now
+	return Number.isFinite(previousAt) && previousAt > 0 && now - previousAt > PAUSE_GAP_MS ? now : began
+}
 
 /**
  * How long, written the same in every language (the units are the symbols s, min and h): seconds under a minute, minutes and seconds under an
@@ -1427,10 +1449,13 @@ export function formatElapsed(ms) {
 }
 
 /**
- * What to say while the status cannot be read. `kind` is `statusFailure` of the error, `elapsedMs` the time since the last good answer and `last`
- * the last good view. A core that restarts during the hop is not an error: while a run is open the page says that the machine is restarting
- * and that it goes on by itself, with the time, and after 15 minutes says to look at the machine, with what the status carried before the restart
- * for that case. Without a run that is open, nothing is known of a restart, and the page says only that the state could not be read.
+ * What to say while the status cannot be read. `kind` is `statusFailure` of the error, `elapsedMs` the time since the outage began (see
+ * `outageStart`) and `last` the last good view. A core that restarts during the hop is not an error: while a run is open the page says that the
+ * machine is restarting and that it goes on by itself, with the time, and after 15 minutes says to look at the machine, with what the status
+ * carried before the restart for that case. Without a run that is open, nothing is known of a restart, and the page says only that the state
+ * could not be read. The same clock runs for any failure while a run is open (an answer that is not a status, a refusal, a gateway's login
+ * page): only a core that is away is said to be restarting, but after 15 minutes of anything the person is sent to the machine. So is a page
+ * that read nothing, opened while the core was away: it cannot tell that a run is open, and cannot keep silent about it for an hour.
  * `unavailable` has no message: the core does not have the feature, and the section says nothing.
  */
 export function outageView({ kind, elapsedMs = 0, last = null }) {
@@ -1438,12 +1463,16 @@ export function outageView({ kind, elapsedMs = 0, last = null }) {
 		return { level: 'signin', message: msg(TEXT.outage.signin), elapsed: null, hint: null }
 	if (kind === 'unavailable')
 		return { level: 'unavailable', message: null, elapsed: null, hint: null }
-	if (kind !== 'down' || !last?.open)
-		return { level: 'unreadable', message: msg(TEXT.outage.unreadable), elapsed: null, hint: null }
+	const unreadable = { level: 'unreadable', message: msg(TEXT.outage.unreadable), elapsed: null, hint: null }
+	if (last && !last.open)
+		return unreadable
 	const time = formatElapsed(elapsedMs)
-	if (elapsedMs < RESTART_LOOK_AFTER_MS)
-		return { level: 'restarting', message: msg(TEXT.outage.restarting), elapsed: msg(TEXT.outage.elapsed, { time }), hint: null }
-	return { level: 'look', message: msg(TEXT.outage.look, { time }), elapsed: null, hint: last.afterRebootHint ?? null }
+	if (elapsedMs >= RESTART_LOOK_AFTER_MS)
+		return { level: 'look', message: msg(TEXT.outage.look, { time }), elapsed: null, hint: last?.afterRebootHint ?? null }
+	if (kind !== 'down' || !last)
+		return unreadable
+	// nothing is said of the time before a second has gone by
+	return { level: 'restarting', message: msg(TEXT.outage.restarting), elapsed: elapsedMs >= 1000 ? msg(TEXT.outage.elapsed, { time }) : null, hint: null }
 }
 
 // ---- starting -----------------------------------------------------------------------------------------------------------
