@@ -1333,12 +1333,24 @@ describe('why a call failed', () => {
 		expect(call({ response: { status: 404, data: {} } })).toEqual(['unavailable', CALL_ERRORS.unavailable])
 		expect(call({ code: 'ECONNABORTED' })).toEqual(['timeout', CALL_ERRORS.timeout])
 		expect(call({ code: 'ETIMEDOUT' })).toEqual(['timeout', CALL_ERRORS.timeout])
-		expect(call({ message: 'Network Error' })).toEqual(['failed', CALL_ERRORS.failed])
+		// no answer at all: the request may have reached the core and been carried out, so it is told as the one that took too long
+		expect(call({ message: 'Network Error' })).toEqual(['timeout', CALL_ERRORS.timeout])
+		expect(call({ code: 'ERR_NETWORK' })).toEqual(['timeout', CALL_ERRORS.timeout])
+		expect(call({ message: 'x', request: {} })).toEqual(['timeout', CALL_ERRORS.timeout])
 		expect(call({ response: { status: 502 } })).toEqual(['failed', CALL_ERRORS.failed])
 		expect(call({ response: { status: 400, data: { success: 400 } } })).toEqual(['failed', CALL_ERRORS.failed])
 		expect(call({ response: { status: 409, data: { success: 409, data: 'x' } } })).toEqual(['failed', CALL_ERRORS.failed])
 		for (const error of [undefined, null, 7, 'x', {}, [], new Error('x')])
 			expect(failureOf(error).kind, String(error)).toBe('failed')
+	})
+
+	it('keeps "try again" for a read that got no answer, which nothing was changed by', () => {
+		expect(failureOf({ message: 'Network Error' }, 'en_us', { read: true }).kind).toBe('failed')
+		expect(failureOf({ code: 'ERR_NETWORK' }, 'en_us', { read: true }).kind).toBe('failed')
+		// and the refusals and the other failures are the same for a read
+		expect(failureOf({ response: { status: 401 } }, 'en_us', { read: true }).kind).toBe('signin')
+		expect(failureOf(refusedWith('no_run', {}), 'en_us', { read: true }).kind).toBe('refusal')
+		expect(failureOf({ code: 'ECONNABORTED' }, 'en_us', { read: true }).kind).toBe('timeout')
 	})
 
 	it('has French for the sentences of a call that did not go through', () => {

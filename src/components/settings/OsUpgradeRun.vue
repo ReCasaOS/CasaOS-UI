@@ -363,7 +363,7 @@
 			:model-value="Boolean(dialog)"
 			scroll="keep"
 			trap-focus
-			@close="closeDialog">
+			@close="requestClose">
 			<div v-if="dialog" class="modal-card os-run-dialog" :class="`is-${dialog.kind}`">
 				<header class="modal-card-head">
 					<h5 :ref="focusHeading" class="modal-card-title os-run-dialog-title" tabindex="-1">
@@ -460,7 +460,11 @@
 					</div>
 				</section>
 				<footer class="modal-card-foot os-run-dialog-foot">
-					<b-button class="os-run-dialog-cancel" :label="$t('Cancel')" rounded @click="closeDialog" />
+					<b-button class="os-run-dialog-cancel"
+						:disabled="Boolean(acting)"
+						:label="$t('Cancel')"
+						rounded
+						@click="requestClose" />
 					<b-button class="os-run-dialog-ok"
 						:disabled="!dialogReady || Boolean(acting)"
 						:label="dialogOk"
@@ -787,6 +791,7 @@ export default {
 			// a window for a step that is not offered any more is closed
 			if (this.dialog && !this.dialogOffered(view))
 				this.closeDialog()
+			this.forgetUncertainCall(view)
 			if (view.runbook.auto && !this.runbook.asked)
 				this.loadRunbook()
 			this.$nextTick(this.focusIfLost)
@@ -805,6 +810,17 @@ export default {
 				this.lastLevel = outage.level
 				this.announced = this.say(outage.message)
 			}
+		},
+		// The words of a call that may have gone through ("it took too long", "no answer") are for as long as the state does not tell: once the state
+		// is another one, or has been read once more since the status that followed the call, they have nothing to add. A refusal is the core's
+		// answer and stays until the next call.
+		forgetUncertainCall(view) {
+			const error = this.callError
+			if (!error || error.kind !== 'timeout' || this.dialog)
+				return
+			error.polls += 1
+			if (error.polls > 1 || error.before !== view.changeKey)
+				this.callError = null
 		},
 		dialogOffered(view) {
 			const dialog = this.dialog
@@ -896,6 +912,7 @@ export default {
 				return false
 			this.acting = key
 			this.callError = null
+			const before = this.view?.changeKey ?? ''
 			let failure = null
 			try {
 				await this.$api.sys[name](body)
@@ -905,7 +922,7 @@ export default {
 			if (this.gone)
 				return false
 			if (failure)
-				this.callError = failure
+				this.callError = { ...failure, before, polls: 0 }
 			else
 				this.typed = ''
 			this.refocus = true
@@ -946,12 +963,17 @@ export default {
 					this.focusState()
 			})
 		},
+		// What the person does to close the window: not while its call is out, or the step would go on with no window to say how it went.
+		requestClose() {
+			if (!this.acting)
+				this.closeDialog()
+		},
 		// Escape closes the window that is on top, and nothing under it: the window this one stands on would close at the same key.
 		onEscape(event) {
 			if (!this.dialog || (event.key !== 'Escape' && event.key !== 'Esc'))
 				return
 			event.stopPropagation()
-			this.closeDialog()
+			this.requestClose()
 		},
 		// the heading of the window takes the focus when it opens, and only then (a function ref runs at every render)
 		focusHeading(element) {
@@ -996,9 +1018,9 @@ export default {
 				if (view)
 					text = view.text
 				else
-					failure = failureOf(null, this.locale)
+					failure = failureOf(null, this.locale, { read: true })
 			} catch (error) {
-				failure = failureOf(error, this.locale)
+				failure = failureOf(error, this.locale, { read: true })
 			}
 			// the window closed, or the run is another one: this text is not for what is on the screen
 			if (this.gone || run !== this.runbookRun)

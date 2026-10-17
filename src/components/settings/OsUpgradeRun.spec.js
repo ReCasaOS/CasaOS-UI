@@ -680,6 +680,66 @@ describe('the buttons', () => {
 		expect(getStatus.mock.calls.length).toBe(asked + 1)
 	})
 
+	it.each([
+		['reboot', 'awaiting_reboot', 'rebootOsUpgrade'],
+		['resume', 'stopped_at_waypoint', 'resumeOsUpgrade'],
+		['abort', 'rehearsing', 'abortOsUpgrade'],
+		['acknowledge', 'failed', 'ackOsUpgrade'],
+	])('say that %s may have gone through when the network gave no answer at all', async (action, state, call) => {
+		await open(caseOf(state, { ack_word: '' }))
+		calls[call].mockImplementation(failure({ message: 'Network Error' }))
+		await press(`.os-run-button.is-${action}`)
+		if (dialog().exists())
+			await press('.os-run-dialog-ok')
+
+		expect(text('.os-run-call-sentence')).toBe('The request took too long. It may have gone through: the state above is what the machine says now.')
+	})
+
+	it('say a start that got no answer at all in the same words, in its window', async () => {
+		await open(status(), { plan: real })
+		calls.startOsUpgrade.mockImplementation(failure({ message: 'Network Error' }))
+		await press('.os-run-hop')
+		await wrapper.find('input[name="os-run-safety-net"][value="snapshot"]').setValue(true)
+		await wrapper.find('#os-run-hostname').setValue('stagevet-box')
+		for (const ack of ['no_interruption', 'no_way_back', 'sources_paused', 'removals_read'])
+			await wrapper.find(`input[type="checkbox"][value="${ack}"]`).setValue(true)
+		await press('.os-run-dialog-ok')
+
+		expect(text('.os-run-dialog .os-run-call-sentence')).toContain('It may have gone through')
+	})
+
+	it('take away the words of a call that may have gone through once the state shows that it did', async () => {
+		await open(caseOf('failed'))
+		calls.ackOsUpgrade.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		// the close was done all the same
+		serve(status())
+		await press('.os-run-button.is-acknowledge')
+
+		expect(text('.os-run-state-title')).toBe('No upgrade is open')
+		expect(wrapper.find('.os-run-call').exists()).toBe(false)
+	})
+
+	it('take away the words of a call that may have gone through at the next answer after the one that follows it, when the state did not change', async () => {
+		await open(caseOf('failed'))
+		calls.ackOsUpgrade.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		await press('.os-run-button.is-acknowledge')
+		expect(text('.os-run-call-sentence')).toContain('The request took too long.')
+		expect(wrapper.find('.os-run-call').attributes('role')).toBe('alert')
+
+		await tick(POLL_MS.open)
+		expect(wrapper.find('.os-run-call').exists()).toBe(false)
+	})
+
+	it('keep the words of a refusal until the next call, whatever the polls say', async () => {
+		await open(caseOf('failed'))
+		calls.ackOsUpgrade.mockImplementation(failure(refused('not_terminal', {})))
+		await press('.os-run-button.is-acknowledge')
+		serve(caseOf('succeeded'))
+		await tick(POLL_MS.open * 4)
+
+		expect(text('.os-run-call-sentence')).toBe('The upgrade is not in a state that this button is for. The state it is in now is shown above.')
+	})
+
 	it('say a code they do not know with the code as text, and a call that did not go through in its own words', async () => {
 		await open(caseOf('failed'))
 		calls.ackOsUpgrade.mockImplementation(failure(refused('<b>strange</b>', {})))
@@ -819,6 +879,43 @@ describe('the confirmation windows', () => {
 		expect(dialog().exists()).toBe(false)
 		expect(wrapper.find('.os-run-button').exists()).toBe(false)
 		expect(document.activeElement).toBe(wrapper.find('.os-run-state-title').element)
+	})
+
+	it('cannot be cancelled by the button, by Escape or by a click outside while their call is out: the step would go on without a window', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-reboot')
+		const out = deferred()
+		calls.rebootOsUpgrade.mockReturnValue(out.promise)
+		await press('.os-run-dialog-ok')
+
+		expect(wrapper.find('.os-run-dialog-cancel').attributes('disabled')).toBeDefined()
+		wrapper.find('.os-run-dialog-cancel').element.click()
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+		await wrapper.find('.modal-background').trigger('click')
+		await tick()
+		expect(dialog().exists()).toBe(true)
+
+		// and they can once the call is done and the state is in
+		out.resolve({ data: { data: {} } })
+		serve(caseOf('awaiting_reboot'))
+		await tick()
+		expect(dialog().exists()).toBe(false)
+		expect(calls.rebootOsUpgrade).toHaveBeenCalledTimes(1)
+	})
+
+	it('are cancelled by the button, Escape and a click outside as long as nothing is out', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-reboot')
+		expect(wrapper.find('.os-run-dialog-cancel').attributes('disabled')).toBeUndefined()
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+		await tick()
+		expect(dialog().exists()).toBe(false)
+
+		await press('.os-run-button.is-reboot')
+		await wrapper.find('.modal-background').trigger('click')
+		await tick()
+		expect(dialog().exists()).toBe(false)
+		expect(calls.rebootOsUpgrade).not.toHaveBeenCalled()
 	})
 
 	it('keep their button shut while the state on the screen is an old one, and say why', async () => {

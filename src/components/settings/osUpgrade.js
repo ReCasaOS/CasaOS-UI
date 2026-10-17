@@ -1054,9 +1054,11 @@ function refusalParams(data, locale) {
  * What a call that failed says. A refusal of the core (400, 409 or 500 with `data.error_code`) is the sentence of its code, with the things it
  * names as `items`; a code this page does not know is said as one, with the code as text. Anything else is a call that did not go through: a
  * session that ended, a core that does not have the feature, an answer that did not come, or one that could not be completed. `kind` tells
- * which. Never the core's own words (`data.error`): they are English, and they are only ever the person's to read in the raw answer.
+ * which. A call that changed something and got no answer at all is told like one that timed out: it may have been carried out. A read
+ * (`read: true`) changed nothing, and is told to be tried again. Never the core's own words (`data.error`): they are English, and they are
+ * only ever the person's to read in the raw answer.
  */
-export function failureOf(error, locale = 'en_us') {
+export function failureOf(error, locale = 'en_us', { read = false } = {}) {
 	const response = error?.response
 	const status = Number.isInteger(response?.status) ? response.status : 0
 	const body = isPlain(response?.data) && isPlain(response.data.data) ? response.data.data : null
@@ -1073,9 +1075,15 @@ export function failureOf(error, locale = 'en_us') {
 		kind = 'signin'
 	else if (status === 404)
 		kind = 'unavailable'
-	else if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT')
+	else if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' || (!read && unanswered(error)))
 		kind = 'timeout'
 	return { kind, status, code: '', message: msg(CALL_ERRORS[kind]), items: [] }
+}
+
+// A request that went out and got no answer at all (the connection dropped, the network failed): it may have reached the core and been
+// carried out, as one that timed out may have. An error that is none of the client's own (a mistake of this page's) is not one.
+function unanswered(error) {
+	return isPlain(error) && !error.response && (error.code === 'ERR_NETWORK' || error.message === 'Network Error' || error.request !== undefined)
 }
 
 /** The sentence of the two refusals that the restart and the shutdown of the top bar meet while an upgrade works on the machine, or null for any other failure. */
