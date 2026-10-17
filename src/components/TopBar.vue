@@ -1199,11 +1199,11 @@ export default {
 			}).catch((error) => {
 				clearInterval(timer)
 				this.resetPower()
-				// an upgrade of the operating system that works on the machine, or a restart that would not come back: a sentence of the language files,
-				// and not the core's own words, which a toast would show as HTML
+				// a sentence of the language files, whatever failed, and never the core's own words, which a toast would show as HTML: an upgrade of
+				// the operating system that works on the machine, or a restart that would not come back, has its own
 				const refusal = powerRefusal(error)
 				this.$buefy.toast.open({
-					message: refusal ? this.$t(refusal.key, refusal.params) : error?.response?.data?.message || error?.message || 'Failed to perform power operation.',
+					message: refusal ? this.$t(refusal.key, refusal.params) : this.$t('Failed to perform power operation.'),
 					type: 'is-danger',
 				})
 			})

@@ -2072,5 +2072,6 @@
   "Bring the current release up to date?": "Mettre à jour la version actuelle ?",
   "The packages of the release the machine runs now are brought up to date (apt-get update and a full upgrade). Nothing is removed.": "Les paquets de la version que la machine utilise maintenant sont mis à jour (apt-get update et une mise à niveau complète). Rien n'est supprimé.",
   "When it ends, the machine may ask for a restart. Backups and automatic updates are held while it works.": "À la fin, la machine peut demander un redémarrage. Les sauvegardes et les mises à jour automatiques sont suspendues pendant qu'elle travaille.",
-  "Bring it up to date": "Mettre à jour"
+  "Bring it up to date": "Mettre à jour",
+  "Failed to perform power operation.": "Le redémarrage ou l'arrêt de la machine a échoué."
 }

@@ -2072,5 +2072,6 @@
   "Bring the current release up to date?": "Bring the current release up to date?",
   "The packages of the release the machine runs now are brought up to date (apt-get update and a full upgrade). Nothing is removed.": "The packages of the release the machine runs now are brought up to date (apt-get update and a full upgrade). Nothing is removed.",
   "When it ends, the machine may ask for a restart. Backups and automatic updates are held while it works.": "When it ends, the machine may ask for a restart. Backups and automatic updates are held while it works.",
-  "Bring it up to date": "Bring it up to date"
+  "Bring it up to date": "Bring it up to date",
+  "Failed to perform power operation.": "Failed to perform power operation."
 }
