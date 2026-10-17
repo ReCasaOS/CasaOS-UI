@@ -25,7 +25,7 @@ const isPlain = value => value !== null && typeof value === 'object' && !Array.i
 // spaces, and it is cut. The ranges are the C0 and C1 controls (0 to 31, 127 to 159) and the marks that set the direction of a text
 // (0x202A to 0x202E, 0x2066 to 0x2069), by their numbers: a mark of that kind is not to be written in a source file.
 const UNSAFE = new RegExp(`[${[[0, 31], [127, 159], [0x202A, 0x202E], [0x2066, 0x2069]].map(range => range.map(code => String.fromCharCode(code)).join('-')).join('')}]`, 'g')
-function clean(value, max = 300) {
+export function clean(value, max = 300) {
 	return typeof value === 'string' ? value.replace(UNSAFE, ' ').trim().slice(0, max) : ''
 }
 
@@ -379,7 +379,7 @@ export const PLAN_KEYS = [...new Set([
 
 // The data a sentence can use, by the name of its placeholder: strings are cleaned and cut, sizes are written for a language.
 // `unknown` says that the room that is free could not be read.
-function paramsOf(data, locale) {
+export function paramsOf(data, locale) {
 	const params = {}
 	for (const name of ['file', 'path', 'name', 'version', 'pattern']) {
 		const value = clean(data[name], 120)
@@ -404,7 +404,7 @@ function paramsOf(data, locale) {
 }
 
 // the first sentence of a code whose placeholders the data fills; the sentence of the value its `by` field has, when it has one
-function sentenceFor(entry, data, params) {
+export function sentenceFor(entry, data, params) {
 	const table = Array.isArray(entry) ? { text: entry } : entry
 	const value = table.by ? data[table.by] : undefined
 	const variant = typeof value === 'string' || typeof value === 'boolean' ? own(table.variants ?? {}, String(value)) : undefined
