@@ -331,7 +331,7 @@
 					</p>
 				</div>
 
-				<!-- the text of the run: read when it is taken over, or when the owner asks for it -->
+				<!-- the text of the run: read when it is taken over, or when the person asks for it -->
 				<details v-if="view.runbook.available" :key="view.runId" class="os-run-runbook mt-4" :open="view.runbook.auto" @toggle="onRunbookToggle">
 					<summary class="has-text-weight-semibold">
 						{{ $t(TEXT.runbook.show) }}

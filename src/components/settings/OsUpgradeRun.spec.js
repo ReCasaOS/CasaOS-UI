@@ -1021,7 +1021,7 @@ describe('the text of the run', () => {
 		expect(calls.getOsUpgradeRunbook).toHaveBeenCalledTimes(2)
 	})
 
-	it('is read only when the owner asks, for a run that is not taken over', async () => {
+	it('is read only when the person asks, for a run that is not taken over', async () => {
 		calls.getOsUpgradeRunbook.mockImplementation(runbook)
 		await open(caseOf('awaiting_reboot'))
 
