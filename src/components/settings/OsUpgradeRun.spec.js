@@ -881,6 +881,77 @@ describe('the confirmation windows', () => {
 		expect(document.activeElement).toBe(wrapper.find('.os-run-state-title').element)
 	})
 
+	it('leave the page locked while the window they stand in is open, and do not lock it when it is not', async () => {
+		const Outer = {
+			data: () => ({ open: true }),
+			render() {
+				const props = { 'modelValue': this.open, 'hasModalCard': true, 'scroll': 'keep', 'canCancel': ['escape'], 'onUpdate:modelValue': (value) => {
+					this.open = value
+				} }
+				return h(BModal, props, {
+					default: () => h('div', { class: 'modal-card outer-card' }, [h(OsUpgradeRun, { canCheck: true, locale: 'en_us' })]),
+				})
+			},
+		}
+		const locked = () => document.body.classList.contains('is-noscroll')
+		serve(caseOf('awaiting_reboot'))
+		wrapper = mount(Outer, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls } } } })
+		await tick()
+		expect(locked()).toBe(true)
+
+		await press('.os-run-button.is-reboot')
+		expect(dialog().exists()).toBe(true)
+		expect(locked()).toBe(true)
+		await press('.os-run-dialog-cancel')
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.vm.open).toBe(true)
+		// the window the person is in is still open: the page behind it does not scroll
+		expect(locked()).toBe(true)
+		await press('.os-run-button.is-reboot')
+		document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+		await tick()
+		expect(locked()).toBe(true)
+	})
+
+	it('say why a window closed when the step is not offered any more, and hand the focus to the title of the section', async () => {
+		await open(status(), { plan: real })
+		wrapper.find('.os-run-hop').element.focus()
+		await press('.os-run-hop')
+		expect(dialog().exists()).toBe(true)
+		serve(caseOf('rehearsing'))
+		await tick(POLL_MS.idle)
+
+		expect(dialog().exists()).toBe(false)
+		expect(text('.os-run-call-sentence')).toBe('An upgrade is open. Finish it or close it first.')
+		expect(wrapper.find('.os-run-call').attributes('role')).toBe('alert')
+		expect(document.activeElement).toBe(wrapper.find('.os-run-title').element)
+	})
+
+	it.each([
+		['the switch', () => status({ beta_enabled: false }), '.os-run-beta-switch', () => caseOf('failed'), 'An upgrade is open. Finish it or close it first.'],
+		['a start, when the upgrade was switched off', () => status(), '.os-run-hop', () => status({ beta_enabled: false }), 'The upgrade is switched off. Switch it on first.'],
+		['a step', () => caseOf('awaiting_reboot'), '.os-run-button.is-reboot', () => caseOf('rebooting'), 'The upgrade is not in a state that this button is for. The state it is in now is shown above.'],
+	])('say why the window of %s closed', async (_, first, opener, later, sentence) => {
+		await open(first(), { plan: real })
+		await press(opener)
+		expect(dialog().exists()).toBe(true)
+		serve(later())
+		await tick(POLL_MS.idle)
+
+		expect(dialog().exists()).toBe(false)
+		expect(text('.os-run-call-sentence')).toBe(sentence)
+	})
+
+	it('say nothing of a window that closes because of the call it was opened for', async () => {
+		await open(caseOf('awaiting_reboot'))
+		await press('.os-run-button.is-reboot')
+		serve(caseOf('rebooting'))
+		await press('.os-run-dialog-ok')
+
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.find('.os-run-call').exists()).toBe(false)
+	})
+
 	it('cannot be cancelled by the button, by Escape or by a click outside while their call is out: the step would go on without a window', async () => {
 		await open(caseOf('awaiting_reboot'))
 		await press('.os-run-button.is-reboot')

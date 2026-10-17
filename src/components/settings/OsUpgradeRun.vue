@@ -7,7 +7,7 @@
 
 		<!-- every value below is a text node: the lines, the names and the codes come from the machine and from the core, never HTML -->
 		<section v-if="visible" aria-labelledby="os-run-title" class="os-run mt-5">
-			<h4 id="os-run-title" class="os-run-title has-text-weight-semibold">
+			<h4 id="os-run-title" ref="title" class="os-run-title has-text-weight-semibold" tabindex="-1">
 				{{ $t(TEXT.heading) }}
 			</h4>
 
@@ -361,7 +361,7 @@
 			custom-class="os-run-modal"
 			has-modal-card
 			:model-value="Boolean(dialog)"
-			scroll="keep"
+			scroll="clip"
 			trap-focus
 			@close="requestClose">
 			<div v-if="dialog" class="modal-card os-run-dialog" :class="`is-${dialog.kind}`">
@@ -788,9 +788,14 @@ export default {
 			this.lastLevel = ''
 			this.outageSince = 0
 			this.askedAt = Date.now()
-			// a window for a step that is not offered any more is closed
-			if (this.dialog && !this.dialogOffered(view))
-				this.closeDialog()
+			// A window for a step that is not offered any more is closed. Its call is not the cause when one is out (the state it changed is the
+			// one that was just read): otherwise the person is told why, and the focus goes to the title of the section.
+			if (this.dialog && !this.dialogOffered(view)) {
+				const why = this.acting ? null : this.whyClosed(this.dialog, view)
+				this.closeDialog(Boolean(why))
+				if (why)
+					this.callError = { kind: 'refusal', code: '', message: sentence(why), items: [] }
+			}
 			this.forgetUncertainCall(view)
 			if (view.runbook.auto && !this.runbook.asked)
 				this.loadRunbook()
@@ -810,6 +815,12 @@ export default {
 				this.lastLevel = outage.level
 				this.announced = this.say(outage.message)
 			}
+		},
+		// What a window that is closed under the person says: the run that is open, the switch that is off, or a step that is not for this state.
+		whyClosed(dialog, view) {
+			if (dialog.kind === 'button' || dialog.kind === 'accept')
+				return REFUSALS.not_terminal[0]
+			return view.open ? REFUSALS.run_open[0] : REFUSALS.beta_off[0]
 		},
 		// The words of a call that may have gone through ("it took too long", "no answer") are for as long as the state does not tell: once the state
 		// is another one, or has been read once more since the status that followed the call, they have nothing to add. A refusal is the core's
@@ -946,7 +957,8 @@ export default {
 			this.dialog = spec
 			window.addEventListener('keyup', this.onEscape, true)
 		},
-		closeDialog() {
+		// `moved`: the window was closed under the person, and the focus goes to the title of the section where the sentence that says why is.
+		closeDialog(moved = false) {
 			if (!this.dialog)
 				return
 			const opener = this.opener
@@ -957,7 +969,9 @@ export default {
 			window.removeEventListener('keyup', this.onEscape, true)
 			// the focus goes back to the button that opened the window, or to the state when that button is gone
 			this.$nextTick(() => {
-				if (opener?.isConnected)
+				if (moved)
+					this.$refs.title?.focus?.({ preventScroll: true })
+				else if (opener?.isConnected)
 					opener.focus?.({ preventScroll: true })
 				else
 					this.focusState()
@@ -1038,6 +1052,11 @@ export default {
 
 .os-run-title {
 	font-size: 1rem;
+
+	// it takes the focus when a window closes under the person, to be read: nobody types into it
+	&:focus {
+		outline: none;
+	}
 }
 
 .os-run-state-title,
