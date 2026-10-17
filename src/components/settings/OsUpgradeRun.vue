@@ -902,6 +902,8 @@ export default {
 			const opener = this.opener
 			this.dialog = null
 			this.opener = null
+			// a refusal said in the window goes with it: it was for the step that was asked
+			this.callError = null
 			window.removeEventListener('keyup', this.onEscape, true)
 			// the focus goes back to the button that opened the window, or to the state when that button is gone
 			this.$nextTick(() => {

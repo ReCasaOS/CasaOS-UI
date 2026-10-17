@@ -7,6 +7,8 @@ import { h, nextTick } from 'vue'
 import OsUpgradeRun from './OsUpgradeRun.vue'
 import { ACK_TEXTS, BUTTONS, BUTTON_LABELS, POLL_MS, RESTART_LOOK_AFTER_MS, SAFETY_NET_TEXTS, TEXT, statusView } from './osUpgrade'
 import real from './__fixtures__/os-plan-d11-12.json'
+import en from '@/assets/lang/en_US.json'
+import fr from '@/assets/lang/fr_FR.json'
 import i18n from '@/plugins/i18n'
 
 // require.context has no Vite equivalent: the real English and French tables, in the plugin's own setup (fallback to English,
@@ -526,14 +528,17 @@ describe('the buttons', () => {
 		expect(calls.ackOsUpgrade.mock.calls).toEqual([[{ action: 'acknowledge', word: '' }], [{ action: 'discard', word: '' }]])
 	})
 
-	it('does not send the typed word with a discard or a take-over: the word is for closing', async () => {
+	it('does not send the typed word with a take-over or a discard: the word is for closing', async () => {
 		await open(caseOf('stopped_at_waypoint', { actions: ['acknowledge', 'discard', 'takeover'] }))
 		await wrapper.find('.os-run-word-input').setValue(ACK_WORD)
-		await press('.os-run-button.is-discard')
 		await press('.os-run-button.is-takeover')
 		await press('.os-run-dialog-ok')
+		expect(calls.ackOsUpgrade.mock.calls).toEqual([[{ action: 'manual', word: '' }]])
 
-		expect(calls.ackOsUpgrade.mock.calls).toEqual([[{ action: 'discard', word: '' }], [{ action: 'manual', word: '' }]])
+		// the word was for the state it was typed in: it is typed again
+		await wrapper.find('.os-run-word-input').setValue(ACK_WORD)
+		await press('.os-run-button.is-discard')
+		expect(calls.ackOsUpgrade.mock.calls).toEqual([[{ action: 'manual', word: '' }], [{ action: 'discard', word: '' }]])
 	})
 
 	it('names the check again, and the putting back, as the buttons they are', async () => {
@@ -566,6 +571,37 @@ describe('the buttons', () => {
 		out.resolve({ data: { data: {} } })
 		await tick()
 		expect(wrapper.find('.os-run-button.is-resume').attributes('disabled')).toBeUndefined()
+	})
+
+	it('make one call for a second click on the refresh and on the switch, which have no window to ask first', async () => {
+		await open(status())
+		const out = deferred()
+		calls.startOsRefresh.mockReturnValue(out.promise)
+		const refresh = wrapper.find('.os-run-refresh-button').element
+		refresh.click()
+		refresh.click()
+		// and the switch, in the same breath, is not another call
+		wrapper.find('.os-run-beta-switch').element.click()
+		await tick()
+
+		expect(calls.startOsRefresh).toHaveBeenCalledTimes(1)
+		expect(calls.setOsUpgradeBeta).not.toHaveBeenCalled()
+		expect(wrapper.find('.os-run-refresh-button').classes()).toContain('is-loading')
+		out.resolve({ data: { data: {} } })
+		await tick()
+		expect(wrapper.find('.os-run-refresh-button').classes()).not.toContain('is-loading')
+	})
+
+	it('open no window for a click that comes while a call is out', async () => {
+		await open(caseOf('stopped_at_waypoint', { ack_word: '', actions: ['resume', 'takeover'] }))
+		calls.resumeOsUpgrade.mockReturnValue(deferred().promise)
+
+		wrapper.find('.os-run-button.is-resume').element.click()
+		wrapper.find('.os-run-button.is-takeover').element.click()
+		await tick()
+
+		expect(calls.resumeOsUpgrade).toHaveBeenCalledTimes(1)
+		expect(dialog().exists()).toBe(false)
 	})
 
 	it('say a refusal in a sentence of the page, by its code, and ask the core what it says now', async () => {
@@ -628,6 +664,18 @@ describe('the confirmation windows', () => {
 		expect(calls.rebootOsUpgrade).not.toHaveBeenCalled()
 		// the focus is back on the button that opened it
 		expect(document.activeElement).toBe(opener)
+	})
+
+	it('take a refusal said in the window away with it when they are cancelled', async () => {
+		await open(caseOf('awaiting_reboot'))
+		calls.rebootOsUpgrade.mockImplementation(failure(refused('not_awaiting_reboot', {})))
+		await press('.os-run-button.is-reboot')
+		await press('.os-run-dialog-ok')
+		expect(text('.os-run-dialog .os-run-call-sentence')).toBe('The machine is not waiting for its restart.')
+
+		await press('.os-run-dialog-cancel')
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.find('.os-run-call').exists()).toBe(false)
 	})
 
 	it('make the call once when confirmed, and close', async () => {
@@ -847,6 +895,27 @@ describe('the start of a rehearsal and of the upgrade', () => {
 			acks: ['no_interruption', 'no_way_back', 'sources_paused', 'removals_read'],
 		})
 		expect(dialog().exists()).toBe(false)
+	})
+
+	it('shows the names of the plan cleaned, and sends them as the plan lists them', async () => {
+		const flip = String.fromCharCode(0x202E)
+		const name = `fuse${flip}${String.fromCharCode(7)}-2`
+		const plan = planWith({
+			problems: [{ code: 'removal_manual', severity: 'needs_acceptance', data: { name, version: '2.9.9-5' } }],
+			paused: [{ file: `docker${flip}.list`, hosts: [], docker: true }],
+		})
+		await open(status(), { plan })
+		await press('.os-run-hop')
+
+		expect(unsafeIn(wrapper.find('.os-run-dialog').text())).toEqual([])
+		expect(text('.os-run-removals li')).toMatch(/^fuse\s+-2$/)
+		await fill()
+		await press('.os-run-dialog-ok')
+
+		// what the core compares is what it wrote
+		const body = calls.startOsUpgrade.mock.calls[0][0]
+		expect(body.accept_removals).toEqual([name])
+		expect(body.paused_sources).toEqual([`docker${flip}.list`])
 	})
 
 	it('keeps the button shut while one thing is missing, whichever it is', async () => {
@@ -1080,8 +1149,12 @@ describe('a core that stops answering', () => {
 		wrapper.vm.$watch('announced', value => heard.push(value))
 		getStatus.mockImplementation(failure({}))
 		await tick(POLL_MS.open + POLL_MS.error * 5)
-
 		expect(heard).toEqual(['The machine is restarting. This page goes on by itself.'])
+
+		// and once more when it turns to the screen of the machine, whose sentence has the time in it
+		await tick(RESTART_LOOK_AFTER_MS)
+		expect(heard).toHaveLength(2)
+		expect(heard[1]).toMatch(/^The machine has not answered for 1\d min \d\d s\. Look at its screen/)
 	})
 })
 
@@ -1130,6 +1203,23 @@ describe('the polling', () => {
 		expect(getStatus).toHaveBeenCalledTimes(1)
 		await tick(POLL_MS.open)
 		expect(getStatus).toHaveBeenCalledTimes(2)
+	})
+
+	it('waits for a later ask as it waits for the first: the next one is made 5 seconds after the answer, not after the last ask', async () => {
+		await open(caseOf('running'))
+		const slow = deferred()
+		getStatus.mockReturnValue(slow.promise)
+		await tick(POLL_MS.open)
+		expect(getStatus).toHaveBeenCalledTimes(2)
+
+		await tick(POLL_MS.open * 6)
+		expect(getStatus).toHaveBeenCalledTimes(2)
+		slow.resolve({ data: { data: caseOf('running') } })
+		getStatus.mockImplementation(() => answer(caseOf('running')))
+		await tick(POLL_MS.open - 1)
+		expect(getStatus).toHaveBeenCalledTimes(2)
+		await tick(1)
+		expect(getStatus).toHaveBeenCalledTimes(3)
 	})
 
 	it('does not wait for the poll that is out to ask after a call, and does not ask twice at once', async () => {
@@ -1236,5 +1326,25 @@ describe('the live region', () => {
 		serve(caseOf('failed'))
 		await tick(POLL_MS.idle)
 		expect(wrapper.find('.os-run-live').text()).toBe('The upgrade stopped')
+	})
+})
+
+// ---- the language files --------------------------------------------------------------------------------------------------------
+
+describe('the sentences of the components themselves', () => {
+	// the keys that the templates and the scripts look up besides those of the tables of osUpgrade.js (which its own spec pins)
+	const literals = ['OsUpgradeRun.vue', 'OsUpgradeCopyable.vue'].flatMap((file) => {
+		const code = readFileSync(`src/components/settings/${file}`, 'utf8')
+		return [...code.matchAll(/\$t\('([^']+)'/g)].map(match => match[1])
+	})
+
+	it('are few, and are all in English and in French', () => {
+		const keys = [...new Set(literals)]
+		expect(keys.sort()).toEqual(['Cancel', 'Copied to clipboard', 'Copy', 'Try again', 'Your browser did not allow copying. The text is selected: copy it with Ctrl+C.'])
+		for (const key of keys) {
+			expect(en[key], key).toBe(key)
+			expect(fr[key], key).toBeTruthy()
+			expect(fr[key], key).not.toBe(key)
+		}
 	})
 })
