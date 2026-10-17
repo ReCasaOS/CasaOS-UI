@@ -1105,6 +1105,21 @@ describe('the confirmation windows', () => {
 		expect(calls.rebootOsUpgrade).not.toHaveBeenCalled()
 	})
 
+	it('keep the words of a call that may have gone through while they are said in the window', async () => {
+		await open(caseOf('awaiting_reboot'))
+		calls.rebootOsUpgrade.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		await press('.os-run-button.is-reboot')
+		await press('.os-run-dialog-ok')
+		expect(text('.os-run-dialog .os-run-call-sentence')).toContain('The request took too long')
+
+		await tick(POLL_MS.open * 3)
+		expect(dialog().exists()).toBe(true)
+		expect(text('.os-run-dialog .os-run-call-sentence')).toContain('The request took too long')
+		// and they go with the window
+		await press('.os-run-dialog-cancel')
+		expect(wrapper.find('.os-run-call').exists()).toBe(false)
+	})
+
 	it('keep their button shut while the state on the screen is an old one, and say why', async () => {
 		await open(caseOf('awaiting_reboot'))
 		await press('.os-run-button.is-reboot')
@@ -1604,6 +1619,21 @@ describe('how long the core has been silent', () => {
 		expect(text('.os-run-outage-message')).toBe(RESTARTING)
 		await tick(2 * 60_000)
 		expect(text('.os-run-outage-message')).toMatch(/^The machine has not answered for 1[56] min/)
+	})
+
+	it('counts again from the page being shown, even after a pause shorter than the time between two asks that is taken for a sleep', async () => {
+		await open(caseOf('rebooting'))
+		getStatus.mockImplementation(failure({}))
+		await tick(POLL_MS.open + POLL_MS.error * 3)
+		expect(text('.os-run-outage-elapsed')).toBe('No answer for 30 s.')
+
+		hide(true)
+		await tick(20_000)
+		hide(false)
+		await tick()
+
+		expect(text('.os-run-outage-message')).toBe(RESTARTING)
+		expect(wrapper.find('.os-run-outage-elapsed').exists()).toBe(false)
 	})
 
 	it('counts again when the page was not asking for a long while and the document was not hidden: a closed lid', async () => {
