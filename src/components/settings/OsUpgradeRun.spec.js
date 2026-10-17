@@ -1869,6 +1869,20 @@ describe('the live region', () => {
 	})
 })
 
+// ---- narrow windows ------------------------------------------------------------------------------------------------------------
+
+describe('a narrow window', () => {
+	const style = source.slice(source.indexOf('<style'))
+
+	// Bulma keeps the label of a button on one line (white-space: nowrap), and a long one in French leaves a phone's window
+	it('lets the label of a button wrap, in the section, in its windows and in the copy buttons', () => {
+		const rule = /\.os-run-root :deep\(\.button\)\s*\{([^}]*)\}/.exec(style)
+		expect(rule).not.toBeNull()
+		expect(rule[1]).toMatch(/white-space:\s*normal/)
+		expect(rule[1]).toMatch(/max-width:\s*100%/)
+	})
+})
+
 // ---- the language files --------------------------------------------------------------------------------------------------------
 
 describe('the sentences of the components themselves', () => {

@@ -1162,6 +1162,13 @@ summary {
 	cursor: pointer;
 }
 
+// Bulma keeps the label of a button on one line: a long one (in French) wraps in a narrow window instead of leaving it
+.os-run-root :deep(.button) {
+	max-width: 100%;
+	line-height: 1.3;
+	white-space: normal;
+}
+
 .os-run-word-text {
 	color: var(--casa-text);
 	background: var(--casa-surface-sunken);

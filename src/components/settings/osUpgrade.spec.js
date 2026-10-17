@@ -273,6 +273,23 @@ describe('the language files', () => {
 	})
 })
 
+describe('the French of the run section', () => {
+	it('names the text of the run by one term, the marche à suivre', () => {
+		const keys = UPGRADE_KEYS.filter(key => /text of the (?:run|upgrade)|Its text is yours|This text is yours/.test(key))
+		expect(keys.length).toBeGreaterThanOrEqual(8)
+		for (const key of keys) {
+			expect(fr[key], key).toContain('marche à suivre')
+			expect(fr[key], key).not.toMatch(/\btexte\b/i)
+		}
+	})
+
+	it('says "what you do" so that it reads as what is to be done, and not as what the person is doing', () => {
+		expect(fr[TEXT.failure.todo]).toBe('Ce qu\'il faut faire')
+		for (const key of UPGRADE_KEYS)
+			expect(fr[key], key).not.toMatch(/Ce que vous faites/)
+	})
+})
+
 // ---- the states -----------------------------------------------------------------------------------------------------------
 
 describe('the view of each state', () => {
