@@ -2,6 +2,14 @@ import { api, instance } from './service.js'
 
 const PREFIX = '/sys'
 
+// The name of a module is a path element of the core's routes: only the core's own rule goes into an address.
+const MODULE_NAME = /^[a-z][a-z0-9-]{0,31}$/
+function moduleName(name) {
+	if (typeof name !== 'string' || !MODULE_NAME.test(name))
+		throw new Error('not the name of a module')
+	return name
+}
+
 const sys = {
 
 	// Get websocket port
@@ -226,6 +234,40 @@ const sys = {
 	// run_unreadable. It holds the lines of the machine's package sources as the files have them, so the token goes in the header.
 	getOsUpgradeRunbook() {
 		return instance.get(`/v1${PREFIX}/os/upgrade/runbook?run=current`, { timeout: 15000 })
+	},
+
+	// The modules of this release, which the core installs and removes with its module assistant. Every POST sends one JSON object (`{}` when
+	// it has nothing to say) and the token goes in the Authorization header, which the instance sets, and never in the address. A refusal is a
+	// 409 with the code in data.error_code, and what makes it precise in data.data; a field that is not valid is a 400 bad_request, and a job that
+	// could not be started a 500 start_failed. A core older than the feature answers 404.
+
+	// What the catalogue of this release offers, joined with what is installed: { catalogue: { ok, error? }, modules: [{ name, title, description,
+	// tier, tag, installed: { version } | null, system: { supported, reasons }, broken?, catalogue }] }. It runs no apt.
+	getModules() {
+		return instance.get(`/v1${PREFIX}/modules`, { timeout: 35000 })
+	},
+
+	// The plan of an install, with the machine unchanged: always 200, with `refused` set when it cannot go ahead. The core makes it for up to a
+	// minute (a simulation of apt), so the call waits a little longer; `signal` lets the person cancel the wait.
+	planModule(name, signal) {
+		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/plan`, {}, { timeout: 70000, signal })
+	},
+
+	// Installs the module for the plan that the person read: data is { plan_id }, and nothing else is sent. 202 with { job, status }, or 409 with
+	// plan_changed when the plan is no longer the one that was read. The core makes the plan again before it starts, which can take a minute.
+	installModule(name, data) {
+		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/install`, { plan_id: data?.plan_id }, { timeout: 130000 })
+	},
+
+	// Removes the module: its service and the files it put down. Never its packages or its data. 202 with { job, status }.
+	removeModule(name) {
+		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/remove`, {}, { timeout: 70000 })
+	},
+
+	// How the job of the module is going, or how it went: { job: { name, state, step, code, undo, kept_packages, started_at, ended_at, log_tail },
+	// status: { installed, version, unit, route } }. It runs no apt and is safe to ask every few seconds.
+	getModuleStatus(name) {
+		return instance.get(`/v1${PREFIX}/modules/${moduleName(name)}/status`, { timeout: 20000 })
 	},
 
 	// stop casaos

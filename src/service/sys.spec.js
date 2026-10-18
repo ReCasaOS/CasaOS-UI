@@ -242,3 +242,85 @@ describe('upgrade of the operating system client', () => {
 		expect(sent().params).toBeUndefined()
 	})
 })
+
+describe('modules client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	const PLAN = `m1-${'ab'.repeat(16)}`
+
+	it('asks for the list from its own route, sends nothing, and waits a little longer than the core', async () => {
+		await sys.getModules()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/modules')
+		expect(sent().data).toBeUndefined()
+		expect(sent().params).toBeUndefined()
+		expect(sent().timeout).toBe(35000)
+	})
+
+	it('asks for the plan with an empty object, waits longer than the minute the core takes, and passes the cancel signal on', async () => {
+		const controller = new AbortController()
+		await sys.planModule('virt', controller.signal)
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/modules/virt/plan')
+		expect(sent().data).toBe('{}')
+		expect(sent().timeout).toBe(70000)
+		expect(sent().signal).toBe(controller.signal)
+	})
+
+	// the core refuses a body with a field it does not know: nothing but the id goes
+	it('installs with the plan id and nothing else', async () => {
+		await sys.installModule('virt', { plan_id: PLAN, name: 'other', rehearsal: true })
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/modules/virt/install')
+		expect(JSON.parse(sent().data)).toEqual({ plan_id: PLAN })
+		expect(sent().timeout).toBe(130000)
+	})
+
+	it('installs with no plan id as an empty object, which the core refuses by name, and not with a made-up one', async () => {
+		await sys.installModule('virt')
+		expect(sent().data).toBe('{}')
+	})
+
+	it('removes with an empty object', async () => {
+		await sys.removeModule('virt')
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/modules/virt/remove')
+		expect(sent().data).toBe('{}')
+		expect(sent().timeout).toBe(70000)
+	})
+
+	it('asks how the job is going from the status of the module, and sends nothing', async () => {
+		await sys.getModuleStatus('virt')
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/modules/virt/status')
+		expect(sent().data).toBeUndefined()
+		expect(sent().timeout).toBe(20000)
+	})
+
+	// the name is a piece of the address: only the core's own rule goes into one, and no request is made for anything else
+	it.each(['', '../sys', 'virt/plan', 'virt?x=1', 'Virt', 'a b', '1virt', 'virt\n', 'v'.repeat(33), undefined, null, 5, {}, ['virt']])('puts no name like %j in an address', (name) => {
+		for (const call of [sys.planModule, sys.installModule, sys.removeModule, sys.getModuleStatus])
+			expect(() => call(name, { plan_id: PLAN })).toThrow('not the name of a module')
+		expect(adapter).not.toHaveBeenCalled()
+	})
+
+	// The token goes in the header, which the instance sets, and in no address, body or query.
+	it.each([
+		['getModules', []],
+		['planModule', ['virt']],
+		['installModule', ['virt', { plan_id: PLAN }]],
+		['removeModule', ['virt']],
+		['getModuleStatus', ['virt']],
+	])('%s carries the access token in the Authorization header and nowhere else', async (name, args) => {
+		localStorage.setItem('access_token', 'the-access-token')
+		try {
+			await sys[name](...args)
+		} finally {
+			localStorage.removeItem('access_token')
+		}
+		expect(sent().headers.Authorization).toBe('the-access-token')
+		expect(sent().url).not.toContain('the-access-token')
+		expect(JSON.stringify(sent().data ?? '')).not.toContain('the-access-token')
+		expect(sent().params).toBeUndefined()
+	})
+})
