@@ -513,6 +513,7 @@ import {
 	nextJobPoll,
 	reasonMessage,
 } from './osModules'
+import events from '@/events/events'
 
 // How many modules are asked about a job when the window opens, how many at the same time, and how long the whole look may take: a status that hangs
 // does not shut the buttons for longer than that, and the core refuses a job while another runs whatever the page knew.
@@ -870,6 +871,8 @@ export default {
 			if (!view.running) {
 				this.follow = ''
 				this.refreshList()
+				// the dashboard shows the cards of the modules that are there now
+				this.$EventBus?.$emit(events.MODULES_CHANGED)
 			}
 		},
 		fail({ kind, code }) {

@@ -105,6 +105,9 @@ async function settle() {
 		await tick()
 }
 
+// what the window tells the rest of the dashboard
+const eventBus = { $emit: vi.fn() }
+
 // the core says each of these in turn, and the last one for ever
 function serveJob(...answers) {
 	let index = 0
@@ -117,7 +120,7 @@ async function open(list = listRaw(), options = {}) {
 		calls.getModules.mockImplementation(() => answer(list))
 	wrapper = mount(ModulesModal, {
 		attachTo: document.body,
-		global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls } } },
+		global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls }, $EventBus: eventBus } },
 		...options,
 	})
 	await settle()
@@ -943,6 +946,19 @@ describe('the job', () => {
 			await tick(60000)
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(asked)
 			expect(vi.getTimerCount()).toBe(0)
+		})
+
+		it('tells the dashboard when a job is over, once, so that its card comes or goes without a reload', async () => {
+			const emit = eventBus.$emit
+			emit.mockClear()
+			await running('route')
+			expect(emit).not.toHaveBeenCalled()
+			serveJob(jobAnswer({ state: 'succeeded', step: 'done' }, { installed: true }))
+			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
+			await tick(MODULE_POLL_MS.running)
+			await tick(60000)
+
+			expect(emit.mock.calls).toEqual([['modulesChanged']])
 		})
 
 		it('says when the job is done: the steps are done, the card appears where the service answers, and the buttons come back', async () => {

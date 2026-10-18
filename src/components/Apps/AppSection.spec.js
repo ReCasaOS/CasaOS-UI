@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
-import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
+import { forgetVirtualMachines, hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -14,6 +14,7 @@ vi.mock('lottie-web-vue', () => ({ default: { name: 'lottie-animation', template
 vi.mock('@/components/VirtualMachines/entry', async importOriginal => ({
 	...await importOriginal(),
 	hasVirtualMachines: vi.fn(),
+	forgetVirtualMachines: vi.fn(),
 	vmApplication: () => ({ name: 'Virtual Machines' }),
 }))
 
@@ -173,5 +174,38 @@ describe('app section virtual machines card', () => {
 
 		expect(names(vm)).toEqual(['App Store', 'Files'])
 		expect(vm.saveSortData).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('app section when a module is installed or removed', () => {
+	const grid = apps => ({ appList: apps.map(name => ({ name })), sortApps: AppSection.methods.sortApps })
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('asks the gateway again, and adds the card where the module answers now', async () => {
+		hasVirtualMachines.mockResolvedValue(true)
+		const vm = grid(['App Store', 'Files'])
+
+		await AppSection.methods.syncVmCard.call(vm)
+
+		expect(forgetVirtualMachines).toHaveBeenCalled()
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Virtual Machines'])
+	})
+
+	it('takes the card away where the module does not answer any more', async () => {
+		hasVirtualMachines.mockResolvedValue(false)
+		const vm = grid(['App Store', 'Files', 'Virtual Machines'])
+
+		await AppSection.methods.syncVmCard.call(vm)
+
+		expect(names(vm)).toEqual(['App Store', 'Files'])
+	})
+
+	it('changes nothing when the card already says what the gateway says', async () => {
+		hasVirtualMachines.mockResolvedValue(true)
+		const vm = grid(['App Store', 'Virtual Machines'])
+
+		await AppSection.methods.syncVmCard.call(vm)
+
+		expect(names(vm)).toEqual(['App Store', 'Virtual Machines'])
 	})
 })

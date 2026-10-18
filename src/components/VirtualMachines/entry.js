@@ -31,7 +31,7 @@ export function vmApplication() {
 }
 
 // Whether the virtual machine module (CasaOS-VirtManagement) answers through
-// the gateway. Asked once per page load: the module does not come and go.
+// the gateway. Asked once, until a module is installed or removed (forgetVirtualMachines).
 export function hasVirtualMachines() {
 	if (!probe) {
 		// the HTTP client is loaded here, not at the top: the app grid imports this
@@ -45,6 +45,12 @@ export function hasVirtualMachines() {
 		})
 	}
 	return probe
+}
+
+// Forgets the answer, for when a module was installed or removed: the next
+// question goes to the gateway again.
+export function forgetVirtualMachines() {
+	probe = null
 }
 
 // Opens the page in a modal, or on a tab of its own when the App launching
