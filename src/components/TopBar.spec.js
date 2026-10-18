@@ -416,14 +416,35 @@ describe('the modules row', () => {
 		return vm
 	}
 
-	// An answer of the core, whatever the catalogue says: the window is the one that says that nothing is offered.
-	it('shows once the core answers', async () => {
-		const vm = bar({ getModules: vi.fn(() => Promise.resolve({ data: { success: 200, data: { catalogue: { ok: false, error: 'none' }, modules: [] } } })) })
+	// What the row does with an answer of the core.
+	const mod = (name, installed = null) => ({ name, installed })
+	async function shows(data) {
+		const vm = bar({ getModules: vi.fn(() => Promise.resolve({ data: { success: 200, data } })) })
 
 		vm.getModules()
 		await flushPromises()
 
-		expect(vm.modulesAvailable).toBe(true)
+		return vm.modulesAvailable
+	}
+
+	it('shows no row for an empty catalogue with nothing installed', async () => {
+		expect(await shows({ catalogue: { ok: true }, modules: [] })).toBe(false)
+	})
+
+	it('shows no row for a failed catalogue with nothing installed', async () => {
+		expect(await shows({ catalogue: { ok: false, error: 'none' }, modules: [] })).toBe(false)
+	})
+
+	it('shows no row for modules listed under a failed catalogue when none is installed', async () => {
+		expect(await shows({ catalogue: { ok: false, error: 'bad' }, modules: [mod('a')] })).toBe(false)
+	})
+
+	it('shows a row for one offered module', async () => {
+		expect(await shows({ catalogue: { ok: true }, modules: [mod('a')] })).toBe(true)
+	})
+
+	it('shows a row for an installed module even when the catalogue is missing', async () => {
+		expect(await shows({ catalogue: { ok: false, error: 'none' }, modules: [mod('a', { version: '1' })] })).toBe(true)
 	})
 
 	// A core older than the feature answers 404: no row that could not work.

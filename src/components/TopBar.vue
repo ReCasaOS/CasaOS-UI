@@ -852,10 +852,13 @@ export default {
 			})
 		},
 
-		// Asked once, from mounted(): the window reads the list itself.
+		// Asked once, from mounted(): the window reads the list itself. The row shows only
+		// when something is offered, or when something is installed (to be managed).
 		getModules() {
-			this.$api.sys.getModules().then(() => {
-				this.modulesAvailable = true
+			this.$api.sys.getModules().then((res) => {
+				const d = res?.data?.data
+				const list = Array.isArray(d?.modules) ? d.modules : []
+				this.modulesAvailable = (d?.catalogue?.ok === true && list.length > 0) || list.some(m => m.installed)
 			}).catch(() => {})
 		},
 
