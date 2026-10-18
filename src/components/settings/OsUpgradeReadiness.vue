@@ -137,7 +137,7 @@ export default {
 			return Boolean(this.view || this.error)
 		},
 		report() {
-			return { asked: Boolean(this.view), busy: this.busy, failed: Boolean(this.error), state: this.view?.state ?? '' }
+			return { asked: Boolean(this.view), busy: this.busy, failed: Boolean(this.error), state: this.view?.state ?? '', warnings: this.view?.warnings.length ?? 0 }
 		},
 		sections() {
 			if (!this.view)

@@ -809,7 +809,8 @@ export default {
 		take(view) {
 			const before = this.view
 			const note = announcement(before, view)
-			if (note)
+			// inside the guide, the guide says it: one announcement for one change
+			if (note && !this.wizard)
 				this.announced = this.$t(note.key, note.params)
 			// the word that was typed is for the state it was typed in
 			if (before && before.changeKey !== view.changeKey)
@@ -849,7 +850,8 @@ export default {
 			const outage = this.outage
 			if (outage?.message && outage.level !== this.lastLevel) {
 				this.lastLevel = outage.level
-				this.announced = this.say(outage.message)
+				if (!this.wizard)
+					this.announced = this.say(outage.message)
 			}
 		},
 		// What a window that is closed under the person says: the run that is open, the switch that is off, or a step that is not for this state.
@@ -1045,8 +1047,9 @@ export default {
 				this.$nextTick(() => element.focus?.({ preventScroll: true }))
 			}
 		},
+		// the state that took the place of the button that was pressed; inside the guide, the guide's sentence says what is next
 		focusState() {
-			this.$refs.stateTitle?.focus?.({ preventScroll: true })
+			((this.wizard && document.getElementById('os-wizard-next')) || this.$refs.stateTitle)?.focus?.({ preventScroll: true })
 		},
 		// A button that was pressed goes with the state it was for, and the focus with it: it goes to the state that took its place.
 		focusIfLost() {

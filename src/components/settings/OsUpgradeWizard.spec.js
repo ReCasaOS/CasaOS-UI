@@ -46,7 +46,7 @@ const order = []
 const calls = {}
 
 function reset() {
-	Object.assign(core, { beta: false, run: null, extra: {}, plan: null, planJob: 'idle', report: REPORT, down: false })
+	Object.assign(core, { made: null, plannable: true, beta: false, run: null, extra: {}, idleExtra: {}, plan: null, planJob: 'idle', report: REPORT, down: false })
 	order.length = 0
 }
 const answer = data => Promise.resolve({ data: { success: 200, message: 'ok', data } })
@@ -54,7 +54,7 @@ const refused = (error_code, data) => ({ response: { status: 409, data: { succes
 
 function statusNow() {
 	if (!core.run)
-		return raw('idle', { beta_enabled: core.beta })
+		return raw('idle', { beta_enabled: core.beta, ...core.idleExtra })
 	const wanted = CASES[core.run]
 	return raw(core.run, { beta_enabled: core.beta, ...wanted.extra, actions: wanted.actions, ...core.extra })
 }
@@ -67,9 +67,11 @@ function makeCalls() {
 	Object.assign(calls, {
 		getOsUpgradeStatus: vi.fn(() => core.down ? Promise.reject(Object.assign(new Error('x'), { request: {} })) : answer(statusNow())),
 		getOsReadiness: log('readiness', () => answer(core.report)),
-		getOsPlan: vi.fn(() => answer(core.planJob === 'done' ? { plannable: true, state: 'done', started_at: '2026-10-12T09:30:00Z', finished_at: '2026-10-12T09:34:10Z', expires_at: core.plan.expires_at, plan: core.plan } : core.planJob === 'running' ? { plannable: true, state: 'running', phase: 'sources', started_at: '2026-10-12T09:59:00Z' } : { plannable: true, state: 'idle' })),
+		getOsPlan: vi.fn(() => answer(core.plannable === false ? { plannable: false, reason: 'not_ready', state: 'idle' } : core.planJob === 'done' ? { plannable: true, state: 'done', started_at: '2026-10-12T09:30:00Z', finished_at: '2026-10-12T09:34:10Z', expires_at: (core.made ?? core.plan).expires_at, plan: core.made ?? core.plan } : core.planJob === 'running' ? { plannable: true, state: 'running', phase: 'sources', started_at: '2026-10-12T09:59:00Z' } : { plannable: true, state: 'idle' })),
 		startOsPlan: log('plan', () => {
 			core.planJob = 'running'
+			// the plan that is made again is made now, and has the same id: the machine is the same
+			core.made = { ...real, made_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString() }
 			return answer({ plannable: true, state: 'running', phase: 'sources', started_at: '2026-10-12T09:59:00Z' })
 		}),
 		getOsRunbook: vi.fn(() => answer({})),
@@ -124,6 +126,14 @@ const current = () => wrapper.find('.os-wizard-step[aria-current="step"]')
 const currentTitle = () => current().find('.os-wizard-step-title').text()
 const stepStates = () => wrapper.findAll('.os-wizard-step-state').map(item => item.text())
 const dialog = () => wrapper.find('.os-run-dialog')
+
+// the machine is checked first, as the guide asks: for the tests that begin after it
+async function openChecked(props = {}) {
+	await open(props)
+	if (currentTitle().includes('Check the machine') && primary().exists())
+		await click('.os-wizard-primary')
+	return wrapper
+}
 
 async function click(selector) {
 	await wrapper.find(selector).trigger('click')
@@ -273,7 +283,7 @@ describe('the journey from a clean Debian 11 to the verdict', () => {
 		await press()
 		await press()
 		await click('.os-run-dialog-ok')
-		expect(text('.os-wizard-live')).toBe('Now at step 2 of 6: Bring the current release up to date')
+		expect(text('.os-wizard-live')).toBe(`Now at step 2 of 6: Bring the current release up to date ${NEXT.refresh_idle}`)
 		// polls that change nothing say nothing more
 		const said = text('.os-wizard-live')
 		await tick(POLL_MS.open * 3)
@@ -292,7 +302,8 @@ describe('the journey from a clean Debian 11 to the verdict', () => {
 describe('a reload in the middle of each step', () => {
 	it.each([
 		['the switch is off', { beta: false }, 'Check the machine'],
-		['the switch is on and nothing else is known', { beta: true }, 'Bring the current release up to date'],
+		['the switch is on and nothing else is known', { beta: true }, 'Check the machine'],
+		['the switch is on and a refresh is behind', { beta: true, idleExtra: { last_refresh_at: '2026-10-12T08:00:00Z' } }, 'Prepare the plan'],
 		['the refresh runs', { beta: true, run: 'refreshing' }, 'Bring the current release up to date'],
 		['the refresh asks for a restart', { beta: true, run: 'reboot_first' }, 'Bring the current release up to date'],
 		['the refresh is done', { beta: true, run: 'refreshed' }, 'Bring the current release up to date'],
@@ -379,7 +390,7 @@ describe('a call that is refused', () => {
 	it('shows its sentence in the window of the step, and the guide stays where it was', async () => {
 		Object.assign(core, { beta: true })
 		calls.startOsRefresh.mockImplementation(() => Promise.reject(refused('busy', { reason: 'apt' })))
-		await open()
+		await openChecked()
 		await press()
 		await click('.os-run-dialog-ok')
 		expect(text('.os-run-dialog .os-run-call-sentence')).toBe('Another package manager is at work on this machine. Wait for it to end, then try again.')
@@ -453,7 +464,7 @@ describe('the plan and the refresh', () => {
 
 	it('does not ask for the plan by itself again after it failed', async () => {
 		Object.assign(core, { beta: true })
-		await open()
+		await openChecked()
 		await click('.os-wizard-secondary')
 		expect(calls.startOsPlan).toHaveBeenCalledTimes(1)
 		core.planJob = 'failed'
@@ -508,7 +519,7 @@ describe('one click, one call', () => {
 describe('the window around the guide', () => {
 	it('puts the focus in the window and back on the button that opened it', async () => {
 		Object.assign(core, { beta: true })
-		await open()
+		await openChecked()
 		await press()
 		expect(dialog().exists()).toBe(true)
 		await tick()
@@ -521,6 +532,7 @@ describe('the window around the guide', () => {
 	it('closes only the window that is on top at Escape', async () => {
 		Object.assign(core, { beta: true })
 		const modal = await open({ os: { id: 'debian', version_id: '11', codename: 'bullseye', pretty_name: 'Debian GNU/Linux 11 (bullseye)', arch: 'amd64', known: true, support: { state: 'security_ended', ends: '2026-08-31', precision: 'day' }, next: { id: 'debian', version_id: '12', codename: 'bookworm', pretty_name: 'Debian 12 (bookworm)', state: 'report' } } }, OsSupportModal)
+		await press()
 		await press()
 		expect(dialog().exists()).toBe(true)
 		window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
@@ -540,7 +552,7 @@ describe('the window around the guide', () => {
 
 	it('clears its timers when the window closes', async () => {
 		Object.assign(core, { beta: true })
-		await open()
+		await openChecked()
 		wrapper.unmount()
 		wrapper = null
 		expect(vi.getTimerCount()).toBe(0)
@@ -555,5 +567,257 @@ describe('the window around the guide', () => {
 		expect(text('.os-wizard-position')).toBe('Étape 1 sur 6 : Vérifier la machine')
 		expect(primary().text()).toBe('Continuer')
 		expect(wrapper.find('nav').attributes('aria-label')).toBe('Étapes de la mise à niveau')
+	})
+})
+
+// ---- the second round: the core's time of the refresh, the plan asked again, and the words of a state that offers nothing -----------
+
+describe('the plan, the check and the refresh, as the core tells them', () => {
+	it('asks for the plan again, and takes the new one, when the core says the refresh came after it (same id, other time)', async () => {
+		Object.assign(core, { beta: true, planJob: 'done', plan: real, idleExtra: { last_refresh_at: '2026-10-12T09:50:00Z' } })
+		await open()
+		expect(order).toEqual(['plan'])
+		expect(currentTitle()).toContain('Prepare the plan')
+		core.planJob = 'done'
+		await tick(1000)
+		expect(currentTitle()).toContain('Rehearse')
+		expect(calls.startOsPlan).toHaveBeenCalledTimes(1)
+		expect(stepStates()[1]).toBe('Done')
+	})
+
+	it('asks the core again whether a plan can be made when the step is reached, and when the person asks', async () => {
+		Object.assign(core, { beta: true, plannable: false, idleExtra: { last_refresh_at: '2026-10-12T09:50:00Z' } })
+		await open()
+		expect(currentTitle()).toContain('Prepare the plan')
+		expect(primary().text()).toBe('Try again')
+		expect(wrapper.find('details.is-plan').attributes('open')).toBeDefined()
+		const asked = calls.getOsPlan.mock.calls.length
+		// the machine is mended: one press, and the plan is asked for
+		core.plannable = true
+		await press()
+		expect(calls.getOsPlan.mock.calls.length).toBeGreaterThan(asked)
+		expect(calls.startOsPlan).toHaveBeenCalledTimes(1)
+	})
+
+	it('asks again by itself when the check is made again while the plan cannot be made', async () => {
+		Object.assign(core, { beta: true, plannable: false, idleExtra: { last_refresh_at: '2026-10-12T09:50:00Z' } })
+		await open()
+		const asked = calls.getOsPlan.mock.calls.length
+		core.plannable = true
+		await wrapper.findComponent({ name: 'OsUpgradeReadiness' }).vm.check()
+		await tick()
+		await tick(1000)
+		expect(calls.getOsPlan.mock.calls.length).toBeGreaterThan(asked)
+	})
+
+	it('shows why nothing is offered when the core never says whether a plan can be made, and a button to try again', async () => {
+		Object.assign(core, { beta: true, idleExtra: { last_refresh_at: '2026-10-12T09:50:00Z' } })
+		calls.getOsPlan.mockImplementation(() => Promise.reject(Object.assign(new Error('x'), { request: {} })))
+		await open()
+		// the section cannot read the plan's state: it is a plan that cannot be made, for now, and the person can ask again
+		expect(text('.os-wizard-next')).toBe(NEXT.plan_unavailable)
+		expect(text('.os-wizard-step.is-blocked .os-wizard-step-reason')).toContain('A plan cannot be made on this machine just now.')
+		expect(primary().text()).toBe('Try again')
+	})
+
+	it('asks for the check before the refresh when the switch is on after a reload', async () => {
+		Object.assign(core, { beta: true })
+		await open()
+		expect(currentTitle()).toContain('Check the machine')
+		expect(calls.startOsRefresh).not.toHaveBeenCalled()
+		expect(primary().text()).toBe('Continue')
+	})
+
+	it('keeps the check open on a report with points to look at until the person says they read them, and opens the report', async () => {
+		core.report = { ...REPORT, state: 'attention', counts: { refuse: 0, warn: 2, ok: 1, info: 0 }, checks: [{ code: 'containers_policy', severity: 'warn', title: 't', detail: 'd', data: { unknown: false, names: ['a'] }, action: 'none' }, { code: 'ram', severity: 'warn', title: 't', detail: 'd', data: { unknown: false }, action: 'none' }, { code: 'merged_usr', severity: 'ok', title: 't', detail: 'd', data: { unknown: false }, action: 'none' }] }
+		await open()
+		await press()
+		expect(text('.os-wizard-next')).toContain('points to look at')
+		expect(primary().text()).toBe('I have read the points')
+		expect(wrapper.find('details.is-check').attributes('open')).toBeDefined()
+		await press()
+		expect(primary().text()).toBe('Switch the upgrade on')
+		expect(calls.setOsUpgradeBeta).not.toHaveBeenCalled()
+	})
+
+	it('says that "I already did it" is not checked, and keeps the step unconfirmed', async () => {
+		Object.assign(core, { beta: true })
+		await openChecked()
+		expect(text('.os-wizard-note')).toBe('Only if you really did: this page cannot check.')
+		expect(wrapper.find('.os-wizard-secondary').attributes('aria-describedby')).toBe('os-wizard-secondary-note')
+		await click('.os-wizard-secondary')
+		expect(stepStates()[1]).toBe('Not confirmed')
+		expect(currentTitle()).toContain('Prepare the plan')
+	})
+
+	it('opens the plan when it is the plan that stops the upgrade', async () => {
+		Object.assign(core, { beta: true, planJob: 'done', plan: { ...real, verdict: 'blocked' } })
+		await open()
+		expect(text('.os-wizard-next')).toBe(NEXT.start_blocked)
+		expect(wrapper.find('details.is-plan').attributes('open')).toBeDefined()
+		expect(text('.os-wizard-why')).toBe('The plan has a problem that nothing can accept.')
+	})
+})
+
+describe('the restart that is not offered, and the one that cannot be seen', () => {
+	it('blocks the last step with the red checks and says the restart is offered again when they are mended', async () => {
+		Object.assign(core, { beta: true, run: 'awaiting_reboot', extra: { actions: ['takeover'], barrier: { ok: false, checks: [{ code: 'fstab_unresolved', ok: false, severity: 'refuse' }] } } })
+		await open()
+		expect(primary().exists()).toBe(false)
+		expect(text('.os-wizard-next')).toBe(NEXT.finish_barrier)
+		expect(wrapper.find('.os-wizard-step.is-blocked').text()).toContain('Restart and check')
+		const said = text('.os-wizard-live')
+		// mended: the core offers the restart, and the guide says so, once
+		core.extra = {}
+		core.run = 'awaiting_reboot'
+		await tick(POLL_MS.open)
+		expect(primary().text()).toBe('Restart now')
+		expect(text('.os-wizard-live')).not.toBe(said)
+		expect(text('.os-wizard-live')).toContain(NEXT.finish_restart)
+		expect(text('.os-run-live')).toBe('')
+	})
+
+	it('offers to go on when the core kept the refresh at its restart and cannot tell the machine restarted', async () => {
+		Object.assign(core, { beta: true, run: 'reboot_first', extra: { boot_unknown: true } })
+		await open()
+		expect(wrapper.find('.os-wizard-secondary').text()).toBe('Already restarted? Continue')
+		await click('.os-wizard-secondary')
+		expect(calls.ackOsUpgrade).toHaveBeenLastCalledWith({ action: 'acknowledge', word: '' })
+	})
+
+	it('shows an old interruption before the point of no return as stopped, with the buttons of the state', async () => {
+		Object.assign(core, { beta: true, run: 'interrupted', extra: { pnr: false, half_upgraded: false, last_activity_at: '2026-10-12T08:00:00Z' } })
+		await open()
+		expect(primary().exists()).toBe(false)
+		expect(wrapper.find('.os-wizard-step.is-stopped').exists()).toBe(true)
+		expect(text('.os-wizard-why')).toBe('The operation stopped at this step. Read why below.')
+	})
+
+	it('does not call a verdict that was taken over by hand a finished upgrade', async () => {
+		Object.assign(core, { beta: true, run: 'manual_done' })
+		await open()
+		expect(primary().text()).toBe('Finish')
+		await press()
+		await tick(POLL_MS.idle)
+		expect(text('.os-wizard-next')).not.toBe(TEXT.finished)
+	})
+
+	it('keeps the steps nobody confirmed unconfirmed when the upgrade is finished, and says what had findings', async () => {
+		Object.assign(core, { beta: true, run: 'succeeded_with_findings' })
+		await open()
+		await press()
+		await tick(POLL_MS.idle)
+		expect(text('.os-wizard-next')).toBe(TEXT.finished)
+		expect(stepStates()).toEqual(['Done', 'Not confirmed', 'Done', 'Not confirmed', 'Done', 'Done with findings'])
+	})
+})
+
+describe('what is read aloud, and where the focus goes', () => {
+	it('says a change once, in the guide, and not in the operation as well', async () => {
+		Object.assign(core, { beta: true })
+		await openChecked()
+		await press()
+		await click('.os-run-dialog-ok')
+		expect(text('.os-run-live')).toBe('')
+		const said = text('.os-wizard-live')
+		expect(said).toContain(NEXT.refresh_working)
+		await becomes('refreshing', { kind: 'refresh' })
+		await tick(POLL_MS.open * 2)
+		expect(text('.os-wizard-live')).toBe(said)
+		expect(text('.os-run-live')).toBe('')
+	})
+
+	it('puts the focus on the sentence of the guide when the button goes inside a step', async () => {
+		Object.assign(core, { beta: true })
+		await openChecked()
+		await press()
+		await click('.os-run-dialog-ok')
+		expect(primary().exists()).toBe(false)
+		expect(document.activeElement).toBe(wrapper.find('.os-wizard-next').element)
+	})
+})
+
+describe('the rehearsal is closed by itself only right after the person put the machine back', () => {
+	it('does not remember the word when the press was ignored because a call was out', async () => {
+		Object.assign(core, { beta: true, run: 'rehearsed' })
+		await open()
+		let release
+		calls.ackOsUpgrade.mockImplementation(() => new Promise((resolve) => {
+			release = () => resolve({ data: { data: {} } })
+		}))
+		// a call of the operation is out: the guide's press is ignored
+		wrapper.findComponent({ name: 'OsUpgradeRun' }).vm.acting = 'abort'
+		await tick()
+		await wrapper.vm.go('discard')
+		expect(wrapper.vm.memory.closeRehearsal).toBe(false)
+		expect(calls.ackOsUpgrade).not.toHaveBeenCalled()
+		release?.()
+	})
+
+	it('closes the ended rehearsal once, and not again at the next answer', async () => {
+		Object.assign(core, { beta: true, run: 'rehearsed' })
+		await open()
+		await press()
+		await tick(POLL_MS.open * 3)
+		expect(calls.ackOsUpgrade.mock.calls.map(call => call[0].action)).toEqual(['discard', 'acknowledge'])
+		expect(wrapper.vm.memory.closeRehearsal).toBe(false)
+	})
+})
+
+describe('a refusal at each step: the guide stays, and the sentence is shown', () => {
+	const WINDOW = '.os-run-dialog .os-run-call-sentence'
+	const SECTION = '.os-run-call-sentence'
+	const MATRIX = [
+		['the beta switch', { beta: false }, 'beta', 'run_open', 'An upgrade is open. Finish it or close it first.', WINDOW, 'Check the machine', ['check', 'press']],
+		['the refresh', { beta: true }, 'refresh', 'busy', 'Another package manager is at work on this machine. Wait for it to end, then try again.', WINDOW, 'Bring the current release up to date', ['check']],
+		['the rehearsal', { beta: true, planJob: 'done', plan: real }, 'start', 'no_plan', 'There is no plan to start from. Make the plan first.', WINDOW, 'Rehearse', ['confirm']],
+		['the putting back', { beta: true, run: 'rehearsed' }, 'ack', 'not_terminal', null, SECTION, 'Rehearse', []],
+		['the close of the refresh', { beta: true, run: 'refreshed' }, 'ack', 'not_terminal', null, SECTION, 'Bring the current release up to date', []],
+		['the upgrade', { beta: true, planJob: 'done', plan: real }, 'start', 'hostname_mismatch', 'The name you typed is not the name of this machine.', WINDOW, 'Start the upgrade', ['skip', 'confirm']],
+		['the restart', { beta: true, run: 'awaiting_reboot' }, 'reboot', 'busy', null, WINDOW, 'Restart and check', ['dialog']],
+		['the last close', { beta: true, run: 'succeeded' }, 'ack', 'not_terminal', null, SECTION, 'Restart and check', []],
+	]
+
+	it.each(MATRIX)('at %s', async (_, given, call, code, sentence, where, title, how) => {
+		Object.assign(core, given)
+		const key = { beta: 'setOsUpgradeBeta', refresh: 'startOsRefresh', start: 'startOsUpgrade', ack: 'ackOsUpgrade', reboot: 'rebootOsUpgrade' }[call]
+		calls[key].mockImplementation(() => Promise.reject(refused(code, {})))
+		await open()
+		// the steps before the one under test are played as a person plays them
+		if (how.includes('check'))
+			await press()
+		if (how.includes('skip'))
+			await click('.os-wizard-secondary')
+		await press()
+		if (given.beta === false || call === 'refresh' || call === 'reboot' || call === 'start') {
+			if (how.includes('confirm'))
+				await confirm({ hop: title === 'Start the upgrade' })
+			else if (dialog().exists() || wrapper.find('.os-run-dialog-ok').exists())
+				await click('.os-run-dialog-ok')
+		}
+		expect(wrapper.find(where).exists()).toBe(true)
+		if (sentence)
+			expect(text(where)).toBe(sentence)
+		expect(currentTitle()).toContain(title)
+		expect(calls[key]).toHaveBeenCalledTimes(1)
+	})
+
+	it('at the check: a report that could not be read is said, and the step stays', async () => {
+		calls.getOsReadiness.mockImplementation(() => Promise.reject(Object.assign(new Error('x'), { response: { status: 500, data: {} } })))
+		await open()
+		await press()
+		expect(wrapper.find('.os-readiness-error').exists()).toBe(true)
+		expect(currentTitle()).toContain('Check the machine')
+		expect(primary().text()).toBe('Check again')
+	})
+
+	it('at the plan: a plan that is refused is said by its section, and the step stays', async () => {
+		Object.assign(core, { beta: true, idleExtra: { last_refresh_at: '2026-10-12T09:50:00Z' } })
+		calls.startOsPlan.mockImplementation(() => Promise.reject(refused('busy', { reason: 'apt' })))
+		await open()
+		await tick()
+		expect(wrapper.find('.os-plan-failure').exists()).toBe(true)
+		expect(currentTitle()).toContain('Prepare the plan')
+		expect(primary().text()).toBe('Continue')
 	})
 })

@@ -1417,6 +1417,14 @@ function causeOf(raw) {
 // ---- the status ---------------------------------------------------------------------------------------------------------
 
 const MAX_LOG_LINES = 200
+// a moment the core wrote, in milliseconds, or null: a string that is a time, after the year 2000 and not more than a day ahead of this machine
+const A_DAY = 24 * 3600 * 1000
+function momentMs(value) {
+	if (typeof value !== 'string' || value.length > 64)
+		return null
+	const ms = Date.parse(value)
+	return Number.isFinite(ms) && ms > 946684800000 && ms < Date.now() + A_DAY ? ms : null
+}
 const SUCCEEDED = ['succeeded', 'succeeded_with_findings']
 const WAITING_FOR_RESTART = ['awaiting_reboot', 'reboot_stalled']
 
@@ -1465,6 +1473,12 @@ export function statusView(raw, locale = 'en_us') {
 		step,
 		progress,
 		since: formatMoment(raw.since, locale),
+		sinceMs: momentMs(raw.since),
+		lastActivityMs: momentMs(raw.last_activity_at),
+		// when the core says the current release was last brought up to date, or null when it does not say
+		lastRefreshMs: momentMs(raw.last_refresh_at),
+		// the core cannot tell whether the machine restarted since the refresh asked for it
+		bootUnknown: raw.boot_unknown === true,
 		lastActivity: formatMoment(raw.last_activity_at, locale),
 		expiresAt: formatMoment(raw.expires_at, locale),
 		banners: [
