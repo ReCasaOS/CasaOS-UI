@@ -15,6 +15,8 @@ const events = {
 	RELOAD_FILE_LIST: 'reloadFileList',
 	SHOW_HOME_CONTEXT_MENU: 'showHomeContextMenu',
 	RELOAD_APP_LIST: 'reloadAppList',
+	// ModulesModal -> AppSection: an optional module was installed or removed
+	MODULES_CHANGED: 'modulesChanged',
 	UPDATE_SYNC_STATUS: 'updateSyncStatus',
 	UN_SHARE: 'unShare',
 	GOTO: 'goto',

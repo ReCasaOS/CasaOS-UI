@@ -107,7 +107,7 @@ import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
-import { VM_APP_NAME, hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
+import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -214,12 +214,15 @@ export default {
 			this.getList()
 		})
 
+		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
+
 		this.ListRefreshTimer = setInterval(() => {
 			this.getList()
 		}, 5000)
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
+		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
@@ -417,6 +420,20 @@ export default {
 
 		// Adds the Virtual Machines card at its saved place once the probe says the
 		// module is there.
+		// A module was installed or removed: ask the gateway again, then add the
+		// card or take it away, without the page being reloaded.
+		syncVmCard() {
+			forgetVirtualMachines()
+			return hasVirtualMachines().then((available) => {
+				const has = this.appList.some(app => app.name === VM_APP_NAME)
+				if (available && !has) {
+					this.appList = this.sortApps(concat(this.appList, vmApplication()), [])
+				} else if (!available && has) {
+					this.appList = this.appList.filter(app => app.name !== VM_APP_NAME)
+				}
+			})
+		},
+
 		addVmCardWhenThere(savedOrder) {
 			return hasVirtualMachines().then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
