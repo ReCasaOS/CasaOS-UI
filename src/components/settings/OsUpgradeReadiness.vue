@@ -118,7 +118,8 @@ export default {
 		},
 	},
 	// state: the state of the report that was read ('' when there is none): the plan below it is not offered for a system that is unsupported or the latest
-	emits: ['state'],
+	// `report` is what the upgrade guide reads: whether the report was asked, is being made, or could not be made, and its state.
+	emits: ['state', 'report'],
 	data() {
 		return {
 			ICONS,
@@ -135,6 +136,9 @@ export default {
 		asked() {
 			return Boolean(this.view || this.error)
 		},
+		report() {
+			return { asked: Boolean(this.view), busy: this.busy, failed: Boolean(this.error), state: this.view?.state ?? '' }
+		},
 		sections() {
 			if (!this.view)
 				return []
@@ -145,6 +149,14 @@ export default {
 				{ id: 'warnings', title: this.$t('Things to look at'), rows: warnings },
 				{ id: 'others', title: this.$t('Other checks (passed: {ok}, notes: {info})', { ok: passed.length, info: notes.length }), rows: others, collapsed: true },
 			].filter(section => section.rows.length)
+		},
+	},
+	watch: {
+		report: {
+			immediate: true,
+			handler(report) {
+				this.$emit('report', report)
+			},
 		},
 	},
 	beforeUnmount() {

@@ -41,14 +41,10 @@
 				<p v-if="link" class="os-link mt-2">
 					<a :href="link.href" rel="noopener noreferrer" target="_blank">{{ $t(link.label) }}</a>
 				</p>
-				<!-- a read-only report: it asks the core, and changes nothing on the machine -->
-				<os-upgrade-readiness v-if="canCheck" :locale="locale" @state="readinessState = $event" />
-				<!-- what apt would do and the text to do it by hand: it asks the core, shows itself only for a machine that can be planned, and changes nothing on the machine -->
-				<os-upgrade-plan v-if="canCheck" :locale="locale" :readiness-state="readinessState" @plan="livePlan = $event" />
 			</template>
 
-			<!-- the run that drives the upgrade: outside the block above, because the run that ended still has to be read and closed after the upgrade, when the next release is another one -->
-			<os-upgrade-run :can-check="canCheck" :locale="locale" :plan="plan" @usable="runUsable = $event" />
+			<!-- the guide of the upgrade: the report, the plan and the run are its steps. Outside the block above, because the run that ended still has to be read and closed after the upgrade, when the next release is another one -->
+			<os-upgrade-wizard :can-check="canCheck" :locale="locale" @usable="runUsable = $event" />
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -58,15 +54,13 @@
 </template>
 
 <script>
-import OsUpgradePlan from './OsUpgradePlan.vue'
-import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
-import OsUpgradeRun from './OsUpgradeRun.vue'
+import OsUpgradeWizard from './OsUpgradeWizard.vue'
 import { canCheckReadiness } from './osReadiness'
 import { extendedSentence, releaseLink, releaseName, supportSentence } from './osSupport'
 
 export default {
 	name: 'OsSupportModal',
-	components: { OsUpgradePlan, OsUpgradeReadiness, OsUpgradeRun },
+	components: { OsUpgradeWizard },
 	props: {
 		// GET /v1/sys/os, as the top bar read it.
 		os: {
@@ -77,11 +71,7 @@ export default {
 	emits: ['close'],
 	data() {
 		return {
-			// the state of the readiness report once it was asked ('' before): the plan is not offered below a system it calls unsupported or the latest
-			readinessState: '',
-			// the plan that the plan section shows, as the core sent it, or null: the section that runs the upgrade starts it from this one
-			livePlan: null,
-			// whether the section that runs the upgrade has read the state and offers something to do
+			// whether the guide of the upgrade has read the state and offers something to do
 			runUsable: false,
 		}
 	},
@@ -112,9 +102,6 @@ export default {
 		},
 		canCheck() {
 			return canCheckReadiness(this.os)
-		},
-		plan() {
-			return this.canCheck ? this.livePlan : null
 		},
 	},
 	// The window opens with the reader on its heading. Buefy's own autoFocus is off

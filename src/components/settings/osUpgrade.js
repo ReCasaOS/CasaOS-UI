@@ -1449,6 +1449,8 @@ export function statusView(raw, locale = 'en_us') {
 		state: known ? raw.state : clean(raw.state, 40),
 		reason: clean(raw.reason, 40),
 		open,
+		// whether the point of no return is behind, as the core says it
+		pnr: raw.pnr === true,
 		group: entry.group,
 		groupLabel: TEXT.groups[entry.group],
 		tone: entry.tone,

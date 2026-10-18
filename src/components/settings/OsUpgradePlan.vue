@@ -411,7 +411,8 @@ export default {
 			default: '',
 		},
 	},
-	emits: ['plan'],
+	// `progress` is what the upgrade guide reads: whether the core has answered, whether a plan can be made, whether a job runs, whether the last ask failed.
+	emits: ['plan', 'progress'],
 	data() {
 		return {
 			ICONS,
@@ -495,6 +496,9 @@ export default {
 			const phase = this.status?.state === 'running' ? this.status.phase : null
 			return phase ? this.phaseText(PLAN_STEP, phase) : this.$t(PLAN_PHASE_UNKNOWN)
 		},
+		progress() {
+			return { ready: this.ready, plannable: this.plannable, running: this.running, failed: Boolean(this.failure) }
+		},
 		countRows() {
 			const { full, first } = this.plan.counts
 			const say = value => value === null ? '–' : String(value)
@@ -509,6 +513,12 @@ export default {
 	watch: {
 		offered(raw) {
 			this.$emit('plan', raw)
+		},
+		progress: {
+			immediate: true,
+			handler(progress) {
+				this.$emit('progress', progress)
+			},
 		},
 	},
 	async mounted() {
