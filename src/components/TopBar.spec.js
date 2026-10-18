@@ -7,6 +7,7 @@ import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
+import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
@@ -49,6 +50,7 @@ describe('the anonymous statistics switch', () => {
 			getHardwareInfo: vi.fn(),
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
+			getModules: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
@@ -162,6 +164,7 @@ describe('the automatic update row', () => {
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
+			getModules: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
@@ -365,6 +368,7 @@ describe('the alerts row', () => {
 		const vm = {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
+			getModules: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -394,6 +398,91 @@ describe('the alerts row', () => {
 	it('says "Alerts" in English and French', () => {
 		expect(en.Alerts).toBe('Alerts')
 		expect(fr.Alerts).toBe('Alertes')
+	})
+})
+
+describe('the modules row', () => {
+	function bar(sys) {
+		const vm = {
+			modulesAvailable: false,
+			$api: { sys },
+			$t: key => key,
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getModules', 'showModules'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	// An answer of the core, whatever the catalogue says: the window is the one that says that nothing is offered.
+	it('shows once the core answers', async () => {
+		const vm = bar({ getModules: vi.fn(() => Promise.resolve({ data: { success: 200, data: { catalogue: { ok: false, error: 'none' }, modules: [] } } })) })
+
+		vm.getModules()
+		await flushPromises()
+
+		expect(vm.modulesAvailable).toBe(true)
+	})
+
+	// A core older than the feature answers 404: no row that could not work.
+	it('shows no row against an older core', async () => {
+		const vm = bar({ getModules: vi.fn(() => Promise.reject(new Error('404'))) })
+
+		vm.getModules()
+		await flushPromises()
+
+		expect(vm.modulesAvailable).toBe(false)
+		expect(source).toMatch(/<div v-if="modulesAvailable"/)
+	})
+
+	it('asks the core when the bar mounts', () => {
+		const vm = {
+			$EventBus: createEventBus(),
+			getAlerts: vi.fn(),
+			getModules: vi.fn(),
+			getOs: vi.fn(),
+			// The rest of mounted(), which this test does not look at.
+			checkVersion: vi.fn(),
+			getUserInfo: vi.fn(),
+			getUsbStatus: vi.fn(),
+			getTelemetry: vi.fn(),
+			getAutoUpdate: vi.fn(),
+			getHardwareInfo: vi.fn(),
+			onTelemetryChanged: vi.fn(),
+		}
+
+		TopBar.mounted.call(vm)
+
+		expect(vm.getModules).toHaveBeenCalledTimes(1)
+	})
+
+	it('sits below the system packages, and opens the window from Manage with the focus left to its heading', () => {
+		const vm = bar({})
+
+		vm.showModules()
+
+		expect(source.indexOf('<!-- Modules Start')).toBeGreaterThan(source.indexOf('<!-- System Package Update End -->'))
+		expect(source).toMatch(/<!-- Modules Start[\s\S]*?@click="showModules"[\s\S]*?<!-- Modules End -->/)
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({
+			component: ModulesModal,
+			hasModalCard: true,
+			trapFocus: true,
+			autoFocus: false,
+			ariaRole: 'dialog',
+			ariaModal: true,
+			ariaLabel: 'Modules',
+			canCancel: ['escape', 'outside'],
+		}))
+	})
+
+	it('says "Modules" and "Manage" in English and French', () => {
+		expect(en.Modules).toBe('Modules')
+		expect(en.Manage).toBe('Manage')
+		expect(fr.Modules).toBe('Modules')
+		expect(fr.Manage).toBe('Gérer')
 	})
 })
 

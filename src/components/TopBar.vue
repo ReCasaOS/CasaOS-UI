@@ -435,6 +435,21 @@
 					</div>
 					<!-- System Package Update End -->
 
+					<!-- Modules Start: only against a core that has the feature -->
+					<div v-if="modulesAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="puzzle-outline" size="is-20" />
+							{{ $t("Modules") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showModules">
+								{{ $t("Manage") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Modules End -->
+
 					<!-- Restart or Shutdown Start -->
 					<div
 						class="is-flex is-align-content-center is-justify-content-center _footer mt-4 pl-3 pr-3 pt-2 pb-2">
@@ -525,6 +540,7 @@ import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
+import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
 import { powerRefusal } from './settings/osUpgrade'
 import { mixin } from '@/mixins/mixin'
@@ -585,6 +601,9 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			// true once the core answers GET /v1/sys/modules: a core older than the
+			// feature shows no row.
+			modulesAvailable: false,
 			// The view of GET /v1/sys/os. null until the core answers: a core older than
 			// the feature, or a call that failed, shows no badge.
 			os: null,
@@ -709,6 +728,7 @@ export default {
 		this.getTelemetry()
 		this.getAutoUpdate()
 		this.getAlerts()
+		this.getModules()
 		this.getOs()
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
@@ -827,6 +847,31 @@ export default {
 				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(): the window reads the list itself.
+		getModules() {
+			this.$api.sys.getModules().then(() => {
+				this.modulesAvailable = true
+			}).catch(() => {})
+		},
+
+		// Buefy's own autoFocus is off: it would move the focus to the window's frame,
+		// and the window puts it on its heading.
+		showModules() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: ModulesModal,
+				hasModalCard: true,
+				trapFocus: true,
+				autoFocus: false,
+				ariaRole: 'dialog',
+				ariaModal: true,
+				ariaLabel: this.$t('Modules'),
+				canCancel: ['escape', 'outside'],
 				scroll: 'keep',
 				animation: 'zoom-in',
 			})
