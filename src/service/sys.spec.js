@@ -149,3 +149,96 @@ describe('operating system client', () => {
 		expect(sent().timeout).toBe(15000)
 	})
 })
+
+describe('upgrade of the operating system client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('asks how the upgrade is going from its own route, sends nothing, and waits 10 seconds', async () => {
+		await sys.getOsUpgradeStatus()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/status')
+		expect(sent().data).toBeUndefined()
+		expect(sent().params).toBeUndefined()
+		expect(sent().timeout).toBe(10000)
+	})
+
+	// The switch has to say true or false: a body that says nothing must not be read as "off".
+	it.each([[true, true], [false, false], [undefined, false], ['yes', false], [1, false]])('switches the upgrade with %s as %s, and says nothing else', async (given, sentValue) => {
+		await sys.setOsUpgradeBeta(given)
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/beta')
+		expect(JSON.parse(sent().data)).toEqual({ enabled: sentValue })
+		expect(sent().timeout).toBe(15000)
+	})
+
+	it.each([[true, true], [false, false], [undefined, false], ['yes', false]])('refreshes with the change accepted as %s -> %s, and waits as long as the core', async (given, sentValue) => {
+		await sys.startOsRefresh(given)
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/refresh')
+		expect(JSON.parse(sent().data)).toEqual({ accept_releaseinfo_change: sentValue })
+		expect(sent().timeout).toBe(300000)
+	})
+
+	it('starts the upgrade with the body it is given, as it is given, and waits as long as the core', async () => {
+		const body = { plan_id: `p1-${'ab'.repeat(16)}`, rehearsal: false, safety_net: 'snapshot', hostname: 'box', accept_removals: ['fuse'], paused_sources: ['docker.list'], acks: ['no_interruption', 'no_way_back'] }
+		await sys.startOsUpgrade(body)
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/start')
+		expect(JSON.parse(sent().data)).toEqual(body)
+		expect(sent().timeout).toBe(300000)
+	})
+
+	// The core refuses a body that is not a JSON object: a button with nothing to say sends {}.
+	it.each([
+		['rebootOsUpgrade', 'reboot'],
+		['resumeOsUpgrade', 'resume'],
+		['abortOsUpgrade', 'abort'],
+	])('%s posts an empty object to its own route', async (name, route) => {
+		await sys[name]()
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe(`/v1/sys/os/upgrade/${route}`)
+		expect(sent().data).toBe('{}')
+		expect(sent().params).toBeUndefined()
+		expect(sent().timeout).toBe(60000)
+	})
+
+	it('sends the word of the person with the action, as it is given', async () => {
+		await sys.ackOsUpgrade({ action: 'acknowledge', word: 'I-KNOW-THIS-MACHINE-IS-HALF-UPGRADED' })
+		expect(sent().method).toBe('post')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/ack')
+		expect(JSON.parse(sent().data)).toEqual({ action: 'acknowledge', word: 'I-KNOW-THIS-MACHINE-IS-HALF-UPGRADED' })
+		expect(sent().timeout).toBe(120000)
+	})
+
+	it('asks for the text of the run that is open, with the run asked for in the address and nothing else', async () => {
+		await sys.getOsUpgradeRunbook()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/os/upgrade/runbook?run=current')
+		expect(sent().data).toBeUndefined()
+		expect(sent().timeout).toBe(15000)
+	})
+
+	// The token goes in the header, which the instance sets, and in no address, body or query.
+	it.each([
+		['getOsUpgradeStatus', []],
+		['setOsUpgradeBeta', [true]],
+		['startOsRefresh', [false]],
+		['startOsUpgrade', [{ plan_id: 'x' }]],
+		['rebootOsUpgrade', []],
+		['resumeOsUpgrade', []],
+		['abortOsUpgrade', []],
+		['ackOsUpgrade', [{ action: 'discard', word: '' }]],
+		['getOsUpgradeRunbook', []],
+	])('%s carries the access token in the Authorization header and nowhere else', async (name, args) => {
+		localStorage.setItem('access_token', 'the-access-token')
+		try {
+			await sys[name](...args)
+		} finally {
+			localStorage.removeItem('access_token')
+		}
+		expect(sent().headers.Authorization).toBe('the-access-token')
+		expect(sent().url).not.toContain('the-access-token')
+		expect(JSON.stringify(sent().data ?? '')).not.toContain('the-access-token')
+		expect(sent().params).toBeUndefined()
+	})
+})

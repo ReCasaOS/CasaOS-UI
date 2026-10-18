@@ -170,6 +170,64 @@ const sys = {
 		return instance.get(`/v1${PREFIX}/os/upgrade/runbook`, { timeout: 15000 })
 	},
 
+	// The upgrade of the operating system itself, on the core's own routes. The token goes in the Authorization header, which the
+	// instance sets, and never in the address. Every POST sends one JSON object, `{}` when it has nothing to say: the core refuses a body
+	// that is not an object (400 bad_request). A refusal is a 409 with the code in data.error_code, and what makes it precise in data.data;
+	// a restart or a close that the machine could not carry out is a 500 with its code. A core older than the feature answers 404.
+
+	// How the upgrade is going: always 200 with the status ({ beta_enabled, state, actions, block, pnr, busy, failure, hint, barrier,
+	// findings, ack_word, after_reboot_hint, log_tail... }), whatever the switch says. It runs no apt and is safe to ask every few
+	// seconds. It waits 10 seconds and not the 60 of the shared client: a core that restarts does not answer, and the next ask is
+	// the page's to make.
+	getOsUpgradeStatus() {
+		return instance.get(`/v1${PREFIX}/os/upgrade/status`, { timeout: 10000 })
+	},
+
+	// Switches the feature on or off: 200 { beta_enabled }, or 409 run_open when a run is open.
+	setOsUpgradeBeta(enabled) {
+		return instance.post(`/v1${PREFIX}/os/upgrade/beta`, { enabled: enabled === true }, { timeout: 15000 })
+	},
+
+	// Brings the release the machine runs to its last state (the plan is made after it). `accept` is the person's word that a repository
+	// whose release information changed is to be taken: only a refresh that stopped for it (failure.hint releaseinfo_change) is asked
+	// again with it. 202 with the status. The core reads the readiness report before it starts, which takes a while: the call waits as
+	// long as the core does (5 minutes), and a call that was cut short may have started the run all the same.
+	startOsRefresh(accept) {
+		return instance.post(`/v1${PREFIX}/os/upgrade/refresh`, { accept_releaseinfo_change: accept === true }, { timeout: 300000 })
+	},
+
+	// Starts the upgrade or its rehearsal. data: { plan_id, rehearsal, safety_net, hostname, accept_removals, paused_sources, acks }, as
+	// startBody of osUpgrade.js builds it: the core refuses (409, data.error_code) a body that is not the plan's, and 400 a field that
+	// is not valid. 202 with the status. It waits as long as the core does (5 minutes), as the refresh does.
+	startOsUpgrade(data) {
+		return instance.post(`/v1${PREFIX}/os/upgrade/start`, data, { timeout: 300000 })
+	},
+
+	// The restart of a machine that waits for it; going on with a run that stopped after its point of no return; calling off a run that
+	// has not reached it. 202 with the status.
+	rebootOsUpgrade() {
+		return instance.post(`/v1${PREFIX}/os/upgrade/reboot`, {}, { timeout: 60000 })
+	},
+	resumeOsUpgrade() {
+		return instance.post(`/v1${PREFIX}/os/upgrade/resume`, {}, { timeout: 60000 })
+	},
+	abortOsUpgrade() {
+		return instance.post(`/v1${PREFIX}/os/upgrade/abort`, {}, { timeout: 60000 })
+	},
+
+	// The person's word on a run that is not running. data: { action: 'acknowledge' | 'discard' | 'manual', word }, `word` being the
+	// ack_word of the status when the run needs it. 200 with the status. Closing a run puts its backup folder away (copied and removed
+	// when it is on another file system), which can take a while.
+	ackOsUpgrade(data) {
+		return instance.post(`/v1${PREFIX}/os/upgrade/ack`, data, { timeout: 120000 })
+	},
+
+	// The text with which to finish the run that is open by hand: { plan_id, hop, text, blocks, from_run }, or 409 no_run or
+	// run_unreadable. It holds the lines of the machine's package sources as the files have them, so the token goes in the header.
+	getOsUpgradeRunbook() {
+		return instance.get(`/v1${PREFIX}/os/upgrade/runbook?run=current`, { timeout: 15000 })
+	},
+
 	// stop casaos
 	stopCasaOS() {
 		return api.post(`${PREFIX}/stop`)

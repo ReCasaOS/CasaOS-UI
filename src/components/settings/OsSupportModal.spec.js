@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OsSupportModal from './OsSupportModal.vue'
 import OsUpgradePlan from './OsUpgradePlan.vue'
 import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
+import OsUpgradeRun from './OsUpgradeRun.vue'
 import { EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
+import real from './__fixtures__/os-plan-d11-12.json'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import i18n from '@/plugins/i18n'
@@ -455,6 +457,141 @@ describe('the operating system window in French', () => {
 		expect(wrapper.find('.os-status').text()).toBe('Le support de sécurité standard pour Ubuntu 22.04.5 LTS prend fin vers juin 2027.')
 		expect(wrapper.find('.os-extended').text()).toBe('Une maintenance de sécurité étendue est proposée séparément : Ubuntu Pro (ESM), jusqu\'à environ avril 2032.')
 		expect(wrapper.find('.os-link a').text()).toBe('Guide de mise à niveau')
+	})
+})
+
+// The run that drives the upgrade: outside the block of the next release, and handed the plan that the plan section shows
+describe('the run section of the operating system window', () => {
+	const section = () => wrapper.findComponent(OsUpgradeRun)
+	const answer = data => Promise.resolve({ data: { success: 200, message: 'ok', data } })
+	const IDLE = { beta_enabled: true, state: 'idle', actions: [] }
+	const RUN = { beta_enabled: true, state: 'succeeded', run_id: '0b9cbd61-5d2c-4a39-9c3e-2f7c0a1d6a11', kind: 'hop', pnr: true, actions: ['acknowledge'] }
+	// a plan that is valid for a long time
+	const PLAN = { ...structuredClone(real), expires_at: '2099-01-01T00:00:00Z' }
+	const done = { plannable: true, state: 'done', expires_at: PLAN.expires_at, plan: PLAN }
+
+	async function openWith(os, upgrade, plan = { plannable: true, state: 'idle' }) {
+		const api = {
+			getOsUpgradeStatus: vi.fn().mockReturnValue(answer(upgrade)),
+			getOsPlan: vi.fn().mockReturnValue(answer(plan)),
+			getOsReadiness: vi.fn(),
+			startOsPlan: vi.fn(),
+		}
+		open(os, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		// the run section asks on a timer of its own, at once
+		await vi.waitFor(() => expect(api.getOsUpgradeStatus).toHaveBeenCalled())
+		await flushPromises()
+		return api
+	}
+
+	it('is in the window of a machine that has no next release when a run is open: the run that ended is read and closed there', async () => {
+		const api = await openWith({ ...BULLSEYE, next: undefined }, RUN)
+
+		expect(section().exists()).toBe(true)
+		expect(section().props('canCheck')).toBe(false)
+		expect(api.getOsUpgradeStatus).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('.os-next').exists()).toBe(false)
+		expect(wrapper.find('.os-run-state-title').text()).toBe('Upgrade done')
+		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Close this run', 'Close'])
+	})
+
+	it('says nothing in the window of a machine that has no next release and no run open', async () => {
+		await openWith({ ...BULLSEYE, next: undefined }, IDLE)
+
+		expect(section().exists()).toBe(true)
+		expect(wrapper.find('.os-run').exists()).toBe(false)
+	})
+
+	it('is under the plan section, asks in the language of the window, and is told that the machine can be checked', async () => {
+		i18n.global.locale = 'fr_fr'
+		await openWith(BULLSEYE, IDLE)
+
+		expect(section().props('locale')).toBe('fr_fr')
+		expect(section().props('canCheck')).toBe(true)
+		const html = wrapper.html()
+		expect(html.indexOf('os-plan-title')).toBeGreaterThan(-1)
+		expect(html.indexOf('os-plan-title')).toBeLessThan(html.indexOf('os-run-title'))
+		expect(wrapper.find('.os-run-title').text()).toBe('Mise à niveau du système d\'exploitation')
+	})
+
+	it('is handed the plan that the plan section shows, and the upgrade is offered from it', async () => {
+		await openWith(BULLSEYE, IDLE, done)
+
+		expect(section().props('plan')).toEqual(PLAN)
+		expect(wrapper.find('.os-run-hop').attributes('disabled')).toBeUndefined()
+		expect(wrapper.find('.os-run-start-hint').exists()).toBe(false)
+	})
+
+	// the sentence is true while nothing can be done: it is not said above a section that does it
+	it('no longer says that ReCasaOS cannot upgrade when the run section is there to start the upgrade', async () => {
+		await openWith(BULLSEYE, IDLE)
+
+		expect(wrapper.find('.os-run-hop').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+		// the rest of what the window says of the next release stays
+		expect(wrapper.find('.os-next').text()).toBe('Debian 12 (bookworm) is the next release.')
+		expect(wrapper.find('.os-snapshot').exists()).toBe(true)
+	})
+
+	it('no longer says it either when the upgrade is switched off and the section offers to switch it on', async () => {
+		await openWith(BULLSEYE, { ...IDLE, beta_enabled: false })
+
+		expect(wrapper.find('.os-run-beta-switch').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+	})
+
+	it('still says it when the core does not have the upgrade', async () => {
+		const api = {
+			getOsUpgradeStatus: vi.fn().mockImplementation(() => Promise.reject(Object.assign(new Error('not found'), { response: { status: 404 } }))),
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: true, state: 'idle' })),
+			getOsReadiness: vi.fn(),
+			startOsPlan: vi.fn(),
+		}
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		await vi.waitFor(() => expect(api.getOsUpgradeStatus).toHaveBeenCalled())
+		await flushPromises()
+
+		expect(wrapper.find('.os-run').exists()).toBe(false)
+		expect(wrapper.find('.os-cannot').text()).toBe('ReCasaOS cannot upgrade the operating system for you yet.')
+	})
+
+	it('still says it while the core has not answered, and when it does not answer', async () => {
+		const api = {
+			getOsUpgradeStatus: vi.fn().mockImplementation(() => Promise.reject(new Error('Network Error'))),
+			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: true, state: 'idle' })),
+			getOsReadiness: vi.fn(),
+			startOsPlan: vi.fn(),
+		}
+		open(BULLSEYE, { global: { plugins: [Buefy, i18n], mocks: { $api: { sys: api } } } })
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+		await vi.waitFor(() => expect(api.getOsUpgradeStatus).toHaveBeenCalled())
+		await flushPromises()
+
+		expect(wrapper.find('.os-run-outage-message').exists()).toBe(true)
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+	})
+
+	it('says it again if the section stops being usable', async () => {
+		const api = await openWith(BULLSEYE, IDLE)
+		expect(wrapper.find('.os-cannot').exists()).toBe(false)
+
+		section().vm.$emit('usable', false)
+		await flushPromises()
+		expect(wrapper.find('.os-cannot').exists()).toBe(true)
+		expect(api.getOsUpgradeStatus).toHaveBeenCalled()
+	})
+
+	it('has no plan to start from before one is made, and again while a new one is being made', async () => {
+		const api = await openWith(BULLSEYE, IDLE, done)
+		expect(section().props('plan')).toEqual(PLAN)
+
+		api.startOsPlan.mockReturnValue(answer({ plannable: true, state: 'running', phase: 'sources' }))
+		await wrapper.find('.os-plan-start').trigger('click')
+		await flushPromises()
+
+		expect(section().props('plan')).toBeNull()
+		expect(wrapper.find('.os-run-hop').attributes('disabled')).toBeDefined()
+		expect(wrapper.find('.os-run-start-hint').text()).toBe('There is no plan to start from. Make the plan first.')
 	})
 })
 

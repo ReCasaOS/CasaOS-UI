@@ -72,11 +72,12 @@ const NO_RUNBOOK_REASONS = ['runbook_unsafe', 'runbook_too_large']
 const plan = (changes = {}) => ({ ...structuredClone(real), ...changes })
 const problem = (code, data = {}, severity = 'needs_acceptance') => ({ code, severity, data })
 const english = (code, data) => sayEnglish(planView(plan({ verdict: 'blocked', problems: [problem(code, data)] }), 'en_us').problems[0].sentence)
-// the control characters (but for the end of a line) and the marks that set the direction of a text that a text has
+// the control characters (but for the end of a line) and the marks that set the direction of a text or show nothing that a text has
 function unsafeIn(text) {
 	return [...text].filter((char) => {
 		const code = char.codePointAt(0)
 		return (code < 32 && char !== '\n') || (code >= 127 && code <= 159) || (code >= 0x202A && code <= 0x202E) || (code >= 0x2066 && code <= 0x2069)
+			|| (code >= 0x200B && code <= 0x200F) || code === 0x061C || code === 0x2060 || code === 0xFEFF || code === 0x2028 || code === 0x2029 || code === 0xAD || (code >= 0xE0000 && code <= 0xE007F)
 	})
 }
 
@@ -1463,13 +1464,16 @@ describe('the plan as text', () => {
 
 // The bounds and the flags of what the machine says: each is a line of osPlan.js that a wrong number or a looser test would leave in place.
 describe('the bounds of what the machine says, and what only `true` is', () => {
-	// the C0 controls (0 to 31) and the C1 controls (127 to 159), and the marks that turn a text round (0x202A to 0x202E, 0x2066 to 0x2069):
-	// the first and the last of each range, and the characters beside them, which stay
+	// the C0 controls (0 to 31) and the C1 controls (127 to 159), the marks that turn a text round (0x202A to 0x202E, 0x2066 to 0x2069), and the
+	// marks that show nothing (0x200B to 0x200F, 0x061C, 0x2060, 0xFEFF, 0x2028, 0x2029, 0xAD and the tag characters 0xE0000 to 0xE007F): the
+	// first and the last of each range, and the characters beside them, which stay
 	it('replaces each control, at the edge of its range and inside, and no character beside them', () => {
-		const names = codes => planView(plan({ removals: codes.map(code => ({ name: `a${String.fromCharCode(code)}b`, version: '1' })) })).removals.map(removal => removal.name)
+		const names = codes => planView(plan({ removals: codes.map(code => ({ name: `a${String.fromCodePoint(code)}b`, version: '1' })) })).removals.map(removal => removal.name)
+		const replaced = [0, 9, 10, 31, 127, 128, 133, 159, 0x202A, 0x202C, 0x202E, 0x2066, 0x2069, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x061C, 0x2060, 0xFEFF, 0x2028, 0x2029, 0xAD, 0xE0000, 0xE0041, 0xE007F]
+		const stay = [32, 126, 160, 0xAC, 0xAE, 0x061B, 0x061D, 0x200A, 0x2010, 0x2027, 0x202F, 0x205F, 0x2061, 0x2065, 0x206A, 0xFEFE, 0xFF00, 0xDFFFF, 0xE0080]
 
-		expect(names([0, 9, 10, 31, 127, 128, 133, 159, 0x202A, 0x202C, 0x202E, 0x2066, 0x2069])).toEqual(Array.from({ length: 13 }, () => 'a b'))
-		expect(names([126, 160, 0x2029, 0x202F, 0x2065, 0x206A, 0xFEFF])).toEqual([126, 160, 0x2029, 0x202F, 0x2065, 0x206A, 0xFEFF].map(code => `a${String.fromCharCode(code)}b`))
+		expect(names(replaced)).toEqual(Array.from({ length: replaced.length }, () => 'a b'))
+		expect(names(stay)).toEqual(stay.map(code => `a${String.fromCodePoint(code)}b`))
 	})
 
 	it('puts a C1 control of a name in a sentence, a line of the sources and a file name as a space', () => {
