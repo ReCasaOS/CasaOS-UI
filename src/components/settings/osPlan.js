@@ -48,7 +48,7 @@ const SCRUBBED_WITHIN = 2048
 // A text that may hold an address, as it is shown: the user and the query of an address are hidden BEFORE the text is cut (a secret
 // that the cut went through would be shown in part, with nothing to hide it). A text that is longer than what is looked at is cut
 // first, and the word the cut went through is dropped with it: an address is one word, so none is left in two halves.
-function safe(value, max) {
+export function safe(value, max) {
 	if (typeof value !== 'string')
 		return ''
 	return clean(scrub(value.length > SCRUBBED_WITHIN ? value.slice(0, SCRUBBED_WITHIN).replace(/\S*$/, '') : value), max)

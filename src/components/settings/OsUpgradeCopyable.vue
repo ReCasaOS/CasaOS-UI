@@ -1,7 +1,13 @@
 <template>
 	<div class="os-copy" :class="{ 'is-block': block }">
 		<!-- a text node: the lines come from the machine and from the core, never HTML -->
-		<pre v-if="block" :id="id" ref="text" class="os-copy-text" tabindex="0">{{ text }}</pre>
+		<pre v-if="block"
+			:id="id"
+			ref="text"
+			:aria-label="label || undefined"
+			class="os-copy-text"
+			:role="label ? 'region' : undefined"
+			tabindex="0">{{ text }}</pre>
 		<code v-else :id="id" ref="text" class="os-copy-text">{{ text }}</code>
 		<b-button class="os-copy-button"
 			:aria-describedby="id"
@@ -32,6 +38,11 @@ export default {
 		block: {
 			type: Boolean,
 			default: false,
+		},
+		// the name of the box when it is one that is read with the keyboard (it takes the focus to be scrolled): said by a screen reader as a region
+		label: {
+			type: String,
+			default: '',
 		},
 	},
 	data() {
