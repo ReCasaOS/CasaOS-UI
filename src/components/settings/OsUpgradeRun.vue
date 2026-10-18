@@ -301,11 +301,11 @@
 				</div>
 
 				<div v-if="view.launch.refresh" class="os-run-refresh mt-4">
-					<p v-if="!view.open" class="os-run-refresh-about">
+					<p v-if="!view.open && !wizard" class="os-run-refresh-about">
 						{{ $t(TEXT.refresh.about) }}
 					</p>
 					<div class="os-run-buttons is-flex is-flex-wrap-wrap mt-2">
-						<b-button v-if="!view.open"
+						<b-button v-if="!view.open && !wizard"
 							class="os-run-refresh-button"
 							:disabled="Boolean(acting) || stale"
 							:label="$t(TEXT.refresh.button)"
@@ -321,7 +321,7 @@
 					</div>
 				</div>
 
-				<div v-if="view.launch.start" class="os-run-start mt-4">
+				<div v-if="view.launch.start && !wizard" class="os-run-start mt-4">
 					<div class="os-run-buttons is-flex is-flex-wrap-wrap">
 						<b-button class="os-run-rehearsal"
 							:disabled="Boolean(acting) || stale || !startable"
@@ -532,8 +532,14 @@ export default {
 			type: Object,
 			default: null,
 		},
+		// Inside the upgrade guide: the guide starts the refresh, the rehearsal and the upgrade, so their buttons are not repeated here.
+		wizard: {
+			type: Boolean,
+			default: false,
+		},
 	},
-	emits: ['usable'],
+	// `status` is what the guide reads (the view, whether it is an old one, whether a call is out); `refused` is the code of a call that the core refused.
+	emits: ['usable', 'status', 'refused'],
 	data() {
 		return {
 			TEXT,
@@ -664,8 +670,17 @@ export default {
 		planId() {
 			return this.planNeeds?.planId ?? ''
 		},
+		report() {
+			return { view: this.view, stale: this.stale, acting: this.acting }
+		},
 	},
 	watch: {
+		report: {
+			immediate: true,
+			handler(report) {
+				this.$emit('status', report)
+			},
+		},
 		usable: {
 			immediate: true,
 			handler(usable) {
@@ -794,7 +809,8 @@ export default {
 		take(view) {
 			const before = this.view
 			const note = announcement(before, view)
-			if (note)
+			// inside the guide, the guide says it: one announcement for one change
+			if (note && !this.wizard)
 				this.announced = this.$t(note.key, note.params)
 			// the word that was typed is for the state it was typed in
 			if (before && before.changeKey !== view.changeKey)
@@ -834,7 +850,8 @@ export default {
 			const outage = this.outage
 			if (outage?.message && outage.level !== this.lastLevel) {
 				this.lastLevel = outage.level
-				this.announced = this.say(outage.message)
+				if (!this.wizard)
+					this.announced = this.say(outage.message)
 			}
 		},
 		// What a window that is closed under the person says: the run that is open, the switch that is off, or a step that is not for this state.
@@ -886,7 +903,7 @@ export default {
 				}, event)
 				return
 			}
-			this.callAction(button.call, buttonBody(button, this.typed), button.action)
+			return this.callAction(button.call, buttonBody(button, this.typed), button.action)
 		},
 		pressBeta(event) {
 			if (this.acting)
@@ -962,10 +979,13 @@ export default {
 			}
 			if (this.gone)
 				return false
-			if (failure)
+			if (failure) {
 				this.callError = { ...failure, before, polls: 0 }
-			else
+				if (failure.code)
+					this.$emit('refused', failure.code)
+			} else {
 				this.typed = ''
+			}
 			this.refocus = true
 			// the buttons stay shut until the status that follows is in: they would be those of the state the call has just changed
 			try {
@@ -1027,8 +1047,9 @@ export default {
 				this.$nextTick(() => element.focus?.({ preventScroll: true }))
 			}
 		},
+		// the state that took the place of the button that was pressed; inside the guide, the guide's sentence says what is next
 		focusState() {
-			this.$refs.stateTitle?.focus?.({ preventScroll: true })
+			((this.wizard && document.getElementById('os-wizard-next')) || this.$refs.stateTitle)?.focus?.({ preventScroll: true })
 		},
 		// A button that was pressed goes with the state it was for, and the focus with it: it goes to the state that took its place.
 		focusIfLost() {

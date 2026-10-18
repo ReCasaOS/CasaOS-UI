@@ -492,7 +492,7 @@ describe('the run section of the operating system window', () => {
 		expect(api.getOsUpgradeStatus).toHaveBeenCalledTimes(1)
 		expect(wrapper.find('.os-next').exists()).toBe(false)
 		expect(wrapper.find('.os-run-state-title').text()).toBe('Upgrade done')
-		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Close this run', 'Close'])
+		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Finish', 'Close this run', 'Close'])
 	})
 
 	it('says nothing in the window of a machine that has no next release and no run open', async () => {
@@ -518,7 +518,10 @@ describe('the run section of the operating system window', () => {
 		await openWith(BULLSEYE, IDLE, done)
 
 		expect(section().props('plan')).toEqual(PLAN)
-		expect(wrapper.find('.os-run-hop').attributes('disabled')).toBeUndefined()
+		// the guide offers the rehearsal from that plan, and the buttons of the run section that did are not repeated
+		expect(wrapper.find('.os-wizard-primary').attributes('disabled')).toBeUndefined()
+		expect(wrapper.find('.os-wizard-next').text()).toContain('Rehearse')
+		expect(wrapper.find('.os-run-hop').exists()).toBe(false)
 		expect(wrapper.find('.os-run-start-hint').exists()).toBe(false)
 	})
 
@@ -526,7 +529,7 @@ describe('the run section of the operating system window', () => {
 	it('no longer says that ReCasaOS cannot upgrade when the run section is there to start the upgrade', async () => {
 		await openWith(BULLSEYE, IDLE)
 
-		expect(wrapper.find('.os-run-hop').exists()).toBe(true)
+		expect(wrapper.find('.os-wizard-guide').exists()).toBe(true)
 		expect(wrapper.find('.os-cannot').exists()).toBe(false)
 		// the rest of what the window says of the next release stays
 		expect(wrapper.find('.os-next').text()).toBe('Debian 12 (bookworm) is the next release.')
@@ -590,8 +593,8 @@ describe('the run section of the operating system window', () => {
 		await flushPromises()
 
 		expect(section().props('plan')).toBeNull()
-		expect(wrapper.find('.os-run-hop').attributes('disabled')).toBeDefined()
-		expect(wrapper.find('.os-run-start-hint').text()).toBe('There is no plan to start from. Make the plan first.')
+		expect(wrapper.find('.os-wizard-primary').exists()).toBe(false)
+		expect(wrapper.find('.os-wizard-next').text()).toBe('The plan is being prepared. This takes a few minutes.')
 	})
 })
 
