@@ -289,12 +289,14 @@ describe('modules client', () => {
 		expect(sent().timeout).toBe(70000)
 	})
 
-	it('asks how the job is going from the status of the module, and sends nothing', async () => {
-		await sys.getModuleStatus('virt')
+	it('asks how the job is going from the status of the module, sends nothing, waits longer than the 30 seconds the core takes to read it, and passes the cancel signal on', async () => {
+		const controller = new AbortController()
+		await sys.getModuleStatus('virt', controller.signal)
 		expect(sent().method).toBe('get')
 		expect(sent().url).toBe('/v1/sys/modules/virt/status')
 		expect(sent().data).toBeUndefined()
-		expect(sent().timeout).toBe(20000)
+		expect(sent().timeout).toBe(35000)
+		expect(sent().signal).toBe(controller.signal)
 	})
 
 	// the name is a piece of the address: only the core's own rule goes into one, and no request is made for anything else
