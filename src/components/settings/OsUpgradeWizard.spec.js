@@ -821,3 +821,47 @@ describe('a refusal at each step: the guide stays, and the sentence is shown', (
 		expect(primary().text()).toBe('Continue')
 	})
 })
+
+describe('the guide on its own turns', () => {
+	it('asks the core again whether a plan can be made when the step is reached, without being pressed', async () => {
+		Object.assign(core, { beta: true, run: 'refreshed', plannable: false })
+		await open()
+		// the machine was mended while the refresh was being closed: the plan was read once, as it could not be made
+		core.plannable = true
+		const asked = calls.getOsPlan.mock.calls.length
+		await press()
+		await tick(1000)
+		expect(calls.getOsPlan.mock.calls.length).toBeGreaterThan(asked)
+		expect(calls.startOsPlan).toHaveBeenCalledTimes(1)
+		expect(currentTitle()).toContain('Prepare the plan')
+	})
+
+	it('moves the focus to the sentence of the guide when the state changes under the button that has it', async () => {
+		Object.assign(core, { beta: true, run: 'awaiting_reboot' })
+		await open()
+		primary().element.focus()
+		expect(document.activeElement).toBe(primary().element)
+		// another browser asked for the restart: the button goes
+		core.run = 'rebooting'
+		await tick(POLL_MS.open)
+		expect(primary().exists()).toBe(false)
+		expect(document.activeElement).toBe(wrapper.find('.os-wizard-next').element)
+	})
+
+	it('does not keep the word to close a rehearsal when the machine was put back and nothing ended', async () => {
+		Object.assign(core, { beta: true, run: 'rehearsed' })
+		await open()
+		// the core puts it back and shows no ended rehearsal
+		calls.ackOsUpgrade.mockImplementation(({ action }) => {
+			core.run = null
+			return answer({ action })
+		})
+		await press()
+		expect(wrapper.vm.memory.closeRehearsal).toBe(false)
+		// a rehearsal that someone else ran and ended is not closed by this guide
+		core.run = 'rehearsal_done'
+		await tick(POLL_MS.idle)
+		await tick(POLL_MS.open * 2)
+		expect(calls.ackOsUpgrade).toHaveBeenCalledTimes(1)
+	})
+})
