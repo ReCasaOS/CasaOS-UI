@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS } from './osModules'
+import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -191,7 +191,7 @@ describe('the list of modules', () => {
 		expect(text('.modules-description')).toContain('Create and run virtual machines')
 		expect(text('.modules-description')).toContain('A virtual machine can be given a USB device')
 		expect(text('.modules-tier')).toBe('Community')
-		expect(text('.modules-tier-sentence')).toBe('Maintained by the community, not proved on a real machine by ReCasaOS.')
+		expect(text('.modules-tier-sentence')).toBe('Tested only against a simulated machine, not a real one.')
 		expect(text('.modules-offered')).toBe('Version offered: v0.1.0')
 		expect(wrapper.find('.modules-install').exists()).toBe(true)
 		expect(wrapper.find('.modules-install').text()).toBe('Install')
@@ -202,7 +202,7 @@ describe('the list of modules', () => {
 	it('says a module of the core in its words', async () => {
 		await open(listRaw([moduleRaw({ tier: 'core' })]))
 
-		expect(text('.modules-tier')).toBe('Core')
+		expect(text('.modules-tier')).toBe('Maintained by ReCasaOS')
 		expect(text('.modules-tier-sentence')).toBe(TIERS.core.sentence)
 	})
 
@@ -284,7 +284,7 @@ describe('the list of modules', () => {
 			calls.getModules.mockImplementation(failure({ response: { status: 502 } }))
 			await open(null)
 
-			expect(text('.modules-list-error-sentence')).toBe('The request could not be completed. Try again.')
+			expect(text('.modules-list-error-sentence')).toBe(TEXT.call.readFailed)
 			expect(wrapper.find('.modules-list-error').attributes('role')).toBe('alert')
 			expect(wrapper.find('.modules-card').exists()).toBe(false)
 
@@ -295,7 +295,7 @@ describe('the list of modules', () => {
 			expect(wrapper.find('.modules-list-error').exists()).toBe(false)
 			expect(wrapper.find('.modules-card').exists()).toBe(true)
 			// and it looks for a job that is already running, which it could not before
-			expect(calls.getModuleStatus).toHaveBeenCalledWith('virt')
+			expect(calls.getModuleStatus).toHaveBeenCalledWith('virt', expect.anything())
 		})
 
 		it('says a core that has no such route, and a session that ended, in their own words', async () => {
@@ -353,7 +353,7 @@ describe('the list of modules', () => {
 			await open(listRaw([moduleRaw({ name: 'constructor', title: 'Constructor' })]))
 
 			expect(wrapper.find('.modules-card[data-module="constructor"]').exists()).toBe(true)
-			expect(calls.getModuleStatus).toHaveBeenCalledWith('constructor')
+			expect(calls.getModuleStatus).toHaveBeenCalledWith('constructor', expect.anything())
 		})
 
 		it('shows the title in the window that asks, in its heading and in its name, as text', async () => {
@@ -427,7 +427,7 @@ describe('the plan of an install', () => {
 		expect(text('.modules-size-extra')).toBe('Room used on the disk by the packages: 200 MiB')
 		expect(text('.modules-archive-url')).toBe(`The module comes from: ${URL_OK}`)
 		expect(text('.modules-dialog-tier')).toContain('Community')
-		expect(text('.modules-dialog-tier')).toContain('Maintained by the community, not proved on a real machine by ReCasaOS.')
+		expect(text('.modules-dialog-tier')).toContain('Tested only against a simulated machine, not a real one.')
 		expect(text('.modules-stay')).toBe('The packages stay on the machine if you remove the module later.')
 		expect(wrapper.findAll('.modules-check')).toHaveLength(9)
 		expect(wrapper.findAll('.modules-check').every(check => check.classes().includes('is-passed'))).toBe(true)
@@ -524,7 +524,7 @@ describe('the plan of an install', () => {
 		await installDialog({ name: 'other' })
 
 		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
-		expect(text('.modules-dialog .modules-call-sentence')).toBe('The request could not be completed. Try again.')
+		expect(text('.modules-dialog .modules-call-sentence')).toBe(TEXT.call.readFailed)
 		expect(wrapper.find('.modules-dialog-retry').exists()).toBe(true)
 	})
 
@@ -652,7 +652,7 @@ describe('the install', () => {
 		expect(dialog().exists()).toBe(false)
 		expect(calls.getModuleStatus).toHaveBeenLastCalledWith('virt')
 		expect(wrapper.find('.modules-job').exists()).toBe(true)
-		expect(text('.modules-job-note')).toBe('A job is running. The buttons come back when it ends.')
+		expect(text('.modules-job-note')).toBe('A job is running. The buttons come back when it ends. Closing this window does not stop it: open the window again to see how it goes.')
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
 	})
 
@@ -732,11 +732,11 @@ describe('the install', () => {
 		await press('.modules-dialog-ok')
 
 		expect(text('.modules-dialog .modules-call-sentence')).toBe(REASONS.busy)
-		expect(text('.modules-dialog .modules-call-detail')).toBe('Reported by the core: an upgrade of the operating system is open')
+		expect(text('.modules-dialog .modules-call-detail')).toBe('Reported by ReCasaOS: an upgrade of the operating system is open')
 		await press('.modules-dialog-cancel')
 
 		expect(text('.modules-busy-sentence')).toBe(REASONS.busy)
-		expect(text('.modules-busy-detail')).toBe('Reported by the core: an upgrade of the operating system is open')
+		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: an upgrade of the operating system is open')
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
 		expect(calls.getModules).toHaveBeenCalledTimes(1)
 
@@ -753,7 +753,7 @@ describe('the install', () => {
 		await press('.modules-dialog-cancel')
 
 		expect(wrapper.find('.modules-busy').exists()).toBe(true)
-		expect(text('.modules-busy-detail')).toBe('Reported by the core: dpkg is locked')
+		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: dpkg is locked')
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
 	})
 
@@ -779,7 +779,7 @@ describe('the install', () => {
 			await press('.modules-dialog-ok')
 
 			expect(dialog().exists()).toBe(true)
-			expect(text('.modules-dialog .modules-call-sentence')).toContain('The request took too long. It may have gone through')
+			expect(text('.modules-dialog .modules-call-sentence')).toBe(TEXT.call.maybe)
 			expect(wrapper.find('.modules-job').exists()).toBe(false)
 		})
 	})
@@ -951,12 +951,12 @@ describe('the job', () => {
 			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
 			await tick(MODULE_POLL_MS.running)
 
-			expect(text('.modules-job-title')).toBe('Virtual machines is installed.')
+			expect(text('.modules-job-title')).toBe('The install of Virtual machines is done.')
 			expect(text('.modules-job-group')).toBe('Finished')
 			expect(text('.modules-next')).toBe('The card of the module appears on the dashboard once its service answers.')
 			expect(wrapper.findAll('.modules-step.is-done')).toHaveLength(8)
 			expect(wrapper.find('.modules-progress').exists()).toBe(false)
-			expect(text('.modules-live')).toBe('Virtual machines is installed.')
+			expect(text('.modules-live')).toBe('The install of Virtual machines is done.')
 			expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
 			expect(wrapper.find('.modules-remove').attributes('disabled')).toBeUndefined()
 			expect(wrapper.find('.modules-job-note').exists()).toBe(false)
@@ -989,13 +989,14 @@ describe('the job', () => {
 			await tick(MODULE_POLL_MS.running)
 			await tick(POLL_MS.error * 3)
 
-			expect(text('.modules-outage-message')).toBe('The machine is restarting. This page goes on by itself.')
+			expect(text('.modules-outage-message')).toBe('ReCasaOS does not answer. It may be restarting. This page tries again by itself.')
 			expect(text('.modules-outage-elapsed')).toMatch(/^No answer for \d+ s\.$/)
-			expect(text('.modules-live')).toBe('The machine is restarting. This page goes on by itself.')
+			expect(text('.modules-live')).toBe('ReCasaOS does not answer. It may be restarting. This page tries again by itself.')
 
 			await tick(RESTART_LOOK_AFTER_MS)
-			expect(text('.modules-outage-message')).toContain('The machine has not answered for')
-			expect(text('.modules-outage-message')).toContain('Look at its screen or console')
+			expect(text('.modules-outage-message')).toContain('ReCasaOS has not answered for')
+			expect(text('.modules-outage-message')).toContain('Look at the machine')
+			expect(text('.modules-outage-message')).not.toContain('waiting for you')
 			expect(wrapper.find('.modules-outage').html()).toContain('is-danger')
 
 			// and it goes on by itself when the core is back
@@ -1115,7 +1116,7 @@ describe('the job', () => {
 			expect(text('.modules-job-group')).toBe('Stopped')
 			expect(text('.modules-stopped-at')).toBe('It stopped at: Check the download')
 			expect(text('.modules-reason-sentence')).toBe(`${REASONS.checksum_mismatch} checksum_mismatch`)
-			expect(text('.modules-undo')).toBe('What the install had done was undone. Mend the cause, then install again.')
+			expect(text('.modules-undo')).toBe(JOB_NEXT.undone)
 			expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Done', 'Failed here', 'Not reached', 'Not reached', 'Not reached', 'Not reached', 'Not reached'])
 			expect(wrapper.find('.modules-advice').exists()).toBe(false)
 			expect(text('.modules-kept-none')).toBe('The install left no package on the machine.')
@@ -1137,7 +1138,7 @@ describe('the job', () => {
 		it('lists the packages that were kept and gives the command to purge them by hand, as text to copy and never to run', async () => {
 			await stopped({ code: 'start_failed', step: 'start', undo: 'rolled_back', kept_packages: ['qemu-utils', 'libvirt-daemon-system'] })
 
-			expect(text('.modules-kept-some')).toBe('These packages are still on the machine: qemu-utils, libvirt-daemon-system.')
+			expect(text('.modules-kept-some')).toBe('These are the packages the module needs: qemu-utils, libvirt-daemon-system. Some may have been on the machine before the install.')
 			expect(text('.modules-kept-purge')).toContain('ReCasaOS never runs it.')
 			expect(text('.modules-kept-command code')).toBe('apt-get purge qemu-utils libvirt-daemon-system')
 			await wrapper.find('.modules-kept-command button').trigger('click')
@@ -1180,7 +1181,7 @@ describe('the job', () => {
 
 			expect(text('.modules-job-title')).toBe('The job on Virtual machines was cut short.')
 			expect(text('.modules-job-group')).toBe('Cut short')
-			expect(text('.modules-undo')).toBe('Nothing was undone.')
+			expect(text('.modules-undo')).toBe(JOB_NEXT.cutInstall)
 			expect(texts('.modules-step .modules-step-mark')[3]).toBe('Cut short here')
 			expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
 			expect(wrapper.find('.modules-install').attributes('disabled')).toBeUndefined()
@@ -1234,17 +1235,16 @@ describe('the job', () => {
 			expect(text('.modules-step.is-current .modules-step-text')).toBe(STEP_TEXTS.remove.manifest)
 		})
 
-		it('looks for the job of each module in turn, and stops at the one that runs', async () => {
+		it('looks for the job of the modules four at a time, and follows the one that runs', async () => {
 			calls.getModuleStatus.mockReset()
 			calls.getModuleStatus.mockImplementation(name => answer(name === 'b' ? jobAnswer({ name: 'b', state: 'running', step: 'packages' }) : { job: jobRaw({ name, state: 'idle', step: '' }), status: {} }))
 			await open(listRaw([moduleRaw({ name: 'a', title: 'A' }), moduleRaw({ name: 'b', title: 'B' }), moduleRaw({ name: 'c', title: 'C' })]))
 
-			expect(calls.getModuleStatus.mock.calls.slice(0, 2).map(call => call[0])).toEqual(['a', 'b'])
+			expect(calls.getModuleStatus.mock.calls.slice(0, 3).map(call => call[0])).toEqual(['a', 'b', 'c'])
 			expect(card('b').find('.modules-job').exists()).toBe(true)
 			expect(card('a').find('.modules-job').exists()).toBe(false)
 			expect(card('c').find('.modules-job').exists()).toBe(false)
-			// the one after the job that runs is not asked about
-			expect(calls.getModuleStatus.mock.calls.map(call => call[0])).not.toContain('c')
+			expect(wrapper.vm.follow).toBe('b')
 		})
 
 		it('tells a job that failed, and one that was cut short, but not one that ended well or that was refused', async () => {
@@ -1265,11 +1265,19 @@ describe('the job', () => {
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(asked)
 		})
 
-		it('tells the console to finish a job that was cut short before the window was opened', async () => {
-			serveJob(jobAnswer({ state: 'interrupted', step: 'download' }))
+		it('tells the console to finish a job that was cut short before the window was opened, after the files began to be written', async () => {
+			serveJob(jobAnswer({ state: 'interrupted', step: 'unpack' }))
 			await open()
 
 			expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
+		})
+
+		it('says that nothing of the module is on the machine for a job cut short before the files, and gives no command', async () => {
+			serveJob(jobAnswer({ state: 'interrupted', step: 'download' }))
+			await open()
+
+			expect(text('.modules-undo')).toBe(JOB_NEXT.cutEarly)
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
 		})
 
 		it('does not ask about a job that cannot be read, and goes on to the next module', async () => {
@@ -1357,7 +1365,7 @@ describe('the remove', () => {
 		await press('.modules-dialog-ok')
 		await tick(MODULE_POLL_MS.running)
 
-		expect(text('.modules-job-title')).toBe('Virtual machines is removed.')
+		expect(text('.modules-job-title')).toBe('The removal of Virtual machines is done.')
 		expect(text('.modules-next')).toBe('The packages that the module installed and its data are still on the machine.')
 		expect(wrapper.find('.modules-install').exists()).toBe(true)
 	})
@@ -1392,7 +1400,7 @@ describe('the remove', () => {
 		await press('.modules-dialog-ok')
 		await press('.modules-dialog-cancel')
 
-		expect(text('.modules-busy-detail')).toBe('Reported by the core: a package manager holds the lock')
+		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: a package manager holds the lock')
 		expect(wrapper.find('.modules-remove').attributes('disabled')).toBeDefined()
 	})
 
@@ -1498,6 +1506,938 @@ describe('the confirmation windows', () => {
 	})
 })
 
+// ---- what the core says of a job, and what the page makes of it -------------------------------------------------------------
+
+describe('the state of a job that is not the core\'s', () => {
+	it('is never a class of the card, and is shown as cleaned and cut text', async () => {
+		const hostile = `x" onmouseover="alert(1) ${BIDI}${NUL}<b>y</b>${'z'.repeat(100)}`
+		serveJob(jobAnswer({ state: hostile, step: 'download' }))
+		await open()
+
+		const job = wrapper.find('.modules-job')
+		expect(job.classes()).toContain('is-unknown')
+		expect(job.classes().join(' ')).not.toMatch(/onmouseover|alert|zzz|x"/)
+		expect(job.attributes('onmouseover')).toBeUndefined()
+		expect(job.find('b').exists()).toBe(false)
+		expect(text('.modules-job-unknown').length).toBeLessThanOrEqual(40)
+		expect(text('.modules-job-unknown')).not.toContain(BIDI)
+		expect(text('.modules-job-unknown')).not.toContain(NUL)
+		expect(text('.modules-job-title')).toBe(TEXT.job.unknownState)
+	})
+
+	it('keeps the class of a state that is the core\'s', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back' }))
+		await open()
+
+		expect(wrapper.find('.modules-job').classes()).toContain('is-failed')
+	})
+})
+
+describe('what a job that stopped says, by what the core says it was', () => {
+	const installed = () => listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])
+
+	it('says a remove that failed at the step manifest, seen from a window opened later, as neither an install nor as nothing to undo, and gives the console', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'manifest', code: 'manifest_write_failed', undo: '' }, { installed: true }))
+		await open(installed())
+
+		expect(text('.modules-job-title')).toBe('The job on Virtual machines stopped.')
+		expect(wrapper.find('.modules-undo').exists()).toBe(false)
+		expect(wrapper.find('.modules-kept').exists()).toBe(false)
+		expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
+		expect(text('.modules-job')).not.toMatch(/nothing to undo|Nothing had been changed|install|packages/i)
+	})
+
+	it('says it a removal when the core says so, with the steps of a removal', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'manifest', code: 'manifest_write_failed', undo: '', kind: 'remove' }, { installed: true }))
+		await open(installed())
+
+		expect(text('.modules-job-title')).toBe('The removal of Virtual machines stopped.')
+		expect(wrapper.findAll('.modules-step')).toHaveLength(4)
+		expect(wrapper.find('.modules-undo').exists()).toBe(false)
+		expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
+	})
+
+	it('says an install that failed when the core says so, whatever the step', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'manifest', code: 'manifest_write_failed', undo: 'rolled_back', kind: 'install', kept_packages: [] }))
+		await open()
+
+		expect(text('.modules-job-title')).toBe('The install of Virtual machines stopped.')
+		expect(text('.modules-undo')).toBe(JOB_NEXT.undone)
+		expect(wrapper.findAll('.modules-step')).toHaveLength(8)
+	})
+
+	it('does not say that what the install had done was undone: the files and the service were removed, the packages were not', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'packages', code: 'packages_failed', undo: 'rolled_back', kept_packages: ['qemu-utils'] }))
+		await open()
+
+		expect(text('.modules-undo')).toBe('The files and the service of the module were removed; the packages were not.')
+		expect(text('.modules-job')).not.toContain('had done was undone')
+	})
+
+	it('says that a job that was stopped before it began changed nothing, and gives no console', async () => {
+		serveJob(jobAnswer({ state: 'interrupted', step: '' }))
+		await open()
+
+		expect(text('.modules-undo')).toBe('The job was stopped before it began. Nothing was changed.')
+		expect(wrapper.find('.modules-advice').exists()).toBe(false)
+		expect(wrapper.find('.modules-stopped-at').exists()).toBe(false)
+	})
+
+	it('says an install whose undo was cut short as that, and not as nothing undone, and gives the console', async () => {
+		serveJob(jobAnswer({ state: 'interrupted', step: 'rollback_files' }))
+		await open()
+
+		expect(text('.modules-undo')).toBe('The install failed and the undo was cut short: some files of the module may still be on the machine.')
+		expect(text('.modules-job')).not.toContain('Nothing was undone')
+		expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
+		// the list of the steps of the undo stays
+		expect(texts('.modules-step .modules-step-text')).toEqual([STEP_TEXTS.remove.stop, STEP_TEXTS.remove.files, STEP_TEXTS.remove.manifest, STEP_TEXTS.remove.reload])
+		expect(texts('.modules-step .modules-step-mark')[1]).toBe('Cut short here')
+	})
+
+	it('says the heading of an install that is being undone as that, and keeps the list of the steps and a progress bar with a name', async () => {
+		serveJob(jobAnswer({ state: 'running', step: 'rollback_files', kind: 'install' }))
+		await open()
+
+		expect(text('.modules-job-title')).toBe('Undoing the install of Virtual machines')
+		expect(text('.modules-job-title')).not.toMatch(/^Installing/)
+		expect(text('.modules-rollback')).toBe(`Undoing the install: ${STEP_TEXTS.remove.files}`)
+		expect(texts('.modules-step .modules-step-text')).toEqual([STEP_TEXTS.remove.stop, STEP_TEXTS.remove.files, STEP_TEXTS.remove.manifest, STEP_TEXTS.remove.reload])
+		expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Now', 'Not yet', 'Not yet'])
+		expect(wrapper.find('.modules-progress').attributes('aria-label')).toBe('Progress of the undo: step 2 of 4')
+		expect(text('.modules-live')).toBe('Virtual machines: undoing the install, Delete the files of the module.')
+	})
+
+	it('says the end of an install and of a removal by what was done', async () => {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state: 'running', step: 'route', kind: 'install' }))
+		await press('.modules-dialog-ok')
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'install' }, { installed: true }))
+		calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
+		await tick(MODULE_POLL_MS.running)
+
+		expect(text('.modules-job-title')).toBe('The install of Virtual machines is done.')
+		expect(text('.modules-live')).toBe('The install of Virtual machines is done.')
+	})
+})
+
+describe('the packages that the module needs, and the command to purge them', () => {
+	it('says one package in the singular', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'start', code: 'start_failed', undo: 'rolled_back', kept_packages: ['ovmf'] }))
+		await open()
+
+		expect(text('.modules-kept-some')).toBe('This is the package the module needs: ovmf. It may have been on the machine before the install.')
+		expect(text('.modules-kept-purge')).toMatch(/^To purge it/)
+		expect(text('.modules-kept-command code')).toBe('apt-get purge ovmf')
+	})
+
+	it('says that some of them may have been on the machine before, and that a purge deletes their configuration files', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'start', code: 'start_failed', undo: 'rolled_back', kept_packages: ['ovmf', 'qemu-utils'] }))
+		await open()
+
+		expect(text('.modules-kept-some')).toContain('Some may have been on the machine before the install.')
+		expect(text('.modules-kept-purge')).toContain('configuration files')
+		expect(text('.modules-kept-purge')).toContain('read what apt says before you agree')
+	})
+
+	it('gives the command after a remove that succeeded too, when the core gives the list, as text to copy', async () => {
+		await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+		await press('.modules-remove')
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'remove', kept_packages: ['qemu-utils', 'libvirt-daemon-system'] }, { installed: false }))
+		calls.getModules.mockImplementation(() => answer(listRaw()))
+		await press('.modules-dialog-ok')
+		await tick(MODULE_POLL_MS.running)
+
+		expect(text('.modules-job-title')).toBe('The removal of Virtual machines is done.')
+		expect(text('.modules-kept-command code')).toBe('apt-get purge qemu-utils libvirt-daemon-system')
+		await wrapper.find('.modules-kept-command button').trigger('click')
+		await settle()
+		expect(copy).toHaveBeenCalledWith('apt-get purge qemu-utils libvirt-daemon-system')
+		expect(calls.removeModule).toHaveBeenCalledTimes(1)
+	})
+
+	it('gives no command after a remove when the core gives no list', async () => {
+		await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+		await press('.modules-remove')
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'remove' }, { installed: false }))
+		await press('.modules-dialog-ok')
+		await tick(MODULE_POLL_MS.running)
+
+		expect(wrapper.find('.modules-kept').exists()).toBe(false)
+		expect(text('.modules-next')).toBe(JOB_NEXT.succeededRemove)
+	})
+})
+
+describe('a plan that cannot be confirmed says why', () => {
+	it('says a plan with no valid identifier, with no word of reading it and confirming, and no button that installs', async () => {
+		await open()
+		await installDialog({ plan_id: '' })
+
+		expect(text('.modules-no-id')).toBe(TEXT.plan.noId)
+		expect(wrapper.find('.modules-dialog-line').exists()).toBe(false)
+		expect(dialog().text()).not.toContain('Read it, then confirm')
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+		expect(wrapper.find('.modules-dialog-cancel').text()).toBe('Close')
+	})
+
+	it('says a plan that does not list the packages, and does not say that apt installs none', async () => {
+		await open()
+		await installDialog({ packages: undefined })
+
+		expect(text('.modules-no-list')).toBe(TEXT.plan.noList)
+		expect(wrapper.find('.modules-no-packages').exists()).toBe(false)
+		expect(dialog().text()).not.toContain('apt installs no package')
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+	})
+
+	it('says a plan that installs no package as that, with the button', async () => {
+		await open()
+		await installDialog({ packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true } })
+
+		expect(text('.modules-no-packages')).toBe('apt installs no package for this module.')
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(true)
+	})
+
+	it('says what is on hold, and gives the command that takes the hold off as text to copy', async () => {
+		await open()
+		const checks = okChecks().map(check => check.code === 'apt' ? { ...check, ok: false, detail: 'held libvirt-daemon-system ovmf' } : check)
+		await installDialog({ refused: 'held_package', plan_id: '', checks })
+
+		expect(text('.modules-refused')).toContain(REASONS.held_package)
+		expect(text('.modules-unhold')).toBe(TEXT.plan.unhold)
+		expect(text('.modules-unhold-command code')).toBe('apt-mark unhold libvirt-daemon-system ovmf')
+		await wrapper.find('.modules-unhold-command button').trigger('click')
+		await settle()
+		expect(copy).toHaveBeenCalledWith('apt-mark unhold libvirt-daemon-system ovmf')
+	})
+
+	it('says the same for the refusal of the install call', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('held_package', { checks: [{ code: 'apt', ok: false, detail: 'held ovmf' }] })))
+		await press('.modules-dialog-ok')
+
+		expect(text('.modules-dialog .modules-unhold-command code')).toBe('apt-mark unhold ovmf')
+	})
+
+	it('says a release of ReCasaOS that cannot be told as that, and not as one that is too old', async () => {
+		await open()
+		await installDialog({ refused: 'recasaos', plan_id: '', checks: okChecks().map(check => check.code === 'recasaos' ? { ...check, ok: false, detail: 'unknown' } : check) })
+
+		expect(text('.modules-refused')).toContain(TEXT.checks.recasaosUnknown)
+		expect(text('.modules-refused')).not.toContain('too old')
+		expect(text('.modules-check-sentence')).toBe(TEXT.checks.recasaosUnknown)
+	})
+
+	it('says the room that is needed and free in the units of the page, and what keeps the machine busy in words', async () => {
+		await open()
+		const checks = okChecks().map((check) => {
+			if (check.code === 'disk')
+				return { ...check, ok: false, detail: 'need 314572800 bytes on /usr, 52428800 free' }
+			if (check.code === 'busy')
+				return { ...check, ok: false, detail: 'package_manager' }
+			return check
+		})
+		await installDialog({ refused: 'busy', plan_id: '', checks })
+
+		const details = texts('.modules-check-detail')
+		expect(details).toContain('Room needed on /usr: 300 MiB. Room free: 50 MiB.')
+		expect(details).toContain(TEXT.busy.package_manager)
+		expect(dialog().text()).not.toContain('314572800')
+	})
+
+	it('shows up to 400 characters of what apt says', async () => {
+		await open()
+		const detail = `The following packages have unmet dependencies: ${'libfoo (>= 1.2) '.repeat(40)}`.slice(0, 400).trim()
+		await installDialog({ refused: 'apt_failed', plan_id: '', checks: okChecks().map(check => check.code === 'apt' ? { ...check, ok: false, detail } : check) })
+
+		expect(text('.modules-check-detail')).toBe(detail)
+	})
+})
+
+describe('what a window says while the core cannot be read', () => {
+	async function followed() {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state: 'running', step: 'download' }))
+		await press('.modules-dialog-ok')
+	}
+
+	it('does not say that the machine restarts when the core answers with an error of its own, and gives its code', async () => {
+		await followed()
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(failure(refused('internal', {}, 500)))
+		await tick(MODULE_POLL_MS.running)
+
+		expect(text('.modules-outage-message')).toContain('ReCasaOS answered with an error. This page tries again by itself.')
+		expect(text('.modules-outage-message')).toContain('internal')
+		expect(wrapper.find('.modules-outage').text()).not.toMatch(/restarting/)
+	})
+
+	it('says a gateway with nothing behind it (502) as a core that does not answer, in the words of a module', async () => {
+		await followed()
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(failure({ response: { status: 502, data: '<html>' } }))
+		await tick(MODULE_POLL_MS.running)
+
+		expect(text('.modules-outage-message')).toBe('ReCasaOS does not answer. It may be restarting. This page tries again by itself.')
+	})
+
+	// the clock of the silence goes on across a tab that was hidden: the page was not asking, and the core was no more answering
+	it('keeps the time of the silence across a tab that is hidden for twenty minutes, and sends the person to the machine at once when it is shown', async () => {
+		await followed()
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(failure({ code: 'ERR_NETWORK', request: {} }))
+		await tick(MODULE_POLL_MS.running)
+		expect(text('.modules-outage-message')).toContain('ReCasaOS does not answer')
+
+		Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(20 * 60 * 1000)
+		expect(calls.getModuleStatus).toHaveBeenCalledTimes(1)
+		delete document.hidden
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(0)
+
+		expect(calls.getModuleStatus).toHaveBeenCalledTimes(2)
+		expect(text('.modules-outage-message')).toContain('ReCasaOS has not answered for 20 min')
+		expect(wrapper.find('.modules-outage').html()).toContain('is-danger')
+	})
+
+	it('does not count the time a tab was hidden as silence when the core answered before', async () => {
+		await followed()
+		Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(20 * 60 * 1000)
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(failure({ code: 'ERR_NETWORK', request: {} }))
+		delete document.hidden
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(0)
+
+		expect(text('.modules-outage-message')).toBe('ReCasaOS does not answer. It may be restarting. This page tries again by itself.')
+		expect(wrapper.find('.modules-outage-elapsed').exists()).toBe(false)
+	})
+})
+
+describe('the busy flag', () => {
+	it('is taken away when a call goes through at the next try, and not kept in front of the job', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementationOnce(failure(refused('busy', { reason: 'a package update is running' })))
+		await press('.modules-dialog-ok')
+		expect(wrapper.find('.modules-busy').exists()).toBe(true)
+
+		serveJob(jobAnswer({ state: 'running', step: 'packages' }))
+		await press('.modules-dialog-ok')
+
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+		expect(wrapper.find('.modules-busy').exists()).toBe(false)
+	})
+
+	it('says what the plan says of what keeps the machine busy in the words of the language, with no prose of the core', async () => {
+		await open()
+		for (const [detail, sentence] of [['package_manager', TEXT.busy.package_manager], ['os_upgrade', TEXT.busy.os_upgrade], ['unreadable', TEXT.busy.unreadable]]) {
+			await installDialog({ refused: 'busy', plan_id: '', checks: okChecks().map(check => check.code === 'busy' ? { ...check, ok: false, detail } : check) })
+			await press('.modules-dialog-cancel')
+
+			expect(text('.modules-busy-message')).toBe(sentence)
+			expect(wrapper.find('.modules-busy-detail').exists()).toBe(false)
+			await press('.modules-busy-retry')
+		}
+	})
+
+	it('says a refusal of the install as busy with its prose as text beside one sentence, and what the plan says in words', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'the upgrade flag is open', checks: [{ code: 'busy', ok: false, detail: 'os_upgrade' }] })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+
+		expect(text('.modules-busy-sentence')).toBe(REASONS.busy)
+		expect(text('.modules-busy-message')).toBe(TEXT.busy.os_upgrade)
+		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: the upgrade flag is open')
+	})
+
+	it('asks again for the list and for the jobs when Check again is pressed, and follows a job it finds', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		expect(calls.getModules).toHaveBeenCalledTimes(1)
+
+		serveJob(jobAnswer({ state: 'running', step: 'download' }))
+		await press('.modules-busy-retry')
+
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModuleStatus).toHaveBeenCalledWith('virt', expect.anything())
+		expect(wrapper.find('.modules-busy').exists()).toBe(false)
+		expect(wrapper.vm.follow).toBe('virt')
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+	})
+})
+
+describe('a call that lost its answer', () => {
+	it('follows the job it finds when that job has already ended, closes the window, and reads the list again', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'install', started_at: '2026-10-18T12:00:30Z', ended_at: '2026-10-18T12:01:00Z' }, { installed: true }))
+		calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
+		await press('.modules-dialog-ok')
+
+		expect(dialog().exists()).toBe(false)
+		expect(text('.modules-job-title')).toBe('The install of Virtual machines is done.')
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		expect(wrapper.find('.modules-job-note').exists()).toBe(false)
+	})
+
+	it('does the same for a job that failed', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back', started_at: '2026-10-18T12:00:30Z' }))
+		await press('.modules-dialog-ok')
+
+		expect(dialog().exists()).toBe(false)
+		expect(text('.modules-job-title')).toBe('The install of Virtual machines stopped.')
+	})
+
+	it.each([502, 503, 504, 500])('looks for the job first when a %d with no code of the core comes back from the install', async (status) => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure({ response: { status, data: '<html>' } }))
+		serveJob(jobAnswer({ state: 'running', step: 'packages', started_at: '2026-10-18T12:00:30Z' }))
+		await press('.modules-dialog-ok')
+
+		expect(dialog().exists()).toBe(false)
+		expect(wrapper.vm.follow).toBe('virt')
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+	})
+
+	it('says that the call may have gone through when it finds no job, for a gateway with nothing behind it', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockImplementation(failure({ response: { status: 502, data: '<html>' } }))
+		serveJob(IDLE)
+		await press('.modules-dialog-ok')
+
+		expect(dialog().exists()).toBe(true)
+		expect(text('.modules-dialog .modules-call-sentence')).toBe(TEXT.call.maybe)
+	})
+
+	it('does not take the report of an earlier job for the job of the call', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back', started_at: '2026-10-18T10:00:00Z' }))
+		await open()
+		await wrapper.find('.modules-job-close').trigger('click')
+		await installDialog()
+		calls.installModule.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		await press('.modules-dialog-ok')
+
+		// (the same job is still there: it is not the job of this call)
+		expect(dialog().exists()).toBe(true)
+		expect(text('.modules-dialog .modules-call-sentence')).toBe(TEXT.call.maybe)
+		expect(wrapper.find('.modules-job').exists()).toBe(false)
+	})
+
+	it('says a plan that got no answer as a read: nothing was changed, try again', async () => {
+		await open()
+		calls.planModule.mockImplementation(failure({ code: 'ECONNABORTED' }))
+		await press('.modules-install')
+
+		expect(text('.modules-dialog .modules-call-sentence')).toBe(TEXT.call.readFailed)
+		expect(dialog().text()).not.toContain('gone through')
+		expect(wrapper.find('.modules-dialog-retry').exists()).toBe(true)
+	})
+})
+
+describe('the list when the page learns that it is out of date', () => {
+	const installed = () => listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])
+
+	it('is read again after a remove that the core refuses as not installed, and the window has no button left to remove', async () => {
+		await open(installed())
+		await press('.modules-remove')
+		calls.getModules.mockImplementation(() => answer(listRaw()))
+		calls.removeModule.mockImplementation(failure(refused('not_installed', {})))
+		await press('.modules-dialog-ok')
+
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(text('.modules-dialog .modules-call-sentence')).toBe(REASONS.not_installed)
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+		expect(wrapper.find('.modules-dialog-cancel').text()).toBe('Close')
+		await press('.modules-dialog-cancel')
+		expect(wrapper.find('.modules-remove').exists()).toBe(false)
+		expect(wrapper.find('.modules-install').exists()).toBe(true)
+	})
+
+	it('is read again after an install that the core refuses as already installed', async () => {
+		await open()
+		await installDialog()
+		calls.getModules.mockImplementation(() => answer(installed()))
+		calls.installModule.mockImplementation(failure(refused('already_installed', {})))
+		await press('.modules-dialog-ok')
+
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+		await press('.modules-dialog-cancel')
+		expect(wrapper.find('.modules-install').exists()).toBe(false)
+		expect(wrapper.find('.modules-remove').exists()).toBe(true)
+	})
+
+	it('is read again after a plan that is refused as already installed', async () => {
+		await open()
+		calls.getModules.mockImplementation(() => answer(installed()))
+		await installDialog({ refused: 'already_installed', plan_id: '', checks: okChecks().map(check => check.code === 'already_installed' ? { ...check, ok: false, detail: 'installed' } : check) })
+
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		await press('.modules-dialog-cancel')
+		expect(wrapper.find('.modules-remove').exists()).toBe(true)
+	})
+
+	it('is read once more, a little later and by itself, when it could not be read at the end of a job', async () => {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state: 'running', step: 'route' }))
+		await press('.modules-dialog-ok')
+		calls.getModules.mockReset()
+		calls.getModules.mockImplementationOnce(failure({ response: { status: 502 } }))
+		calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'install' }, { installed: true }))
+		await tick(MODULE_POLL_MS.running)
+
+		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('.modules-list-error').exists()).toBe(true)
+		await tick(5000)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(wrapper.find('.modules-list-error').exists()).toBe(false)
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		// once, and no more
+		await tick(120000)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('does not retry again when the second reading fails too', async () => {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state: 'running', step: 'route' }))
+		await press('.modules-dialog-ok')
+		calls.getModules.mockReset()
+		calls.getModules.mockImplementation(failure({ response: { status: 502 } }))
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'install' }, { installed: true }))
+		await tick(MODULE_POLL_MS.running)
+		await tick(60000)
+
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('leaves no timer when the window closes before the second reading', async () => {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state: 'running', step: 'route' }))
+		await press('.modules-dialog-ok')
+		calls.getModules.mockReset()
+		calls.getModules.mockImplementation(failure({ response: { status: 502 } }))
+		serveJob(jobAnswer({ state: 'succeeded', step: 'done', kind: 'install' }, { installed: true }))
+		await tick(MODULE_POLL_MS.running)
+		expect(vi.getTimerCount()).toBeGreaterThan(0)
+		close()
+
+		expect(vi.getTimerCount()).toBe(0)
+	})
+})
+
+describe('the look for the jobs when the window opens', () => {
+	const modules = count => Array.from({ length: count }, (_, index) => moduleRaw({ name: `m${index}`, title: `M${index}` }))
+
+	it('asks four modules at a time, and the next as soon as one has answered', async () => {
+		const out = {}
+		let now = 0
+		let most = 0
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation((name) => {
+			out[name] = deferred()
+			now++
+			most = Math.max(most, now)
+			return out[name].promise.finally(() => {
+				now--
+			})
+		})
+		await open(listRaw(modules(10)))
+
+		expect(calls.getModuleStatus.mock.calls.map(call => call[0])).toEqual(['m0', 'm1', 'm2', 'm3'])
+		expect(wrapper.vm.probing).toBe(true)
+		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
+		out.m1.resolve({ data: { data: { job: jobRaw({ name: 'm1', state: 'idle', step: '' }), status: {} } } })
+		await settle()
+		expect(calls.getModuleStatus.mock.calls.map(call => call[0])).toEqual(['m0', 'm1', 'm2', 'm3', 'm4'])
+
+		for (let round = 0; round < 8; round++) {
+			for (const name of Object.keys(out))
+				out[name].resolve({ data: { data: { job: jobRaw({ name, state: 'idle', step: '' }), status: {} } } })
+			await settle()
+		}
+		expect(calls.getModuleStatus).toHaveBeenCalledTimes(10)
+		expect(most).toBeLessThanOrEqual(4)
+		expect(wrapper.vm.probing).toBe(false)
+	})
+
+	it('gives the whole look one deadline, and the buttons come back when statuses hang', async () => {
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation((name, signal) => new Promise((resolve, reject) => {
+			signal?.addEventListener('abort', () => reject(new Error('aborted')))
+		}))
+		await open(listRaw(modules(16)))
+
+		expect(wrapper.vm.probing).toBe(true)
+		expect(calls.getModuleStatus).toHaveBeenCalledTimes(4)
+		await tick(14000)
+		expect(wrapper.vm.probing).toBe(true)
+		await tick(1000)
+		await settle()
+
+		expect(wrapper.vm.probing).toBe(false)
+		// no more are asked once the time is up, and the ones that were out were given up
+		expect(calls.getModuleStatus).toHaveBeenCalledTimes(4)
+		for (const call of calls.getModuleStatus.mock.calls)
+			expect(call[1].aborted).toBe(true)
+		expect(wrapper.find('.modules-install').attributes('disabled')).toBeUndefined()
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('leaves no timer and gives up the asks when the window closes during the look', async () => {
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(() => new Promise(() => {}))
+		await open(listRaw(modules(6)))
+		const signals = calls.getModuleStatus.mock.calls.map(call => call[1])
+		close()
+
+		expect(signals.every(signal => signal.aborted)).toBe(true)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('stops asking for the next modules once a job is found to run', async () => {
+		calls.getModuleStatus.mockReset()
+		calls.getModuleStatus.mockImplementation(name => answer(name === 'm0' ? jobAnswer({ name, state: 'running', step: 'packages' }) : { job: jobRaw({ name, state: 'idle', step: '' }), status: {} }))
+		await open(listRaw(modules(12)))
+
+		expect(wrapper.vm.follow).toBe('m0')
+		expect(calls.getModuleStatus.mock.calls.filter(call => call[0] !== 'm0').length).toBeLessThanOrEqual(4)
+	})
+})
+
+describe('a plan that was given up', () => {
+	it('says once that the machine may still work on it for up to a minute, announces it, and does not ask again by itself', async () => {
+		const out = deferred()
+		calls.planModule.mockReturnValue(out.promise)
+		await open()
+		await press('.modules-install')
+		await press('.modules-dialog-cancel')
+
+		expect(text('.modules-plan-note')).toBe(TEXT.plan.cancelled)
+		expect(text('.modules-live')).toBe(TEXT.plan.cancelled)
+		await tick(120000)
+		expect(calls.planModule).toHaveBeenCalledTimes(1)
+		// it goes away when the minute is over
+		expect(wrapper.find('.modules-plan-note').exists()).toBe(false)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('is not said for a plan that was answered', async () => {
+		await open()
+		await installDialog()
+		await press('.modules-dialog-cancel')
+
+		expect(wrapper.find('.modules-plan-note').exists()).toBe(false)
+	})
+
+	it('goes when another plan is asked for', async () => {
+		const out = deferred()
+		calls.planModule.mockReturnValueOnce(out.promise)
+		await open()
+		await press('.modules-install')
+		await press('.modules-dialog-cancel')
+		expect(wrapper.find('.modules-plan-note').exists()).toBe(true)
+		await installDialog()
+
+		expect(wrapper.find('.modules-plan-note').exists()).toBe(false)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('leaves no timer when the window closes while the note is up', async () => {
+		calls.planModule.mockReturnValue(deferred().promise)
+		await open()
+		await press('.modules-install')
+		await press('.modules-dialog-cancel')
+		expect(vi.getTimerCount()).toBeGreaterThan(0)
+		close()
+
+		expect(vi.getTimerCount()).toBe(0)
+	})
+})
+
+// ---- the confirmation window says what it does ------------------------------------------------------------------------------
+
+describe('the confirmation of an install', () => {
+	it('shows what the module says about itself, with its notes, the version, and what the install does to the machine', async () => {
+		await open()
+		await installDialog()
+
+		expect(text('.modules-dialog-about')).toContain('A virtual machine can be given a USB device')
+		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+		expect(text('.modules-consequences')).toBe(TEXT.plan.consequencesText)
+		expect(text('.modules-consequences')).toContain('apt as root')
+		expect(text('.modules-consequences')).toContain('/usr/bin')
+		expect(text('.modules-consequences')).toContain('/usr/lib/systemd/system')
+		expect(text('.modules-consequences')).toContain('starts when the machine boots')
+		expect(text('.modules-consequences')).toContain('Do not switch the machine off')
+	})
+
+	it('says the description as text', async () => {
+		const html = '<img src=x onerror="alert(1)">'
+		await open(listRaw([moduleRaw({ description: html })]))
+		await installDialog()
+
+		expect(dialog().find('img').exists()).toBe(false)
+		expect(text('.modules-dialog-about')).toBe(html)
+	})
+
+	it('does not show a version that is not a tag', async () => {
+		await open()
+		await installDialog({ tag: '<b>1</b>' })
+
+		expect(wrapper.find('.modules-dialog-version').exists()).toBe(false)
+	})
+
+	it('says what is happening while the install is asked for, and not that there is something to read; the window cannot be left', async () => {
+		await open()
+		await installDialog()
+		calls.installModule.mockReturnValue(deferred().promise)
+		await press('.modules-dialog-ok')
+
+		expect(text('.modules-dialog-calling')).toBe(TEXT.plan.starting)
+		expect(dialog().text()).not.toContain('Read it, then confirm')
+		expect(wrapper.find('.modules-dialog-line').exists()).toBe(false)
+		expect(wrapper.find('.modules-calling').attributes('aria-label')).toBe('Starting the install')
+		expect(wrapper.find('.modules-dialog-cancel').attributes('disabled')).toBeDefined()
+		expect(text('.modules-live')).toBe(TEXT.plan.starting)
+	})
+
+	it('says what is happening while the remove is asked for', async () => {
+		await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+		await press('.modules-remove')
+		calls.removeModule.mockReturnValue(deferred().promise)
+		await press('.modules-dialog-ok')
+
+		expect(text('.modules-dialog-calling')).toBe(TEXT.remove.starting)
+		expect(wrapper.find('.modules-calling').attributes('aria-label')).toBe('Starting the removal')
+		expect(texts('.modules-dialog .modules-dialog-line')).toHaveLength(2)
+	})
+
+	it('announces the plan when it is there, and why it is refused when it is', async () => {
+		await open()
+		await installDialog()
+		expect(text('.modules-live')).toBe('The plan for Virtual machines is ready. Read it, then confirm.')
+		await press('.modules-dialog-cancel')
+
+		await installDialog({ refused: 'os', plan_id: '', checks: okChecks().map(check => check.code === 'os' ? { ...check, ok: false, detail: 'unsupported debian:11' } : check) })
+		expect(text('.modules-live')).toBe(REASONS.os)
+	})
+
+	it('names the box of the log, which takes the focus to be scrolled', async () => {
+		serveJob(jobAnswer({ state: 'running', step: 'download', log_tail: ['a line'] }))
+		await open()
+
+		const pre = wrapper.find('.modules-log-text pre')
+		expect(pre.attributes('tabindex')).toBe('0')
+		expect(pre.attributes('aria-label')).toBe(TEXT.job.log)
+		expect(pre.attributes('role')).toBe('region')
+	})
+})
+
+describe('the report of a job that stopped', () => {
+	it('is put away when the person has read it, until another job begins', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back', started_at: '2026-10-18T10:00:00Z' }))
+		await open()
+		expect(text('.modules-job-close')).toBe('Close this report')
+
+		await press('.modules-job-close')
+
+		expect(wrapper.find('.modules-job').exists()).toBe(false)
+		expect(document.activeElement).toBe(wrapper.find('.modules-card-title').element)
+		// the buttons are not shut by a report: they were not before it was closed either
+		expect(wrapper.find('.modules-install').attributes('disabled')).toBeUndefined()
+
+		serveJob(jobAnswer({ state: 'running', step: 'packages', started_at: '2026-10-18T12:30:00Z' }))
+		await installDialog()
+		await press('.modules-dialog-ok')
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+		expect(wrapper.find('.modules-job-close').exists()).toBe(false)
+	})
+
+	it('is put away for a job that was cut short too', async () => {
+		serveJob(jobAnswer({ state: 'interrupted', step: 'unpack' }))
+		await open()
+		await press('.modules-job-close')
+
+		expect(wrapper.find('.modules-job').exists()).toBe(false)
+	})
+
+	it.each([
+		['running', { step: 'download' }],
+		['succeeded', { step: 'done' }],
+	])('is not offered for a job that is %s', async (state, extra) => {
+		await open()
+		await installDialog()
+		serveJob(jobAnswer({ state, ...extra }))
+		await press('.modules-dialog-ok')
+
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+		expect(wrapper.find('.modules-job-close').exists()).toBe(false)
+	})
+
+	it('comes back for the report of another job of the same module', async () => {
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back', started_at: '2026-10-18T10:00:00Z' }))
+		await open()
+		await press('.modules-job-close')
+		expect(wrapper.find('.modules-job').exists()).toBe(false)
+
+		serveJob(jobAnswer({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo: 'rolled_back', started_at: '2026-10-18T11:00:00Z' }))
+		await wrapper.vm.probeJob('virt')
+		await settle()
+		expect(wrapper.find('.modules-job').exists()).toBe(true)
+	})
+})
+
+describe('the shape of the card', () => {
+	it('lets the log scroll in its own box: the message the report stands in cannot grow to the width of its longest line', () => {
+		const style = source.slice(source.indexOf('<style'))
+		expect(style).toMatch(/\.modules-job\s+:deep\(\.media-content\)/)
+		expect(style).toMatch(/min-width: 0/)
+	})
+})
+
+// ---- the Tab key --------------------------------------------------------------------------------------------------------------
+
+describe('the Tab key inside the confirmation window, under the real hold of Buefy on the window it stands on', () => {
+	const Outer = {
+		data: () => ({ open: true }),
+		render() {
+			const props = { 'modelValue': this.open, 'hasModalCard': true, 'canCancel': ['escape'], 'trapFocus': true, 'autoFocus': false, 'onUpdate:modelValue': (value) => {
+				this.open = value
+			} }
+			return h(BModal, props, { default: () => h('div', { class: 'modal-card outer-card' }, [h(ModulesModal)]) })
+		},
+	}
+
+	async function opened() {
+		calls.getModules.mockImplementation(() => answer(listRaw()))
+		calls.planModule.mockImplementation(() => answer(planRaw()))
+		wrapper = mount(Outer, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls } } } })
+		await settle()
+		wrapper.find('.modules-install').element.focus()
+		await press('.modules-install')
+	}
+
+	function tab(target, shift = false) {
+		const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: shift, bubbles: true, cancelable: true })
+		target.dispatchEvent(event)
+		return event
+	}
+	const inDialog = () => Boolean(document.activeElement?.closest('.modules-dialog'))
+	const cancel = () => wrapper.find('.modules-dialog-cancel').element
+	const ok = () => wrapper.find('.modules-dialog-ok').element
+
+	it('goes from the heading to the first control of the window, and not to the button of the card under it', async () => {
+		await opened()
+		const heading = wrapper.find('.modules-dialog-title').element
+		expect(document.activeElement).toBe(heading)
+
+		const event = tab(heading)
+
+		expect(event.defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(cancel())
+		expect(document.activeElement).not.toBe(wrapper.find('.modules-install').element)
+	})
+
+	it('goes from the last control to the first, and from the first to the last with the Shift key', async () => {
+		await opened()
+
+		cancel().focus()
+		expect(tab(cancel(), true).defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(ok())
+
+		expect(tab(ok()).defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(cancel())
+	})
+
+	it('goes from the heading to the last control with the Shift key, and does not leave for what is before the window', async () => {
+		await opened()
+		const heading = wrapper.find('.modules-dialog-title').element
+
+		const event = tab(heading, true)
+
+		expect(event.defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(ok())
+		expect(inDialog()).toBe(true)
+	})
+
+	it('leaves the keys of the middle to the browser, which goes from one control to the next', async () => {
+		await opened()
+		const event = tab(cancel())
+		expect(event.defaultPrevented).toBe(false)
+		expect(tab(ok(), true).defaultPrevented).toBe(false)
+	})
+
+	it('keeps the focus inside the window, whichever key is pressed again and again', async () => {
+		await opened()
+		let at = wrapper.find('.modules-dialog-title').element
+		for (const shift of [false, true, false, false, true, true, false]) {
+			tab(at, shift)
+			expect(inDialog()).toBe(true)
+			at = document.activeElement
+		}
+	})
+
+	// a click on the text of a window leaves the focus on the window itself, which is no stop of the Tab key
+	it('goes from the window itself to its first control, and with the Shift key to its last', async () => {
+		await opened()
+		const card = wrapper.find('.modules-dialog').element
+		card.focus()
+		expect(document.activeElement).toBe(card)
+
+		expect(tab(card).defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(cancel())
+		card.focus()
+		expect(tab(card, true).defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(ok())
+	})
+
+	it('goes round in the window itself too, and from its heading', async () => {
+		calls.getModules.mockImplementation(() => answer(listRaw()))
+		wrapper = mount(Outer, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls } } } })
+		await settle()
+		const title = wrapper.find('.modules-title').element
+		const buttons = wrapper.findAll('.modules-modal button:not([disabled])').map(button => button.element)
+		expect(document.activeElement).toBe(title)
+
+		const back = tab(title, true)
+		expect(back.defaultPrevented).toBe(true)
+		expect(document.activeElement).toBe(buttons.at(-1))
+		expect(document.activeElement.textContent).toContain('Close')
+
+		tab(buttons.at(-1))
+		expect(document.activeElement).toBe(buttons[0])
+		tab(buttons[0], true)
+		expect(document.activeElement).toBe(buttons.at(-1))
+	})
+})
+
 // ---- the page --------------------------------------------------------------------------------------------------------------
 
 describe('the page', () => {
@@ -1538,7 +2478,7 @@ describe('the page', () => {
 		i18n.global.locale = 'fr_fr'
 		await open()
 
-		expect(text('.modules-tier-sentence')).toBe('Maintenu par la communauté, non éprouvé sur une vraie machine par ReCasaOS.')
+		expect(text('.modules-tier-sentence')).toBe('Testé uniquement sur une machine simulée, pas sur une vraie.')
 		expect(text('.modules-offered')).toBe('Version proposée : v0.1.0')
 		expect(wrapper.find('.modules-install').text()).toBe('Installer')
 	})

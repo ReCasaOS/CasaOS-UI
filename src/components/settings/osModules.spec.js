@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
 	CHECKS,
+	JOB_NEXT,
 	JOB_STATES,
 	JOB_TITLES,
 	MODULE_KEYS,
@@ -23,6 +24,7 @@ import {
 	moduleFailure,
 	moduleOutage,
 	modulePlanView,
+	moduleStatusFailure,
 	nextJobPoll,
 	reasonMessage,
 } from './osModules'
@@ -112,6 +114,9 @@ const jobRaw = (changes = {}) => ({ name: 'virt', state: 'running', step: 'downl
 const answer = (changes = {}, status = { installed: false }) => ({ job: jobRaw(changes), status })
 const job = (changes, options) => jobView(answer(changes, options?.status), { name: 'virt', title: 'Virtual machines', ...options })
 
+// a refusal of the core: a 409 with its code in data.error_code
+const refusal = (error_code, data, status = 409) => ({ response: { status, data: { success: status, message: 'x', data: { error_code, error: 'A sentence of the core, in English', data } } } })
+
 // every message of a view: { key, params, keys? }, and the keys alone
 function keysIn(view) {
 	const keys = []
@@ -176,6 +181,20 @@ describe('the sentences of the codes', () => {
 
 	it('ends every sentence that has placeholders on one that has none', () => {
 		expect(REASONS.bad_request.at(-1)).not.toMatch(/\{\w+\}/)
+	})
+
+	// the writing phase can have written some of the files before it stopped: what was written is said by the undo of the job, and not by the code
+	it.each(['unpack_path', 'file_exists', 'unpack_limits', 'unpack_corrupt'])('does not say, with %s, that nothing was written', (code) => {
+		expect(REASONS[code]).not.toMatch(/nothing was written/i)
+	})
+
+	it('does not tell the person to update apt when apt names unmet dependencies', () => {
+		expect(REASONS.apt_failed).toMatch(/unmet dependencies/)
+		expect(REASONS.apt_failed).toMatch(/will not help/)
+	})
+
+	it('says a download that is not the one the release expects as a module that was not installed, and not as one to mend', () => {
+		expect(REASONS.checksum_mismatch).toBe('The downloaded file is not the one this release expects, so the module was not installed. Try again later; if it happens again, report it.')
 	})
 })
 
@@ -244,8 +263,14 @@ describe('the view of the list', () => {
 			expect(listView(listRaw([moduleRaw({ tier })])).modules[0].tier).toEqual({ id: tier, ...TIERS[tier], raw: '' })
 		})
 
-		it('says the community sentence in plain words', () => {
-			expect(TIERS.community.sentence).toBe('Maintained by the community, not proved on a real machine by ReCasaOS.')
+		it('says the community sentence in plain words: tested against a simulated machine only', () => {
+			expect(TIERS.community.sentence).toBe('Tested only against a simulated machine, not a real one.')
+			expect(TIERS.community.sentence).not.toMatch(/maintained|proved/i)
+		})
+
+		it('says the core sentence, and names the tier by who maintains it', () => {
+			expect(TIERS.core.sentence).toBe('Proved on a real machine by ReCasaOS.')
+			expect(TIERS.core.label).toBe('Maintained by ReCasaOS')
 		})
 
 		it.each(['beta', '<b>core</b>', 'Core', '__proto__', 'constructor', 'x'.repeat(1000)])('says %j as a kind that it does not know, and never as proved', (tier) => {
@@ -411,6 +436,41 @@ describe('the view of the plan', () => {
 		expect(view.incomplete).toBe(true)
 	})
 
+	// "Read it, then confirm" is for a plan that has a button: one that cannot be installed says why
+	it('cannot install a plan whose id is not the core\'s, and says that, and not that there is something to confirm', () => {
+		for (const plan_id of ['', 'm1-', 5, null, undefined]) {
+			const view = plan({ plan_id })
+			expect(view.installable).toBe(false)
+			expect(view.noId).toBe(true)
+			expect(view.incomplete).toBe(false)
+			expect(view.noList).toBe(false)
+		}
+		expect(plan().noId).toBe(false)
+		expect(plan({ refused: 'os', plan_id: '' }).noId).toBe(false)
+		expect(plan({ plan_id: '', checks: [] }).noId).toBe(false)
+	})
+
+	it('cannot install a plan that does not list the packages that apt installs, and does not say that apt installs none', () => {
+		for (const packages of [undefined, null, 'x', 5, [], {}, { to_install: null, known: true }, { to_install: 'qemu-utils', known: true }, { to_upgrade: [], known: true }]) {
+			const view = plan({ packages })
+			expect(view.installable, JSON.stringify(packages)).toBe(false)
+			expect(view.packages.listed).toBe(false)
+			expect(view.noList).toBe(true)
+			expect(installBody(view)).toBeNull()
+		}
+		// an empty list that the plan gives is a plan that installs nothing, and that is something it can say
+		const none = plan({ packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true } })
+		expect(none.packages.listed).toBe(true)
+		expect(none.noList).toBe(false)
+		expect(none.installable).toBe(true)
+	})
+
+	it('says the version of the module that the plan installs, as a tag and nothing else', () => {
+		expect(plan().tag).toBe('v0.1.0')
+		for (const tag of ['0.1.0', 'v0.1', '<b>', 5, null, undefined, 'v0.1.0 '])
+			expect(plan({ tag }).tag).toBe('')
+	})
+
 	it('cannot install a plan with no check at all', () => {
 		for (const checks of [[], undefined, null, 'ok', {}, [null, 5]]) {
 			const view = plan({ checks })
@@ -451,6 +511,116 @@ describe('the view of the plan', () => {
 		expect(view.checks[0].message.key).toBe(REASONS[refused])
 	})
 
+	// the core allows 400 characters to what apt says of why it cannot plan the install
+	it('shows what apt says of a plan it could not make, up to the 400 characters the core allows', () => {
+		const detail = `The following packages have unmet dependencies: ${'libfoo (>= 1.2) '.repeat(40)}`.slice(0, 400)
+		const view = plan({ refused: 'apt_failed', plan_id: '', checks: okChecks().map(check => check.code === 'apt' ? { ...check, ok: false, detail } : check) })
+		expect(view.checks[0].detail).toBe(detail.trim())
+		expect(view.checks[0].detail.length).toBeGreaterThan(300)
+		expect(plan({ refused: 'apt_failed', plan_id: '', checks: [{ code: 'apt', ok: false, detail: 'x '.repeat(500) }] }).checks[0].detail.length).toBeLessThanOrEqual(400)
+	})
+
+	describe('says the details of a check in the words of the language, where the core\'s words are a closed set', () => {
+		const withDetail = (code, detail, refused = '') => plan({ refused, plan_id: refused ? '' : PLAN_ID_OK, checks: okChecks().map(check => check.code === code ? { ...check, ok: false, detail } : check) }).checks[0]
+
+		it.each(['package_manager', 'os_upgrade', 'unreadable'])('what keeps the machine busy: %s', (detail) => {
+			const check = withDetail('busy', detail, 'busy')
+			expect(check.detailMessage).toEqual({ key: TEXT.busy[detail], params: {} })
+		})
+
+		it('says another word of the busy check as it came, as text', () => {
+			const check = withDetail('busy', 'dpkg is locked', 'busy')
+			expect(check.detailMessage).toBeNull()
+			expect(check.detail).toBe('dpkg is locked')
+		})
+
+		it('says the room that is needed and free in the units of the page, not in bytes', () => {
+			const check = withDetail('disk', 'need 314572800 bytes on /var/lib/casaos/modules/tmp, 52428800 free', 'disk_short')
+			expect(check.detailMessage).toEqual({ key: TEXT.checks.disk, params: { path: '/var/lib/casaos/modules/tmp', needed: '300 MiB', free: '50 MiB' } })
+			const french = plan({ refused: 'disk_short', plan_id: '', checks: [{ code: 'disk', ok: false, detail: 'need 314572800 bytes on /usr, 1610612736 free' }] }, { locale: 'fr_fr' }).checks[0]
+			expect(french.detailMessage.params).toEqual({ path: '/usr', needed: '300 Mio', free: '1,5 Gio' })
+		})
+
+		it.each([
+			'need 5 bytes on tmp, 1 free',
+			'need 5 bytes on /a b, 1 free',
+			'need 5 bytes on /<img>, 1 free',
+			'need -5 bytes on /usr, 1 free',
+			`need ${'9'.repeat(40)} bytes on /usr, 1 free`,
+			'unknown',
+			'room for 200 MiB, 100 MiB free',
+		])('shows the detail %j of a disk check as it came, as text', (detail) => {
+			const check = withDetail('disk', detail, 'disk_short')
+			expect(check.detailMessage).toBeNull()
+			expect(check.detail).toBe(detail)
+		})
+
+		it('does not translate the detail of a check that passed or was not made', () => {
+			const ok = plan({ checks: okChecks().map(check => check.code === 'busy' ? { ...check, detail: 'package_manager' } : check) }).checks.find(check => check.code === 'busy')
+			expect(ok.detailMessage).toBeNull()
+			expect(ok.detail).toBe('')
+		})
+	})
+
+	describe('a release that ReCasaOS cannot tell', () => {
+		const unknown = (extra = {}) => plan({ refused: 'recasaos', plan_id: '', checks: okChecks().map(check => check.code === 'recasaos' ? { ...check, ok: false, detail: 'unknown' } : check), ...extra })
+
+		it('is not a release that is too old: the check and the refusal say it in their own words', () => {
+			const view = unknown()
+			expect(view.checks[0].message).toEqual({ key: TEXT.checks.recasaosUnknown, params: {} })
+			expect(view.refusedMessage).toEqual({ key: TEXT.checks.recasaosUnknown, params: {} })
+			expect(TEXT.checks.recasaosUnknown).toBe('ReCasaOS cannot tell its own version, so it cannot tell whether the module fits it.')
+		})
+
+		it('says too old for a release that is old', () => {
+			const view = plan({ refused: 'recasaos', plan_id: '', checks: okChecks().map(check => check.code === 'recasaos' ? { ...check, ok: false, detail: 'have v0.5.20 need 0.5.23' } : check) })
+			expect(view.checks[0].message.key).toBe(REASONS.recasaos)
+			expect(view.refusedMessage.key).toBe(REASONS.recasaos)
+		})
+
+		it('says the refusal of a call in the same words', () => {
+			const failure = moduleFailure(refusal('recasaos', { checks: [{ code: 'recasaos', ok: false, detail: 'unknown' }] }))
+			expect(failure.message.key).toBe(TEXT.checks.recasaosUnknown)
+			expect(moduleFailure(refusal('recasaos', {})).message.key).toBe(REASONS.recasaos)
+		})
+	})
+
+	describe('a package that is on hold', () => {
+		const held = (detail, refused = 'held_package') => plan({ refused, plan_id: '', checks: okChecks().map(check => check.code === 'apt' ? { ...check, ok: false, detail } : check) })
+
+		it('gives the command that takes the hold off, for the names apt gave', () => {
+			expect(held('held qemu-utils').unhold).toEqual({ command: 'apt-mark unhold qemu-utils' })
+			expect(held('held qemu-utils ovmf').unhold).toEqual({ command: 'apt-mark unhold qemu-utils ovmf' })
+		})
+
+		it.each([
+			'held',
+			'held ',
+			'held a',
+			'held ab; reboot',
+			'held ab $(reboot)',
+			'held --force',
+			'held ab AB',
+			'held ab/ab',
+			'the following packages have unmet dependencies',
+			`held ${Array.from({ length: 30 }, (_, index) => `pkg${index}`).join(' ')}`,
+		])('gives no command for the detail %j', (detail) => {
+			expect(held(detail).unhold).toBeNull()
+		})
+
+		it('gives none for a refusal that is not a hold, or when the plan is not refused', () => {
+			expect(held('held qemu-utils', 'apt_failed').unhold).toBeNull()
+			expect(plan().unhold).toBeNull()
+		})
+
+		it('gives it for the refusal of a call, too', () => {
+			const failure = moduleFailure(refusal('held_package', { checks: [{ code: 'apt', ok: false, detail: 'held ovmf' }] }))
+			expect(failure.unhold).toEqual({ command: 'apt-mark unhold ovmf' })
+			expect(moduleFailure(refusal('held_package', {})).unhold).toBeNull()
+			expect(moduleFailure(refusal('os', { checks: [{ code: 'apt', ok: false, detail: 'held ovmf' }] })).unhold).toBeNull()
+		})
+	})
+
 	it('says a check it does not know as one, with its code', () => {
 		const view = plan({ checks: [...okChecks(), { code: 'brand_new', ok: true }] })
 		expect(view.checks.at(-1).label.params).toEqual({ code: 'brand_new' })
@@ -479,7 +649,7 @@ describe('the view of the plan', () => {
 		})
 		for (const text of [view.tier.raw, view.refused, view.checks[0].code, view.checks[0].detail, ...view.packages.install, ...view.packages.upgrade, view.archive.url])
 			expect(text).not.toMatch(UNSAFE)
-		expect(view.checks[0].detail.length).toBeLessThanOrEqual(200)
+		expect(view.checks[0].detail.length).toBeLessThanOrEqual(400)
 		expect(view.archive.url.length).toBeLessThanOrEqual(200)
 		expect(view.packages.install[0].length).toBeLessThanOrEqual(80)
 		expect(view.installable).toBe(false)
@@ -591,14 +761,14 @@ describe('the view of the job', () => {
 			}
 		})
 
-		it('for the steps of a rollback', () => {
+		it('for the steps of a rollback: the list stays, with the steps of the undo', () => {
 			for (const step of REMOVE_STEPS.filter(item => item !== 'done')) {
 				const view = job({ state, step: `${ROLLBACK}${step}`, undo: state === 'failed' ? 'rollback_incomplete' : '' })
 				expect(view).not.toBeNull()
 				expect(view.rollback).toBe(true)
 				expect(view.kind).toBe('install')
-				expect(view.steps).toEqual([])
-				expect(view.progress).toBeNull()
+				expect(view.steps.map(item => item.id)).toEqual(STEPS.remove)
+				expect(view.progress === null || view.progress.label.key === TEXT.job.progressRollback).toBe(true)
 				for (const key of keysIn(view))
 					expect(MODULE_KEYS, key).toContain(key)
 			}
@@ -670,6 +840,17 @@ describe('the view of the job', () => {
 			expect(job({ state: 'succeeded', step: 'done' }, { status: { installed: false } }).kind).toBe('remove')
 		})
 
+		it.each(['install', 'remove'])('by what the core says (%s), before the step and before what the page remembers', (declared) => {
+			const other = declared === 'install' ? 'remove' : 'install'
+			for (const step of ['', 'packages', 'files', 'manifest', 'rollback_stop', 'done'])
+				expect(job({ step, kind: declared }, { kind: other }).kind, step).toBe(declared)
+		})
+
+		it.each(['', 'both', 5, null, undefined, {}, [], '__proto__', 'INSTALL', 'install '])('does not take %j, which the core says, for a kind', (declared) => {
+			expect(job({ step: 'packages', kind: declared }).kind).toBe('install')
+			expect(job({ step: 'manifest', kind: declared }).kind).toBe('')
+		})
+
 		it('not at all when nothing says it, and says the step without a list', () => {
 			for (const view of [job({ step: 'manifest' }), job({ state: 'succeeded', step: 'done' }, { status: {} }), job({ step: '' }, { kind: 'both' })]) {
 				expect(view.kind).toBe('')
@@ -717,31 +898,70 @@ describe('the view of the job', () => {
 			expect(view.kept).toBeNull()
 		})
 
+		// what the core's `undo` is set to for every failure of an install, even before anything was written, and packages are never undone
 		it.each([
-			['rolled_back', 'undone', false],
-			['rollback_incomplete', 'did not finish', true],
-			['', 'nothing to undo', false],
-		])('a job that failed with undo %j: says what happened to what it had done', (undo, words, advice) => {
+			['rolled_back', JOB_NEXT.undone, false],
+			['rollback_incomplete', JOB_NEXT.notUndone, true],
+			['', JOB_NEXT.nothingWritten, false],
+		])('a job that failed with undo %j at a step before the files: says what became of what it had done', (undo, sentence, advice) => {
 			const view = job({ state: 'failed', step: 'verify', code: 'checksum_mismatch', undo }, { kind: 'install' })
-			expect(view.undoText.key).toContain(words)
+			expect(view.undoText.key).toBe(sentence)
 			expect(view.reason.key).toBe(REASONS.checksum_mismatch)
 			expect(view.stoppedAt).toEqual({ key: TEXT.job.stoppedAt, params: { step: STEP_TEXTS.install.verify }, keys: ['step'] })
 			expect(Boolean(view.advice)).toBe(advice)
 			expect(view.tone).toBe('is-danger')
 		})
 
-		it('says an undo that it does not know as an undo that did not finish, and gives the console', () => {
-			const view = job({ state: 'failed', step: 'verify', code: 'internal_error', undo: 'half' }, { kind: 'install' })
-			expect(view.undoText.key).toContain('did not finish')
+		it('does not say that what the install had done was undone: the files and the service were removed, and the packages were not', () => {
+			expect(JOB_NEXT.undone).toBe('The files and the service of the module were removed; the packages were not.')
+			for (const step of ['packages', 'unpack', 'start', 'route'])
+				expect(job({ state: 'failed', step, code: 'internal_error', undo: 'rolled_back' }, { kind: 'install' }).undoText.key).toBe(JOB_NEXT.undone)
+		})
+
+		it('says that nothing can be told of the undo of an install that stopped after it began to write and says no undo, and gives the console', () => {
+			const view = job({ state: 'failed', step: 'unpack', code: 'unpack_failed', undo: '' }, { kind: 'install' })
+			expect(view.undoText.key).toBe(JOB_NEXT.undoUnknown)
 			expect(view.advice).toEqual({ command: 'casaos module remove virt' })
 		})
 
-		it('a job that was cut short: nothing was undone, and the console finishes it', () => {
-			const view = job({ state: 'interrupted', step: 'unpack' })
-			expect(view.title.key).toBe(JOB_TITLES.interrupted.any)
-			expect(view.undoText.key).toBe('Nothing was undone.')
+		it('says an undo that it does not know as an undo that did not finish, and gives the console', () => {
+			const view = job({ state: 'failed', step: 'verify', code: 'internal_error', undo: 'half' }, { kind: 'install' })
+			expect(view.undoText.key).toBe(JOB_NEXT.notUndone)
 			expect(view.advice).toEqual({ command: 'casaos module remove virt' })
-			expect(view.stoppedAt.params.step).toBe(STEP_TEXTS.install.unpack)
+		})
+
+		// the matrix of a job that was cut short: the step says what was done, and the console is for what the page cannot finish
+		it.each([
+			['', 'install', JOB_NEXT.cutBeforeStart, false],
+			['', 'remove', JOB_NEXT.cutBeforeStart, false],
+			['', '', JOB_NEXT.cutBeforeStart, false],
+			['packages', 'install', JOB_NEXT.cutEarly, false],
+			['download', 'install', JOB_NEXT.cutEarly, false],
+			['verify', 'install', JOB_NEXT.cutEarly, false],
+			['unpack', 'install', JOB_NEXT.cutInstall, true],
+			['units', 'install', JOB_NEXT.cutInstall, true],
+			['manifest', 'install', JOB_NEXT.cutInstall, true],
+			['start', 'install', JOB_NEXT.cutInstall, true],
+			['route', 'install', JOB_NEXT.cutInstall, true],
+			['stop', 'remove', JOB_NEXT.cutRemove, true],
+			['files', 'remove', JOB_NEXT.cutRemove, true],
+			['manifest', 'remove', JOB_NEXT.cutRemove, true],
+			['reload', 'remove', JOB_NEXT.cutRemove, true],
+			['manifest', '', JOB_NEXT.cutUnknown, true],
+			['rollback_stop', 'install', JOB_NEXT.cutRollback, true],
+			['rollback_files', '', JOB_NEXT.cutRollback, true],
+		])('a job cut short at the step %j, of the kind %j: says %#, and the console is %s', (step, kind, sentence, advice) => {
+			const view = job({ state: 'interrupted', step, kind }, {})
+			expect(view.undoText.key).toBe(sentence)
+			expect(Boolean(view.advice)).toBe(advice)
+			expect(view.title.key).toBe(JOB_TITLES.interrupted.any)
+			expect(view.undoText.key).not.toBe('Nothing was undone.')
+		})
+
+		it('says that an install that failed and whose undo was cut short is that, and not that nothing was undone', () => {
+			const view = job({ state: 'interrupted', step: 'rollback_files' })
+			expect(view.undoText.key).toBe('The install failed and the undo was cut short: some files of the module may still be on the machine.')
+			expect(view.stoppedAt.params.step).toBe(STEP_TEXTS.remove.files)
 		})
 
 		it('a remove that failed: the console finishes it', () => {
@@ -749,6 +969,51 @@ describe('the view of the job', () => {
 			expect(view.advice).toEqual({ command: 'casaos module remove virt' })
 			expect(view.undoText).toBeNull()
 			expect(view.kept).toBeNull()
+		})
+
+		// a failed remove seen from a window that was opened later: nothing says it was a remove, and the step manifest is in both
+		it('a job that failed at the step manifest, whose kind nobody says: says neither an install nor that there was nothing to undo, and gives the console', () => {
+			const view = job({ state: 'failed', step: 'manifest', code: 'manifest_write_failed', undo: '' })
+			expect(view.kind).toBe('')
+			expect(view.undoText).toBeNull()
+			expect(view.title.key).toBe(JOB_TITLES.failed.any)
+			expect(view.advice).toEqual({ command: 'casaos module remove virt' })
+			expect(view.kept).toBeNull()
+			expect(JSON.stringify(keysIn(view))).not.toMatch(/nothing to undo|install/i)
+		})
+
+		it('a remove that failed at the step manifest, as the core says it: no word of an install', () => {
+			const view = job({ state: 'failed', step: 'manifest', code: 'manifest_write_failed', undo: '', kind: 'remove' })
+			expect(view.kind).toBe('remove')
+			expect(view.title.key).toBe(JOB_TITLES.failed.remove)
+			expect(view.undoText).toBeNull()
+			expect(view.kept).toBeNull()
+			expect(view.advice).toEqual({ command: 'casaos module remove virt' })
+			expect(view.steps.map(step => step.id)).toEqual(STEPS.remove)
+		})
+
+		it('the steps of a rollback keep the list, with the step of the undo marked, and a progress bar of their own', () => {
+			const run = job({ state: 'running', step: 'rollback_files' })
+			expect(run.steps.map(step => [step.id, step.mark])).toEqual([['stop', 'done'], ['files', 'current'], ['manifest', 'pending'], ['reload', 'pending']])
+			expect(run.progress).toMatchObject({ value: 1, max: 4 })
+			expect(run.progress.label).toEqual({ key: TEXT.job.progressRollback, params: { index: '2', total: '4' } })
+			const cut = job({ state: 'interrupted', step: 'rollback_manifest' })
+			expect(cut.steps.map(step => step.mark)).toEqual(['done', 'done', 'stopped', 'skipped'])
+		})
+
+		it('the heading while an install is undone is that, and not that it is installing', () => {
+			const view = job({ state: 'running', step: 'rollback_stop' })
+			expect(view.title).toEqual({ key: 'Undoing the install of {module}', params: { module: 'Virtual machines' } })
+			expect(view.title.key).not.toBe(JOB_TITLES.running.install)
+			expect(job({ state: 'running', step: 'unpack' }, { kind: 'install' }).title.key).toBe(JOB_TITLES.running.install)
+		})
+
+		it('says the end of the job as a sentence that names what was done, for the heading and for the announcement', () => {
+			const install = job({ state: 'succeeded', step: 'done', kind: 'install' })
+			const remove = job({ state: 'succeeded', step: 'done', kind: 'remove' })
+			expect(install.title).toEqual({ key: 'The install of {module} is done.', params: { module: 'Virtual machines' } })
+			expect(remove.title).toEqual({ key: 'The removal of {module} is done.', params: { module: 'Virtual machines' } })
+			expect(jobAnnouncement(job({ state: 'running', step: 'route', kind: 'install' }), install)).toBe(install.title)
 		})
 
 		it('gives no command for a job that did not fail, or an install that was undone', () => {
@@ -784,9 +1049,24 @@ describe('the view of the job', () => {
 			expect(view.finished).toBe(false)
 			expect(view.title.key).toBe(TEXT.job.unknownState)
 			expect(view.group).toBe('Unknown state')
-			expect(view.state).toBe(state)
+			expect(view.state).toBe(state.slice(0, 40))
 			expect(view.advice).toBeNull()
 			expect(view.reason).toBeNull()
+		})
+
+		// the state of a job is a class of the card and a piece of text: an unknown one is never a class, and is cleaned and cut as a text
+		it.each(HOSTILE)('%#: never as a class name, and cleaned and cut as a text', (state) => {
+			const view = job({ state })
+			expect(view.stateClass).toBe('is-unknown')
+			expect(view.stateText).not.toMatch(UNSAFE)
+			expect(view.stateText.length).toBeLessThanOrEqual(40)
+			expect(view.state).toBe(view.stateText)
+			expect(view.changeKey).not.toContain('\u0000')
+		})
+
+		it.each(JOB_STATE_NAMES)('%s: a class of its own', (state) => {
+			expect(job({ state }).stateClass).toBe(`is-${state}`)
+			expect(job({ state }).stateText).toBe(state)
 		})
 	})
 
@@ -851,10 +1131,62 @@ describe('the view of the job', () => {
 			expect(got.command).toBe('')
 		})
 
-		it('is not asked of a job that did not fail, or of a remove', () => {
-			expect(job({ state: 'succeeded', step: 'done', kept_packages: ['a'] }, { kind: 'install' }).kept).toBeNull()
-			expect(job({ state: 'failed', step: 'files', kept_packages: ['a'] }, { kind: 'remove' }).kept).toBeNull()
-			expect(job({ state: 'running', step: 'download', kept_packages: ['a'] }).kept).toBeNull()
+		it('is not asked of a job that did not fail, or of a remove that stopped, or of an install that succeeded', () => {
+			expect(job({ state: 'succeeded', step: 'done', kept_packages: ['ab'] }, { kind: 'install' }).kept).toBeNull()
+			expect(job({ state: 'failed', step: 'files', kept_packages: ['ab'] }, { kind: 'remove' }).kept).toBeNull()
+			expect(job({ state: 'running', step: 'download', kept_packages: ['ab'] }).kept).toBeNull()
+			expect(job({ state: 'refused', code: 'busy', kept_packages: ['ab'] }).kept).toBeNull()
+			expect(job({ state: 'interrupted', step: 'unpack', kept_packages: ['ab'] }).kept).toBeNull()
+		})
+
+		// the packages are the module's whole list, and the purge command is the same after a remove that succeeded as after an install that failed
+		it('gives the command to purge them after a remove that succeeded, when the core gives the list, and says nothing when it does not', () => {
+			const done = list => job({ state: 'succeeded', step: 'done', kind: 'remove', kept_packages: list }).kept
+			expect(done(['qemu-utils', 'libvirt-daemon-system'])).toMatchObject({ known: true, count: 2, command: 'apt-get purge qemu-utils libvirt-daemon-system', unsafe: false })
+			expect(done(null)).toBeNull()
+			expect(done(['x; reboot']).command).toBe('')
+		})
+
+		it('says one package in the singular and many in the plural', () => {
+			expect(kept(['qemu-utils']).count).toBe(1)
+			expect(kept(['qemu-utils', 'ovmf']).count).toBe(2)
+			expect(TEXT.job.keptOne).not.toBe(TEXT.job.keptSome)
+			expect(TEXT.job.purgeOne).not.toBe(TEXT.job.purge)
+		})
+
+		it('says that the packages are the ones the module needs, some of which may have been there before, and that a purge deletes their configuration', () => {
+			expect(TEXT.job.keptSome).toMatch(/packages the module needs/)
+			expect(TEXT.job.keptSome).toMatch(/may have been on the machine before/)
+			expect(TEXT.job.purge).toMatch(/configuration files/)
+			expect(TEXT.job.purge).toMatch(/read what apt says before you agree/)
+			expect(TEXT.job.purgeOne).toMatch(/configuration files/)
+		})
+
+		// the rule of the core's package names (pkg/osmodule/manifest.go ValidPackageName): two to 64 characters, and not one that apt reads as an order or as a file
+		it.each([
+			['ab', true],
+			['a1', true],
+			['0ab', true],
+			['g++', false],
+			['libstdc++6', true],
+			['a.b+c-d', true],
+			['a'.repeat(64), true],
+			['a'.repeat(65), false],
+			['a', false],
+			['-ab', false],
+			['.ab', false],
+			['+ab', false],
+			['ab-', false],
+			['ab+', false],
+			['ab.deb', false],
+			['x.deb', false],
+			['ab.debx', true],
+			['Ab', false],
+			['a_b', false],
+			['a b', false],
+		])('takes the package name %j for %s', (name, valid) => {
+			expect(Boolean(kept([name]).command)).toBe(valid)
+			expect(kept([name]).unsafe).toBe(!valid)
 		})
 
 		it('keeps the HTML of a name as text and never in a command', () => {
@@ -880,6 +1212,17 @@ describe('the view of the job', () => {
 
 		it('keeps the HTML of a line as text', () => {
 			expect(job({ log_tail: ['<b>bold</b> | <script>x</script>'] }).logTail).toEqual(['<b>bold</b> | <script>x</script>'])
+		})
+
+		// the user and the query of an address are hidden BEFORE the line is cut: a user part that runs past the cut is not shown in front of it
+		it('hides the user and the query of an address, whatever the length of the line', () => {
+			const [got] = job({ log_tail: [`${'x '.repeat(110)}https://user:hunter2@example.com/path?token=abcdef and more`] }).logTail
+			expect(got).not.toContain('hunter2')
+			expect(got).not.toContain('abcdef')
+			for (const text of [`https://user:${'s'.repeat(3000)}@host.example/path?key=abc`, `see https://${'u'.repeat(2500)}@host.example/`]) {
+				const shown = job({ log_tail: [text] }).logTail.join('')
+				expect(shown).not.toMatch(/[su]{10}/)
+			}
 		})
 
 		it.each(NOT_A_LIST)('survives a log that is %j', (value) => {
@@ -1003,22 +1346,75 @@ describe('the polling of the job', () => {
 	})
 })
 
-describe('what is said while the job cannot be read', () => {
-	it('says a core that restarts as one, with the time, and goes on by itself', () => {
-		expect(moduleOutage({ kind: 'down', elapsedMs: 0 })).toMatchObject({ level: 'restarting', elapsed: null })
-		const later = moduleOutage({ kind: 'down', elapsedMs: 65000 })
-		expect(later.level).toBe('restarting')
-		expect(later.message.key).toBe('The machine is restarting. This page goes on by itself.')
-		expect(later.elapsed.params.time).toBe('1 min 05 s')
+describe('why the job cannot be read', () => {
+	it.each([
+		['a session that ended', { response: { status: 401 } }, 'signin', ''],
+		['a core without the route', { response: { status: 404 } }, 'unavailable', ''],
+		['no answer at all', { code: 'ERR_NETWORK', request: {} }, 'down', ''],
+		['a timeout', { code: 'ECONNABORTED' }, 'down', ''],
+		['a gateway with nothing behind it (502)', { response: { status: 502 } }, 'down', ''],
+		['a gateway with nothing behind it (503)', { response: { status: 503, data: '<html>' } }, 'down', ''],
+		['a gateway with nothing behind it (504)', { response: { status: 504 } }, 'down', ''],
+		['an error of the core, with its code', { response: { status: 500, data: { success: 500, data: { error_code: 'internal', error: 'x' } } } }, 'error', 'internal'],
+		['an error of the core with a code, behind a gateway', { response: { status: 503, data: { data: { error_code: 'start_failed' } } } }, 'error', 'start_failed'],
+		['a 500 that is no answer of the core', { response: { status: 500, data: '<html>' } }, 'error', ''],
+		['an answer of a client error', { response: { status: 400, data: {} } }, 'failed', ''],
+		['an error of the page', new Error('x'), 'down', ''],
+		['nothing', null, 'down', ''],
+	])('tells %s', (_, error, kind, code) => {
+		expect(moduleStatusFailure(error)).toEqual({ kind, code })
 	})
 
-	it('sends the person to the machine after fifteen minutes of anything', () => {
-		for (const kind of ['down', 'failed']) {
+	it('does not take a 500 internal for a machine that restarts', () => {
+		const internal = { response: { status: 500, data: { data: { error_code: 'internal' } } } }
+		expect(moduleStatusFailure(internal).kind).not.toBe('down')
+		expect(moduleOutage(moduleStatusFailure(internal)).message.key).not.toMatch(/restart/i)
+	})
+
+	it('takes a browser that is offline for the own network of the person, and not for a core that is away', () => {
+		Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+		try {
+			expect(moduleStatusFailure({ request: {} })).toEqual({ kind: 'failed', code: '' })
+		} finally {
+			delete navigator.onLine
+		}
+		expect(moduleStatusFailure({ request: {} })).toEqual({ kind: 'down', code: '' })
+	})
+
+	it.each(HOSTILE)('cleans the code of an error of the core (%#)', (value) => {
+		const got = moduleStatusFailure({ response: { status: 500, data: { data: { error_code: value } } } })
+		expect(got.code).not.toMatch(UNSAFE)
+		expect(got.code.length).toBeLessThanOrEqual(60)
+	})
+})
+
+describe('what is said while the job cannot be read', () => {
+	it('says a core that does not answer as one that may be restarting, in the words of a module, with the time, and goes on by itself', () => {
+		expect(moduleOutage({ kind: 'down', elapsedMs: 0 })).toMatchObject({ level: 'down', elapsed: null })
+		const later = moduleOutage({ kind: 'down', elapsedMs: 65000 })
+		expect(later.level).toBe('down')
+		expect(later.message.key).toBe('ReCasaOS does not answer. It may be restarting. This page tries again by itself.')
+		expect(later.elapsed.params.time).toBe('1 min 05 s')
+		expect(later.message.key).not.toMatch(/The machine is restarting/)
+	})
+
+	it('says a core that answers with an error as that, with its code, and not as a machine that restarts', () => {
+		const view = moduleOutage({ kind: 'error', code: 'internal', elapsedMs: 5000 })
+		expect(view.level).toBe('error')
+		expect(view.message.key).toBe('ReCasaOS answered with an error. This page tries again by itself.')
+		expect(view.code).toBe('internal')
+		expect(view.elapsed.params.time).toBe('5 s')
+	})
+
+	it('sends the person to the machine after fifteen minutes of anything, in the words of a module and not in those of an upgrade that waits for the person', () => {
+		for (const kind of ['down', 'failed', 'error']) {
 			const view = moduleOutage({ kind, elapsedMs: RESTART_LOOK_AFTER_MS })
 			expect(view.level).toBe('look')
 			expect(view.message.params.time).toBe('15 min 00 s')
+			expect(view.message.key).toBe('ReCasaOS has not answered for {time}. Look at the machine: it may be off, or still restarting. This page keeps trying.')
+			expect(view.message.key).not.toMatch(/waiting for you/)
 		}
-		expect(moduleOutage({ kind: 'down', elapsedMs: RESTART_LOOK_AFTER_MS - 1 }).level).toBe('restarting')
+		expect(moduleOutage({ kind: 'down', elapsedMs: RESTART_LOOK_AFTER_MS - 1 }).level).toBe('down')
 	})
 
 	it('says an answer that is not a state as the state of the job that could not be read, in the words of a job', () => {
@@ -1036,8 +1432,6 @@ describe('what is said while the job cannot be read', () => {
 })
 
 // ---- when a call fails -----------------------------------------------------------------------------------------------------
-
-const refusal = (error_code, data, status = 409) => ({ response: { status, data: { success: status, message: 'x', data: { error_code, error: 'A sentence of the core, in English', data } } } })
 
 describe('the failure of a call', () => {
 	it.each(API_CODES)('says the refusal %s in its sentence, with the code', (code) => {
@@ -1067,9 +1461,17 @@ describe('the failure of a call', () => {
 		expect(failure.message.key).toBe(REASONS.busy)
 		expect(failure.detail).toBe('an upgrade of the operating system is open')
 		expect(moduleFailure(refusal('busy', { reason: '<b>x</b>\u0000'.repeat(100) })).detail).not.toMatch(UNSAFE)
-		expect(moduleFailure(refusal('busy', { reason: 'x'.repeat(5000) })).detail).toHaveLength(200)
+		expect(moduleFailure(refusal('busy', { reason: 'word '.repeat(1000) })).detail).toHaveLength(200)
 		expect(moduleFailure(refusal('busy', {})).detail).toBe('')
 		expect(moduleFailure(refusal('plan_changed', { reason: 'x' })).detail).toBe('')
+	})
+
+	it('says what the plan says of the thing that keeps the machine busy, in the words of the language, beside the core\'s prose', () => {
+		const failure = moduleFailure(refusal('busy', { reason: 'an upgrade of the operating system is open', checks: [{ code: 'busy', ok: false, detail: 'os_upgrade' }] }))
+		expect(failure.busy).toEqual({ key: TEXT.busy.os_upgrade, params: {} })
+		expect(failure.detail).toBe('an upgrade of the operating system is open')
+		expect(moduleFailure(refusal('busy', { reason: 'x' })).busy).toBeNull()
+		expect(moduleFailure(refusal('os', { checks: [{ code: 'busy', ok: false, detail: 'os_upgrade' }] })).busy).toBeNull()
 	})
 
 	it('names the field of a request that was not accepted', () => {
@@ -1097,6 +1499,46 @@ describe('the failure of a call', () => {
 
 	it('tells a read that got no answer as one to be tried again, and not as a call that may have gone through', () => {
 		expect(moduleFailure({ code: 'ERR_NETWORK', request: {} }, 'en_us', { read: true }).kind).toBe('failed')
+	})
+
+	// a read changes nothing: whatever the way it got no answer, it says so and says to try again
+	it.each([
+		['a timeout', { code: 'ECONNABORTED' }],
+		['a timeout of the browser', { code: 'ETIMEDOUT' }],
+		['no answer', { code: 'ERR_NETWORK', request: {} }],
+		['a gateway with nothing behind it', { response: { status: 502 } }],
+		['a 500 that is no answer of the core', { response: { status: 500, data: '<html>' } }],
+		['nothing', null],
+	])('says a read that got %s: nothing was changed, try again', (_, error) => {
+		const failure = moduleFailure(error, 'en_us', { read: true })
+		expect(failure.kind).toBe('failed')
+		expect(failure.message.key).toBe(TEXT.call.readFailed)
+		expect(failure.message.key).not.toMatch(/gone through/)
+	})
+
+	// a call that changes the machine may have been carried out when it got no answer: the page looks at the job before it says anything
+	it.each([
+		['a timeout', { code: 'ECONNABORTED' }],
+		['no answer', { code: 'ERR_NETWORK', request: {} }],
+		['a gateway with nothing behind it (502)', { response: { status: 502 } }],
+		['a gateway with nothing behind it (503)', { response: { status: 503, data: '<html>' } }],
+		['a gateway with nothing behind it (504)', { response: { status: 504, data: {} } }],
+		['a 500 with no code of the core', { response: { status: 500, data: '<html>' } }],
+		['a 502 with a body that has no code', { response: { status: 502, data: { data: {} } } }],
+		['a 503 with a code of the core', { response: { status: 503, data: { data: { error_code: 'busy' } } } }],
+	])('says a call that changes the machine, and that got %s, as one that may have gone through', (_, error) => {
+		const failure = moduleFailure(error, 'en_us', { mutating: true })
+		expect(failure.kind).toBe('timeout')
+		expect(failure.message.key).toBe(TEXT.call.maybe)
+	})
+
+	it.each([
+		['a refusal of the core', { response: { status: 409, data: { data: { error_code: 'busy' } } } }, 'refusal'],
+		['an error of the core with its code', { response: { status: 500, data: { data: { error_code: 'start_failed' } } } }, 'refusal'],
+		['a session that ended', { response: { status: 401 } }, 'signin'],
+		['a request that was not accepted, with no code', { response: { status: 400, data: {} } }, 'failed'],
+	])('does not say that %s may have gone through', (_, error, kind) => {
+		expect(moduleFailure(error, 'en_us', { mutating: true }).kind).toBe(kind)
 	})
 
 	it.each(HOSTILE)('survives %# in the code, the data and the reason', (value) => {
@@ -1192,5 +1634,51 @@ describe('the language files', () => {
 	it('speaks plainly: no word of the core\'s internals in a sentence that a person reads', () => {
 		for (const key of MODULE_KEYS)
 			expect(key, key).not.toMatch(/\b(?:rollback_|plan_id|v-html|manifest\.json|systemctl)\b/)
+	})
+
+	// one name for what answers: ReCasaOS, as the sentences of the OS page say it ("ReCasaOS a refusé"), and not the core, and never a heart: "Cœur" is also the cores of a processor
+	it('says ReCasaOS, and not the core, in English and in French', () => {
+		for (const key of MODULE_KEYS) {
+			expect(key, key).not.toMatch(/\bthe core\b/i)
+			expect(fr[key], key).not.toMatch(/\bc(?:œ|oe)urs?\b/i)
+			expect(fr[key], key).not.toMatch(/\ble core\b/i)
+		}
+		expect(fr[TEXT.reported]).toBe('Signalé par ReCasaOS')
+		expect(fr[TIERS.core.label]).toBe('Maintenu par ReCasaOS')
+	})
+
+	it('writes the French of the page as French is written', () => {
+		for (const key of MODULE_KEYS) {
+			expect(fr[key], key).not.toMatch(/\bque apt\b/)
+			expect(fr[key], key).not.toMatch(/\ben travers\b/)
+			expect(fr[key], key).not.toMatch(/\bjeté\b/)
+			// root is a user: "en tant que root", as the OS page says it
+			expect(fr[key], key).not.toMatch(/\b(?:en|au) root\b/)
+		}
+		expect(fr[CHECKS.apt]).toBe('Paquets qu\'apt peut installer')
+		expect(fr[CHECKS.foreign_unit]).toBe('Aucun fichier de service ne gêne')
+		expect(fr[REASONS.not_root]).toContain('en tant que root')
+	})
+
+	// the marks of a step agree with "étape" (feminine)
+	it('makes the marks of a step agree with the word for a step in French', () => {
+		expect(fr[STEP_MARKS.done.text]).toBe('Faite')
+		expect(fr[STEP_MARKS.pending.text]).toBe('Pas encore faite')
+		expect(fr[STEP_MARKS.stopped.text]).toBe('Interrompue ici')
+		expect(fr[STEP_MARKS.skipped.text]).toBe('Non atteinte')
+		expect(fr[STEP_MARKS.current.text]).toBe('En cours')
+		expect(fr[STEP_MARKS.failed.text]).toBe('Échec ici')
+	})
+
+	it('says one package in the singular in French, and many in the plural', () => {
+		expect(fr[TEXT.job.keptOne]).toMatch(/Voici le paquet.*Il était/)
+		expect(fr[TEXT.job.keptSome]).toMatch(/Voici les paquets.*Certains étaient/)
+		expect(fr[TEXT.job.purgeOne]).toMatch(/^Pour le purger/)
+		expect(fr[TEXT.job.purge]).toMatch(/^Pour les purger/)
+	})
+
+	it('says the headline of an install and of a removal in French', () => {
+		expect(fr[JOB_TITLES.succeeded.install]).toBe('L\'installation de {module} est terminée.')
+		expect(fr[JOB_TITLES.succeeded.remove]).toBe('La suppression de {module} est terminée.')
 	})
 })

@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card modules-modal">
+	<div class="modal-card modules-modal" tabindex="-1" @keydown.tab="onTab">
 		<header class="modal-card-head">
 			<!-- takes the focus when the window opens, to be read; nobody types into it -->
 			<h3 ref="title" class="title is-header modules-title" tabindex="-1">
@@ -37,6 +37,7 @@
 			<b-message v-if="outage && outage.message" class="modules-outage mt-2" size="is-small" :type="outage.level === 'look' ? 'is-danger' : 'is-warning'">
 				<p class="modules-outage-message has-text-weight-semibold">
 					{{ say(outage.message) }}
+					<code v-if="outage.code" class="is-size-7">{{ outage.code }}</code>
 				</p>
 				<p v-if="outage.elapsed" class="modules-outage-elapsed">
 					{{ say(outage.elapsed) }}
@@ -55,16 +56,24 @@
 				<p class="modules-busy-sentence mt-1">
 					{{ say(busyMessage) }}
 				</p>
+				<p v-if="busy.message" class="modules-busy-message is-size-7 mt-1">
+					{{ say(busy.message) }}
+				</p>
 				<p v-if="busy.detail" class="modules-busy-detail is-size-7 mt-1">
 					{{ fact(TEXT.reported, busy.detail) }}
 				</p>
 				<b-button class="modules-busy-retry mt-2"
-					:disabled="loading"
+					:disabled="loading || probing"
 					:label="$t(TEXT.checkAgain)"
 					rounded
 					size="is-small"
 					@click="clearBusy" />
 			</b-message>
+
+			<!-- the plan that was given up may still be worked out by the machine: said once, and the page does not ask again by itself -->
+			<p v-if="planNote" class="modules-plan-note is-size-7 mt-2">
+				{{ $t(TEXT.plan.cancelled) }}
+			</p>
 
 			<template v-if="view">
 				<!-- no catalogue, or none that can be read: nothing is offered, and that is all there is to say -->
@@ -83,7 +92,7 @@
 				<ul v-if="cards.length" class="modules-list">
 					<li v-for="card in cards" :key="card.module.name" class="modules-card mt-3" :data-module="card.module.name">
 						<div class="modules-card-head">
-							<h4 class="modules-card-title has-text-weight-semibold">
+							<h4 class="modules-card-title has-text-weight-semibold" tabindex="-1">
 								{{ card.module.title }}
 							</h4>
 							<code class="modules-card-name is-size-7">{{ card.module.name }}</code>
@@ -122,7 +131,7 @@
 							</li>
 						</ul>
 
-						<b-message v-if="card.job" class="modules-job mt-3" :class="`is-${card.job.state}`" size="is-small" :type="card.job.tone">
+						<b-message v-if="card.job" class="modules-job mt-3" :class="card.job.stateClass" size="is-small" :type="card.job.tone">
 							<h5 class="modules-job-title has-text-weight-semibold">
 								{{ say(card.job.title) }}
 							</h5>
@@ -130,7 +139,7 @@
 								{{ $t(card.job.group) }}
 							</p>
 							<p v-if="!card.job.known" class="modules-job-unknown mt-1">
-								<code>{{ card.job.state }}</code>
+								<code>{{ card.job.stateText }}</code>
 							</p>
 							<p v-if="card.job.startedAt" class="modules-job-since is-size-7 mt-1">
 								{{ fact(TEXT.job.started, card.job.startedAt) }}
@@ -170,7 +179,7 @@
 
 							<div v-if="card.job.kept" class="modules-kept mt-2">
 								<p v-if="card.job.kept.known && card.job.kept.count" class="modules-kept-some">
-									{{ $t(TEXT.job.keptSome, { names: card.job.kept.names }) }}
+									{{ $t(card.job.kept.count === 1 ? TEXT.job.keptOne : TEXT.job.keptSome, { names: card.job.kept.names }) }}
 								</p>
 								<p v-else-if="card.job.kept.known" class="modules-kept-none">
 									{{ $t(TEXT.job.keptNone) }}
@@ -183,7 +192,7 @@
 								</p>
 								<template v-if="card.job.kept.command">
 									<p class="modules-kept-purge is-size-7 mt-1">
-										{{ $t(TEXT.job.purge) }}
+										{{ $t(card.job.kept.count === 1 ? TEXT.job.purgeOne : TEXT.job.purge) }}
 									</p>
 									<os-upgrade-copyable class="modules-kept-command mt-1" :text="card.job.kept.command" />
 								</template>
@@ -203,11 +212,23 @@
 								<h6 class="has-text-weight-semibold">
 									{{ $t(TEXT.job.log) }}
 								</h6>
-								<os-upgrade-copyable block class="modules-log-text mt-1" :text="card.job.logTail.join('\n')" />
+								<os-upgrade-copyable block
+									class="modules-log-text mt-1"
+									:label="$t(TEXT.job.log)"
+									:text="card.job.logTail.join('\n')" />
 							</div>
 							<p v-else-if="card.job.running" class="modules-log-empty is-size-7 mt-2">
 								{{ $t(TEXT.job.noLog) }}
 							</p>
+
+							<!-- a report that was read is put away until another job begins -->
+							<div v-if="card.job.dismissible" class="modules-job-buttons mt-3">
+								<b-button class="modules-job-close"
+									:label="$t(TEXT.job.close)"
+									rounded
+									size="is-small"
+									@click="closeReport(card.module.name)" />
+							</div>
 						</b-message>
 
 						<div v-if="card.module.canInstall || card.module.canRemove" class="modules-buttons is-flex is-flex-wrap-wrap mt-3">
@@ -228,7 +249,9 @@
 				</ul>
 			</template>
 
-			<!-- the confirmation windows: Buefy's modal, with the focus on the heading and not on the button that acts -->
+			<!-- the confirmation windows: Buefy's modal, with the focus on the heading and not on the button that acts. It has no hold on the Tab key of its own:
+				the window holds it (onTab). Buefy's hold on a window inside another one moves the focus, at the same key, to the first control of the window it
+				stands on, and it does not take the Shift key from the heading. -->
 			<b-modal :aria-label="dialogTitle || $t(TEXT.heading)"
 				aria-modal
 				aria-role="dialog"
@@ -239,9 +262,8 @@
 				has-modal-card
 				:model-value="Boolean(dialog)"
 				scroll="clip"
-				trap-focus
 				@close="requestClose">
-				<div v-if="dialog" class="modal-card modules-dialog" :class="`is-${dialog.kind}`">
+				<div v-if="dialog" class="modal-card modules-dialog" :class="`is-${dialog.kind}`" tabindex="-1" @keydown.tab="onTab">
 					<header class="modal-card-head">
 						<h5 :ref="focusHeading" class="modal-card-title modules-dialog-title" tabindex="-1">
 							{{ dialogTitle }}
@@ -270,45 +292,78 @@
 									{{ say(dialog.plan.refusedMessage) }}
 									<code class="is-size-7">{{ dialog.plan.refused }}</code>
 								</p>
+								<template v-if="dialog.plan.unhold">
+									<p class="modules-unhold is-size-7 mt-1">
+										{{ $t(TEXT.plan.unhold) }}
+									</p>
+									<os-upgrade-copyable class="modules-unhold-command mt-1" :text="dialog.plan.unhold.command" />
+								</template>
 							</template>
 							<template v-else>
-								<p v-if="dialog.plan.incomplete" class="modules-incomplete mt-2">
+								<!-- while the install is asked for the dialog says what is happening, and not that there is something to read -->
+								<template v-if="calling">
+									<p class="modules-dialog-calling mt-2" role="status">
+										{{ $t(TEXT.plan.starting) }}
+									</p>
+									<progress class="modules-calling progress is-small is-info mt-2" :aria-label="$t(TEXT.plan.startingLabel)"></progress>
+								</template>
+								<p v-else-if="dialog.plan.incomplete" class="modules-incomplete mt-2">
 									{{ $t(TEXT.plan.incomplete) }}
+								</p>
+								<p v-else-if="dialog.plan.noList" class="modules-incomplete modules-no-list mt-2">
+									{{ $t(TEXT.plan.noList) }}
+								</p>
+								<p v-else-if="dialog.plan.noId" class="modules-incomplete modules-no-id mt-2">
+									{{ $t(TEXT.plan.noId) }}
 								</p>
 								<p v-else class="modules-dialog-line mt-2">
 									{{ $t(TEXT.plan.intro) }}
+								</p>
+								<p v-if="dialog.plan.tag" class="modules-dialog-version mt-2">
+									{{ fact(TEXT.offered, dialog.plan.tag) }}
 								</p>
 								<p v-if="dialog.plan.tier" class="modules-dialog-tier mt-2">
 									<span class="tag is-light" :class="`is-${dialog.plan.tier.id}`">{{ $t(dialog.plan.tier.label) }}</span>
 									{{ $t(dialog.plan.tier.sentence) }}
 								</p>
 
-								<h6 class="has-text-weight-semibold mt-3">
-									{{ $t(TEXT.plan.packages) }}
-								</h6>
-								<ul v-if="dialog.plan.packages.install.length" class="modules-names mt-1">
-									<li v-for="name in dialog.plan.packages.install" :key="name">
-										{{ name }}
-									</li>
-									<li v-if="dialog.plan.packages.moreInstall">
-										{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreInstall }) }}
-									</li>
-								</ul>
-								<p v-else class="modules-no-packages mt-1">
-									{{ $t(TEXT.plan.noPackages) }}
-								</p>
-								<template v-if="dialog.plan.packages.upgrade.length">
-									<h6 class="has-text-weight-semibold mt-2">
-										{{ $t(TEXT.plan.upgrades) }}
+								<template v-if="dialog.description">
+									<h6 class="has-text-weight-semibold mt-3">
+										{{ $t(TEXT.plan.about) }}
 									</h6>
-									<ul class="modules-names modules-upgrades mt-1">
-										<li v-for="name in dialog.plan.packages.upgrade" :key="name">
+									<p class="modules-dialog-about mt-1">
+										{{ dialog.description }}
+									</p>
+								</template>
+
+								<template v-if="dialog.plan.packages.listed">
+									<h6 class="has-text-weight-semibold mt-3">
+										{{ $t(TEXT.plan.packages) }}
+									</h6>
+									<ul v-if="dialog.plan.packages.install.length" class="modules-names mt-1">
+										<li v-for="name in dialog.plan.packages.install" :key="name">
 											{{ name }}
 										</li>
-										<li v-if="dialog.plan.packages.moreUpgrade">
-											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreUpgrade }) }}
+										<li v-if="dialog.plan.packages.moreInstall">
+											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreInstall }) }}
 										</li>
 									</ul>
+									<p v-else class="modules-no-packages mt-1">
+										{{ $t(TEXT.plan.noPackages) }}
+									</p>
+									<template v-if="dialog.plan.packages.upgrade.length">
+										<h6 class="has-text-weight-semibold mt-2">
+											{{ $t(TEXT.plan.upgrades) }}
+										</h6>
+										<ul class="modules-names modules-upgrades mt-1">
+											<li v-for="name in dialog.plan.packages.upgrade" :key="name">
+												{{ name }}
+											</li>
+											<li v-if="dialog.plan.packages.moreUpgrade">
+												{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreUpgrade }) }}
+											</li>
+										</ul>
+									</template>
 								</template>
 
 								<ul class="modules-sizes mt-3">
@@ -328,7 +383,15 @@
 										{{ fact(TEXT.plan.from, dialog.plan.archive.url) }}
 									</li>
 								</ul>
-								<p v-if="dialog.plan.installable" class="modules-stay is-size-7 mt-3">
+
+								<!-- what the install does to the machine: said before it is confirmed -->
+								<h6 class="has-text-weight-semibold mt-3">
+									{{ $t(TEXT.plan.consequences) }}
+								</h6>
+								<p class="modules-consequences mt-1">
+									{{ $t(TEXT.plan.consequencesText) }}
+								</p>
+								<p v-if="dialog.plan.installable" class="modules-stay is-size-7 mt-2">
 									{{ $t(TEXT.plan.stay) }}
 								</p>
 							</template>
@@ -344,7 +407,8 @@
 									{{ ' ' }}
 									<span v-if="check.message" class="modules-check-sentence">{{ say(check.message) }}</span>
 									{{ ' ' }}
-									<span v-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
+									<span v-if="check.detailMessage" class="modules-check-detail is-size-7">{{ say(check.detailMessage) }}</span>
+									<span v-else-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
 									{{ ' ' }}
 									<code class="is-size-7">{{ check.code }}</code>
 								</li>
@@ -353,7 +417,13 @@
 
 						<!-- the remove -->
 						<template v-else-if="dialog.kind === 'remove'">
-							<p class="modules-dialog-line">
+							<template v-if="calling">
+								<p class="modules-dialog-calling" role="status">
+									{{ $t(TEXT.remove.starting) }}
+								</p>
+								<progress class="modules-calling progress is-small is-info mt-2" :aria-label="$t(TEXT.remove.startingLabel)"></progress>
+							</template>
+							<p class="modules-dialog-line" :class="{ 'mt-3': calling }">
 								{{ $t(TEXT.remove.stops) }}
 							</p>
 							<p class="modules-dialog-line modules-stays mt-2">
@@ -380,9 +450,18 @@
 										<code class="is-size-7">{{ item.code }}</code>
 									</li>
 								</ul>
+								<p v-if="callError.busy" class="modules-call-busy is-size-7">
+									{{ say(callError.busy) }}
+								</p>
 								<p v-if="callError.detail" class="modules-call-detail is-size-7">
 									{{ fact(TEXT.reported, callError.detail) }}
 								</p>
+								<template v-if="callError.unhold">
+									<p class="modules-unhold is-size-7">
+										{{ $t(TEXT.plan.unhold) }}
+									</p>
+									<os-upgrade-copyable class="modules-unhold-command mt-1" :text="callError.unhold.command" />
+								</template>
 								<code v-if="callError.code" class="modules-call-code is-size-7">{{ callError.code }}</code>
 							</b-message>
 						</div>
@@ -421,7 +500,6 @@
 <script>
 import OsUpgradeCopyable from './OsUpgradeCopyable.vue'
 import { DETAIL_FORMAT } from './osReadiness'
-import { outageStart, statusFailure } from './osUpgrade'
 import {
 	TEXT,
 	installBody,
@@ -431,15 +509,26 @@ import {
 	moduleFailure,
 	moduleOutage,
 	modulePlanView,
+	moduleStatusFailure,
 	nextJobPoll,
 	reasonMessage,
 } from './osModules'
 
-// How many modules are asked about a job when the window opens: the core runs one at a time and the catalogue is a handful of modules.
-// ponytail: one ask each, in turn; a core that tells which module has a job would make it one ask.
+// How many modules are asked about a job when the window opens, how many at the same time, and how long the whole look may take: a status that hangs
+// does not shut the buttons for longer than that, and the core refuses a job while another runs whatever the page knew.
 const MAX_PROBES = 16
+const PROBES_AT_ONCE = 4
+const DISCOVERY_MS = 15000
+// the wait before the list is read once more, when it could not be read at the end of a job
+const RELOAD_RETRY_MS = 5000
+// how long the machine may still be working out a plan that was given up (the core makes it for up to a minute)
+const PLAN_NOTE_MS = 60000
 // the jobs whose result is told although this window did not start them: what is worth knowing when the window is opened later
 const REMEMBERED = new Set(['running', 'failed', 'interrupted'])
+// the refusals that say that the list the page shows is not what the machine has
+const STALE = new Set(['not_installed', 'already_installed'])
+// what the Tab key goes through (the same list as Buefy's hold on a window)
+const TABBABLE = 'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
 
 export default {
 	name: 'ModulesModal',
@@ -452,8 +541,8 @@ export default {
 			view: null,
 			loading: false,
 			listError: null,
-			// the jobs the window knows of, by the name of the module: { view, followed, kind }. A job that this window started is told until it
-			// starts another; one it only found is told when it is running or did not end well.
+			// the jobs the window knows of, by the name of the module: { view, followed, kind, dismissedAt }. A job that this window started is told until it
+			// starts another; one it only found is told when it is running or did not end well; a report that was read is put away until another job begins.
 			jobs: Object.create(null),
 			// the module whose job is being followed ('' when none)
 			follow: '',
@@ -462,15 +551,17 @@ export default {
 			probed: false,
 			// the scheduler's word for the last ask of the job: 'none', 'ok' or 'error'
 			last: 'none',
+			// why the job cannot be read (moduleStatusFailure), and the code the core gave
 			failure: '',
+			failureCode: '',
+			// when the silence began (0 for none). It goes on across a tab that was hidden: the page was not asking, and the core was no more answering.
 			outageSince: 0,
-			askedAt: 0,
 			elapsedMs: 0,
 			lastLevel: '',
 			announced: '',
 			// the name of the call that is out ('' when none): one at a time
 			acting: '',
-			// what the core said it is busy with, or null
+			// what the machine said it is busy with: { message, detail } or null
 			busy: null,
 			callError: null,
 			// the confirmation window that is open, or null
@@ -481,6 +572,13 @@ export default {
 			// which plan the window waits for: another plan, or a window that was closed, drops the one that is out
 			planTicket: 0,
 			planAbort: null,
+			// the plan that was given up may still run on the machine: said until it must have ended
+			planNote: false,
+			noteTimer: null,
+			// the look for the jobs: its cancel, and the deadline of the whole look
+			discovery: null,
+			discoveryTimer: null,
+			retryTimer: null,
 			timer: null,
 			inFlight: false,
 			gone: false,
@@ -499,10 +597,14 @@ export default {
 			return (this.view?.modules ?? []).map(module => ({ module, job: this.jobOf(module.name) }))
 		},
 		outage() {
-			return this.failure ? moduleOutage({ kind: this.failure, elapsedMs: this.elapsedMs }) : null
+			return this.failure ? moduleOutage({ kind: this.failure, code: this.failureCode, elapsedMs: this.elapsedMs }) : null
 		},
 		busyMessage() {
 			return reasonMessage('busy')
+		},
+		// the install or the remove is asked of the core: the window says what is happening and cannot be left
+		calling() {
+			return Boolean(this.dialog) && this.acting === this.dialog.key
 		},
 		dialogTitle() {
 			if (!this.dialog)
@@ -513,10 +615,10 @@ export default {
 		cancelLabel() {
 			return this.dialog?.phase === 'planning' || this.dialogOk ? 'Cancel' : 'Close'
 		},
-		// the button that acts: there is none while the plan is made, none for a plan that cannot go ahead
+		// the button that acts: there is none while the plan is made, none for a plan that cannot go ahead, none for a step that the machine says is moot
 		dialogOk() {
 			const dialog = this.dialog
-			if (!dialog)
+			if (!dialog || STALE.has(this.callError?.code))
 				return ''
 			if (dialog.kind === 'remove')
 				return this.$t(TEXT.remove.ok)
@@ -533,6 +635,10 @@ export default {
 		// an answer that comes after the window closed has nobody to tell, and nothing is asked again
 		this.gone = true
 		clearTimeout(this.timer)
+		clearTimeout(this.noteTimer)
+		clearTimeout(this.retryTimer)
+		clearTimeout(this.discoveryTimer)
+		this.discovery?.abort()
 		this.planTicket++
 		this.planAbort?.abort()
 		document.removeEventListener('visibilitychange', this.onVisibility)
@@ -556,10 +662,21 @@ export default {
 			const view = entry?.view
 			if (!view || view.state === 'idle')
 				return null
+			// a report that was read is not told again, until the module has another job
+			if (entry.dismissedAt !== undefined && entry.dismissedAt === view.startedAtRaw)
+				return null
 			return entry.followed || REMEMBERED.has(view.state) || !view.known ? view : null
 		},
 		titleOf(name) {
 			return this.view?.modules.find(module => module.name === name)?.title ?? name
+		},
+		// Puts a report that was read away. The focus goes to the heading of its card: the button it was on is gone.
+		closeReport(name) {
+			const entry = this.jobs[name]
+			if (!entry?.view?.dismissible)
+				return
+			this.jobs[name] = { ...entry, dismissedAt: entry.view.startedAtRaw }
+			this.$nextTick(() => this.$el.querySelector?.(`[data-module="${name}"] .modules-card-title`)?.focus?.({ preventScroll: true }))
 		},
 
 		// ---- the list ----
@@ -572,9 +689,10 @@ export default {
 				await this.probeJobs()
 			}
 		},
+		// true when the list was read, false when it could not be, nothing when another reading was already under way
 		async loadList() {
 			if (this.loading || this.gone)
-				return
+				return undefined
 			this.loading = true
 			let view = null
 			let failure = null
@@ -586,53 +704,82 @@ export default {
 				failure = moduleFailure(error, this.locale, { read: true })
 			}
 			if (this.gone)
-				return
+				return undefined
 			this.loading = false
 			if (failure) {
 				this.listError = failure
-				return
+				return false
 			}
 			this.listError = null
 			this.view = view
+			return true
 		},
-		clearBusy() {
+		// The list at the end of a job says what is installed now, and the buttons depend on it: when it cannot be read it is read once more, later.
+		async refreshList() {
+			if (await this.loadList() !== false)
+				return
+			clearTimeout(this.retryTimer)
+			this.retryTimer = setTimeout(() => {
+				this.retryTimer = null
+				this.loadList()
+			}, RELOAD_RETRY_MS)
+		},
+		// The flag said what the last call saw, and it is not known what the machine is busy with now: the list and the jobs are read again (a job that
+		// runs is followed), and the next call says whether the machine is still busy.
+		async clearBusy() {
 			this.busy = null
-			this.loadList()
+			await this.loadList()
+			await this.probeJobs()
 		},
 
 		// ---- the job ----
 
-		// Asks about the job of each module in turn, so that a job that is running (started before this window was opened, or from another) is followed.
+		// Asks about the job of each module, four at a time and within one deadline for them all, so that a job that is running (started before this window was
+		// opened, or from another) is followed. A look that is not over at the deadline is given up: the buttons come back, and the core refuses a second job.
 		async probeJobs() {
 			if (this.gone || !this.view || this.probing)
 				return
 			this.probing = true
+			const controller = typeof AbortController === 'function' ? new AbortController() : null
+			this.discovery = controller
+			this.discoveryTimer = setTimeout(() => controller?.abort(), DISCOVERY_MS)
+			const names = this.view.modules.slice(0, MAX_PROBES).map(module => module.name)
+			let index = 0
+			const worker = async () => {
+				while (!this.gone && !controller?.signal.aborted && !this.follow && index < names.length)
+					await this.probeJob(names[index++], controller?.signal)
+			}
 			try {
-				for (const module of this.view.modules.slice(0, MAX_PROBES)) {
-					if (this.gone || this.follow)
-						break
-					await this.probeJob(module.name)
-				}
+				await Promise.all(Array.from({ length: Math.min(PROBES_AT_ONCE, names.length) }, worker))
 			} finally {
+				clearTimeout(this.discoveryTimer)
+				this.discoveryTimer = null
+				this.discovery = null
 				this.probing = false
 			}
 		},
-		async probeJob(name) {
+		// true when the job of the module was read
+		async probeJob(name, signal) {
 			let raw
 			try {
-				raw = (await this.$api.sys.getModuleStatus(name))?.data?.data
+				raw = (await this.$api.sys.getModuleStatus(name, signal))?.data?.data
 			} catch {
 				// a module whose job cannot be read is told nothing of: the polling says it when a job is followed
-				return
+				return false
 			}
 			if (this.gone)
-				return
-			const view = jobView(raw, { name, title: this.titleOf(name), kind: this.jobs[name]?.kind, locale: this.locale })
+				return false
+			const old = this.jobs[name]
+			const view = jobView(raw, { name, title: this.titleOf(name), kind: old?.kind, locale: this.locale })
 			if (!view)
-				return
-			this.jobs[name] = { view, followed: Boolean(this.jobs[name]?.followed), kind: view.kind || this.jobs[name]?.kind || '' }
-			if (view.running)
+				return false
+			this.jobs[name] = { view, followed: Boolean(old?.followed), kind: view.kind || old?.kind || '', dismissedAt: old?.dismissedAt }
+			if (view.running && !this.follow) {
+				// a job that is already running when the window opens is told, once, as the steps of the one it starts are
+				this.announced = this.say(view.live)
 				this.startFollowing(name, view.kind, null)
+			}
+			return true
 		},
 		// What the answer of an install or a remove says is shown at once and not trusted: the job is asked for again right away.
 		startFollowing(name, kind, raw) {
@@ -647,7 +794,10 @@ export default {
 			this.follow = name
 			this.last = 'none'
 			this.failure = ''
+			this.failureCode = ''
 			this.outageSince = 0
+			// a job that is followed is what keeps the machine busy now: what a call saw before is not what the page says any more
+			this.busy = null
 			this.schedule()
 		},
 		// A setTimeout chain, not an interval: one request at a time. Nothing while the document is hidden: it asks at once when shown again.
@@ -666,9 +816,7 @@ export default {
 				this.timer = null
 				return
 			}
-			// the page was not asking while it was hidden: as far as it knows, the core has not been silent for that long
-			this.outageSince = 0
-			this.elapsedMs = 0
+			// Asks at once. A silence that began before the page was hidden is the same silence: it is not counted again from here.
 			this.last = 'none'
 			this.schedule()
 		},
@@ -682,7 +830,7 @@ export default {
 			} catch {
 				// whatever the page could not make sense of: it says that it could not read, and asks again
 				if (!this.gone)
-					this.fail('failed')
+					this.fail({ kind: 'failed', code: '' })
 			} finally {
 				this.inFlight = false
 				this.schedule()
@@ -695,7 +843,7 @@ export default {
 				raw = (await this.$api.sys.getModuleStatus(name))?.data?.data
 			} catch (error) {
 				if (!this.gone)
-					this.fail(statusFailure(error))
+					this.fail(moduleStatusFailure(error))
 				return
 			}
 			// the window closed, or the job is not the one that is followed any more
@@ -705,7 +853,7 @@ export default {
 			if (view)
 				this.take(name, view)
 			else
-				this.fail('failed')
+				this.fail({ kind: 'failed', code: '' })
 		},
 		take(name, view) {
 			const entry = this.jobs[name] ?? { followed: true, kind: '' }
@@ -715,23 +863,23 @@ export default {
 			this.jobs[name] = { ...entry, view, kind: view.kind || entry.kind }
 			this.last = 'ok'
 			this.failure = ''
+			this.failureCode = ''
 			this.lastLevel = ''
 			this.outageSince = 0
-			this.askedAt = Date.now()
 			// a job that is not running any more is over: the list says what is installed now
 			if (!view.running) {
 				this.follow = ''
-				this.loadList()
+				this.refreshList()
 			}
 		},
-		fail(kind) {
+		fail({ kind, code }) {
 			this.last = 'error'
 			// a core that has no such route while a job runs is a core that is away (a gateway without its route), not one that lacks the feature
 			this.failure = kind === 'unavailable' ? 'down' : kind
-			// the silence is counted from the first ask that failed, and from the page being asked again after it was paused
+			this.failureCode = code
+			// the silence is counted from the first ask that failed after an answer
 			const now = Date.now()
-			this.outageSince = outageStart(this.outageSince, this.askedAt, now)
-			this.askedAt = now
+			this.outageSince = this.outageSince || now
 			this.elapsedMs = now - this.outageSince
 			const outage = this.outage
 			if (outage?.message && outage.level !== this.lastLevel) {
@@ -745,7 +893,7 @@ export default {
 		pressInstall(module, event) {
 			if (this.disabled || !module.canInstall)
 				return undefined
-			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, phase: 'planning', plan: null, notice: null }, event)
+			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
 			return this.requestPlan(false)
 		},
 		pressRemove(module, event) {
@@ -764,6 +912,9 @@ export default {
 			this.planAbort = controller
 			this.acting = 'plan'
 			this.callError = null
+			// whoever asks again has been told: the note about the plan that was given up goes
+			this.planNote = false
+			clearTimeout(this.noteTimer)
 			dialog.phase = 'planning'
 			dialog.plan = null
 			dialog.notice = null
@@ -772,7 +923,8 @@ export default {
 			try {
 				raw = (await this.$api.sys.planModule(dialog.name, controller?.signal))?.data?.data
 			} catch (error) {
-				failure = moduleFailure(error, this.locale)
+				// the plan changes nothing: a plan that got no answer is one to ask for again
+				failure = moduleFailure(error, this.locale, { read: true })
 			}
 			// the window was closed, or another plan was asked for: this one is for nobody
 			if (this.gone || ticket !== this.planTicket)
@@ -788,8 +940,15 @@ export default {
 			dialog.plan = plan
 			dialog.phase = 'plan'
 			dialog.notice = changed ? reasonMessage('plan_changed') : null
-			if (plan.refused === 'busy')
-				this.busy = { detail: plan.checks.find(check => check.code === 'busy')?.detail ?? '' }
+			// the plan is announced when it is there: whether it can be confirmed, or why it cannot
+			this.announced = this.say(plan.refused ? plan.refusedMessage : { key: TEXT.plan.ready, params: { module: dialog.title } })
+			if (plan.refused === 'busy') {
+				const check = plan.checks.find(item => item.code === 'busy' && item.mark === 'failed')
+				this.busy = { message: check?.detailMessage ?? null, detail: check?.detailMessage ? '' : check?.detail ?? '' }
+			}
+			// a module that the machine has already is a list that is out of date
+			if (plan.refused === 'already_installed')
+				this.loadList()
 		},
 		// The call a window was opened for: the install of the plan on the screen, or the remove.
 		async confirmDialog() {
@@ -808,12 +967,15 @@ export default {
 		async callModule(dialog, call, args) {
 			this.acting = dialog.key
 			this.callError = null
+			this.announced = this.say({ key: dialog.kind === 'install' ? TEXT.plan.starting : TEXT.remove.starting, params: {} })
+			// the job the module had before the call: a job that is found afterwards and is not that one is the job of this call
+			const before = this.jobs[dialog.name]?.view?.startedAtRaw ?? ''
 			let raw = null
 			let failure = null
 			try {
 				raw = (await this.$api.sys[call](...args))?.data?.data
 			} catch (error) {
-				failure = moduleFailure(error, this.locale)
+				failure = moduleFailure(error, this.locale, { mutating: true })
 			}
 			if (this.gone)
 				return
@@ -827,20 +989,31 @@ export default {
 			if (failure.kind === 'timeout') {
 				// (the kind of the job that may be there is the kind of the call)
 				const old = this.jobs[dialog.name]
-				this.jobs[dialog.name] = { view: old?.view ?? null, followed: Boolean(old?.followed), kind: dialog.kind }
+				this.jobs[dialog.name] = { ...old, view: old?.view ?? null, followed: Boolean(old?.followed), kind: dialog.kind }
 				await this.probeJob(dialog.name)
 				if (this.gone)
 					return
-				if (this.follow === dialog.name) {
+				const found = this.jobs[dialog.name]?.view
+				// a job that is there, and that is not the one the module had, is the job of the call, whatever state it is in by now
+				if (found && found.state !== 'idle' && found.startedAtRaw !== before) {
+					this.jobs[dialog.name].followed = true
+					const note = jobAnnouncement(old?.view, found)
+					if (note)
+						this.announced = this.say(note)
 					this.acting = ''
 					if (this.dialog === dialog)
 						this.closeDialog()
+					if (!found.running)
+						this.refreshList()
 					return
 				}
 			}
 			this.acting = ''
 			if (failure.code === 'busy')
-				this.busy = { detail: failure.detail }
+				this.busy = { message: failure.busy, detail: failure.detail }
+			// a refusal that says the list is out of date: the list is read again
+			if (STALE.has(failure.code))
+				this.loadList()
 			if (failure.code === 'plan_changed' && dialog.kind === 'install' && this.dialog === dialog) {
 				await this.requestPlan(true)
 				return
@@ -865,12 +1038,13 @@ export default {
 			this.opener = null
 			// a refusal said in the window goes with it: it was for the step that was asked
 			this.callError = null
-			// the plan that was being made is for nobody now
+			// the plan that was being made is for nobody now, but the machine does not know it: it may work on it for up to a minute
 			if (this.acting === 'plan') {
 				this.planTicket++
 				this.planAbort?.abort()
 				this.planAbort = null
 				this.acting = ''
+				this.planCancelled()
 			}
 			window.removeEventListener('keyup', this.onEscape, true)
 			// the focus goes back to the button that opened the window, or to the heading when that button is shut or gone
@@ -879,6 +1053,16 @@ export default {
 				if (!opener?.isConnected || document.activeElement !== opener)
 					this.$refs.title?.focus?.({ preventScroll: true })
 			})
+		},
+		// Said once, and not asked again by the page: the core's plan holds its place for as long as it works, and nothing here frees it.
+		planCancelled() {
+			this.planNote = true
+			this.announced = this.say({ key: TEXT.plan.cancelled, params: {} })
+			clearTimeout(this.noteTimer)
+			this.noteTimer = setTimeout(() => {
+				this.noteTimer = null
+				this.planNote = false
+			}, PLAN_NOTE_MS)
 		},
 		// What the person does to close the window: not while its call is out, or the step would go on with no window to say how it went. The plan can
 		// be given up: it changes nothing.
@@ -893,6 +1077,25 @@ export default {
 			event.stopPropagation()
 			this.requestClose()
 		},
+		// The Tab key goes round inside the window it is pressed in, in both directions, and from its heading (which takes the focus when the window opens
+		// and is not a stop of the Tab key). It is stopped here, so that no window under this one hears it: Buefy's hold on each window moves the focus to the
+		// first control of the window it stands on, and the one it holds for the window on top does not take the Shift key from the heading.
+		onTab(event) {
+			event.stopPropagation()
+			const box = event.currentTarget
+			const ring = Array.from(box.querySelectorAll(TABBABLE)).filter(element => box !== this.$el || !element.closest('.modules-dialog'))
+			const inside = ring.includes(event.target)
+			if (!ring.length) {
+				event.preventDefault()
+				return
+			}
+			const edge = ring[event.shiftKey ? 0 : ring.length - 1]
+			if (inside && event.target !== edge)
+				return
+			const target = ring[event.shiftKey ? ring.length - 1 : 0]
+			event.preventDefault()
+			target.focus({ preventScroll: true })
+		},
 		// the heading of the window takes the focus when it opens, and only then (a function ref runs at every render)
 		focusHeading(element) {
 			if (element && this.focusPending) {
@@ -906,7 +1109,10 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.modules-title:focus {
+.modules-title:focus,
+.modules-card-title:focus,
+.modules-modal:focus,
+.modules-dialog:focus {
 	outline: none;
 }
 
@@ -955,6 +1161,13 @@ export default {
 	margin-left: 1rem;
 }
 
+// The report of a job holds a log that is as wide as its longest line: the message it stands in is a flex box, whose item would grow to that width
+// and push the card out of the window, and the log scrolls in its own box instead.
+.modules-job :deep(.media),
+.modules-job :deep(.media-content) {
+	min-width: 0;
+}
+
 .modules-steps .modules-step {
 	display: flex;
 	flex-wrap: wrap;
@@ -1001,7 +1214,8 @@ export default {
 	columns: 12rem;
 }
 
-.modules-buttons {
+.modules-buttons,
+.modules-job-buttons {
 	gap: 0.5rem;
 }
 
