@@ -2396,5 +2396,12 @@
   "The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.": "La mise à jour a été interrompue, par exemple par un redémarrage de la machine. Appuyez de nouveau sur Mettre à jour ou sur Supprimer : ReCasaOS remet l'ancienne version en place avant toute autre chose.",
   "The record of the installed module cannot be read, or a file that it lists is missing or cannot be read. Nothing was changed. Look at it at a console, delete it by hand, remove the module, then install it again.": "Le relevé du module installé est illisible, ou un fichier qu'il liste est absent ou illisible. Rien n'a été modifié. Regardez-le sur une console, supprimez-le à la main, supprimez le module, puis installez-le de nouveau.",
   "Skipped: the service was stopped before the update": "Ignorée : le service était arrêté avant la mise à jour",
-  "The folder that is kept": "Le dossier qui est gardé"
+  "The folder that is kept": "Le dossier qui est gardé",
+  "The backup of the old version could not be deleted.": "La sauvegarde de l'ancienne version n'a pas pu être supprimée.",
+  "The module was removed, but some files of an unfinished update were left: they are named in the log below.": "Le module a été supprimé, mais des fichiers d'une mise à jour inachevée ont été laissés : ils sont nommés dans le journal ci-dessous.",
+  "Checking what an unfinished update left": "Vérification de ce qu'une mise à jour inachevée a laissé",
+  "Files that were left as they are": "Fichiers laissés tels quels",
+  "The update of {module} is installed, but its backup is still there": "La mise à jour de {module} est installée, mais sa sauvegarde est restée",
+  "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.": "La mise à jour a échoué et a été annulée, mais certains fichiers ont été laissés tels quels : l'ancienne version n'est donc pas complète. Ils sont nommés ci-dessous et dans le journal. Appuyez sur Supprimer, puis sur Installer, pour obtenir un module propre.",
+  "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.": "La mise à jour est installée, mais son dossier de sauvegarde n'a pas pu être supprimé (son chemin est ci-dessous). La prochaine installation, mise à jour ou suppression remettra l'ancienne version en place, sauf si le dossier est supprimé à la main."
 }

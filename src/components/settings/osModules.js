@@ -232,6 +232,7 @@ export const TEXT = {
 		progressUpdate: 'Progress of the update: step {index} of {total}',
 		putBack: 'Putting the old version back.',
 		folder: 'The folder that is kept',
+		leftFiles: 'Files that were left as they are',
 		stoppedAt: 'It stopped at: {step}',
 		unknownState: 'This page does not know the state of this job.',
 		advice: 'Run this command as root at a console of the machine. It finishes the cleaning. Then try again.',
@@ -327,7 +328,8 @@ export const REASONS = {
 	route_timeout: 'The service of the module started, but it did not answer on the gateway of the dashboard in time.',
 	interrupted: 'The job was cut short before it ended.',
 	unit_not_stopped: 'The service of the module would not stop, so nothing was deleted.',
-	remove_incomplete: 'Some files of the module could not be deleted.',
+	remove_incomplete: { text: 'Some files of the module could not be deleted.', steps: { leftovers: 'The module was removed, but some files of an unfinished update were left: they are named in the log below.' } },
+	backup_not_dropped: 'The backup of the old version could not be deleted.',
 	internal_error: 'ReCasaOS hit an internal error. The log below may say more.',
 }
 export const REASON_UNKNOWN = 'ReCasaOS gave a reason that this page does not know: {code}.'
@@ -636,6 +638,7 @@ export const STEP_TEXTS = {
 		files: 'Delete the files of the module',
 		manifest: 'Forget the module',
 		reload: 'Tell systemd that the service is gone',
+		leftovers: 'Checking what an unfinished update left',
 	},
 	update: {
 		packages: 'Install the packages that the new version adds',
@@ -660,7 +663,7 @@ export const STEP_UNKNOWN = 'A step that this page does not know: {code}'
 
 // the steps that say which kind of job it is; manifest and done are in both
 const INSTALL_ONLY = new Set(['packages', 'download', 'verify', 'unpack', 'units', 'start', 'route'])
-const REMOVE_ONLY = new Set(['stop', 'files', 'reload'])
+const REMOVE_ONLY = new Set(['stop', 'files', 'reload', 'leftovers'])
 const UPDATE_ONLY = new Set(['backup', 'swap'])
 // the steps before the files of the module are written (the unpack is the first that writes): a job cut short or stopped there has put nothing of the module on the machine
 const BEFORE_FILES = new Set(['', 'packages', 'download', 'verify'])
@@ -709,7 +712,7 @@ export const JOB_TITLES = {
 	running: { install: 'Installing {module}', remove: 'Removing {module}', update: 'Updating {module}', rollback: 'Undoing the install of {module}', putBack: 'Putting the old version of {module} back', any: 'A job is running on {module}' },
 	succeeded: { install: 'The install of {module} is done.', remove: 'The removal of {module} is done.', update: 'The update of {module} is done.', updateTo: 'The update of {module} to {tag} is done.', any: 'The job on {module} is done.' },
 	refused: { any: 'The job on {module} was refused. Nothing was changed.' },
-	failed: { install: 'The install of {module} stopped.', remove: 'The removal of {module} stopped.', update: 'The update of {module} stopped.', any: 'The job on {module} stopped.' },
+	failed: { install: 'The install of {module} stopped.', remove: 'The removal of {module} stopped.', update: 'The update of {module} stopped.', updateNotDropped: 'The update of {module} is installed, but its backup is still there', any: 'The job on {module} stopped.' },
 	interrupted: { any: 'The job on {module} was cut short.' },
 }
 export const JOB_LIVE = {
@@ -733,6 +736,8 @@ export const JOB_NEXT = {
 	cutUnknown: 'The job was cut short: some files of the module may be on the machine.',
 	succeededUpdate: 'The module runs the new version. Its configuration and its data were kept.',
 	updateBack: 'The old version of the module is back: the module is as it was before the update.',
+	updateLeft: 'The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.',
+	updateNotDropped: 'The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.',
 	updateKept: 'The old version could not be put back whole: a file was changed while the update ran, or the copy of the old version cannot be read. Nothing more was changed, and the folder with the copy is kept (its path is below). If the update is over and the module is as it should be, delete the folder by hand. If it is not, put the files of the old version back by hand from that folder, then delete it. Then press Update or Remove again. ReCasaOS never deletes it by itself.',
 	updateUnknown: 'ReCasaOS cannot tell whether the old version was put back. Press Update or Remove again: ReCasaOS looks at it first.',
 	updateCut: 'The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.',
@@ -741,13 +746,22 @@ export const JOB_NEXT = {
 // What a job that failed or was cut short says of what it had done, and whether the console finishes the work. The console is for what the page
 // cannot finish: an undo that did not end, a removal that stopped, a job whose kind is not known (it may be a removal), and a job that was cut short
 // after it began to write.
-function endingOf({ state, kind, step, undo }) {
+function endingOf({ state, kind, step, undo, code }) {
+	// the update is installed and only its backup is left: it is not a failure to be undone
+	if (kind === 'update' && state === 'failed' && code === 'backup_not_dropped')
+		return { undoMessage: JOB_NEXT.updateNotDropped, folder: true, advice: false }
+	// a remove that went on past an unfinished update names what it left in the log
+	if (kind === 'remove' && state === 'failed' && step === 'leftovers')
+		return { undoMessage: null, advice: false }
 	// an update either put the old version back or did not: the console is for the copy that is kept, and the sentence says what to do
 	if (kind === 'update' && (state === 'failed' || (state === 'interrupted' && step))) {
 		if (state === 'interrupted')
 			return { undoMessage: JOB_NEXT.updateCut, advice: false }
 		if (undo === 'rolled_back')
 			return { undoMessage: JOB_NEXT.updateBack, advice: false }
+		// some files are the owner's and were left as they are: the old version is not whole
+		if (undo === 'rolled_back_with_left')
+			return { undoMessage: JOB_NEXT.updateLeft, advice: false }
 		return undo ? { undoMessage: JOB_NEXT.updateKept, folder: true, advice: false } : { undoMessage: JOB_NEXT.updateUnknown, advice: false }
 	}
 	if (state === 'failed') {
@@ -786,8 +800,7 @@ export const STEP_MARKS = {
 	left: { text: 'Skipped: the service was stopped before the update', icon: 'skip-next-circle-outline' },
 }
 
-function stepsOf(kind, state, step, left = []) {
-	const ids = own(STEPS, kind)
+function stepsOf(kind, state, step, left = [], ids = own(STEPS, kind)) {
 	if (!ids)
 		return []
 	const at = ids.indexOf(step)
@@ -846,7 +859,7 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const step = typeof job.step === 'string' && STEP_WORD.test(job.step) ? job.step : ''
 	const code = typeof job.code === 'string' && CODE_WORD.test(job.code) ? job.code : ''
 	const codeText = clean(job.code, 60)
-	const undo = job.undo === 'rolled_back' || job.undo === 'rollback_incomplete' ? job.undo : (typeof job.undo === 'string' && job.undo ? 'rollback_incomplete' : '')
+	const undo = job.undo === 'rolled_back' || job.undo === 'rolled_back_with_left' || job.undo === 'rollback_incomplete' ? job.undo : (typeof job.undo === 'string' && job.undo ? 'rollback_incomplete' : '')
 	const running = state === 'running'
 	const finished = state === 'succeeded' || state === 'refused' || state === 'failed' || state === 'interrupted'
 	const putBack = PUT_BACK.test(step)
@@ -860,14 +873,19 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const listStep = rollback ? step.slice(ROLLBACK.length) : step
 	// an update of a module that was stopped leaves it stopped: the core writes `start` and `route` as skipped, which the job does not carry, and the status shows a service that does not run
 	const left = jobKind === 'update' && state === 'succeeded' && isPlain(status.unit) && status.unit.active === false ? ['start', 'route'] : []
-	const stepList = putBack ? [] : stepsOf(listKind, state, listStep, left)
-	const at = putBack ? -1 : own(STEPS, listKind)?.indexOf(listStep) ?? -1
-	const total = own(STEPS, listKind)?.length ?? 0
+	// a remove that goes on past an unfinished update has one more step, and only then
+	const ids = listKind === 'remove' && listStep === 'leftovers' ? [...STEPS.remove, 'leftovers'] : own(STEPS, listKind)
+	// an update whose only trouble is its backup is installed: no step of it is left undone
+	const installedUpdate = jobKind === 'update' && state === 'failed' && code === 'backup_not_dropped'
+	const stepList = putBack || installedUpdate ? [] : stepsOf(listKind, state, listStep, left, ids)
+	const at = putBack ? -1 : ids?.indexOf(listStep) ?? -1
+	const total = ids?.length ?? 0
 	const stepText = stepMessage(listKind, listStep)
 	// the title of an update that is being put back, of an install that is being undone, and of an update that is done to a version the status gives
 	const titleKey = (running && putBack && jobKind === 'update' ? titles.putBack : undefined)
 		?? (running && rollback ? titles.rollback : undefined)
 		?? (state === 'succeeded' && jobKind === 'update' && version ? titles.updateTo : undefined)
+		?? (installedUpdate ? titles.updateNotDropped : undefined)
 		?? titles[jobKind] ?? titles.any
 	const titleMessage = msg(titleKey, titleKey === titles.updateTo ? { module, tag: version } : { module })
 	let live = titleMessage
@@ -881,7 +899,8 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const cutShort = state === 'interrupted'
 	// a job that was refused or stopped says why
 	const ended = failed || state === 'refused'
-	const ending = endingOf({ state, kind: jobKind, step, undo })
+	const ending = endingOf({ state, kind: jobKind, step, undo, code })
+	const logLines = list(job.log_tail).filter(item => typeof item === 'string').slice(-MAX_LOG_LINES).map(item => line(item)).filter(Boolean)
 	let next = null
 	if (state === 'succeeded')
 		next = jobKind === 'install' ? msg(JOB_NEXT.succeededInstall) : jobKind === 'remove' ? msg(JOB_NEXT.succeededRemove) : jobKind === 'update' ? msg(JOB_NEXT.succeededUpdate) : null
@@ -916,7 +935,9 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 		kept: keptOf(job.kept_packages, jobKind, state),
 		next,
 		advice: ending.advice && MODULE_NAME.test(name) ? { command: `casaos module remove ${name}` } : null,
-		logTail: list(job.log_tail).filter(item => typeof item === 'string').slice(-MAX_LOG_LINES).map(item => line(item)).filter(Boolean),
+		// the files an update left as they are, as the log names them: `left: <path>` lines, to be read and copied
+		leftFiles: undo === 'rolled_back_with_left' && jobKind === 'update' ? logLines.filter(item => item.startsWith('left: ')) : [],
+		logTail: logLines,
 		startedAt: formatMoment(job.started_at, locale),
 		// the time as the core wrote it: what tells one job of a module from the next
 		startedAtRaw: typeof job.started_at === 'string' ? clean(job.started_at, 40) : '',

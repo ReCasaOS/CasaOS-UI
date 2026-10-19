@@ -1394,7 +1394,7 @@ describe('the remove', () => {
 		await tick(MODULE_POLL_MS.running)
 
 		expect(text('.modules-job-title')).toBe('The removal of Virtual machines stopped.')
-		expect(text('.modules-reason-sentence')).toContain(REASONS.remove_incomplete)
+		expect(text('.modules-reason-sentence')).toContain(REASONS.remove_incomplete.text)
 		expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
 		expect(wrapper.find('.modules-kept').exists()).toBe(false)
 	})
@@ -2948,6 +2948,32 @@ describe('the update of an installed module', () => {
 
 			expect(text('.modules-call-sentence')).toBe(reasonMessage('files_unreadable', { kind: 'update' }).key)
 			expect(text('.modules-call-items')).toContain('The record of the installed module cannot be read')
+		})
+
+		it('does not say that the old version is back when files were left as they are, names them to copy, and says to remove then install', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back_with_left', log_tail: ['left: /usr/bin/virt-tool'] })
+
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateLeft)
+			expect(text('.modules-undo')).not.toContain('is back')
+			expect(text('.modules-left-label')).toBe('Files that were left as they are')
+			expect(text('.modules-left')).toContain('left: /usr/bin/virt-tool')
+			expect(wrapper.find('.modules-left button').exists()).toBe(true)
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+		})
+
+		it('does not show the headline of a success when the update is installed but its backup stayed, and names the folder to copy', async () => {
+			await updating('route')
+			await finished({ state: 'failed', step: '', code: 'backup_not_dropped', undo: '' }, { installed: true, version: 'v0.1.3' })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines is installed, but its backup is still there')
+			expect(text('.modules-job-title')).not.toContain('is done')
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateNotDropped)
+			expect(text('.modules-folder code')).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(wrapper.findAll('.modules-step')).toHaveLength(0)
+			expect(text('.modules-reason-sentence')).toBe(`${REASONS.backup_not_dropped} backup_not_dropped`)
+			// nothing in the card deletes the folder
+			expect(wrapper.find('.modules-folder').findAll('button').map(button => button.text())).toEqual(['Copy'])
 		})
 
 		it('does not say that the old version is back when the core does not say so', async () => {

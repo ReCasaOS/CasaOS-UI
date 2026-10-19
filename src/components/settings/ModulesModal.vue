@@ -186,6 +186,12 @@
 								</p>
 								<os-upgrade-copyable class="modules-folder mt-1" :text="card.job.folder" />
 							</template>
+							<template v-if="card.job.leftFiles.length">
+								<p class="modules-left-label is-size-7 mt-1">
+									{{ $t(TEXT.job.leftFiles) }}
+								</p>
+								<os-upgrade-copyable block class="modules-left mt-1" :label="$t(TEXT.job.leftFiles)" :text="card.job.leftFiles.join('\n')" />
+							</template>
 
 							<div v-if="card.job.kept" class="modules-kept mt-2">
 								<p v-if="card.job.kept.known && card.job.kept.count" class="modules-kept-some">

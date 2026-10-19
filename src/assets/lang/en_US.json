@@ -2396,5 +2396,12 @@
   "The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.": "The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.",
   "The record of the installed module cannot be read, or a file that it lists is missing or cannot be read. Nothing was changed. Look at it at a console, delete it by hand, remove the module, then install it again.": "The record of the installed module cannot be read, or a file that it lists is missing or cannot be read. Nothing was changed. Look at it at a console, delete it by hand, remove the module, then install it again.",
   "Skipped: the service was stopped before the update": "Skipped: the service was stopped before the update",
-  "The folder that is kept": "The folder that is kept"
+  "The folder that is kept": "The folder that is kept",
+  "The backup of the old version could not be deleted.": "The backup of the old version could not be deleted.",
+  "The module was removed, but some files of an unfinished update were left: they are named in the log below.": "The module was removed, but some files of an unfinished update were left: they are named in the log below.",
+  "Checking what an unfinished update left": "Checking what an unfinished update left",
+  "Files that were left as they are": "Files that were left as they are",
+  "The update of {module} is installed, but its backup is still there": "The update of {module} is installed, but its backup is still there",
+  "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.": "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.",
+  "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.": "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand."
 }
