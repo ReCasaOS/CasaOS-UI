@@ -180,6 +180,12 @@
 							<p v-if="card.job.undoText" class="modules-undo mt-1">
 								{{ say(card.job.undoText) }}
 							</p>
+							<template v-if="card.job.folder">
+								<p class="modules-folder-label is-size-7 mt-1">
+									{{ $t(TEXT.job.folder) }}
+								</p>
+								<os-upgrade-copyable class="modules-folder mt-1" :text="card.job.folder" />
+							</template>
 
 							<div v-if="card.job.kept" class="modules-kept mt-2">
 								<p v-if="card.job.kept.known && card.job.kept.count" class="modules-kept-some">
@@ -356,7 +362,7 @@
 
 								<!-- what the update adds, and what the new version no longer names (those stay: no package is removed) -->
 								<template v-if="dialog.plan.update">
-									<h6 class="has-text-weight-semibold mt-3">
+									<h6 class="modules-update-added-heading has-text-weight-semibold mt-3">
 										{{ $t(TEXT.update.added) }}
 									</h6>
 									<ul v-if="dialog.plan.update.added.length" class="modules-names modules-added mt-1">
@@ -389,10 +395,11 @@
 								</template>
 
 								<template v-if="dialog.plan.packages.listed">
-									<h6 v-if="!dialog.plan.update || dialog.plan.packages.install.length" class="has-text-weight-semibold mt-3">
+									<h6 v-if="!dialog.plan.update" class="has-text-weight-semibold mt-3">
 										{{ $t(TEXT.plan.packages) }}
 									</h6>
-									<ul v-if="dialog.plan.packages.install.length" class="modules-names mt-1">
+									<!-- the packages of an update that apt installs are the list above -->
+									<ul v-if="!dialog.plan.update && dialog.plan.packages.install.length" class="modules-names mt-1">
 										<li v-for="name in dialog.plan.packages.install" :key="name">
 											{{ name }}
 										</li>
@@ -1058,7 +1065,7 @@ export default {
 			try {
 				raw = (await this.$api.sys[call](...args))?.data?.data
 			} catch (error) {
-				failure = moduleFailure(error, this.locale, { mutating: true })
+				failure = moduleFailure(error, this.locale, { mutating: true, mode: dialog.kind === 'update' ? 'update' : 'install' })
 			}
 			if (this.gone)
 				return

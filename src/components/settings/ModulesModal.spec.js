@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS } from './osModules'
+import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, reasonMessage } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -2634,11 +2634,12 @@ describe('the update of an installed module', () => {
 			expect(text('.modules-dialog-installed')).toBe('Installed version: v0.1.2')
 			expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.3')
 			expect(text('.modules-dialog .modules-dialog-line')).toBe('This is what the update does. Read it, then confirm.')
+			expect(text('.modules-update-added-heading')).toBe('These packages will be installed')
 			expect(texts('.modules-added li')).toEqual(['qemu-img'])
 			expect(texts('.modules-dropped li')).toEqual(['old-helper'])
 			expect(text('.modules-dropped-note')).toBe('They stay on the machine: ReCasaOS never removes a package.')
-			// what apt does is said too: it may add more than the manifest names
-			expect(texts('.modules-dialog .modules-names:not(.modules-added):not(.modules-dropped):not(.modules-upgrades) li')).toEqual(['qemu-img', 'libc6'])
+			// the list of what apt installs is the one above: it is not said twice
+			expect(wrapper.findAll('.modules-dialog .modules-names:not(.modules-added):not(.modules-dropped):not(.modules-upgrades)')).toHaveLength(0)
 			expect(text('.modules-size-download')).toBe('Download of the packages: 1 MiB')
 			expect(texts('.modules-update-consequences li')).toEqual([
 				'The service of the module stops for a moment, then starts again.',
@@ -2661,7 +2662,7 @@ describe('the update of an installed module', () => {
 			await open(updatable())
 			await updateDialog({ packages: { to_install: [], to_upgrade: [], known: false }, update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } })
 
-			expect(text('.modules-no-added')).toBe('The update adds no package.')
+			expect(text('.modules-no-added')).toBe('No package to install')
 			expect(wrapper.find('.modules-added').exists()).toBe(false)
 			expect(wrapper.find('.modules-dropped').exists()).toBe(false)
 			expect(wrapper.find('.modules-no-packages').exists()).toBe(false)
@@ -2912,7 +2913,15 @@ describe('the update of an installed module', () => {
 			await updating('unpack')
 			await finished({ state: step ? 'failed' : 'refused', step, code, undo: step ? 'rolled_back' : '' })
 
-			expect(text('.modules-reason-sentence')).toBe(`${REASONS[code]} ${code}`)
+			expect(text('.modules-reason-sentence')).toBe(`${reasonMessage(code, { kind: 'update' }).key} ${code}`)
+		})
+
+		it('shows start and route as skipped when the service was stopped before the update, and keeps the headline', async () => {
+			await updating('route')
+			await finished({ state: 'succeeded', step: 'done' }, { installed: true, version: 'v0.1.3', unit: { active: false, enabled: false }, route: { answers: false } })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines to v0.1.3 is done.')
+			expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Skipped: the service was stopped before the update', 'Skipped: the service was stopped before the update'])
 		})
 
 		it('tells the owner where the copy of the old version is kept, and to press Update or Remove again, when it could not be put back', async () => {
@@ -2920,10 +2929,25 @@ describe('the update of an installed module', () => {
 			await finished({ state: 'failed', step: 'swap', code: 'recovery_incomplete', undo: 'rollback_incomplete' })
 
 			expect(text('.modules-reason-sentence')).toBe(`${REASONS.recovery_incomplete} recovery_incomplete`)
-			expect(text('.modules-undo')).toContain('/var/lib/casaos/modules/tmp/backup-virt')
-			expect(text('.modules-undo')).toContain('Press Update or Remove again')
+			expect(text('.modules-undo')).toContain('a file was changed while the update ran')
+			expect(text('.modules-undo')).toContain('press Update or Remove again')
+			// the folder is given as text to copy, and nothing in the page deletes it
+			expect(text('.modules-folder code')).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(wrapper.find('.modules-folder button').exists()).toBe(true)
+			expect(text('.modules-folder-label')).toBe('The folder that is kept')
 			expect(wrapper.find('.modules-advice').exists()).toBe(false)
 			expect(wrapper.find('.modules-kept').exists()).toBe(false)
+		})
+
+		it('says the refusal files_unreadable of an update in the words of an update, in the window', async () => {
+			await open(updatable())
+			await updateDialog()
+			const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== 'installed', detail: item === 'installed' ? 'files_missing' : '' }))
+			calls.installModule.mockImplementationOnce(failure(refused('files_unreadable', { checks })))
+			await press('.modules-dialog-ok')
+
+			expect(text('.modules-call-sentence')).toBe(reasonMessage('files_unreadable', { kind: 'update' }).key)
+			expect(text('.modules-call-items')).toContain('The record of the installed module cannot be read')
 		})
 
 		it('does not say that the old version is back when the core does not say so', async () => {

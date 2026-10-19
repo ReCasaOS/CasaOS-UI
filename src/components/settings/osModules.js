@@ -199,8 +199,8 @@ export const TEXT = {
 		intro: 'This is what the update does. Read it, then confirm.',
 		starting: 'ReCasaOS is making the plan again and starting the update. This can take up to two minutes. Do not switch the machine off.',
 		startingLabel: 'Starting the update',
-		added: 'Packages that the update adds',
-		addedNone: 'The update adds no package.',
+		added: 'These packages will be installed',
+		addedNone: 'No package to install',
 		dropped: 'Packages that the new version no longer names',
 		droppedNote: 'They stay on the machine: ReCasaOS never removes a package.',
 		consequences: 'What the update does to the machine',
@@ -231,6 +231,7 @@ export const TEXT = {
 		progressRollback: 'Progress of the undo: step {index} of {total}',
 		progressUpdate: 'Progress of the update: step {index} of {total}',
 		putBack: 'Putting the old version back.',
+		folder: 'The folder that is kept',
 		stoppedAt: 'It stopped at: {step}',
 		unknownState: 'This page does not know the state of this job.',
 		advice: 'Run this command as root at a console of the machine. It finishes the cleaning. Then try again.',
@@ -296,7 +297,10 @@ export const REASONS = {
 	declined: 'The job was declined.',
 	log_unwritable: 'The log of the job could not be written. Nothing was changed.',
 	lock_failed: 'ReCasaOS could not take the lock that keeps two jobs from running at once.',
-	files_unreadable: 'A file that records an earlier install cannot be read, or a file that it lists is missing. Look at it at a console, delete the record by hand, then try again.',
+	files_unreadable: {
+		text: 'A file that records an earlier install cannot be read. Look at it at a console, delete it by hand, then try again.',
+		kinds: { update: 'The record of the installed module cannot be read, or a file that it lists is missing or cannot be read. Nothing was changed. Look at it at a console, delete it by hand, remove the module, then install it again.' },
+	},
 	files_unverified: 'The record of this module is of an older kind, so ReCasaOS cannot check its files. Remove the module, then install it again.',
 	up_to_date: 'The module is already at the version that this release offers.',
 	downgrade: 'The installed version is later than the one this release offers, and ReCasaOS never takes a module back to an earlier version.',
@@ -304,7 +308,7 @@ export const REASONS = {
 	unit_changed: 'The new version names another service than the one that is installed, so ReCasaOS does not update it in place.',
 	backup_failed: 'ReCasaOS could not make a copy of the files that the update replaces.',
 	swap_failed: 'The files of the new version could not be put in place.',
-	recovery_incomplete: 'ReCasaOS could not finish putting back the version that an earlier update replaced.',
+	recovery_incomplete: 'ReCasaOS could not finish putting back the version that an earlier update replaced, or the copy of that version cannot be read.',
 	state_unsafe: 'The folder where ReCasaOS keeps the state of the modules is not safe to use. Look at it at a console.',
 	tmp_unusable: 'The folder where the module is downloaded cannot be used.',
 	packages_failed: 'apt could not install the packages. The log below says why.',
@@ -328,8 +332,8 @@ export const REASONS = {
 }
 export const REASON_UNKNOWN = 'ReCasaOS gave a reason that this page does not know: {code}.'
 
-/** The sentence of a code. `step` is the step of a job (the one code that depends on it is start_failed), `data` the core's data of a refusal. */
-export function reasonMessage(code, { step = '', data = {} } = {}) {
+/** The sentence of a code. `step` is the step of a job (start_failed depends on it), `kind` the kind of the job or of the plan (files_unreadable depends on it), `data` the core's data of a refusal. */
+export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 	const entry = own(REASONS, code)
 	if (entry === undefined)
 		return msg(REASON_UNKNOWN, { code: clean(code, 60) || '?' })
@@ -338,7 +342,7 @@ export function reasonMessage(code, { step = '', data = {} } = {}) {
 		return sentenceFor(entry, {}, field ? { field } : {})
 	}
 	if (isPlain(entry))
-		return msg(own(entry.steps, step) ?? entry.text)
+		return msg(own(entry.steps ?? {}, step) ?? own(entry.kinds ?? {}, kind) ?? entry.text)
 	return msg(entry)
 }
 
@@ -394,13 +398,13 @@ function detailMessage(code, detail, locale) {
 }
 
 // the sentence of a check that failed: a release that the machine cannot tell is not a release that is too old
-function failureMessage(code, refused, detail) {
+function failureMessage(code, refused, detail, kind) {
 	if (code === 'recasaos' && detail.trim() === 'unknown')
 		return msg(TEXT.checks.recasaosUnknown)
-	return reasonMessage(checkFailure(code, refused))
+	return reasonMessage(checkFailure(code, refused), { kind })
 }
 
-function checkView(raw, refused, locale) {
+function checkView(raw, refused, locale, kind = '') {
 	const code = clean(raw.code, 40)
 	// a check that was not made (the plan stopped at an earlier one, or the user cannot look at the locks): not ok, and not the reason of a refusal
 	const detail = typeof raw.detail === 'string' ? raw.detail : ''
@@ -415,7 +419,7 @@ function checkView(raw, refused, locale) {
 		notChecked,
 		mark,
 		markText: TEXT.marks[mark],
-		message: failed ? failureMessage(code, refused, detail) : null,
+		message: failed ? failureMessage(code, refused, detail, kind) : null,
 		// the core allows 400 characters to what apt says
 		detail: failed ? line(detail, 400) : '',
 		detailMessage: failed ? detailMessage(code, detail, locale) : null,
@@ -425,13 +429,13 @@ function checkView(raw, refused, locale) {
 const MARK_ORDER = { failed: 0, notChecked: 1, passed: 2 }
 
 // The sentence of a plan that was refused, or of a call that was refused with the code of a check: the check says more for a release that is not known.
-function refusalMessage(refused, checks) {
+function refusalMessage(refused, checks, kind = '') {
 	if (refused === 'recasaos') {
 		const failed = checks.find(check => check.code === 'recasaos' && check.mark === 'failed')
 		if (failed?.message)
 			return failed.message
 	}
-	return reasonMessage(refused)
+	return reasonMessage(refused, { kind })
 }
 
 // The command that takes the hold off a package, when apt named the packages that are held (`held a b`): given only for names that are package names, whole.
@@ -557,7 +561,7 @@ export function modulePlanView(raw, { name = '', locale = 'en_us', mode = 'insta
 	const tag = typeof raw.tag === 'string' && TAG.test(raw.tag) ? raw.tag : ''
 	const update = mode === 'update' ? updateView(raw.update, tag) : null
 	const refused = raw.refused === null || raw.refused === undefined || raw.refused === '' ? '' : (typeof raw.refused === 'string' ? clean(raw.refused, 60) : '') || 'unknown'
-	const checks = list(raw.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, refused, locale)).sort((a, b) => MARK_ORDER[a.mark] - MARK_ORDER[b.mark])
+	const checks = list(raw.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, refused, locale, mode)).sort((a, b) => MARK_ORDER[a.mark] - MARK_ORDER[b.mark])
 	const apt = isPlain(raw.packages) ? raw.packages : {}
 	const install = packageNames(apt.to_install)
 	const upgrade = packageNames(apt.to_upgrade)
@@ -575,7 +579,7 @@ export function modulePlanView(raw, { name = '', locale = 'en_us', mode = 'insta
 		tag,
 		tier: tierOf(raw.tier),
 		refused,
-		refusedMessage: refused ? refusalMessage(refused, checks) : null,
+		refusedMessage: refused ? refusalMessage(refused, checks, mode) : null,
 		unhold: holdOf(checks, refused),
 		checks,
 		incomplete,
@@ -729,7 +733,7 @@ export const JOB_NEXT = {
 	cutUnknown: 'The job was cut short: some files of the module may be on the machine.',
 	succeededUpdate: 'The module runs the new version. Its configuration and its data were kept.',
 	updateBack: 'The old version of the module is back: the module is as it was before the update.',
-	updateKept: 'Putting the old version back did not finish. A copy of it is kept on the machine, in /var/lib/casaos/modules/tmp/backup-{module}. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else. If that fails again, look at the log below at a console of the machine.',
+	updateKept: 'The old version could not be put back whole: a file was changed while the update ran, or the copy of the old version cannot be read. Nothing more was changed, and the folder with the copy is kept (its path is below). If the update is over and the module is as it should be, delete the folder by hand. If it is not, put the files of the old version back by hand from that folder, then delete it. Then press Update or Remove again. ReCasaOS never deletes it by itself.',
 	updateUnknown: 'ReCasaOS cannot tell whether the old version was put back. Press Update or Remove again: ReCasaOS looks at it first.',
 	updateCut: 'The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.',
 }
@@ -737,14 +741,14 @@ export const JOB_NEXT = {
 // What a job that failed or was cut short says of what it had done, and whether the console finishes the work. The console is for what the page
 // cannot finish: an undo that did not end, a removal that stopped, a job whose kind is not known (it may be a removal), and a job that was cut short
 // after it began to write.
-function endingOf({ state, kind, step, undo, module }) {
+function endingOf({ state, kind, step, undo }) {
 	// an update either put the old version back or did not: the console is for the copy that is kept, and the sentence says what to do
 	if (kind === 'update' && (state === 'failed' || (state === 'interrupted' && step))) {
 		if (state === 'interrupted')
 			return { undoMessage: JOB_NEXT.updateCut, advice: false }
 		if (undo === 'rolled_back')
 			return { undoMessage: JOB_NEXT.updateBack, advice: false }
-		return undo ? { undoMessage: JOB_NEXT.updateKept, params: { module }, advice: false } : { undoMessage: JOB_NEXT.updateUnknown, advice: false }
+		return undo ? { undoMessage: JOB_NEXT.updateKept, folder: true, advice: false } : { undoMessage: JOB_NEXT.updateUnknown, advice: false }
 	}
 	if (state === 'failed') {
 		if (kind !== 'install')
@@ -778,9 +782,11 @@ export const STEP_MARKS = {
 	failed: { text: 'Failed here', icon: 'alert-circle-outline' },
 	stopped: { text: 'Cut short here', icon: 'stop-circle-outline' },
 	skipped: { text: 'Not reached', icon: 'minus-circle-outline' },
+	// an update of a module that was stopped leaves it stopped, and does not start it
+	left: { text: 'Skipped: the service was stopped before the update', icon: 'skip-next-circle-outline' },
 }
 
-function stepsOf(kind, state, step) {
+function stepsOf(kind, state, step, left = []) {
 	const ids = own(STEPS, kind)
 	if (!ids)
 		return []
@@ -790,7 +796,7 @@ function stepsOf(kind, state, step) {
 	return ids.map((id, index) => {
 		let mark
 		if (all)
-			mark = 'done'
+			mark = left.includes(id) ? 'left' : 'done'
 		else if (at < 0 || index > at)
 			mark = ended ? 'skipped' : 'pending'
 		else if (index < at)
@@ -852,7 +858,9 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	// the steps of a rollback are those of a remove
 	const listKind = rollback ? 'remove' : jobKind
 	const listStep = rollback ? step.slice(ROLLBACK.length) : step
-	const stepList = putBack ? [] : stepsOf(listKind, state, listStep)
+	// an update of a module that was stopped leaves it stopped: the core writes `start` and `route` as skipped, which the job does not carry, and the status shows a service that does not run
+	const left = jobKind === 'update' && state === 'succeeded' && isPlain(status.unit) && status.unit.active === false ? ['start', 'route'] : []
+	const stepList = putBack ? [] : stepsOf(listKind, state, listStep, left)
 	const at = putBack ? -1 : own(STEPS, listKind)?.indexOf(listStep) ?? -1
 	const total = own(STEPS, listKind)?.length ?? 0
 	const stepText = stepMessage(listKind, listStep)
@@ -873,7 +881,7 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const cutShort = state === 'interrupted'
 	// a job that was refused or stopped says why
 	const ended = failed || state === 'refused'
-	const ending = endingOf({ state, kind: jobKind, step, undo, module: name })
+	const ending = endingOf({ state, kind: jobKind, step, undo })
 	let next = null
 	if (state === 'succeeded')
 		next = jobKind === 'install' ? msg(JOB_NEXT.succeededInstall) : jobKind === 'remove' ? msg(JOB_NEXT.succeededRemove) : jobKind === 'update' ? msg(JOB_NEXT.succeededUpdate) : null
@@ -900,9 +908,11 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 		rollbackStep: running && putBack ? msg(TEXT.job.putBack) : running && rollback ? msg(TEXT.job.rollback, { step: stepText.key }, ['step']) : null,
 		stoppedAt: (failed || cutShort) && step ? msg(TEXT.job.stoppedAt, { step: stepText.key }, ['step']) : null,
 		live,
-		reason: ended && code ? reasonMessage(code, { step }) : (ended && codeText ? msg(REASON_UNKNOWN, { code: codeText }) : null),
+		reason: ended && code ? reasonMessage(code, { step, kind: jobKind }) : (ended && codeText ? msg(REASON_UNKNOWN, { code: codeText }) : null),
 		code: ended ? codeText : '',
-		undoText: ending.undoMessage ? msg(ending.undoMessage, ending.params ?? {}) : null,
+		undoText: ending.undoMessage ? msg(ending.undoMessage) : null,
+		// where the copy of the old version is kept, to be read and copied, never run
+		folder: ending.folder && MODULE_NAME.test(name) ? `/var/lib/casaos/modules/tmp/backup-${name}` : null,
 		kept: keptOf(job.kept_packages, jobKind, state),
 		next,
 		advice: ending.advice && MODULE_NAME.test(name) ? { command: `casaos module remove ${name}` } : null,
@@ -997,7 +1007,7 @@ export function moduleOutage({ kind, code = '', elapsedMs = 0 }) {
  * got no answer it is told to be tried again. A call that changes the machine (`mutating`: the install and the remove) that got no answer, or an
  * answer of a gateway with nothing behind it, may have been carried out, and is told so. Never the core's own words (`data.error`).
  */
-export function moduleFailure(error, locale = 'en_us', { read = false, mutating = false } = {}) {
+export function moduleFailure(error, locale = 'en_us', { read = false, mutating = false, mode = '' } = {}) {
 	const base = failureOf(error, locale, { read })
 	if (base.kind === 'unavailable')
 		return { ...base, message: msg(TEXT.unavailable), detail: '', busy: null, unhold: null }
@@ -1015,9 +1025,9 @@ export function moduleFailure(error, locale = 'en_us', { read = false, mutating 
 	}
 	const body = error?.response?.data?.data
 	const data = isPlain(body) && isPlain(body.data) ? body.data : {}
-	const all = list(data.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, base.code, locale))
+	const all = list(data.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, base.code, locale, mode))
 	const items = all.filter(check => check.mark === 'failed').map(check => ({ code: check.code, message: check.message }))
-	const message = base.code === 'recasaos' ? refusalMessage(base.code, all) : reasonMessage(base.code, { data })
+	const message = base.code === 'recasaos' ? refusalMessage(base.code, all, mode) : reasonMessage(base.code, { data, kind: mode })
 	const busy = base.code === 'busy' ? (all.find(check => check.code === 'busy' && check.mark === 'failed')?.detailMessage ?? null) : null
 	return { kind: 'refusal', status: base.status, code: base.code, message, items, detail: base.code === 'busy' ? line(data.reason, 200) : '', busy, unhold: holdOf(all, base.code) }
 }

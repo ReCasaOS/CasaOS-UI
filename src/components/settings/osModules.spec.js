@@ -1677,7 +1677,7 @@ describe('the view of the plan of an update', () => {
 	it.each(UPDATE_REFUSALS)('cannot install a plan that is refused with %s, and says why', (code) => {
 		const view = updatePlan({ refused: code, plan_id: '' })
 		expect(view.installable).toBe(false)
-		expect(view.refusedMessage.key).toBe(REASONS[code])
+		expect(view.refusedMessage.key).toBe(reasonMessage(code, { kind: 'update' }).key)
 	})
 
 	it.each([
@@ -1693,10 +1693,10 @@ describe('the view of the plan of an update', () => {
 	])('says the check %s that failed with %s in the sentence of the refusal, first', (check, code) => {
 		const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== check, detail: item === check ? 'x' : '' }))
 		const view = updatePlan({ refused: code, plan_id: '', checks })
-		expect(view.refusedMessage.key).toBe(REASONS[code])
+		expect(view.refusedMessage.key).toBe(reasonMessage(code, { kind: 'update' }).key)
 		expect(view.checks[0].code).toBe(check)
 		expect(view.checks[0].mark).toBe('failed')
-		expect(view.checks[0].message.key).toBe(REASONS[code])
+		expect(view.checks[0].message.key).toBe(reasonMessage(code, { kind: 'update' }).key)
 	})
 
 	it('says that the check of the version was not made when the check of the installation failed', () => {
@@ -1705,7 +1705,7 @@ describe('the view of the plan of an update', () => {
 		const newer = view.checks.find(check => check.code === 'newer')
 		expect(newer.mark).toBe('notChecked')
 		expect(newer.message).toBeNull()
-		expect(view.checks.find(check => check.code === 'installed').message.key).toBe(REASONS.files_unreadable)
+		expect(view.checks.find(check => check.code === 'installed').message.key).toBe(reasonMessage('files_unreadable', { kind: 'update' }).key)
 	})
 
 	it('shows HTML in the names of the packages as text', () => {
@@ -1835,10 +1835,11 @@ describe('the view of the job of an update', () => {
 		})
 
 		it.each(['backup_failed', 'swap_failed', 'recovery_incomplete', 'up_to_date', 'downgrade', 'unit_changed', 'version_unknown', 'files_unverified', 'files_unreadable', 'not_installed', 'manifest_invalid'])('says %s in its own sentence', (code) => {
-			expect(reasonMessage(code).key).toBe(REASONS[code])
-			expect(MODULE_KEYS).toContain(REASONS[code])
-			expect(en[REASONS[code]]).toBe(REASONS[code])
-			expect(fr[REASONS[code]]).not.toBe(REASONS[code])
+			const key = reasonMessage(code, { kind: 'update' }).key
+			expect(key).not.toBe(REASON_UNKNOWN)
+			expect(MODULE_KEYS).toContain(key)
+			expect(en[key]).toBe(key)
+			expect(fr[key]).not.toBe(key)
 		})
 
 		it('says that the old version is back when the core says the update was rolled back, whatever the step', () => {
@@ -1852,12 +1853,25 @@ describe('the view of the job of an update', () => {
 
 		it('says where the copy is kept, and what to press, when putting the old version back did not finish', () => {
 			const view = ujob({ state: 'failed', step: 'swap', code: 'recovery_incomplete', undo: 'rollback_incomplete' })
-			expect(view.undoText).toEqual({ key: JOB_NEXT.updateKept, params: { module: 'virt' } })
-			expect(JOB_NEXT.updateKept).toContain('backup-{module}')
+			expect(view.undoText).toEqual({ key: JOB_NEXT.updateKept, params: {} })
+			// the sentence says what it means in words, and the path is given apart, to copy
+			expect(JOB_NEXT.updateKept).toContain('a file was changed while the update ran')
+			expect(JOB_NEXT.updateKept).toContain('by hand')
 			expect(JOB_NEXT.updateKept).toContain('Update or Remove')
+			expect(view.folder).toBe('/var/lib/casaos/modules/tmp/backup-virt')
 			expect(view.advice).toBeNull()
 			// whatever the core says of the undo, other than it was done, is not that it was done
 			expect(ujob({ state: 'failed', step: 'swap', undo: 'something_else' }).undoText.key).toBe(JOB_NEXT.updateKept)
+		})
+
+		it('names a folder only when the old version could not be put back whole', () => {
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back' }).folder).toBeNull()
+			expect(ujob({ state: 'failed', step: 'swap', undo: '' }).folder).toBeNull()
+			expect(ujob({ state: 'interrupted', step: 'swap' }).folder).toBeNull()
+			expect(ujob({ state: 'succeeded', step: 'done' }).folder).toBeNull()
+			expect(ujob({ state: 'running', step: 'swap' }).folder).toBeNull()
+			expect(job({ kind: 'install', state: 'failed', step: 'unpack', undo: 'rollback_incomplete' }).folder).toBeNull()
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rollback_incomplete' }).folder).toBe('/var/lib/casaos/modules/tmp/backup-virt')
 		})
 
 		it('does not say that the old version is back when nothing says so', () => {
@@ -1899,13 +1913,71 @@ describe('the view of the job of an update', () => {
 	})
 })
 
+describe('the words that depend on the kind of job', () => {
+	const INSTALL_FILES_UNREADABLE = 'A file that records an earlier install cannot be read. Look at it at a console, delete it by hand, then try again.'
+
+	it('keeps the sentence of an install and of a remove for files_unreadable, byte for byte', () => {
+		expect(reasonMessage('files_unreadable')).toEqual({ key: INSTALL_FILES_UNREADABLE, params: {} })
+		expect(reasonMessage('files_unreadable', { kind: 'install' }).key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(reasonMessage('files_unreadable', { kind: 'remove' }).key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(job({ state: 'failed', step: 'unpack', code: 'files_unreadable', undo: 'rolled_back' }).reason.key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(fr[INSTALL_FILES_UNREADABLE]).toBe('Un fichier qui garde la trace d\'une installation précédente est illisible. Regardez-le sur une console, supprimez-le à la main, puis réessayez.')
+		expect(moduleFailure(refusal('files_unreadable', {})).message.key).toBe(INSTALL_FILES_UNREADABLE)
+	})
+
+	it('says for an update that the record of the installed module cannot be read, that nothing was changed, and what to do', () => {
+		const key = reasonMessage('files_unreadable', { kind: 'update' }).key
+		expect(key).not.toBe(INSTALL_FILES_UNREADABLE)
+		expect(key).toContain('The record of the installed module cannot be read')
+		expect(key).toContain('Nothing was changed')
+		expect(key).toContain('remove the module, then install it again')
+		expect(job({ kind: 'update', state: 'failed', step: 'unpack', code: 'files_unreadable', undo: 'rolled_back' }).reason.key).toBe(key)
+		expect(moduleFailure(refusal('files_unreadable', {}), 'en_us', { mode: 'update' }).message.key).toBe(key)
+		expect(updatePlanFor('files_unreadable').refusedMessage.key).toBe(key)
+	})
+
+	function updatePlanFor(code) {
+		return modulePlanView(planRaw({ mode: 'update', tag: 'v0.1.3', refused: code, plan_id: '', checks: [], update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } }), { name: 'virt', mode: 'update' })
+	}
+})
+
+describe('an update of a module that was stopped', () => {
+	const stopped = { installed: true, version: 'v0.1.3', unit: { active: false, enabled: false }, route: { answers: false } }
+	const ujob = (changes, status) => job({ kind: 'update', ...changes }, { status })
+
+	it('shows start and route as skipped, not failed and not pending, and keeps the headline', () => {
+		const view = ujob({ state: 'succeeded', step: 'done' }, stopped)
+		expect(view.steps.map(item => item.mark)).toEqual(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'left', 'left'])
+		expect(view.steps.slice(8).map(item => item.markText)).toEqual(['Skipped: the service was stopped before the update', 'Skipped: the service was stopped before the update'])
+		expect(view.title.key).toBe(JOB_TITLES.succeeded.updateTo)
+		expect(view.next.key).toBe(JOB_NEXT.succeededUpdate)
+		expect(STEP_MARKS.left.icon).toBeTruthy()
+		expect(fr[STEP_MARKS.left.text]).toBe('Ignorée : le service était arrêté avant la mise à jour')
+	})
+
+	it.each([
+		['the service runs', { ...stopped, unit: { active: true, enabled: true } }],
+		['the status does not say', { installed: true, version: 'v0.1.3' }],
+		['the unit is not an object', { installed: true, version: 'v0.1.3', unit: 'no' }],
+		['active is not false', { installed: true, version: 'v0.1.3', unit: { active: null } }],
+	])('shows every step done when %s', (_, status) => {
+		expect(ujob({ state: 'succeeded', step: 'done' }, status).steps.every(item => item.mark === 'done')).toBe(true)
+	})
+
+	it('skips nothing for a job that did not succeed, or that is not an update', () => {
+		expect(ujob({ state: 'failed', step: 'start', code: 'start_failed', undo: 'rolled_back' }, stopped).steps.map(item => item.mark)).not.toContain('left')
+		expect(ujob({ state: 'running', step: 'swap' }, stopped).steps.map(item => item.mark)).not.toContain('left')
+		expect(job({ kind: 'install', state: 'succeeded', step: 'done' }, { status: stopped }).steps.map(item => item.mark)).not.toContain('left')
+	})
+})
+
 describe('the failure of a call that updates', () => {
 	it.each(UPDATE_REFUSALS)('says the refusal %s of the update in its sentence and lists the checks that failed', (code) => {
 		const checks = [{ code: 'installed', ok: false, detail: 'x' }, { code: 'catalogue', ok: true, detail: '' }, { code: 'newer', ok: false, detail: 'not_checked' }]
-		const failure = moduleFailure(refusal(code, { checks }))
-		expect(failure.message.key).toBe(REASONS[code])
+		const failure = moduleFailure(refusal(code, { checks }), 'en_us', { mode: 'update' })
+		expect(failure.message.key).toBe(reasonMessage(code, { kind: 'update' }).key)
 		expect(failure.items.map(item => item.code)).toEqual(['installed'])
-		expect(failure.items[0].message.key).toBe(REASONS[['manifest_invalid', 'files_unreadable', 'files_unverified'].includes(code) ? code : 'not_installed'])
+		expect(failure.items[0].message.key).toBe(reasonMessage(['manifest_invalid', 'files_unreadable', 'files_unverified'].includes(code) ? code : 'not_installed', { kind: 'update' }).key)
 	})
 })
 
