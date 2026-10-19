@@ -254,6 +254,8 @@ export const REASONS = {
 	recasaos: 'This release of ReCasaOS is too old for the module. Update ReCasaOS first.',
 	already_installed: 'The module is already installed.',
 	foreign_unit: 'A service file with the name of the module is already on this machine and is not the module\'s. Move it away first.',
+	dpkg_state: 'The package manager could not be asked whether an install was left half done. Try again.',
+	dpkg_broken: 'The package manager was left half done by an earlier install, and ReCasaOS could not finish it. Run dpkg --configure -a at a console, then try again.',
 	disk_short: 'There is not enough room on the disk for the module.',
 	disk_unknown: 'The room left on the disk could not be read.',
 	apt_missing: 'apt-get is not on this machine, so the packages cannot be installed.',
@@ -316,6 +318,7 @@ export const CHECKS = {
 	already_installed: 'Not installed yet',
 	foreign_unit: 'No service file in the way',
 	busy: 'Nothing else at work',
+	dpkg_state: 'Package manager in good order',
 	disk: 'Room on the disk',
 	apt: 'Packages that apt can install',
 }
