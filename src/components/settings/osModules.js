@@ -25,19 +25,23 @@
  *     listView(raw) -> { ok, error, modules } | null          null for what is not a list. `ok` is the catalogue's; when it is not, no module can be
  *                                                              installed (the ones that are installed can still be removed)
  *       module: { name, title, description, tier: { id, label, sentence, raw } | null, tag, installed: { version } | null, supported,
- *                 reasons: [{ code, message }], broken, inCatalogue, canInstall, canRemove }
+ *                 reasons: [{ code, message }], broken, inCatalogue, update: { installed, latest } | null, canInstall, canUpdate, canRemove }
+ *       `update` is there only when the core says an update is available AND the two tags say it too (the latest is strictly later than the
+ *       installed one, which is the version the list shows).
  *   The plan
- *     modulePlanView(raw, { name, locale }) -> plan | null      null for what is not the plan of that module
- *       plan: { name, tag, tier, refused, refusedMessage, unhold: { command } | null, checks: [{ code, label, ok, notChecked, mark, markText, message,
+ *     modulePlanView(raw, { name, locale, mode }) -> plan | null   null for what is not the plan of that module in that mode ('install', or 'update':
+ *                                                              a plan of the other mode is never taken for this one)
+ *       plan: { name, mode, update: { installed, latest, added, dropped, moreAdded, moreDropped } | null, tag, tier, refused, refusedMessage, unhold: { command } | null, checks: [{ code, label, ok, notChecked, mark, markText, message,
  *               detail, detailMessage }], incomplete, noList, noId, packages: { listed, install, upgrade, moreInstall, moreUpgrade, known, downloadText,
  *               extraText }, archive: { url, bytesText }, planId, installable }
- *     installBody(plan) -> { plan_id } | null                   the body of the install call: the displayed plan's id, and nothing if it cannot install
+ *     installBody(plan) -> { plan_id } | { plan_id, mode: 'update' } | null   the body of the install call: the displayed plan's id (and the mode of an
+ *                                                              update), and nothing if it cannot install
  *   The job
  *     jobView(raw, { name, title, kind, locale }) -> job | null
  *       job: { name, state, stateText, stateClass, known, running, finished, dismissible, step, rollback, kind, title, group, tone, progress: { value,
  *              max, label } | null, steps: [{ id, text, mark, markText, icon }], rollbackStep, stoppedAt, live, reason, code, undoText, kept: { known,
  *              names, count, command, unsafe } | null, next, advice: { command } | null, logTail, startedAt, startedAtRaw, endedAt, changeKey }
- *       The core says whether the job is an install or a remove (`job.kind`, empty when it cannot tell). Only when it does not, `kind` is told
+ *       The core says whether the job is an install, a remove or an update (`job.kind`, empty when it cannot tell). Only when it does not, `kind` is told
  *       from the step, then from what the page remembers of its call. A job whose kind is still not known says neither.
  *     jobAnnouncement(previous, next) -> message | null         one per change of the job, none per poll
  *   Polling
@@ -186,6 +190,27 @@ export const TEXT = {
 		startingLabel: 'Starting the removal',
 		ok: 'Remove the module',
 	},
+	update: {
+		title: 'Update {module}',
+		badge: 'Version {latest} available',
+		planning: 'ReCasaOS is working out what the update would do. This can take up to a minute, and nothing is changed.',
+		planningLabel: 'Making the plan',
+		ready: 'The plan for the update of {module} is ready. Read it, then confirm.',
+		intro: 'This is what the update does. Read it, then confirm.',
+		starting: 'ReCasaOS is making the plan again and starting the update. This can take up to two minutes. Do not switch the machine off.',
+		startingLabel: 'Starting the update',
+		added: 'Packages that the update adds',
+		addedNone: 'The update adds no package.',
+		dropped: 'Packages that the new version no longer names',
+		droppedNote: 'They stay on the machine: ReCasaOS never removes a package.',
+		consequences: 'What the update does to the machine',
+		stops: 'The service of the module stops for a moment, then starts again.',
+		machines: 'This page does not touch the machines that the module runs, but the service that manages them is stopped for a moment: check that this is a good time.',
+		config: 'The configuration that you set for the module, and its data, are kept.',
+		back: 'If something fails, the old version is put back.',
+		keepOn: 'Do not switch the machine off while it runs.',
+		ok: 'Update the module',
+	},
 	marks: { passed: 'Passed', failed: 'Failed', notChecked: 'Not checked' },
 	outage: {
 		unreadable: 'The state of the job could not be read just now. This page tries again by itself.',
@@ -204,6 +229,8 @@ export const TEXT = {
 		progressInstall: 'Progress of the install: step {index} of {total}',
 		progressRemove: 'Progress of the removal: step {index} of {total}',
 		progressRollback: 'Progress of the undo: step {index} of {total}',
+		progressUpdate: 'Progress of the update: step {index} of {total}',
+		putBack: 'Putting the old version back.',
 		stoppedAt: 'It stopped at: {step}',
 		unknownState: 'This page does not know the state of this job.',
 		advice: 'Run this command as root at a console of the machine. It finishes the cleaning. Then try again.',
@@ -244,7 +271,7 @@ export const REASONS = {
 	busy: 'Something else is at work on this machine, such as an upgrade of the operating system, a package update or another module job. Wait for it to end, then try again.',
 	plan_changed: 'The plan changed after you read it. Read the new plan, then confirm again.',
 	plan_timeout: 'The plan took too long to make. Try again in a moment.',
-	not_installed: 'Nothing of this module is installed, so there is nothing to remove.',
+	not_installed: 'Nothing of this module is installed, so there is nothing to remove or to update.',
 	start_failed: { text: 'ReCasaOS could not start the job. Nothing was changed.', steps: { start: 'The service of the module would not start.' } },
 	internal: 'The request could not be carried out.',
 	// the checks of the plan, and the refusals of its disk and apt checks (pkg/osmodule/plan.go)
@@ -269,7 +296,15 @@ export const REASONS = {
 	declined: 'The job was declined.',
 	log_unwritable: 'The log of the job could not be written. Nothing was changed.',
 	lock_failed: 'ReCasaOS could not take the lock that keeps two jobs from running at once.',
-	files_unreadable: 'A file that records an earlier install cannot be read. Look at it at a console, delete it by hand, then try again.',
+	files_unreadable: 'A file that records an earlier install cannot be read, or a file that it lists is missing. Look at it at a console, delete the record by hand, then try again.',
+	files_unverified: 'The record of this module is of an older kind, so ReCasaOS cannot check its files. Remove the module, then install it again.',
+	up_to_date: 'The module is already at the version that this release offers.',
+	downgrade: 'The installed version is later than the one this release offers, and ReCasaOS never takes a module back to an earlier version.',
+	version_unknown: 'ReCasaOS cannot read the installed version of this module. Remove the module, then install it again.',
+	unit_changed: 'The new version names another service than the one that is installed, so ReCasaOS does not update it in place.',
+	backup_failed: 'ReCasaOS could not make a copy of the files that the update replaces.',
+	swap_failed: 'The files of the new version could not be put in place.',
+	recovery_incomplete: 'ReCasaOS could not finish putting back the version that an earlier update replaced.',
 	state_unsafe: 'The folder where ReCasaOS keeps the state of the modules is not safe to use. Look at it at a console.',
 	tmp_unusable: 'The folder where the module is downloaded cannot be used.',
 	packages_failed: 'apt could not install the packages. The log below says why.',
@@ -282,7 +317,7 @@ export const REASONS = {
 	unpack_limits: 'The archive of the module is larger than a module may be.',
 	unpack_corrupt: 'The archive of the module is damaged.',
 	units_failed: 'systemd could not reload its list of services.',
-	manifest_invalid: 'The description of the module in its archive is not valid.',
+	manifest_invalid: 'The description of the module, in its archive or on this machine, is not valid.',
 	manifest_mismatch: 'The description of the module in its archive is not the one that this release of ReCasaOS expects.',
 	manifest_write_failed: 'The record of the module could not be written.',
 	route_timeout: 'The service of the module started, but it did not answer on the gateway of the dashboard in time.',
@@ -316,6 +351,8 @@ export const CHECKS = {
 	arch: 'Processor',
 	recasaos: 'Release of ReCasaOS',
 	already_installed: 'Not installed yet',
+	installed: 'Installed, and its files can be checked',
+	newer: 'A later version is offered',
 	foreign_unit: 'No service file in the way',
 	busy: 'Nothing else at work',
 	dpkg_state: 'Package manager in good order',
@@ -324,7 +361,13 @@ export const CHECKS = {
 }
 export const CHECK_UNKNOWN = 'A check that this page does not know: {code}'
 // the refusals that come from a check that says more than its own code
-const CHECK_REFUSALS = { disk: ['disk_short', 'disk_unknown'], apt: ['apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact'] }
+const CHECK_REFUSALS = {
+	installed: ['not_installed', 'manifest_invalid', 'files_unverified', 'files_unreadable'],
+	newer: ['up_to_date', 'downgrade', 'version_unknown'],
+	foreign_unit: ['foreign_unit', 'unit_changed'],
+	disk: ['disk_short', 'disk_unknown'],
+	apt: ['apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact'],
+}
 
 // why a check that failed failed, from the code of the check and of the refusal of the plan
 function checkFailure(code, refused) {
@@ -408,6 +451,29 @@ function holdOf(checks, refused) {
 const MAX_MODULES = 64
 const MAX_REASONS = 8
 
+// A tag is later than another when its numbers are, one by one: v0.1.10 is later than v0.1.9.
+function later(a, b) {
+	if (!TAG.test(a) || !TAG.test(b))
+		return false
+	const x = a.slice(1).split('.').map(Number)
+	const y = b.slice(1).split('.').map(Number)
+	for (let i = 0; i < 3; i++) {
+		if (x[i] !== y[i])
+			return x[i] > y[i]
+	}
+	return false
+}
+
+// The update the list offers: the core says it is available, and the page says it again from the tags (the latest strictly later than the installed
+// version that the card shows), or it offers nothing.
+function updateOf(raw, installed) {
+	if (!isPlain(raw) || raw.available !== true || !installed || !installed.version)
+		return null
+	if (raw.installed !== installed.version || !later(raw.latest, raw.installed))
+		return null
+	return { installed: raw.installed, latest: raw.latest }
+}
+
 function moduleView(raw, catalogueOk) {
 	if (!isPlain(raw) || typeof raw.name !== 'string' || !MODULE_NAME.test(raw.name))
 		return null
@@ -420,6 +486,7 @@ function moduleView(raw, catalogueOk) {
 	const installed = isPlain(raw.installed) ? { version: typeof raw.installed.version === 'string' && TAG.test(raw.installed.version) ? raw.installed.version : '' } : null
 	const broken = raw.broken ? (typeof raw.broken === 'string' ? clean(raw.broken, 40) : '') || 'unknown' : ''
 	const inCatalogue = raw.catalogue !== false
+	const update = updateOf(raw.update, installed)
 	return {
 		name: raw.name,
 		title: clean(raw.title, 80) || raw.name,
@@ -431,7 +498,9 @@ function moduleView(raw, catalogueOk) {
 		reasons,
 		broken,
 		inCatalogue,
+		update,
 		canInstall: catalogueOk && inCatalogue && supported && !installed && !broken,
+		canUpdate: Boolean(update) && catalogueOk && inCatalogue && !broken,
 		canRemove: Boolean(installed) || Boolean(broken),
 	}
 }
@@ -465,14 +534,28 @@ function packageNames(value) {
 	return { names: names.slice(0, MAX_PACKAGES), more: Math.max(0, names.length - MAX_PACKAGES) }
 }
 
+// What an update changes, from the plan of one: the two tags (the latest strictly later, and the plan's own tag), and the packages it adds and no longer names.
+function updateView(raw, tag) {
+	if (!isPlain(raw) || !later(raw.latest, raw.installed) || raw.latest !== tag)
+		return null
+	const added = packageNames(raw.added)
+	const dropped = packageNames(raw.dropped)
+	return { installed: raw.installed, latest: raw.latest, added: added.names, moreAdded: added.more, dropped: dropped.names, moreDropped: dropped.more }
+}
+
 /**
- * The plan of an install, as the core answers it (a refused plan is a plan too). null for something that is not the plan of that module. It can
- * install only when it is not refused, every check passed, it lists the packages that apt installs and its id is the shape of the core's: anything
- * else shows its reasons and no button.
+ * The plan of an install or of an update, as the core answers it (a refused plan is a plan too). null for something that is not the plan of that module
+ * in that mode. It can install only when it is not refused, every check passed, it lists the packages that apt installs, its id is the shape of the core's
+ * and (for an update) it says what changes: anything else shows its reasons and no button.
  */
-export function modulePlanView(raw, { name = '', locale = 'en_us' } = {}) {
+export function modulePlanView(raw, { name = '', locale = 'en_us', mode = 'install' } = {}) {
 	if (!isPlain(raw) || raw.name !== name)
 		return null
+	// only the plan of an update says its mode: a plan of the other mode is not this one, whatever its id
+	if ((raw.mode === 'update' ? 'update' : 'install') !== mode)
+		return null
+	const tag = typeof raw.tag === 'string' && TAG.test(raw.tag) ? raw.tag : ''
+	const update = mode === 'update' ? updateView(raw.update, tag) : null
 	const refused = raw.refused === null || raw.refused === undefined || raw.refused === '' ? '' : (typeof raw.refused === 'string' ? clean(raw.refused, 60) : '') || 'unknown'
 	const checks = list(raw.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, refused, locale)).sort((a, b) => MARK_ORDER[a.mark] - MARK_ORDER[b.mark])
 	const apt = isPlain(raw.packages) ? raw.packages : {}
@@ -482,12 +565,14 @@ export function modulePlanView(raw, { name = '', locale = 'en_us' } = {}) {
 	const planId = typeof raw.plan_id === 'string' && PLAN_ID.test(raw.plan_id) ? raw.plan_id : ''
 	const known = apt.known === true
 	// a plan that does not list the packages says nothing of what apt installs: "apt installs no package" is a thing it must say, and not a thing it may leave out
-	const listed = Array.isArray(apt.to_install)
+	const listed = Array.isArray(apt.to_install) && (mode !== 'update' || Boolean(update))
 	// a plan that did not check everything is not one to confirm (the core checks again when it is asked to install)
 	const incomplete = !refused && (checks.length === 0 || checks.some(check => !check.ok))
 	return {
 		name,
-		tag: typeof raw.tag === 'string' && TAG.test(raw.tag) ? raw.tag : '',
+		mode,
+		update,
+		tag,
 		tier: tierOf(raw.tier),
 		refused,
 		refusedMessage: refused ? refusalMessage(refused, checks) : null,
@@ -512,9 +597,11 @@ export function modulePlanView(raw, { name = '', locale = 'en_us' } = {}) {
 	}
 }
 
-/** The body of the install call, from the plan that is on the screen: its own id and nothing else; null when that plan cannot install. */
+/** The body of the install call, from the plan that is on the screen: its own id, with the mode when it is an update's, and nothing else; null when that plan cannot install. */
 export function installBody(plan) {
-	return isPlain(plan) && plan.installable === true && typeof plan.planId === 'string' && PLAN_ID.test(plan.planId) ? { plan_id: plan.planId } : null
+	if (!isPlain(plan) || plan.installable !== true || typeof plan.planId !== 'string' || !PLAN_ID.test(plan.planId))
+		return null
+	return plan.mode === 'update' ? { plan_id: plan.planId, mode: 'update' } : { plan_id: plan.planId }
 }
 
 // ---- the job ------------------------------------------------------------------------------------------------------------
@@ -523,8 +610,12 @@ export function installBody(plan) {
 export const STEPS = {
 	install: ['packages', 'download', 'verify', 'unpack', 'units', 'manifest', 'start', 'route'],
 	remove: ['stop', 'files', 'manifest', 'reload'],
+	update: ['packages', 'download', 'verify', 'unpack', 'backup', 'stop', 'swap', 'units', 'start', 'route'],
 }
 export const ROLLBACK = 'rollback_'
+// the steps of an update that is put back (pkg/modulecmd): rollback_restore, rollback_units and rollback_start when it failed, and recover_* when a run
+// finds the copy of an update that was cut short. The page says them all in one sentence and lists no step for them.
+const PUT_BACK = /^(?:rollback_(?:restore|units|start)|recover_[a-z_]+)$/
 export const STEP_TEXTS = {
 	install: {
 		packages: 'Install the packages that the module needs',
@@ -542,6 +633,19 @@ export const STEP_TEXTS = {
 		manifest: 'Forget the module',
 		reload: 'Tell systemd that the service is gone',
 	},
+	update: {
+		packages: 'Install the packages that the new version adds',
+		download: 'Download the new version',
+		verify: 'Check the download',
+		unpack: 'Unpack the new version and check it',
+		backup: 'Keep a copy of the files that the update replaces',
+		stop: 'Stop the service of the module',
+		swap: 'Put the new files in place',
+		units: 'Tell systemd about the service of the module',
+		start: 'Start the service of the module',
+		route: 'Wait for the service to answer',
+		putBack: 'Put the old version back',
+	},
 	// a step of a job whose kind is not known, and the end of every job
 	any: {
 		manifest: 'Update the record of the module',
@@ -553,27 +657,32 @@ export const STEP_UNKNOWN = 'A step that this page does not know: {code}'
 // the steps that say which kind of job it is; manifest and done are in both
 const INSTALL_ONLY = new Set(['packages', 'download', 'verify', 'unpack', 'units', 'start', 'route'])
 const REMOVE_ONLY = new Set(['stop', 'files', 'reload'])
+const UPDATE_ONLY = new Set(['backup', 'swap'])
 // the steps before the files of the module are written (the unpack is the first that writes): a job cut short or stopped there has put nothing of the module on the machine
 const BEFORE_FILES = new Set(['', 'packages', 'download', 'verify'])
 
 function stepMessage(kind, step) {
+	if (PUT_BACK.test(step))
+		return msg(STEP_TEXTS.update.putBack)
 	const text = own(STEP_TEXTS[kind] ?? {}, step) ?? own(STEP_TEXTS.any, step)
 	return text ? msg(text) : msg(STEP_UNKNOWN, { code: step || '?' })
 }
 
 /**
- * The kind of a job, install or remove. The core says it (`job.kind`); a job that it cannot tell (one started by hand, a log with no queued line)
+ * The kind of a job, install, remove or update. The core says it (`job.kind`); a job that it cannot tell (one started by hand, a log with no queued line)
  * is told from the step where the step says it (the steps of a rollback are an install's), then from what the page remembers of the call it made,
  * then, for a job that ended at done, from whether the module is installed. '' when it cannot be told: the page then says neither.
  */
 function kindOf(declared, step, remembered, installed, finishedAtDone) {
-	if (declared === 'install' || declared === 'remove')
+	if (declared === 'install' || declared === 'remove' || declared === 'update')
 		return declared
+	if (UPDATE_ONLY.has(step) || /^rollback_(?:restore|units|start)$/.test(step))
+		return 'update'
 	if (INSTALL_ONLY.has(step) || step.startsWith(ROLLBACK))
 		return 'install'
 	if (REMOVE_ONLY.has(step))
 		return 'remove'
-	if (remembered === 'install' || remembered === 'remove')
+	if (remembered === 'install' || remembered === 'remove' || remembered === 'update')
 		return remembered
 	if (finishedAtDone && typeof installed === 'boolean')
 		return installed ? 'install' : 'remove'
@@ -593,15 +702,16 @@ export const JOB_STATE_UNKNOWN = { group: 'Unknown state', tone: 'is-warning' }
 
 export const JOB_TITLES = {
 	idle: { any: 'No job ran on {module}.' },
-	running: { install: 'Installing {module}', remove: 'Removing {module}', rollback: 'Undoing the install of {module}', any: 'A job is running on {module}' },
-	succeeded: { install: 'The install of {module} is done.', remove: 'The removal of {module} is done.', any: 'The job on {module} is done.' },
+	running: { install: 'Installing {module}', remove: 'Removing {module}', update: 'Updating {module}', rollback: 'Undoing the install of {module}', putBack: 'Putting the old version of {module} back', any: 'A job is running on {module}' },
+	succeeded: { install: 'The install of {module} is done.', remove: 'The removal of {module} is done.', update: 'The update of {module} is done.', updateTo: 'The update of {module} to {tag} is done.', any: 'The job on {module} is done.' },
 	refused: { any: 'The job on {module} was refused. Nothing was changed.' },
-	failed: { install: 'The install of {module} stopped.', remove: 'The removal of {module} stopped.', any: 'The job on {module} stopped.' },
+	failed: { install: 'The install of {module} stopped.', remove: 'The removal of {module} stopped.', update: 'The update of {module} stopped.', any: 'The job on {module} stopped.' },
 	interrupted: { any: 'The job on {module} was cut short.' },
 }
 export const JOB_LIVE = {
 	step: '{module}: step {index} of {total}, {step}.',
 	rollback: '{module}: undoing the install, {step}.',
+	putBack: '{module}: putting the old version back.',
 }
 // what to say after a job that ended: what became of what it had done, and what to do
 export const JOB_NEXT = {
@@ -617,12 +727,25 @@ export const JOB_NEXT = {
 	cutRollback: 'The install failed and the undo was cut short: some files of the module may still be on the machine.',
 	cutRemove: 'The removal was cut short: some files of the module may still be on the machine.',
 	cutUnknown: 'The job was cut short: some files of the module may be on the machine.',
+	succeededUpdate: 'The module runs the new version. Its configuration and its data were kept.',
+	updateBack: 'The old version of the module is back: the module is as it was before the update.',
+	updateKept: 'Putting the old version back did not finish. A copy of it is kept on the machine, in /var/lib/casaos/modules/tmp/backup-{module}. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else. If that fails again, look at the log below at a console of the machine.',
+	updateUnknown: 'ReCasaOS cannot tell whether the old version was put back. Press Update or Remove again: ReCasaOS looks at it first.',
+	updateCut: 'The update was cut short, for instance by a restart of the machine. Press Update or Remove again: ReCasaOS puts the old version back before it does anything else.',
 }
 
 // What a job that failed or was cut short says of what it had done, and whether the console finishes the work. The console is for what the page
 // cannot finish: an undo that did not end, a removal that stopped, a job whose kind is not known (it may be a removal), and a job that was cut short
 // after it began to write.
-function endingOf({ state, kind, step, undo }) {
+function endingOf({ state, kind, step, undo, module }) {
+	// an update either put the old version back or did not: the console is for the copy that is kept, and the sentence says what to do
+	if (kind === 'update' && (state === 'failed' || (state === 'interrupted' && step))) {
+		if (state === 'interrupted')
+			return { undoMessage: JOB_NEXT.updateCut, advice: false }
+		if (undo === 'rolled_back')
+			return { undoMessage: JOB_NEXT.updateBack, advice: false }
+		return undo ? { undoMessage: JOB_NEXT.updateKept, params: { module }, advice: false } : { undoMessage: JOB_NEXT.updateUnknown, advice: false }
+	}
 	if (state === 'failed') {
 		if (kind !== 'install')
 			return { undoMessage: null, advice: true }
@@ -687,6 +810,8 @@ const MAX_KEPT = 40
 // succeeded.
 function keptOf(raw, kind, state) {
 	const install = kind === 'install'
+	if (kind === 'update')
+		return null
 	if (!((state === 'failed' && kind !== 'remove') || (state === 'succeeded' && kind === 'remove')))
 		return null
 	if (!Array.isArray(raw))
@@ -707,6 +832,7 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	if (!job || job.name !== name || typeof job.state !== 'string')
 		return null
 	const status = isPlain(raw.status) ? raw.status : {}
+	const version = typeof status.version === 'string' && TAG.test(status.version) ? status.version : ''
 	const state = job.state
 	const known = Boolean(own(JOB_STATES, state))
 	// a state that is not the core's is shown as text, cleaned and cut
@@ -717,7 +843,8 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const undo = job.undo === 'rolled_back' || job.undo === 'rollback_incomplete' ? job.undo : (typeof job.undo === 'string' && job.undo ? 'rollback_incomplete' : '')
 	const running = state === 'running'
 	const finished = state === 'succeeded' || state === 'refused' || state === 'failed' || state === 'interrupted'
-	const rollback = step.startsWith(ROLLBACK)
+	const putBack = PUT_BACK.test(step)
+	const rollback = step.startsWith(ROLLBACK) && !putBack
 	const module = clean(title, 80) || name
 	const jobKind = kindOf(job.kind, step, kind, status.installed, finished && step === 'done')
 	const group = known ? JOB_STATES[state] : JOB_STATE_UNKNOWN
@@ -725,13 +852,20 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	// the steps of a rollback are those of a remove
 	const listKind = rollback ? 'remove' : jobKind
 	const listStep = rollback ? step.slice(ROLLBACK.length) : step
-	const stepList = stepsOf(listKind, state, listStep)
-	const at = own(STEPS, listKind)?.indexOf(listStep) ?? -1
+	const stepList = putBack ? [] : stepsOf(listKind, state, listStep)
+	const at = putBack ? -1 : own(STEPS, listKind)?.indexOf(listStep) ?? -1
 	const total = own(STEPS, listKind)?.length ?? 0
 	const stepText = stepMessage(listKind, listStep)
-	const titleMessage = msg((running && rollback ? titles.rollback : undefined) ?? titles[jobKind] ?? titles.any, { module })
+	// the title of an update that is being put back, of an install that is being undone, and of an update that is done to a version the status gives
+	const titleKey = (running && putBack && jobKind === 'update' ? titles.putBack : undefined)
+		?? (running && rollback ? titles.rollback : undefined)
+		?? (state === 'succeeded' && jobKind === 'update' && version ? titles.updateTo : undefined)
+		?? titles[jobKind] ?? titles.any
+	const titleMessage = msg(titleKey, titleKey === titles.updateTo ? { module, tag: version } : { module })
 	let live = titleMessage
-	if (running && rollback)
+	if (running && putBack)
+		live = msg(JOB_LIVE.putBack, { module })
+	else if (running && rollback)
 		live = msg(JOB_LIVE.rollback, { module, step: stepText.key }, ['step'])
 	else if (running && at >= 0)
 		live = msg(JOB_LIVE.step, { module, index: String(at + 1), total: String(total), step: stepText.key }, ['step'])
@@ -739,11 +873,11 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 	const cutShort = state === 'interrupted'
 	// a job that was refused or stopped says why
 	const ended = failed || state === 'refused'
-	const ending = endingOf({ state, kind: jobKind, step, undo })
+	const ending = endingOf({ state, kind: jobKind, step, undo, module: name })
 	let next = null
 	if (state === 'succeeded')
-		next = jobKind === 'install' ? msg(JOB_NEXT.succeededInstall) : jobKind === 'remove' ? msg(JOB_NEXT.succeededRemove) : null
-	const progressLabel = rollback ? TEXT.job.progressRollback : jobKind === 'install' ? TEXT.job.progressInstall : TEXT.job.progressRemove
+		next = jobKind === 'install' ? msg(JOB_NEXT.succeededInstall) : jobKind === 'remove' ? msg(JOB_NEXT.succeededRemove) : jobKind === 'update' ? msg(JOB_NEXT.succeededUpdate) : null
+	const progressLabel = rollback ? TEXT.job.progressRollback : jobKind === 'install' ? TEXT.job.progressInstall : jobKind === 'update' ? TEXT.job.progressUpdate : TEXT.job.progressRemove
 	return {
 		name,
 		state: stateText,
@@ -756,19 +890,19 @@ export function jobView(raw, { name = '', title = '', kind = '', locale = 'en_us
 		// a report of a job that stopped is read once, and then put away until another job begins
 		dismissible: failed || cutShort,
 		step,
-		rollback,
+		rollback: rollback || putBack,
 		kind: jobKind,
 		title: titleMessage,
 		group: group.group,
 		tone: group.tone,
 		progress: running && at >= 0 ? { value: at, max: total, label: msg(progressLabel, { index: String(at + 1), total: String(total) }) } : null,
 		steps: stepList,
-		rollbackStep: running && rollback ? msg(TEXT.job.rollback, { step: stepText.key }, ['step']) : null,
+		rollbackStep: running && putBack ? msg(TEXT.job.putBack) : running && rollback ? msg(TEXT.job.rollback, { step: stepText.key }, ['step']) : null,
 		stoppedAt: (failed || cutShort) && step ? msg(TEXT.job.stoppedAt, { step: stepText.key }, ['step']) : null,
 		live,
 		reason: ended && code ? reasonMessage(code, { step }) : (ended && codeText ? msg(REASON_UNKNOWN, { code: codeText }) : null),
 		code: ended ? codeText : '',
-		undoText: ending.undoMessage ? msg(ending.undoMessage) : null,
+		undoText: ending.undoMessage ? msg(ending.undoMessage, ending.params ?? {}) : null,
 		kept: keptOf(job.kept_packages, jobKind, state),
 		next,
 		advice: ending.advice && MODULE_NAME.test(name) ? { command: `casaos module remove ${name}` } : null,
