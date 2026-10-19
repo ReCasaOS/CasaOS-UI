@@ -42,11 +42,11 @@ const REMOVE_STEPS = ['stop', 'files', 'manifest', 'reload', 'done']
 // pkg/modulecmd/jobstate.go Job*
 const JOB_STATE_NAMES = ['idle', 'running', 'succeeded', 'refused', 'failed', 'interrupted']
 // pkg/osmodule/plan.go Check*, in the order the plan lists them
-const CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'disk', 'apt']
+const CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
 // pkg/osmodule/plan.go: the code a plan is refused with (the code of the check, but for the disk and apt checks, which say more)
-const PLAN_REFUSALS = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
+const PLAN_REFUSALS = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
 // pkg/modulecmd/install.go Code*
-const RUN_CODES = ['not_root', 'busy', 'plan_changed', 'confirmation_needed', 'declined', 'not_installed', 'log_unwritable', 'lock_failed', 'files_unreadable', 'packages_failed', 'held_package', 'download_failed', 'download_too_large', 'checksum_mismatch', 'unpack_failed', 'units_failed', 'manifest_invalid', 'manifest_mismatch', 'manifest_write_failed', 'start_failed', 'route_timeout', 'interrupted', 'unit_not_stopped', 'remove_incomplete', 'tmp_unusable', 'state_unsafe', 'internal_error']
+const RUN_CODES = ['not_root', 'busy', 'plan_changed', 'confirmation_needed', 'declined', 'not_installed', 'log_unwritable', 'lock_failed', 'files_unreadable', 'packages_failed', 'dpkg_broken', 'held_package', 'download_failed', 'download_too_large', 'checksum_mismatch', 'unpack_failed', 'units_failed', 'manifest_invalid', 'manifest_mismatch', 'manifest_write_failed', 'start_failed', 'route_timeout', 'interrupted', 'unit_not_stopped', 'remove_incomplete', 'tmp_unusable', 'state_unsafe', 'internal_error']
 // pkg/osmodule/unpack.go: Unpack*, FileExists
 const UNPACK_CODES = ['unpack_path', 'file_exists', 'unpack_limits', 'unpack_corrupt']
 // service/system_module.go Module*, and route/v1/system_module.go (a failure that no refusal covers)
