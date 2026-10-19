@@ -276,6 +276,31 @@ describe('modules client', () => {
 		expect(sent().timeout).toBe(130000)
 	})
 
+	it('asks for the plan of an update with its mode and nothing else', async () => {
+		await sys.planModule('virt', undefined, 'update')
+		expect(sent().url).toBe('/v1/sys/modules/virt/plan')
+		expect(JSON.parse(sent().data)).toEqual({ mode: 'update' })
+		expect(sent().timeout).toBe(70000)
+	})
+
+	// the core refuses a mode it does not know: only the one the page uses goes
+	it.each([undefined, 'install', '', 'remove', 'UPDATE', 5, {}])('asks for the plan of an install, with no mode, for the mode %j', async (mode) => {
+		await sys.planModule('virt', undefined, mode)
+		expect(sent().data).toBe('{}')
+	})
+
+	it('installs an update with the plan id and its mode, and nothing else', async () => {
+		await sys.installModule('virt', { plan_id: PLAN, mode: 'update', name: 'other', rehearsal: true })
+		expect(sent().url).toBe('/v1/sys/modules/virt/install')
+		expect(JSON.parse(sent().data)).toEqual({ plan_id: PLAN, mode: 'update' })
+		expect(sent().timeout).toBe(130000)
+	})
+
+	it.each(['install', '', 'remove', 'UPDATE', 5, undefined])('installs with the plan id alone for the mode %j', async (mode) => {
+		await sys.installModule('virt', { plan_id: PLAN, mode })
+		expect(JSON.parse(sent().data)).toEqual({ plan_id: PLAN })
+	})
+
 	it('installs with no plan id as an empty object, which the core refuses by name, and not with a made-up one', async () => {
 		await sys.installModule('virt')
 		expect(sent().data).toBe('{}')

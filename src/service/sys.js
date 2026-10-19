@@ -247,16 +247,21 @@ const sys = {
 		return instance.get(`/v1${PREFIX}/modules`, { timeout: 35000 })
 	},
 
-	// The plan of an install, with the machine unchanged: always 200, with `refused` set when it cannot go ahead. The core makes it for up to a
-	// minute (a simulation of apt), so the call waits a little longer; `signal` lets the person cancel the wait.
-	planModule(name, signal) {
-		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/plan`, {}, { timeout: 70000, signal })
+	// The plan of an install (or, with `mode` 'update', of the update of a module that is installed), with the machine unchanged: always 200, with
+	// `refused` set when it cannot go ahead. The core makes it for up to a minute (a simulation of apt), so the call waits a little longer; `signal`
+	// lets the person cancel the wait. Only 'update' is a mode to send: the plan of an install has no body.
+	planModule(name, signal, mode) {
+		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/plan`, mode === 'update' ? { mode } : {}, { timeout: 70000, signal })
 	},
 
-	// Installs the module for the plan that the person read: data is { plan_id }, and nothing else is sent. 202 with { job, status }, or 409 with
-	// plan_changed when the plan is no longer the one that was read. The core makes the plan again before it starts, which can take a minute.
+	// Installs the module for the plan that the person read: data is { plan_id }, and { plan_id, mode: 'update' } for the update of a module that is
+	// installed; nothing else is sent. 202 with { job, status }, or 409 with plan_changed when the plan is no longer the one that was read. The core
+	// makes the plan again before it starts, which can take a minute.
 	installModule(name, data) {
-		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/install`, { plan_id: data?.plan_id }, { timeout: 130000 })
+		const body = { plan_id: data?.plan_id }
+		if (data?.mode === 'update')
+			body.mode = 'update'
+		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/install`, body, { timeout: 130000 })
 	},
 
 	// Removes the module: its service and the files it put down. Never its packages or its data. 202 with { job, status }.

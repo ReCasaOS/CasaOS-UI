@@ -113,6 +113,10 @@
 							<li v-else-if="card.module.tag" class="modules-offered">
 								{{ fact(TEXT.offered, card.module.tag) }}
 							</li>
+							<!-- a later version is offered: a word on a tag, beside the installed version above -->
+							<li v-if="card.module.canUpdate" class="modules-update">
+								<span class="modules-update-badge tag is-info is-light">{{ $t(TEXT.update.badge, { latest: card.module.update.latest }) }}</span>
+							</li>
 							<li v-if="card.module.broken" class="modules-broken">
 								{{ $t(TEXT.broken) }}
 								<code class="is-size-7">{{ card.module.broken }}</code>
@@ -176,6 +180,18 @@
 							<p v-if="card.job.undoText" class="modules-undo mt-1">
 								{{ say(card.job.undoText) }}
 							</p>
+							<template v-if="card.job.folder">
+								<p class="modules-folder-label is-size-7 mt-1">
+									{{ $t(TEXT.job.folder) }}
+								</p>
+								<os-upgrade-copyable class="modules-folder mt-1" :text="card.job.folder" />
+							</template>
+							<template v-if="card.job.leftFiles.length">
+								<p class="modules-left-label is-size-7 mt-1">
+									{{ $t(TEXT.job.leftFiles) }}
+								</p>
+								<os-upgrade-copyable block class="modules-left mt-1" :label="$t(TEXT.job.leftFiles)" :text="card.job.leftFiles.join('\n')" />
+							</template>
 
 							<div v-if="card.job.kept" class="modules-kept mt-2">
 								<p v-if="card.job.kept.known && card.job.kept.count" class="modules-kept-some">
@@ -231,13 +247,19 @@
 							</div>
 						</b-message>
 
-						<div v-if="card.module.canInstall || card.module.canRemove" class="modules-buttons is-flex is-flex-wrap-wrap mt-3">
+						<div v-if="card.module.canInstall || card.module.canUpdate || card.module.canRemove" class="modules-buttons is-flex is-flex-wrap-wrap mt-3">
 							<b-button v-if="card.module.canInstall"
 								class="modules-install"
 								:disabled="disabled"
 								:label="$t('Install')"
 								rounded
 								@click="pressInstall(card.module, $event)" />
+							<b-button v-if="card.module.canUpdate"
+								class="modules-update-button"
+								:disabled="disabled"
+								:label="$t('Update')"
+								rounded
+								@click="pressUpdate(card.module, $event)" />
 							<b-button v-if="card.module.canRemove"
 								class="modules-remove"
 								:disabled="disabled"
@@ -271,15 +293,15 @@
 					</header>
 					<section class="modal-card-body">
 						<!-- the plan is being made -->
-						<template v-if="dialog.kind === 'install' && dialog.phase === 'planning'">
+						<template v-if="dialog.kind !== 'remove' && dialog.phase === 'planning'">
 							<p class="modules-dialog-line">
-								{{ $t(TEXT.plan.planning) }}
+								{{ $t(words.planning) }}
 							</p>
-							<progress class="modules-planning progress is-small is-info mt-2" :aria-label="$t(TEXT.plan.planningLabel)"></progress>
+							<progress class="modules-planning progress is-small is-info mt-2" :aria-label="$t(words.planningLabel)"></progress>
 						</template>
 
 						<!-- the plan, as the core made it -->
-						<template v-else-if="dialog.kind === 'install' && dialog.plan">
+						<template v-else-if="dialog.kind !== 'remove' && dialog.plan">
 							<p v-if="dialog.notice" class="modules-dialog-notice has-text-weight-semibold" role="status">
 								{{ say(dialog.notice) }}
 							</p>
@@ -303,9 +325,9 @@
 								<!-- while the install is asked for the dialog says what is happening, and not that there is something to read -->
 								<template v-if="calling">
 									<p class="modules-dialog-calling mt-2" role="status">
-										{{ $t(TEXT.plan.starting) }}
+										{{ $t(words.starting) }}
 									</p>
-									<progress class="modules-calling progress is-small is-info mt-2" :aria-label="$t(TEXT.plan.startingLabel)"></progress>
+									<progress class="modules-calling progress is-small is-info mt-2" :aria-label="$t(words.startingLabel)"></progress>
 								</template>
 								<p v-else-if="dialog.plan.incomplete" class="modules-incomplete mt-2">
 									{{ $t(TEXT.plan.incomplete) }}
@@ -317,9 +339,17 @@
 									{{ $t(TEXT.plan.noId) }}
 								</p>
 								<p v-else class="modules-dialog-line mt-2">
-									{{ $t(TEXT.plan.intro) }}
+									{{ $t(words.intro) }}
 								</p>
-								<p v-if="dialog.plan.tag" class="modules-dialog-version mt-2">
+								<template v-if="dialog.plan.update">
+									<p class="modules-dialog-installed mt-2">
+										{{ fact(TEXT.installed, dialog.plan.update.installed) }}
+									</p>
+									<p class="modules-dialog-version mt-1">
+										{{ fact(TEXT.offered, dialog.plan.update.latest) }}
+									</p>
+								</template>
+								<p v-else-if="dialog.plan.tag" class="modules-dialog-version mt-2">
 									{{ fact(TEXT.offered, dialog.plan.tag) }}
 								</p>
 								<p v-if="dialog.plan.tier" class="modules-dialog-tier mt-2">
@@ -336,11 +366,46 @@
 									</p>
 								</template>
 
+								<!-- what the update adds, and what the new version no longer names (those stay: no package is removed) -->
+								<template v-if="dialog.plan.update">
+									<h6 class="modules-update-added-heading has-text-weight-semibold mt-3">
+										{{ $t(TEXT.update.added) }}
+									</h6>
+									<ul v-if="dialog.plan.update.added.length" class="modules-names modules-added mt-1">
+										<li v-for="name in dialog.plan.update.added" :key="name">
+											{{ name }}
+										</li>
+										<li v-if="dialog.plan.update.moreAdded">
+											{{ $t(TEXT.plan.more, { n: dialog.plan.update.moreAdded }) }}
+										</li>
+									</ul>
+									<p v-else class="modules-no-added mt-1">
+										{{ $t(TEXT.update.addedNone) }}
+									</p>
+									<template v-if="dialog.plan.update.dropped.length">
+										<h6 class="has-text-weight-semibold mt-2">
+											{{ $t(TEXT.update.dropped) }}
+										</h6>
+										<p class="modules-dropped-note is-size-7 mt-1">
+											{{ $t(TEXT.update.droppedNote) }}
+										</p>
+										<ul class="modules-names modules-dropped mt-1">
+											<li v-for="name in dialog.plan.update.dropped" :key="name">
+												{{ name }}
+											</li>
+											<li v-if="dialog.plan.update.moreDropped">
+												{{ $t(TEXT.plan.more, { n: dialog.plan.update.moreDropped }) }}
+											</li>
+										</ul>
+									</template>
+								</template>
+
 								<template v-if="dialog.plan.packages.listed">
-									<h6 class="has-text-weight-semibold mt-3">
+									<h6 v-if="!dialog.plan.update" class="has-text-weight-semibold mt-3">
 										{{ $t(TEXT.plan.packages) }}
 									</h6>
-									<ul v-if="dialog.plan.packages.install.length" class="modules-names mt-1">
+									<!-- the packages of an update that apt installs are the list above -->
+									<ul v-if="!dialog.plan.update && dialog.plan.packages.install.length" class="modules-names mt-1">
 										<li v-for="name in dialog.plan.packages.install" :key="name">
 											{{ name }}
 										</li>
@@ -348,7 +413,7 @@
 											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreInstall }) }}
 										</li>
 									</ul>
-									<p v-else class="modules-no-packages mt-1">
+									<p v-else-if="!dialog.plan.update" class="modules-no-packages mt-1">
 										{{ $t(TEXT.plan.noPackages) }}
 									</p>
 									<template v-if="dialog.plan.packages.upgrade.length">
@@ -376,7 +441,7 @@
 									<li v-if="dialog.plan.packages.extraText" class="modules-size-extra">
 										{{ fact(TEXT.plan.extra, dialog.plan.packages.extraText) }}
 									</li>
-									<li v-if="!dialog.plan.packages.known" class="modules-size-unknown">
+									<li v-if="!dialog.plan.packages.known && !(dialog.plan.update && !dialog.plan.packages.install.length)" class="modules-size-unknown">
 										{{ $t(TEXT.plan.unknownSize) }}
 									</li>
 									<li v-if="dialog.plan.archive.url" class="modules-archive-url">
@@ -384,16 +449,30 @@
 									</li>
 								</ul>
 
-								<!-- what the install does to the machine: said before it is confirmed -->
-								<h6 class="has-text-weight-semibold mt-3">
-									{{ $t(TEXT.plan.consequences) }}
-								</h6>
-								<p class="modules-consequences mt-1">
-									{{ $t(TEXT.plan.consequencesText) }}
-								</p>
-								<p v-if="dialog.plan.installable" class="modules-stay is-size-7 mt-2">
-									{{ $t(TEXT.plan.stay) }}
-								</p>
+								<!-- what the install or the update does to the machine: said before it is confirmed -->
+								<template v-if="dialog.plan.update">
+									<h6 class="has-text-weight-semibold mt-3">
+										{{ $t(TEXT.update.consequences) }}
+									</h6>
+									<ul class="modules-consequences modules-update-consequences mt-1">
+										<li>{{ $t(TEXT.update.stops) }}</li>
+										<li>{{ $t(TEXT.update.machines) }}</li>
+										<li>{{ $t(TEXT.update.config) }}</li>
+										<li>{{ $t(TEXT.update.back) }}</li>
+										<li>{{ $t(TEXT.update.keepOn) }}</li>
+									</ul>
+								</template>
+								<template v-else>
+									<h6 class="has-text-weight-semibold mt-3">
+										{{ $t(TEXT.plan.consequences) }}
+									</h6>
+									<p class="modules-consequences mt-1">
+										{{ $t(TEXT.plan.consequencesText) }}
+									</p>
+									<p v-if="dialog.plan.installable" class="modules-stay is-size-7 mt-2">
+										{{ $t(TEXT.plan.stay) }}
+									</p>
+								</template>
 							</template>
 
 							<h6 class="has-text-weight-semibold mt-3">
@@ -527,7 +606,9 @@ const PLAN_NOTE_MS = 60000
 // the jobs whose result is told although this window did not start them: what is worth knowing when the window is opened later
 const REMEMBERED = new Set(['running', 'failed', 'interrupted'])
 // the refusals that say that the list the page shows is not what the machine has
-const STALE = new Set(['not_installed', 'already_installed'])
+const STALE = new Set(['not_installed', 'already_installed', 'up_to_date'])
+// the words of the window of an install and of an update, which are those of a plan
+const wordsOf = kind => kind === 'update' ? TEXT.update : TEXT.plan
 // what the Tab key goes through (the same list as Buefy's hold on a window)
 const TABBABLE = 'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
 
@@ -607,10 +688,13 @@ export default {
 		calling() {
 			return Boolean(this.dialog) && this.acting === this.dialog.key
 		},
+		words() {
+			return wordsOf(this.dialog?.kind)
+		},
 		dialogTitle() {
 			if (!this.dialog)
 				return ''
-			return this.$t(this.dialog.kind === 'install' ? TEXT.plan.title : TEXT.remove.title, { module: this.dialog.title })
+			return this.$t(this.dialog.kind === 'remove' ? TEXT.remove.title : this.words.title, { module: this.dialog.title })
 		},
 		// the way out of the window: a step that can be given up is cancelled, a plan that cannot go ahead is closed
 		cancelLabel() {
@@ -623,7 +707,7 @@ export default {
 				return ''
 			if (dialog.kind === 'remove')
 				return this.$t(TEXT.remove.ok)
-			return dialog.phase === 'plan' && dialog.plan?.installable ? this.$t(TEXT.plan.ok) : ''
+			return dialog.phase === 'plan' && dialog.plan?.installable ? this.$t(wordsOf(dialog.kind).ok) : ''
 		},
 	},
 	mounted() {
@@ -871,8 +955,9 @@ export default {
 			if (!view.running) {
 				this.follow = ''
 				this.refreshList()
-				// the dashboard shows the cards of the modules that are there now
-				this.$EventBus?.$emit(events.MODULES_CHANGED)
+				// the dashboard shows the cards of the modules that are there now; an update brings none and takes none away
+				if (view.kind !== 'update')
+					this.$EventBus?.$emit(events.MODULES_CHANGED)
 			}
 		},
 		fail({ kind, code }) {
@@ -899,6 +984,12 @@ export default {
 			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
 			return this.requestPlan(false)
 		},
+		pressUpdate(module, event) {
+			if (this.disabled || !module.canUpdate)
+				return undefined
+			this.openDialog({ kind: 'update', key: 'update', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
+			return this.requestPlan(false)
+		},
 		pressRemove(module, event) {
 			if (this.disabled || !module.canRemove)
 				return
@@ -907,7 +998,7 @@ export default {
 		// The plan of the install, asked for again whenever the window shows a new one. Cancelling the window, or asking again, drops the one that is out.
 		async requestPlan(changed) {
 			const dialog = this.dialog
-			if (!dialog || dialog.kind !== 'install')
+			if (!dialog || dialog.kind === 'remove')
 				return
 			const ticket = ++this.planTicket
 			this.planAbort?.abort()
@@ -924,7 +1015,9 @@ export default {
 			let raw
 			let failure = null
 			try {
-				raw = (await this.$api.sys.planModule(dialog.name, controller?.signal))?.data?.data
+				// the plan of an update is asked for with its mode; the plan of an install is asked for as it always was
+				const args = dialog.kind === 'update' ? [dialog.name, controller?.signal, 'update'] : [dialog.name, controller?.signal]
+				raw = (await this.$api.sys.planModule(...args))?.data?.data
 			} catch (error) {
 				// the plan changes nothing: a plan that got no answer is one to ask for again
 				failure = moduleFailure(error, this.locale, { read: true })
@@ -934,7 +1027,7 @@ export default {
 				return
 			this.acting = ''
 			this.planAbort = null
-			const plan = failure ? null : modulePlanView(raw, { name: dialog.name, locale: this.locale })
+			const plan = failure ? null : modulePlanView(raw, { name: dialog.name, locale: this.locale, mode: dialog.kind === 'update' ? 'update' : 'install' })
 			if (!plan) {
 				dialog.phase = 'failed'
 				this.callError = failure ?? moduleFailure(null, this.locale, { read: true })
@@ -944,13 +1037,13 @@ export default {
 			dialog.phase = 'plan'
 			dialog.notice = changed ? reasonMessage('plan_changed') : null
 			// the plan is announced when it is there: whether it can be confirmed, or why it cannot
-			this.announced = this.say(plan.refused ? plan.refusedMessage : { key: TEXT.plan.ready, params: { module: dialog.title } })
+			this.announced = this.say(plan.refused ? plan.refusedMessage : { key: wordsOf(dialog.kind).ready, params: { module: dialog.title } })
 			if (plan.refused === 'busy') {
 				const check = plan.checks.find(item => item.code === 'busy' && item.mark === 'failed')
 				this.busy = { message: check?.detailMessage ?? null, detail: check?.detailMessage ? '' : check?.detail ?? '' }
 			}
-			// a module that the machine has already is a list that is out of date
-			if (plan.refused === 'already_installed')
+			// a module that the machine has already (or has no more, or has already updated) is a list that is out of date
+			if (STALE.has(plan.refused))
 				this.loadList()
 		},
 		// The call a window was opened for: the install of the plan on the screen, or the remove.
@@ -970,7 +1063,7 @@ export default {
 		async callModule(dialog, call, args) {
 			this.acting = dialog.key
 			this.callError = null
-			this.announced = this.say({ key: dialog.kind === 'install' ? TEXT.plan.starting : TEXT.remove.starting, params: {} })
+			this.announced = this.say({ key: dialog.kind === 'remove' ? TEXT.remove.starting : wordsOf(dialog.kind).starting, params: {} })
 			// the job the module had before the call: a job that is found afterwards and is not that one is the job of this call
 			const before = this.jobs[dialog.name]?.view?.startedAtRaw ?? ''
 			let raw = null
@@ -978,7 +1071,7 @@ export default {
 			try {
 				raw = (await this.$api.sys[call](...args))?.data?.data
 			} catch (error) {
-				failure = moduleFailure(error, this.locale, { mutating: true })
+				failure = moduleFailure(error, this.locale, { mutating: true, mode: dialog.kind === 'update' ? 'update' : 'install' })
 			}
 			if (this.gone)
 				return
@@ -1017,7 +1110,7 @@ export default {
 			// a refusal that says the list is out of date: the list is read again
 			if (STALE.has(failure.code))
 				this.loadList()
-			if (failure.code === 'plan_changed' && dialog.kind === 'install' && this.dialog === dialog) {
+			if (failure.code === 'plan_changed' && dialog.kind !== 'remove' && this.dialog === dialog) {
 				await this.requestPlan(true)
 				return
 			}

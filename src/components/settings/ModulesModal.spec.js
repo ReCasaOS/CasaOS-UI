@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS } from './osModules'
+import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, reasonMessage } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -1394,7 +1394,7 @@ describe('the remove', () => {
 		await tick(MODULE_POLL_MS.running)
 
 		expect(text('.modules-job-title')).toBe('The removal of Virtual machines stopped.')
-		expect(text('.modules-reason-sentence')).toContain(REASONS.remove_incomplete)
+		expect(text('.modules-reason-sentence')).toContain(REASONS.remove_incomplete.text)
 		expect(text('.modules-advice-command code')).toBe('casaos module remove virt')
 		expect(wrapper.find('.modules-kept').exists()).toBe(false)
 	})
@@ -2497,5 +2497,530 @@ describe('the page', () => {
 		expect(text('.modules-tier-sentence')).toBe('Testé uniquement sur une machine simulée, pas sur une vraie.')
 		expect(text('.modules-offered')).toBe('Version proposée : v0.1.0')
 		expect(wrapper.find('.modules-install').text()).toBe('Installer')
+	})
+})
+
+// ---- the update -------------------------------------------------------------------------------------------------------------
+
+describe('the update of an installed module', () => {
+	const UPDATE_CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'installed', 'newer', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
+	const updatable = (changes = {}) => listRaw([moduleRaw({ installed: { version: 'v0.1.2' }, tag: 'v0.1.3', update: { available: true, installed: 'v0.1.2', latest: 'v0.1.3' }, ...changes })])
+	const updateChecks = () => UPDATE_CHECK_CODES.map(code => ({ code, ok: true, detail: '' }))
+	const updatePlanRaw = (changes = {}) => planRaw({
+		mode: 'update',
+		tag: 'v0.1.3',
+		checks: updateChecks(),
+		packages: { to_install: ['qemu-img', 'libc6'], to_upgrade: ['libc6'], download_bytes: 1048576, extra_bytes: 2097152, known: true },
+		update: { installed: 'v0.1.2', latest: 'v0.1.3', added: ['qemu-img'], dropped: ['old-helper'] },
+		...changes,
+	})
+	// the job of an update, as the core says it
+	const updateJob = (changes = {}, status = { installed: true, version: 'v0.1.2' }) => jobAnswer({ kind: 'update', ...changes }, status)
+
+	// the plan of the update on the screen, after Update was pressed
+	async function updateDialog(planChanges = {}) {
+		calls.planModule.mockImplementation(() => answer(updatePlanRaw(planChanges)))
+		wrapper.find('.modules-update-button').element.focus()
+		await press('.modules-update-button')
+	}
+	// an update that is running, its window closed
+	async function updating(step = 'backup') {
+		await open(updatable())
+		await updateDialog()
+		serveJob(updateJob({ state: 'running', step }))
+		calls.installModule.mockImplementation(() => answer(updateJob({ state: 'running', step: '' })))
+		await press('.modules-dialog-ok')
+	}
+	const finished = (changes, status) => {
+		serveJob(updateJob({ ended_at: '2026-10-18T12:01:00Z', ...changes }, status))
+		return tick(MODULE_POLL_MS.running)
+	}
+
+	beforeEach(() => eventBus.$emit.mockClear())
+
+	describe('the card', () => {
+		it('shows the version that is offered, the installed version and an Update button, when an update is available', async () => {
+			await open(updatable())
+
+			expect(text('.modules-update-badge')).toBe('Version v0.1.3 available')
+			expect(text('.modules-installed')).toBe('Installed version: v0.1.2')
+			expect(wrapper.find('.modules-update-button').text()).toBe('Update')
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeUndefined()
+			expect(wrapper.find('.modules-install').exists()).toBe(false)
+			expect(wrapper.find('.modules-remove').exists()).toBe(true)
+		})
+
+		it.each([
+			['the core says that there is none', { update: { available: false, installed: 'v0.1.2', latest: 'v0.1.3' } }],
+			['both versions are the same', { update: { available: true, installed: 'v0.1.2', latest: 'v0.1.2' } }],
+			['the offered version is earlier', { update: { available: true, installed: 'v0.1.2', latest: 'v0.1.1' } }],
+			['the core says nothing of an update', { update: undefined }],
+			['the installed version is not known', { installed: { version: null } }],
+			['the module is not installed', { installed: null }],
+		])('shows neither the badge nor the button when %s', async (_, changes) => {
+			await open(updatable(changes))
+
+			expect(wrapper.find('.modules-update-badge').exists()).toBe(false)
+			expect(wrapper.find('.modules-update-button').exists()).toBe(false)
+		})
+
+		it('says the badge and the button in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(updatable())
+
+			expect(text('.modules-update-badge')).toBe('Version v0.1.3 disponible')
+			expect(text('.modules-update-button')).toBe('Mettre à jour')
+		})
+
+		it('shuts the button while a job runs, like Install and Remove, and a press does nothing', async () => {
+			serveJob(updateJob({ state: 'running', step: 'download' }, { installed: true }))
+			await open(updatable())
+
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeDefined()
+			expect(wrapper.find('.modules-remove').attributes('disabled')).toBeDefined()
+			await wrapper.find('.modules-update-button').trigger('click')
+			wrapper.vm.pressUpdate(wrapper.vm.view.modules[0], undefined)
+			await settle()
+			expect(calls.planModule).not.toHaveBeenCalled()
+			expect(dialog().exists()).toBe(false)
+		})
+
+		it('shuts the button while the machine is busy', async () => {
+			await open(updatable())
+			wrapper.vm.busy = { message: null, detail: '' }
+			await settle()
+
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeDefined()
+			wrapper.vm.pressUpdate(wrapper.vm.view.modules[0], undefined)
+			await settle()
+			expect(calls.planModule).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('the plan', () => {
+		it('asks for the plan with the mode update, once, in a window of the update with a spinner', async () => {
+			const out = deferred()
+			calls.planModule.mockReturnValue(out.promise)
+			await open(updatable())
+			wrapper.find('.modules-update-button').element.focus()
+			await press('.modules-update-button')
+
+			expect(calls.planModule).toHaveBeenCalledTimes(1)
+			expect(calls.planModule).toHaveBeenCalledWith('virt', expect.any(AbortSignal), 'update')
+			expect(calls.installModule).not.toHaveBeenCalled()
+			expect(text('.modules-dialog-title')).toBe('Update Virtual machines')
+			expect(text('.modules-dialog .modules-dialog-line')).toContain('what the update would do')
+			expect(wrapper.find('.modules-planning').attributes('aria-label')).toBe('Making the plan')
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+			expect(document.activeElement).toBe(wrapper.find('.modules-dialog-title').element)
+			out.resolve({ data: { data: updatePlanRaw() } })
+		})
+
+		it('asks only once for two clicks and a call of the method', async () => {
+			calls.planModule.mockReturnValue(deferred().promise)
+			await open(updatable())
+			await wrapper.find('.modules-update-button').trigger('click')
+			await wrapper.find('.modules-update-button').trigger('click')
+			wrapper.vm.pressUpdate(wrapper.vm.view.modules[0], undefined)
+			await settle()
+
+			expect(calls.planModule).toHaveBeenCalledTimes(1)
+		})
+
+		it('shows the new version, what the update adds, what the new version no longer names, the checks and what the update does', async () => {
+			await open(updatable())
+			await updateDialog()
+
+			expect(text('.modules-dialog-installed')).toBe('Installed version: v0.1.2')
+			expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.3')
+			expect(text('.modules-dialog .modules-dialog-line')).toBe('This is what the update does. Read it, then confirm.')
+			expect(text('.modules-update-added-heading')).toBe('These packages will be installed')
+			expect(texts('.modules-added li')).toEqual(['qemu-img'])
+			expect(texts('.modules-dropped li')).toEqual(['old-helper'])
+			expect(text('.modules-dropped-note')).toBe('They stay on the machine: ReCasaOS never removes a package.')
+			// the list of what apt installs is the one above: it is not said twice
+			expect(wrapper.findAll('.modules-dialog .modules-names:not(.modules-added):not(.modules-dropped):not(.modules-upgrades)')).toHaveLength(0)
+			expect(text('.modules-size-download')).toBe('Download of the packages: 1 MiB')
+			expect(texts('.modules-update-consequences li')).toEqual([
+				'The service of the module stops for a moment, then starts again.',
+				'This page does not touch the machines that the module runs, but the service that manages them is stopped for a moment: check that this is a good time.',
+				'The configuration that you set for the module, and its data, are kept.',
+				'If something fails, the old version is put back.',
+				'Do not switch the machine off while it runs.',
+			])
+			expect(wrapper.find('.modules-stay').exists()).toBe(false)
+			expect(wrapper.findAll('.modules-check')).toHaveLength(11)
+			expect(texts('.modules-check-label')).toContain('Installed, and its files can be checked')
+			expect(texts('.modules-check-label')).toContain('A later version is offered')
+			expect(wrapper.find('.modules-dialog-ok').text()).toBe('Update the module')
+			expect(wrapper.find('.modules-dialog-ok').classes()).toContain('is-primary')
+			expect(wrapper.find('.modules-dialog-cancel').text()).toBe('Cancel')
+			expect(calls.installModule).not.toHaveBeenCalled()
+		})
+
+		it('says an update that adds no package in a line, and offers to confirm it', async () => {
+			await open(updatable())
+			await updateDialog({ packages: { to_install: [], to_upgrade: [], known: false }, update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } })
+
+			expect(text('.modules-no-added')).toBe('No package to install')
+			expect(wrapper.find('.modules-added').exists()).toBe(false)
+			expect(wrapper.find('.modules-dropped').exists()).toBe(false)
+			expect(wrapper.find('.modules-no-packages').exists()).toBe(false)
+			expect(wrapper.find('.modules-size-unknown').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(true)
+		})
+
+		it('shows the names of the packages as text', async () => {
+			await open(updatable())
+			await updateDialog({ update: { installed: 'v0.1.2', latest: 'v0.1.3', added: ['<img src=x onerror=alert(1)>'], dropped: ['<b>old</b>'] } })
+
+			expect(wrapper.find('.modules-dialog img').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog .modules-dropped b').exists()).toBe(false)
+			expect(text('.modules-added')).toContain('<img src=x onerror=alert(1)>')
+			expect(text('.modules-dropped')).toBe('<b>old</b>')
+		})
+
+		it('says a refused plan: the sentence and the code, the check that failed first, and no button; the list is read again', async () => {
+			await open(updatable())
+			const checks = UPDATE_CHECK_CODES.map(code => ({ code, ok: code !== 'newer', detail: code === 'newer' ? 'same_tag' : '' }))
+			await updateDialog({ refused: 'up_to_date', plan_id: '', checks })
+
+			expect(text('.modules-refused')).toContain(REASONS.up_to_date)
+			expect(text('.modules-refused code')).toBe('up_to_date')
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+			expect(wrapper.findAll('.modules-check')[0].classes()).toContain('is-failed')
+			expect(wrapper.findAll('.modules-check-label')[0].text()).toBe('A later version is offered')
+			expect(wrapper.findAll('.modules-check-sentence')[0].text()).toBe(REASONS.up_to_date)
+			expect(wrapper.find('.modules-dialog-cancel').text()).toBe('Close')
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(calls.installModule).not.toHaveBeenCalled()
+		})
+
+		it.each([
+			['files_unverified', 'installed'],
+			['unit_changed', 'foreign_unit'],
+			['downgrade', 'newer'],
+		])('says the refusal %s of the check %s in its words', async (code, check) => {
+			await open(updatable())
+			const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== check, detail: item === check ? 'x' : '' }))
+			await updateDialog({ refused: code, plan_id: '', checks })
+
+			expect(text('.modules-refused')).toContain(REASONS[code])
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+			expect(wrapper.findAll('.modules-check-sentence')[0].text()).toBe(REASONS[code])
+		})
+
+		it('does not take the plan of an install for the plan of an update: a failure to try again, and no button', async () => {
+			await open(updatable())
+			calls.planModule.mockImplementation(() => answer(planRaw()))
+			await press('.modules-update-button')
+
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-retry').exists()).toBe(true)
+			expect(calls.installModule).not.toHaveBeenCalled()
+		})
+
+		it('has no button for a plan that does not say what changes', async () => {
+			await open(updatable())
+			await updateDialog({ update: undefined })
+
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+			expect(text('.modules-no-list')).toContain('cannot be confirmed')
+		})
+
+		it('gives up when Cancel is pressed, and the focus is back on the Update button', async () => {
+			await open(updatable())
+			await updateDialog()
+			await press('.modules-dialog-cancel')
+
+			expect(dialog().exists()).toBe(false)
+			expect(calls.installModule).not.toHaveBeenCalled()
+			expect(document.activeElement).toBe(wrapper.find('.modules-update-button').element)
+		})
+
+		it('closes at Escape, the window that is on top and not the one under it', async () => {
+			await open(updatable())
+			await updateDialog()
+			document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+			await settle()
+
+			expect(dialog().exists()).toBe(false)
+			expect(wrapper.find('.modules-modal').exists()).toBe(true)
+			expect(wrapper.emitted('close')).toBeUndefined()
+		})
+
+		it('says the window in French, with the words of the update', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(updatable())
+			await updateDialog()
+
+			expect(text('.modules-dialog-title')).toBe('Mettre à jour Virtual machines')
+			expect(text('.modules-dialog-ok')).toBe('Mettre à jour le module')
+			expect(text('.modules-dropped-note')).toBe('Ils restent sur la machine : ReCasaOS ne supprime jamais un paquet.')
+		})
+	})
+
+	describe('the start of the job', () => {
+		it('starts the job with the id of the plan that is shown and the mode update, once, after the plan, and follows it', async () => {
+			await open(updatable())
+			await updateDialog()
+			serveJob(updateJob({ state: 'running', step: 'backup' }))
+			const out = deferred()
+			calls.installModule.mockReturnValue(out.promise)
+
+			await wrapper.find('.modules-dialog-ok').trigger('click')
+			await wrapper.find('.modules-dialog-ok').trigger('click')
+			wrapper.vm.confirmDialog()
+			await settle()
+
+			expect(text('.modules-dialog-calling')).toContain('starting the update')
+			expect(wrapper.find('.modules-calling').attributes('aria-label')).toBe('Starting the update')
+			expect(calls.installModule).toHaveBeenCalledTimes(1)
+			expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID, mode: 'update' })
+			expect(calls.planModule.mock.invocationCallOrder[0]).toBeLessThan(calls.installModule.mock.invocationCallOrder[0])
+			expect(calls.removeModule).not.toHaveBeenCalled()
+			out.resolve({ data: { data: updateJob({ state: 'running', step: '' }) } })
+			await settle()
+
+			expect(calls.installModule).toHaveBeenCalledTimes(1)
+			expect(calls.planModule).toHaveBeenCalledTimes(1)
+			expect(dialog().exists()).toBe(false)
+			expect(calls.getModuleStatus).toHaveBeenLastCalledWith('virt')
+		})
+
+		it('asks for the plan again, with the mode update, when the plan changed, and starts the job for the new one', async () => {
+			await open(updatable())
+			await updateDialog()
+			calls.planModule.mockImplementation(() => answer(updatePlanRaw({ plan_id: PLAN_ID_2 })))
+			calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+			await press('.modules-dialog-ok')
+
+			expect(calls.planModule).toHaveBeenCalledTimes(2)
+			expect(calls.planModule).toHaveBeenLastCalledWith('virt', expect.any(AbortSignal), 'update')
+			expect(text('.modules-dialog-notice')).toBe(REASONS.plan_changed)
+			await press('.modules-dialog-ok')
+
+			expect(calls.installModule).toHaveBeenCalledTimes(2)
+			expect(calls.installModule).toHaveBeenLastCalledWith('virt', { plan_id: PLAN_ID_2, mode: 'update' })
+		})
+
+		it.each([
+			['up_to_date', 'newer'],
+			['downgrade', 'newer'],
+			['unit_changed', 'foreign_unit'],
+			['files_unverified', 'installed'],
+			['not_installed', 'installed'],
+		])('says the refusal %s in the window with the check that failed, and keeps the window open', async (code, check) => {
+			await open(updatable())
+			await updateDialog()
+			const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== check, detail: item === check ? 'x' : '' }))
+			calls.installModule.mockImplementationOnce(failure(refused(code, { checks })))
+			await press('.modules-dialog-ok')
+
+			expect(dialog().exists()).toBe(true)
+			expect(text('.modules-call-sentence')).toBe(REASONS[code])
+			expect(text('.modules-call-code')).toBe(code)
+			expect(wrapper.find('.modules-job').exists()).toBe(false)
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeUndefined()
+			// a list that is out of date is read again
+			if (code === 'up_to_date' || code === 'not_installed')
+				expect(calls.getModules).toHaveBeenCalledTimes(2)
+		})
+	})
+
+	describe('the job', () => {
+		it('lists the steps of an update with the current one marked, and says that the module is being updated', async () => {
+			await updating('backup')
+
+			expect(dialog().exists()).toBe(false)
+			expect(text('.modules-job-title')).toBe('Updating Virtual machines')
+			expect(texts('.modules-step .modules-step-text')).toEqual([
+				STEP_TEXTS.update.packages,
+				STEP_TEXTS.update.download,
+				STEP_TEXTS.update.verify,
+				STEP_TEXTS.update.unpack,
+				STEP_TEXTS.update.backup,
+				STEP_TEXTS.update.stop,
+				STEP_TEXTS.update.swap,
+				STEP_TEXTS.update.units,
+				STEP_TEXTS.update.start,
+				STEP_TEXTS.update.route,
+			])
+			expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Done', 'Done', 'Done', 'Now', 'Not yet', 'Not yet', 'Not yet', 'Not yet', 'Not yet'])
+			expect(wrapper.find('.modules-progress').attributes('aria-label')).toBe('Progress of the update: step 5 of 10')
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeDefined()
+			expect(wrapper.find('.modules-remove').attributes('disabled')).toBeDefined()
+		})
+
+		it('says the end: the update to the version, the list read again with the new version, and nothing said to the dashboard', async () => {
+			await updating('route')
+			calls.getModules.mockImplementation(() => answer(updatable({ installed: { version: 'v0.1.3' }, update: { available: false, installed: 'v0.1.3', latest: 'v0.1.3' } })))
+			await finished({ state: 'succeeded', step: 'done' }, { installed: true, version: 'v0.1.3' })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines to v0.1.3 is done.')
+			expect(text('.modules-job-group')).toBe('Finished')
+			expect(text('.modules-next')).toBe(JOB_NEXT.succeededUpdate)
+			expect(texts('.modules-step .modules-step-mark').every(mark => mark === 'Done')).toBe(true)
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+			expect(wrapper.find('.modules-kept').exists()).toBe(false)
+			// the list is read again: the new version is the installed one and there is no badge any more
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(text('.modules-installed')).toBe('Installed version: v0.1.3')
+			expect(wrapper.find('.modules-update-badge').exists()).toBe(false)
+			expect(wrapper.find('.modules-update-button').exists()).toBe(false)
+			expect(wrapper.find('.modules-remove').attributes('disabled')).toBeUndefined()
+			// the module did not come or go: the cards of the dashboard are left alone
+			expect(eventBus.$emit).not.toHaveBeenCalled()
+		})
+
+		it('says the end in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await updating('route')
+			await finished({ state: 'succeeded', step: 'done' }, { installed: true, version: 'v0.1.3' })
+
+			expect(text('.modules-job-title')).toBe('La mise à jour de Virtual machines vers v0.1.3 est terminée.')
+		})
+
+		it('says a failed update that was rolled back: where it stopped, why by the code, that the old version is back, and no command', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back' })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines stopped.')
+			expect(text('.modules-job-group')).toBe('Stopped')
+			expect(text('.modules-stopped-at')).toBe(`It stopped at: ${STEP_TEXTS.update.swap}`)
+			expect(text('.modules-reason-sentence')).toBe(`${REASONS.swap_failed} swap_failed`)
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateBack)
+			expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Failed here', 'Not reached', 'Not reached', 'Not reached'])
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+			expect(wrapper.find('.modules-kept').exists()).toBe(false)
+			expect(wrapper.find('.modules-job-close').exists()).toBe(true)
+			// the buttons are back, and nothing was said to the dashboard
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeUndefined()
+			expect(eventBus.$emit).not.toHaveBeenCalled()
+		})
+
+		it.each([
+			['backup_failed', 'backup'],
+			['unit_changed', ''],
+			['up_to_date', ''],
+			['downgrade', ''],
+			['version_unknown', ''],
+			['files_unverified', ''],
+			['files_unreadable', ''],
+			['not_installed', ''],
+			['manifest_invalid', 'unpack'],
+		])('says the code %s of an update in its sentence', async (code, step) => {
+			await updating('unpack')
+			await finished({ state: step ? 'failed' : 'refused', step, code, undo: step ? 'rolled_back' : '' })
+
+			expect(text('.modules-reason-sentence')).toBe(`${reasonMessage(code, { kind: 'update' }).key} ${code}`)
+		})
+
+		it('shows start and route as skipped when the service was stopped before the update, and keeps the headline', async () => {
+			await updating('route')
+			await finished({ state: 'succeeded', step: 'done' }, { installed: true, version: 'v0.1.3', unit: { active: false, enabled: false }, route: { answers: false } })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines to v0.1.3 is done.')
+			expect(texts('.modules-step .modules-step-mark')).toEqual(['Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Done', 'Skipped: the service was stopped before the update', 'Skipped: the service was stopped before the update'])
+		})
+
+		it('tells the owner where the copy of the old version is kept, and to press Update or Remove again, when it could not be put back', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'recovery_incomplete', undo: 'rollback_incomplete' })
+
+			expect(text('.modules-reason-sentence')).toBe(`${REASONS.recovery_incomplete} recovery_incomplete`)
+			expect(text('.modules-undo')).toContain('a file was changed while the update ran')
+			expect(text('.modules-undo')).toContain('press Update or Remove again')
+			// the folder is given as text to copy, and nothing in the page deletes it
+			expect(text('.modules-folder code')).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(wrapper.find('.modules-folder button').exists()).toBe(true)
+			expect(text('.modules-folder-label')).toBe('The folder that is kept')
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+			expect(wrapper.find('.modules-kept').exists()).toBe(false)
+		})
+
+		it('says the refusal files_unreadable of an update in the words of an update, in the window', async () => {
+			await open(updatable())
+			await updateDialog()
+			const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== 'installed', detail: item === 'installed' ? 'files_missing' : '' }))
+			calls.installModule.mockImplementationOnce(failure(refused('files_unreadable', { checks })))
+			await press('.modules-dialog-ok')
+
+			expect(text('.modules-call-sentence')).toBe(reasonMessage('files_unreadable', { kind: 'update' }).key)
+			expect(text('.modules-call-items')).toContain('The record of the installed module cannot be read')
+		})
+
+		it('does not say that the old version is back when files were left as they are, names them to copy, and says to remove then install', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back_with_left', log_tail: ['left: /usr/bin/virt-tool'] })
+
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateLeft)
+			expect(text('.modules-undo')).not.toContain('is back')
+			expect(text('.modules-left-label')).toBe('Files that were left as they are')
+			expect(text('.modules-left')).toContain('left: /usr/bin/virt-tool')
+			expect(wrapper.find('.modules-left button').exists()).toBe(true)
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+		})
+
+		it('does not show the headline of a success when the update is installed but its backup stayed, and names the folder to copy', async () => {
+			await updating('route')
+			await finished({ state: 'failed', step: '', code: 'backup_not_dropped', undo: '' }, { installed: true, version: 'v0.1.3' })
+
+			expect(text('.modules-job-title')).toBe('The update of Virtual machines is installed, but its backup is still there')
+			expect(text('.modules-job-title')).not.toContain('is done')
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateNotDropped)
+			expect(text('.modules-folder code')).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(wrapper.findAll('.modules-step')).toHaveLength(0)
+			expect(text('.modules-reason-sentence')).toBe(`${REASONS.backup_not_dropped} backup_not_dropped`)
+			// nothing in the card deletes the folder
+			expect(wrapper.find('.modules-folder').findAll('button').map(button => button.text())).toEqual(['Copy'])
+		})
+
+		it('does not say that the old version is back when the core does not say so', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'swap_failed', undo: '' })
+
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateUnknown)
+		})
+
+		it('tells the owner of an update that was cut short to press Update or Remove again', async () => {
+			await updating('swap')
+			await finished({ state: 'interrupted', step: 'swap' })
+
+			expect(text('.modules-job-title')).toBe('The job on Virtual machines was cut short.')
+			expect(text('.modules-undo')).toBe(JOB_NEXT.updateCut)
+			expect(wrapper.find('.modules-advice').exists()).toBe(false)
+			expect(wrapper.find('.modules-job-close').exists()).toBe(true)
+		})
+
+		it('says that the old version is being put back while it is, in one line and with no list of steps', async () => {
+			await updating('swap')
+			serveJob(updateJob({ state: 'running', step: 'rollback_restore' }))
+			await tick(MODULE_POLL_MS.running)
+
+			expect(text('.modules-job-title')).toBe('Putting the old version of Virtual machines back')
+			expect(text('.modules-rollback')).toBe('Putting the old version back.')
+			expect(wrapper.findAll('.modules-step')).toHaveLength(0)
+			expect(wrapper.find('.modules-progress').exists()).toBe(false)
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeDefined()
+			expect(wrapper.find('.modules-live').text()).toBe('Virtual machines: putting the old version back.')
+		})
+
+		it('follows an update that was started before the window was opened', async () => {
+			serveJob(updateJob({ state: 'running', step: 'stop' }))
+			await open(updatable())
+
+			expect(text('.modules-job-title')).toBe('Updating Virtual machines')
+			expect(text('.modules-step.is-current .modules-step-text')).toBe(STEP_TEXTS.update.stop)
+			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeDefined()
+		})
+
+		it('shows the log as text', async () => {
+			await updating('swap')
+			await finished({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back', log_tail: ['<img src=x onerror=alert(1)>'] })
+
+			expect(wrapper.find('.modules-log img').exists()).toBe(false)
+			expect(text('.modules-log-text')).toContain('<img src=x onerror=alert(1)>')
+		})
 	})
 })

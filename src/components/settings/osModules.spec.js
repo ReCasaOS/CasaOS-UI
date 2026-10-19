@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
 	CHECKS,
+	CHECK_UNKNOWN,
+	JOB_LIVE,
 	JOB_NEXT,
 	JOB_STATES,
 	JOB_TITLES,
@@ -53,7 +55,13 @@ const UNPACK_CODES = ['unpack_path', 'file_exists', 'unpack_limits', 'unpack_cor
 const API_CODES = ['bad_request', 'not_root', 'unsupported', 'busy', 'plan_changed', 'not_installed', 'plan_timeout', 'start_failed', 'internal']
 // pkg/modulecmd/query.go: the checks that say no to a system in the list (and a module that the catalogue no longer has)
 const SYSTEM_REASONS = ['os', 'arch', 'recasaos', 'catalogue']
-const ALL_CODES = [...new Set([...PLAN_REFUSALS, ...RUN_CODES, ...UNPACK_CODES, ...API_CODES, ...SYSTEM_REASONS])]
+// the update of a module (docs/os-modules.md, "Updating an installed module"): the steps, the checks in their order, the codes of a plan that is refused
+// and the codes of a job that failed
+const UPDATE_STEPS = ['packages', 'download', 'verify', 'unpack', 'backup', 'stop', 'swap', 'units', 'start', 'route', 'done']
+const UPDATE_CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'installed', 'newer', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
+const UPDATE_REFUSALS = ['catalogue', 'os', 'arch', 'recasaos', 'not_installed', 'manifest_invalid', 'files_unreadable', 'files_unverified', 'version_unknown', 'up_to_date', 'downgrade', 'foreign_unit', 'unit_changed', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
+const UPDATE_JOB_CODES = ['backup_failed', 'swap_failed', 'recovery_incomplete', 'backup_not_dropped', 'unit_not_stopped', 'unpack_corrupt', 'unpack_path', 'unpack_limits', 'file_exists', 'manifest_invalid', 'manifest_mismatch', 'start_failed', 'route_timeout', 'interrupted']
+const ALL_CODES = [...new Set([...PLAN_REFUSALS, ...RUN_CODES, ...UNPACK_CODES, ...API_CODES, ...SYSTEM_REASONS, ...UPDATE_REFUSALS, ...UPDATE_JOB_CODES])]
 
 // ---- what the core sends, and what is hostile ------------------------------------------------------------------------------
 
@@ -628,7 +636,8 @@ describe('the view of the plan', () => {
 	})
 
 	it('has a label for every check of the core', () => {
-		expect(Object.keys(CHECKS)).toEqual(CHECK_CODES)
+		// the checks of an install and of an update: each has its words
+		expect([...Object.keys(CHECKS)].sort()).toEqual([...new Set([...CHECK_CODES, ...UPDATE_CHECK_CODES])].sort())
 	})
 
 	it.each([null, undefined, 'plan', 5, [], true, {}, planRaw({ name: 'other' }), planRaw({ name: 5 })])('is nothing for %j, or for the plan of another module', (raw) => {
@@ -1557,6 +1566,516 @@ describe('the failure of a call', () => {
 
 // ---- the sizes -------------------------------------------------------------------------------------------------------------
 
+// ---- the update ---------------------------------------------------------------------------------------------------------------
+
+describe('the list: an update that is available', () => {
+	const offered = (changes = {}) => moduleRaw({ installed: { version: 'v0.1.2' }, tag: 'v0.1.3', update: { available: true, installed: 'v0.1.2', latest: 'v0.1.3' }, ...changes })
+	const first = raw => listView(listRaw([raw])).modules[0]
+
+	it('offers the update that the core says is available, with both tags', () => {
+		const module = first(offered())
+		expect(module.update).toEqual({ installed: 'v0.1.2', latest: 'v0.1.3' })
+		expect(module.canUpdate).toBe(true)
+		expect(module.canInstall).toBe(false)
+		expect(module.canRemove).toBe(true)
+	})
+
+	it('compares the tags as numbers: v0.1.10 is later than v0.1.9', () => {
+		expect(first(offered({ installed: { version: 'v0.1.9' }, update: { available: true, installed: 'v0.1.9', latest: 'v0.1.10' } })).canUpdate).toBe(true)
+		expect(first(offered({ installed: { version: 'v0.9.0' }, update: { available: true, installed: 'v0.9.0', latest: 'v1.0.0' } })).canUpdate).toBe(true)
+	})
+
+	it.each([
+		['the core says that there is none', { update: { available: false, installed: 'v0.1.2', latest: 'v0.1.3' } }],
+		['the versions are the same, whatever the core says', { update: { available: true, installed: 'v0.1.2', latest: 'v0.1.2' } }],
+		['the latest is earlier, whatever the core says', { update: { available: true, installed: 'v0.1.2', latest: 'v0.1.1' } }],
+		['v0.1.10 is installed and v0.1.9 is the latest', { installed: { version: 'v0.1.10' }, update: { available: true, installed: 'v0.1.10', latest: 'v0.1.9' } }],
+		['the update is for another version than the one the list shows', { update: { available: true, installed: 'v0.1.1', latest: 'v0.1.3' } }],
+		['the flag is not a boolean', { update: { available: 'true', installed: 'v0.1.2', latest: 'v0.1.3' } }],
+		['the tags are not tags', { update: { available: true, installed: 'v0.1.2', latest: '<b>v9</b>' } }],
+		['the update is not an object', { update: 'available' }],
+		['the core says nothing', { update: undefined }],
+		['the module is not installed', { installed: null }],
+		['the installed version is not known', { installed: { version: null } }],
+		['the module is broken', { broken: 'manifest_broken' }],
+		['the catalogue no longer has the module', { catalogue: false }],
+	])('offers no update when %s', (_, changes) => {
+		expect(first(offered(changes)).canUpdate).toBe(false)
+	})
+
+	it('offers none when the catalogue is not ok, but the module can still be removed', () => {
+		const view = listView(listRaw([offered()], { ok: false, error: 'invalid' }))
+		expect(view.modules).toHaveLength(1)
+		expect(view.modules[0].canUpdate).toBe(false)
+		expect(view.modules[0].canRemove).toBe(true)
+	})
+})
+
+describe('the view of the plan of an update', () => {
+	const updateChecks = () => UPDATE_CHECK_CODES.map(code => ({ code, ok: true, detail: '' }))
+	function updatePlanRaw(changes = {}) {
+		return planRaw({
+			mode: 'update',
+			tag: 'v0.1.3',
+			checks: updateChecks(),
+			packages: { to_install: ['qemu-img'], to_upgrade: [], download_bytes: 1048576, extra_bytes: 2097152, known: true },
+			update: { installed: 'v0.1.2', latest: 'v0.1.3', added: ['qemu-img'], dropped: ['old-helper'] },
+			...changes,
+		})
+	}
+	const updatePlan = (changes, options) => modulePlanView(updatePlanRaw(changes), { name: 'virt', mode: 'update', ...options })
+
+	it('can install an update plan that is not refused, whose checks all passed, and that says what changes', () => {
+		const view = updatePlan()
+		expect(view.installable).toBe(true)
+		expect(view.mode).toBe('update')
+		expect(view.update).toEqual({ installed: 'v0.1.2', latest: 'v0.1.3', added: ['qemu-img'], dropped: ['old-helper'], moreAdded: 0, moreDropped: 0 })
+		expect(view.tag).toBe('v0.1.3')
+		expect(view.checks.map(check => check.code)).toEqual(UPDATE_CHECK_CODES)
+		for (const check of view.checks)
+			expect(check.label.key, check.code).not.toBe(CHECK_UNKNOWN)
+	})
+
+	it('can install a plan that adds no package (apt is not asked)', () => {
+		const view = updatePlan({ packages: { to_install: [], to_upgrade: [], known: false }, update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } })
+		expect(view.installable).toBe(true)
+		expect(view.packages.listed).toBe(true)
+		expect(view.update.added).toEqual([])
+		expect(view.update.dropped).toEqual([])
+	})
+
+	it('cuts a long list of packages and counts what it left out', () => {
+		const names = Array.from({ length: 130 }, (_, index) => `pkg-${index}`)
+		const view = updatePlan({ update: { installed: 'v0.1.2', latest: 'v0.1.3', added: names, dropped: names } })
+		expect(view.update.added).toHaveLength(100)
+		expect(view.update.moreAdded).toBe(30)
+		expect(view.update.moreDropped).toBe(30)
+	})
+
+	it('is the plan of an update only in the mode of an update, and the plan of an install only in the mode of an install', () => {
+		expect(modulePlanView(updatePlanRaw(), { name: 'virt' })).toBeNull()
+		expect(modulePlanView(updatePlanRaw(), { name: 'virt', mode: 'install' })).toBeNull()
+		expect(modulePlanView(planRaw(), { name: 'virt', mode: 'update' })).toBeNull()
+		expect(modulePlanView(planRaw({ mode: 'install' }), { name: 'virt', mode: 'update' })).toBeNull()
+		expect(modulePlanView(planRaw(), { name: 'virt' }).installable).toBe(true)
+	})
+
+	it.each([
+		['says nothing of what changes', { update: undefined }],
+		['says it as something that is not an object', { update: 'v0.1.3' }],
+		['has two tags that are the same', { update: { installed: 'v0.1.3', latest: 'v0.1.3', added: [], dropped: [] } }],
+		['goes back to an earlier tag', { update: { installed: 'v0.1.3', latest: 'v0.1.2', added: [], dropped: [] } }],
+		['has a latest that is not the tag of the plan', { update: { installed: 'v0.1.2', latest: 'v0.1.4', added: [], dropped: [] } }],
+		['has tags that are not tags', { update: { installed: 'x', latest: 'v0.1.3', added: [], dropped: [] } }],
+	])('cannot install a plan that %s', (_, changes) => {
+		const view = updatePlan(changes)
+		expect(view.installable).toBe(false)
+		expect(view.update).toBeNull()
+		expect(view.noList).toBe(true)
+	})
+
+	it.each(UPDATE_REFUSALS)('cannot install a plan that is refused with %s, and says why', (code) => {
+		const view = updatePlan({ refused: code, plan_id: '' })
+		expect(view.installable).toBe(false)
+		expect(view.refusedMessage.key).toBe(reasonMessage(code, { kind: 'update' }).key)
+	})
+
+	it.each([
+		['installed', 'not_installed'],
+		['installed', 'manifest_invalid'],
+		['installed', 'files_unreadable'],
+		['installed', 'files_unverified'],
+		['newer', 'up_to_date'],
+		['newer', 'downgrade'],
+		['newer', 'version_unknown'],
+		['foreign_unit', 'foreign_unit'],
+		['foreign_unit', 'unit_changed'],
+	])('says the check %s that failed with %s in the sentence of the refusal, first', (check, code) => {
+		const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: item !== check, detail: item === check ? 'x' : '' }))
+		const view = updatePlan({ refused: code, plan_id: '', checks })
+		expect(view.refusedMessage.key).toBe(reasonMessage(code, { kind: 'update' }).key)
+		expect(view.checks[0].code).toBe(check)
+		expect(view.checks[0].mark).toBe('failed')
+		expect(view.checks[0].message.key).toBe(reasonMessage(code, { kind: 'update' }).key)
+	})
+
+	it('says that the check of the version was not made when the check of the installation failed', () => {
+		const checks = UPDATE_CHECK_CODES.map(item => ({ code: item, ok: !['installed', 'newer'].includes(item), detail: item === 'newer' ? 'not_checked' : item === 'installed' ? 'files_missing' : '' }))
+		const view = updatePlan({ refused: 'files_unreadable', plan_id: '', checks })
+		const newer = view.checks.find(check => check.code === 'newer')
+		expect(newer.mark).toBe('notChecked')
+		expect(newer.message).toBeNull()
+		expect(view.checks.find(check => check.code === 'installed').message.key).toBe(reasonMessage('files_unreadable', { kind: 'update' }).key)
+	})
+
+	it('shows HTML in the names of the packages as text', () => {
+		const view = updatePlan({ update: { installed: 'v0.1.2', latest: 'v0.1.3', added: ['<img src=x onerror=alert(1)>', 'a\u0000b'], dropped: ['x'.repeat(1000)] } })
+		for (const name of [...view.update.added, ...view.update.dropped])
+			expect(name).not.toMatch(UNSAFE)
+		expect(view.update.dropped[0].length).toBeLessThanOrEqual(80)
+	})
+})
+
+describe('the body of the install of an update', () => {
+	const updateOk = () => modulePlanView(planRaw({ mode: 'update', tag: 'v0.1.3', checks: UPDATE_CHECK_CODES.map(code => ({ code, ok: true, detail: '' })), update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } }), { name: 'virt', mode: 'update' })
+
+	it('is the id of the plan that is shown and the mode of an update, and nothing else', () => {
+		expect(installBody(updateOk())).toEqual({ plan_id: PLAN_ID_OK, mode: 'update' })
+		expect(Object.keys(installBody(updateOk())).sort()).toEqual(['mode', 'plan_id'])
+	})
+
+	it('is the id alone for the plan of an install', () => {
+		expect(installBody(plan())).toEqual({ plan_id: PLAN_ID_OK })
+	})
+
+	it('is nothing for an update plan that cannot install', () => {
+		expect(installBody({ ...updateOk(), installable: false })).toBeNull()
+		expect(installBody({ ...updateOk(), planId: '' })).toBeNull()
+	})
+})
+
+describe('the view of the job of an update', () => {
+	const ujob = (changes, options) => job({ kind: 'update', ...changes }, options)
+
+	it('has the steps of the core, in order, each with a sentence', () => {
+		expect([...STEPS.update, 'done']).toEqual(UPDATE_STEPS)
+		for (const step of STEPS.update)
+			expect(STEP_TEXTS.update[step], step).toBeTruthy()
+		expect(STEP_TEXTS.update.putBack).toBeTruthy()
+	})
+
+	describe.each(JOB_STATE_NAMES)('in the state %s', (state) => {
+		it('says each step of the update in the words of the language, and lists them all', () => {
+			for (const step of ['', ...UPDATE_STEPS]) {
+				const view = ujob({ state, step, code: state === 'failed' || state === 'refused' ? 'swap_failed' : '', undo: state === 'failed' ? 'rolled_back' : '' })
+				expect(view, step).not.toBeNull()
+				expect(view.kind).toBe('update')
+				expect(view.steps.map(item => item.id)).toEqual(STEPS.update)
+				for (const key of keysIn(view))
+					expect(MODULE_KEYS, `${state}/${step}: ${key}`).toContain(key)
+			}
+		})
+
+		it('puts the old version back in one sentence, and lists no step for it', () => {
+			for (const step of ['rollback_restore', 'rollback_units', 'rollback_start', 'recover_restore', 'recover_units', 'recover_start']) {
+				const view = ujob({ state, step, undo: state === 'failed' ? 'rollback_incomplete' : '' })
+				expect(view.steps, step).toEqual([])
+				expect(view.progress).toBeNull()
+				for (const key of keysIn(view))
+					expect(MODULE_KEYS, `${state}/${step}: ${key}`).toContain(key)
+			}
+		})
+	})
+
+	it('tells an update from the step when the core does not say, for the two steps only an update has and for its steps of putting back', () => {
+		expect(job({ step: 'backup' }).kind).toBe('update')
+		expect(job({ step: 'swap' }).kind).toBe('update')
+		expect(job({ step: 'rollback_restore' }).kind).toBe('update')
+		expect(job({ step: 'rollback_units' }).kind).toBe('update')
+		expect(job({ step: 'rollback_start' }).kind).toBe('update')
+		// the steps that an install and a remove have too stay as they were
+		expect(job({ step: 'stop' }).kind).toBe('remove')
+		expect(job({ step: 'download' }).kind).toBe('install')
+		expect(job({ step: 'rollback_stop' }).kind).toBe('install')
+		// what the page remembers of its call counts when nothing else says
+		expect(job({ step: 'manifest' }, { kind: 'update' }).kind).toBe('update')
+	})
+
+	it('shows the progress of an update, in the words of an update', () => {
+		const view = ujob({ state: 'running', step: 'backup' })
+		expect(view.progress).toMatchObject({ value: 4, max: 10 })
+		expect(view.progress.label).toEqual({ key: TEXT.job.progressUpdate, params: { index: '5', total: '10' } })
+		expect(view.title).toEqual({ key: JOB_TITLES.running.update, params: { module: 'Virtual machines' } })
+		expect(view.live.params).toMatchObject({ index: '5', total: '10' })
+		expect(view.steps.map(item => item.mark)).toEqual(['done', 'done', 'done', 'done', 'current', 'pending', 'pending', 'pending', 'pending', 'pending'])
+	})
+
+	it('says that the old version is being put back, in the title, in the live region and in a line of its own', () => {
+		for (const step of ['rollback_restore', 'recover_restore']) {
+			const view = ujob({ state: 'running', step })
+			expect(view.title).toEqual({ key: JOB_TITLES.running.putBack, params: { module: 'Virtual machines' } })
+			expect(view.live).toEqual({ key: JOB_LIVE.putBack, params: { module: 'Virtual machines' } })
+			expect(view.rollbackStep).toEqual({ key: TEXT.job.putBack, params: {} })
+		}
+		// a run that begins by putting back the copy of an update that was cut short says so too, whatever it is going to do
+		const install = job({ kind: 'install', state: 'running', step: 'recover_restore' })
+		expect(install.rollbackStep.key).toBe(TEXT.job.putBack)
+		expect(install.steps).toEqual([])
+		expect(install.title.key).toBe(JOB_TITLES.running.install)
+	})
+
+	it('says the step it stopped at, in words', () => {
+		expect(ujob({ state: 'failed', step: 'backup', code: 'backup_failed', undo: 'rolled_back' }).stoppedAt.params.step).toBe(STEP_TEXTS.update.backup)
+		expect(ujob({ state: 'failed', step: 'recover_restore', code: 'recovery_incomplete', undo: 'rollback_incomplete' }).stoppedAt.params.step).toBe(STEP_TEXTS.update.putBack)
+	})
+
+	describe('when it is done', () => {
+		it('says the update to the version the status gives, and that the configuration was kept', () => {
+			const view = ujob({ state: 'succeeded', step: 'done' }, { status: { installed: true, version: 'v0.1.3' } })
+			expect(view.title).toEqual({ key: JOB_TITLES.succeeded.updateTo, params: { module: 'Virtual machines', tag: 'v0.1.3' } })
+			expect(view.next).toEqual({ key: JOB_NEXT.succeededUpdate, params: {} })
+			expect(view.kept).toBeNull()
+			expect(view.advice).toBeNull()
+			expect(view.undoText).toBeNull()
+			expect(view.steps.every(item => item.mark === 'done')).toBe(true)
+		})
+
+		it.each([undefined, null, '', 'v1', '<b>v0.1.3</b>', 5])('says the update with no version when the status gives %j', (version) => {
+			const view = ujob({ state: 'succeeded', step: 'done' }, { status: { installed: true, version } })
+			expect(view.title).toEqual({ key: JOB_TITLES.succeeded.update, params: { module: 'Virtual machines' } })
+		})
+	})
+
+	describe('when it did not go well', () => {
+		it.each(ALL_CODES)('says the code %s as the reason of an update that failed', (code) => {
+			const view = ujob({ state: 'failed', step: 'swap', code, undo: 'rolled_back' })
+			expect(view.reason.key).not.toBe(REASON_UNKNOWN)
+			expect(view.code).toBe(code)
+			expect(view.title.key).toBe(code === 'backup_not_dropped' ? JOB_TITLES.failed.updateNotDropped : JOB_TITLES.failed.update)
+		})
+
+		it.each(['backup_failed', 'swap_failed', 'recovery_incomplete', 'up_to_date', 'downgrade', 'unit_changed', 'version_unknown', 'files_unverified', 'files_unreadable', 'not_installed', 'manifest_invalid'])('says %s in its own sentence', (code) => {
+			const key = reasonMessage(code, { kind: 'update' }).key
+			expect(key).not.toBe(REASON_UNKNOWN)
+			expect(MODULE_KEYS).toContain(key)
+			expect(en[key]).toBe(key)
+			expect(fr[key]).not.toBe(key)
+		})
+
+		it('says that the old version is back when the core says the update was rolled back, whatever the step', () => {
+			for (const step of ['packages', 'backup', 'swap', 'start', 'route']) {
+				const view = ujob({ state: 'failed', step, code: 'swap_failed', undo: 'rolled_back' })
+				expect(view.undoText).toEqual({ key: JOB_NEXT.updateBack, params: {} })
+				expect(view.advice).toBeNull()
+				expect(view.kept).toBeNull()
+			}
+		})
+
+		it('says where the copy is kept, and what to press, when putting the old version back did not finish', () => {
+			const view = ujob({ state: 'failed', step: 'swap', code: 'recovery_incomplete', undo: 'rollback_incomplete' })
+			expect(view.undoText).toEqual({ key: JOB_NEXT.updateKept, params: {} })
+			// the sentence says what it means in words, and the path is given apart, to copy
+			expect(JOB_NEXT.updateKept).toContain('a file was changed while the update ran')
+			expect(JOB_NEXT.updateKept).toContain('by hand')
+			expect(JOB_NEXT.updateKept).toContain('Update or Remove')
+			expect(view.folder).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(view.advice).toBeNull()
+			// whatever the core says of the undo, other than it was done, is not that it was done
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'something_else' }).undoText.key).toBe(JOB_NEXT.updateKept)
+		})
+
+		it('names a folder only when the old version could not be put back whole', () => {
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back' }).folder).toBeNull()
+			expect(ujob({ state: 'failed', step: 'swap', undo: '' }).folder).toBeNull()
+			expect(ujob({ state: 'interrupted', step: 'swap' }).folder).toBeNull()
+			expect(ujob({ state: 'succeeded', step: 'done' }).folder).toBeNull()
+			expect(ujob({ state: 'running', step: 'swap' }).folder).toBeNull()
+			expect(job({ kind: 'install', state: 'failed', step: 'unpack', undo: 'rollback_incomplete' }).folder).toBeNull()
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rollback_incomplete' }).folder).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+		})
+
+		it('does not say that the old version is back when nothing says so', () => {
+			const view = ujob({ state: 'failed', step: 'swap', code: 'swap_failed', undo: '' })
+			expect(view.undoText).toEqual({ key: JOB_NEXT.updateUnknown, params: {} })
+			expect(view.advice).toBeNull()
+		})
+
+		it('says an update that was cut short, and to press Update or Remove again, because ReCasaOS puts the old version back first', () => {
+			for (const step of ['packages', 'backup', 'swap', 'route', 'rollback_restore', 'recover_start']) {
+				const view = ujob({ state: 'interrupted', step })
+				expect(view.undoText, step).toEqual({ key: JOB_NEXT.updateCut, params: {} })
+				expect(view.advice).toBeNull()
+				expect(view.dismissible).toBe(true)
+			}
+			expect(JOB_NEXT.updateCut).toContain('Press Update or Remove again')
+			expect(JOB_NEXT.updateCut).toContain('puts the old version back before')
+			// before it began, nothing was changed
+			expect(ujob({ state: 'interrupted', step: '' }).undoText.key).toBe(JOB_NEXT.cutBeforeStart)
+		})
+
+		it('says no package that an install left, and no purge command, for an update', () => {
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back', kept_packages: ['qemu-utils'] }).kept).toBeNull()
+			expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back' }).kept).toBeNull()
+		})
+
+		it('says an update that was refused, with nothing changed', () => {
+			const view = ujob({ state: 'refused', step: '', code: 'up_to_date' })
+			expect(view.title.key).toBe(JOB_TITLES.refused.any)
+			expect(view.reason.key).toBe(REASONS.up_to_date)
+		})
+	})
+
+	it('announces the change of an update once, not at each answer', () => {
+		const running = ujob({ state: 'running', step: 'backup' })
+		expect(jobAnnouncement(null, running)).toEqual(running.live)
+		expect(jobAnnouncement(running, ujob({ state: 'running', step: 'backup' }))).toBeNull()
+		expect(jobAnnouncement(running, ujob({ state: 'running', step: 'swap' }))).not.toBeNull()
+	})
+})
+
+describe('the words that depend on the kind of job', () => {
+	const INSTALL_FILES_UNREADABLE = 'A file that records an earlier install cannot be read. Look at it at a console, delete it by hand, then try again.'
+
+	it('keeps the sentence of an install and of a remove for files_unreadable, byte for byte', () => {
+		expect(reasonMessage('files_unreadable')).toEqual({ key: INSTALL_FILES_UNREADABLE, params: {} })
+		expect(reasonMessage('files_unreadable', { kind: 'install' }).key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(reasonMessage('files_unreadable', { kind: 'remove' }).key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(job({ state: 'failed', step: 'unpack', code: 'files_unreadable', undo: 'rolled_back' }).reason.key).toBe(INSTALL_FILES_UNREADABLE)
+		expect(fr[INSTALL_FILES_UNREADABLE]).toBe('Un fichier qui garde la trace d\'une installation précédente est illisible. Regardez-le sur une console, supprimez-le à la main, puis réessayez.')
+		expect(moduleFailure(refusal('files_unreadable', {})).message.key).toBe(INSTALL_FILES_UNREADABLE)
+	})
+
+	it('says for an update that the record of the installed module cannot be read, that nothing was changed, and what to do', () => {
+		const key = reasonMessage('files_unreadable', { kind: 'update' }).key
+		expect(key).not.toBe(INSTALL_FILES_UNREADABLE)
+		expect(key).toContain('The record of the installed module cannot be read')
+		expect(key).toContain('Nothing was changed')
+		expect(key).toContain('remove the module, then install it again')
+		expect(job({ kind: 'update', state: 'failed', step: 'unpack', code: 'files_unreadable', undo: 'rolled_back' }).reason.key).toBe(key)
+		expect(moduleFailure(refusal('files_unreadable', {}), 'en_us', { mode: 'update' }).message.key).toBe(key)
+		expect(updatePlanFor('files_unreadable').refusedMessage.key).toBe(key)
+	})
+
+	function updatePlanFor(code) {
+		return modulePlanView(planRaw({ mode: 'update', tag: 'v0.1.3', refused: code, plan_id: '', checks: [], update: { installed: 'v0.1.2', latest: 'v0.1.3', added: [], dropped: [] } }), { name: 'virt', mode: 'update' })
+	}
+})
+
+describe('the result words of an update that left files, and of one whose backup stayed', () => {
+	const ujob = (changes, options) => job({ kind: 'update', ...changes }, options)
+	const left = ['some line', 'left: /usr/bin/virt-tool', 'left: /etc/casaos/virt.d/local.conf', 'rolled back, but these files were left as they are']
+
+	it('does not say that the old version is back when files were left as they are, and says to remove then install', () => {
+		const view = ujob({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back_with_left', log_tail: left })
+		expect(view.undoText).toEqual({ key: JOB_NEXT.updateLeft, params: {} })
+		expect(view.undoText.key).not.toBe(JOB_NEXT.updateBack)
+		expect(JOB_NEXT.updateLeft).toContain('the old version is not whole')
+		expect(JOB_NEXT.updateLeft).toContain('Press Remove, then Install')
+		expect(view.advice).toBeNull()
+		expect(view.folder).toBeNull()
+		expect(view.leftFiles).toEqual(['left: /usr/bin/virt-tool', 'left: /etc/casaos/virt.d/local.conf'])
+		expect(view.logTail).toEqual(left)
+		expect(view.dismissible).toBe(true)
+		for (const key of keysIn(view))
+			expect(MODULE_KEYS, key).toContain(key)
+	})
+
+	it('names the files only for that word, and only for an update', () => {
+		expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back_with_left' }).leftFiles).toEqual([])
+		expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back', log_tail: left }).leftFiles).toEqual([])
+		expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back', log_tail: left }).undoText.key).toBe(JOB_NEXT.updateBack)
+		expect(job({ kind: 'install', state: 'failed', step: 'unpack', undo: 'rolled_back_with_left', log_tail: left }).leftFiles).toEqual([])
+		expect(ujob({ state: 'failed', step: 'swap', undo: 'rolled_back_with_left', log_tail: [`left: ${'x'.repeat(5000)}`, 'left: <img src=x>'] }).leftFiles.every(item => item.length <= 240)).toBe(true)
+	})
+
+	describe('backup_not_dropped', () => {
+		const view = () => ujob({ state: 'failed', step: '', code: 'backup_not_dropped', undo: '' })
+
+		it('does not say that the update is done or that it stopped: it is installed, and its backup is still there', () => {
+			expect(view().title).toEqual({ key: JOB_TITLES.failed.updateNotDropped, params: { module: 'Virtual machines' } })
+			expect(JOB_TITLES.failed.updateNotDropped).toContain('is installed')
+			expect(view().title.key).not.toBe(JOB_TITLES.succeeded.update)
+			expect(view().title.key).not.toBe(JOB_TITLES.succeeded.updateTo)
+			expect(view().title.key).not.toBe(JOB_TITLES.failed.update)
+			expect(view().next).toBeNull()
+			expect(view().reason.key).toBe(REASONS.backup_not_dropped)
+			expect(view().code).toBe('backup_not_dropped')
+		})
+
+		it('names the folder as text, and says that the next job puts the old version back unless it is deleted by hand', () => {
+			expect(view().undoText).toEqual({ key: JOB_NEXT.updateNotDropped, params: {} })
+			expect(JOB_NEXT.updateNotDropped).toContain('put the old version back')
+			expect(JOB_NEXT.updateNotDropped).toContain('by hand')
+			expect(view().folder).toBe('/var/lib/casaos/modules/tmp/backup-virt')
+			expect(view().advice).toBeNull()
+			expect(view().kept).toBeNull()
+		})
+
+		it('lists no step as not reached, since every step was made', () => {
+			expect(view().steps).toEqual([])
+			expect(view().stoppedAt).toBeNull()
+			// any other failure of an update still lists them
+			expect(ujob({ state: 'failed', step: 'swap', code: 'swap_failed', undo: 'rolled_back' }).steps).toHaveLength(10)
+		})
+
+		it('is the sentence of an update only', () => {
+			const other = job({ kind: 'install', state: 'failed', step: '', code: 'backup_not_dropped' })
+			expect(other.title.key).toBe(JOB_TITLES.failed.install)
+			expect(other.folder).toBeNull()
+		})
+	})
+})
+
+describe('the step leftovers of a remove', () => {
+	it('is a step of a remove, with a sentence', () => {
+		expect(STEP_TEXTS.remove.leftovers).toBe('Checking what an unfinished update left')
+		expect(job({ step: 'leftovers' }).kind).toBe('remove')
+	})
+
+	it('is listed after the four steps of a remove, and only when the job is at it', () => {
+		const view = job({ kind: 'remove', state: 'failed', step: 'leftovers', code: 'remove_incomplete' })
+		expect(view.steps.map(item => item.id)).toEqual([...STEPS.remove, 'leftovers'])
+		expect(view.steps.map(item => item.mark)).toEqual(['done', 'done', 'done', 'done', 'failed'])
+		expect(view.stoppedAt.params.step).toBe(STEP_TEXTS.remove.leftovers)
+		expect(job({ kind: 'remove', state: 'failed', step: 'reload', code: 'remove_incomplete' }).steps.map(item => item.id)).toEqual(STEPS.remove)
+		expect(job({ kind: 'remove', state: 'succeeded', step: 'done' }).steps.map(item => item.id)).toEqual(STEPS.remove)
+		const running = job({ kind: 'remove', state: 'running', step: 'leftovers' })
+		expect(running.progress).toMatchObject({ value: 4, max: 5 })
+	})
+
+	it('says that the module was removed and that the log names what was left, and no command', () => {
+		const view = job({ kind: 'remove', state: 'failed', step: 'leftovers', code: 'remove_incomplete' })
+		expect(view.reason.key).toBe(REASONS.remove_incomplete.steps.leftovers)
+		expect(view.reason.key).toContain('The module was removed')
+		expect(view.reason.key).toContain('log below')
+		expect(view.advice).toBeNull()
+		// the same code at another step keeps its sentence
+		expect(job({ kind: 'remove', state: 'failed', step: 'files', code: 'remove_incomplete' }).reason.key).toBe(REASONS.remove_incomplete.text)
+		expect(job({ kind: 'remove', state: 'failed', step: 'files', code: 'remove_incomplete' }).advice).not.toBeNull()
+		expect(reasonMessage('remove_incomplete').key).toBe('Some files of the module could not be deleted.')
+	})
+})
+
+describe('an update of a module that was stopped', () => {
+	const stopped = { installed: true, version: 'v0.1.3', unit: { active: false, enabled: false }, route: { answers: false } }
+	const ujob = (changes, status) => job({ kind: 'update', ...changes }, { status })
+
+	it('shows start and route as skipped, not failed and not pending, and keeps the headline', () => {
+		const view = ujob({ state: 'succeeded', step: 'done' }, stopped)
+		expect(view.steps.map(item => item.mark)).toEqual(['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'left', 'left'])
+		expect(view.steps.slice(8).map(item => item.markText)).toEqual(['Skipped: the service was stopped before the update', 'Skipped: the service was stopped before the update'])
+		expect(view.title.key).toBe(JOB_TITLES.succeeded.updateTo)
+		expect(view.next.key).toBe(JOB_NEXT.succeededUpdate)
+		expect(STEP_MARKS.left.icon).toBeTruthy()
+		expect(fr[STEP_MARKS.left.text]).toBe('Ignorée : le service était arrêté avant la mise à jour')
+	})
+
+	it.each([
+		['the service runs', { ...stopped, unit: { active: true, enabled: true } }],
+		['the status does not say', { installed: true, version: 'v0.1.3' }],
+		['the unit is not an object', { installed: true, version: 'v0.1.3', unit: 'no' }],
+		['active is not false', { installed: true, version: 'v0.1.3', unit: { active: null } }],
+	])('shows every step done when %s', (_, status) => {
+		expect(ujob({ state: 'succeeded', step: 'done' }, status).steps.every(item => item.mark === 'done')).toBe(true)
+	})
+
+	it('skips nothing for a job that did not succeed, or that is not an update', () => {
+		expect(ujob({ state: 'failed', step: 'start', code: 'start_failed', undo: 'rolled_back' }, stopped).steps.map(item => item.mark)).not.toContain('left')
+		expect(ujob({ state: 'running', step: 'swap' }, stopped).steps.map(item => item.mark)).not.toContain('left')
+		expect(job({ kind: 'install', state: 'succeeded', step: 'done' }, { status: stopped }).steps.map(item => item.mark)).not.toContain('left')
+	})
+})
+
+describe('the failure of a call that updates', () => {
+	it.each(UPDATE_REFUSALS)('says the refusal %s of the update in its sentence and lists the checks that failed', (code) => {
+		const checks = [{ code: 'installed', ok: false, detail: 'x' }, { code: 'catalogue', ok: true, detail: '' }, { code: 'newer', ok: false, detail: 'not_checked' }]
+		const failure = moduleFailure(refusal(code, { checks }), 'en_us', { mode: 'update' })
+		expect(failure.message.key).toBe(reasonMessage(code, { kind: 'update' }).key)
+		expect(failure.items.map(item => item.code)).toEqual(['installed'])
+		expect(failure.items[0].message.key).toBe(reasonMessage(['manifest_invalid', 'files_unreadable', 'files_unverified'].includes(code) ? code : 'not_installed', { kind: 'update' }).key)
+	})
+})
+
 describe('the sizes', () => {
 	it.each([
 		[0, 'en', '0 B'],
@@ -1675,6 +2194,21 @@ describe('the language files', () => {
 		expect(fr[TEXT.job.keptSome]).toMatch(/Voici les paquets.*Certains étaient/)
 		expect(fr[TEXT.job.purgeOne]).toMatch(/^Pour le purger/)
 		expect(fr[TEXT.job.purge]).toMatch(/^Pour les purger/)
+	})
+
+	// one word for each thing: a module, an update (a "mise à jour"), and the verb "mettre à jour"
+	it('says the update in French with the words "mise à jour" and "mettre à jour", and never an upgrade', () => {
+		for (const key of MODULE_KEYS) {
+			if (/\bupdate\b/i.test(key) && !/apt-get update|package update|Update ReCasaOS/.test(key))
+				expect(fr[key], key).toMatch(/à jour/)
+			if (!/upgrade/i.test(key) && /\b(?:update|updating)\b/i.test(key))
+				expect(fr[key], key).not.toMatch(/mise à niveau/i)
+		}
+		expect(fr[TEXT.update.badge]).toBe('Version {latest} disponible')
+		expect(fr[TEXT.update.ok]).toBe('Mettre à jour le module')
+		expect(fr[JOB_TITLES.succeeded.updateTo]).toBe('La mise à jour de {module} vers {tag} est terminée.')
+		expect(fr[JOB_TITLES.running.update]).toBe('Mise à jour de {module}')
+		expect(fr.Update).toBe('Mettre à jour')
 	})
 
 	it('says the headline of an install and of a removal in French', () => {
