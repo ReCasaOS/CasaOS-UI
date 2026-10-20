@@ -69,3 +69,22 @@ describe('the Statistics entry', () => {
 		expect(win).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('the Statistics window when it is already open', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		document.body.innerHTML = '<div class="modal is-active stats-modal"><div class="stats-page"><h3 tabindex="-1">Statistics</h3></div></div>'
+	})
+
+	it('is reused: no second modal, the heading is focused, the item is offered to the page', async () => {
+		const { openStatistics } = await import('./entry.js')
+		const { buefy, open } = fakeBuefy()
+		const heard = vi.fn()
+		window.addEventListener('stats-open-item', heard)
+		expect(openStatistics(buefy, { appLaunchInIframe: true, appLaunchExceptions: [] }, { item: 'vm:abc' })).toBeNull()
+		window.removeEventListener('stats-open-item', heard)
+		expect(open).not.toHaveBeenCalled()
+		expect(document.activeElement).toBe(document.querySelector('.stats-page h3'))
+		expect(heard.mock.calls[0][0].detail).toBe('vm:abc')
+	})
+})

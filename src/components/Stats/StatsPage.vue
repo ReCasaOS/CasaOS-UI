@@ -26,7 +26,7 @@
 										type="button"
 										@click="select(keyOf(item))">
 										<span :class="`state-${item.state}`" aria-hidden="true" class="stats-dot"></span>
-										<span class="is-sr-only">{{ stateWord(item.state) }}</span>
+										<span class="is-sr-only">{{ stateWord(item.state, item.kind) }}</span>
 										<span v-if="columns[item.source].state === 'error'" class="is-sr-only">{{ $t('Out of date') }}</span>
 										<span class="stats-item-name">{{ item.name }}</span>
 										<span class="stats-item-cpu">{{ cpuText(item) }}</span>
@@ -58,7 +58,7 @@
 							<div class="stats-title">
 								<h4 class="stats-name">{{ selected.name }}</h4>
 								<span class="stats-kind">{{ kindWord(selected.kind) }}</span>
-								<span class="stats-state">{{ stateWord(selected.state) }}</span>
+								<span class="stats-state">{{ stateWord(selected.state, selected.kind) }}</span>
 								<span v-if="sinceText" class="stats-since">{{ sinceText }}</span>
 								<button class="button is-small is-rounded ml-auto" type="button" @click="openAlerts">{{ $t('Alert settings') }}</button>
 							</div>
@@ -252,8 +252,12 @@ export default {
 		figureList() {
 			return figures(this.seriesData, this.selected, this.locale, this.$t)
 		},
+		// a string, so that a new object for the same item (every poll of the list) does not build the charts again
+		selectedKind() {
+			return this.selected?.kind || ''
+		},
 		charts() {
-			return buildCharts(this.seriesData, { range: this.range, hidden: new Set(this.hiddenKeys), kind: this.selected?.kind || '', t: (key, params) => this.$t(key, params) })
+			return buildCharts(this.seriesData, { range: this.range, hidden: new Set(this.hiddenKeys), kind: this.selectedKind, locale: this.locale, t: (key, params) => this.$t(key, params) })
 		},
 		hasData() {
 			return this.charts.some(chart => !chart.empty)
@@ -298,11 +302,13 @@ export default {
 		this.seriesPoller = createPoller({ run: () => this.fetchSeries(), intervalMs: REFRESH_MS })
 		this.listPoller = createPoller({ run: () => this.loadAll(), intervalMs: REFRESH_MS })
 		document.addEventListener('visibilitychange', this.onVisibility)
+		window.addEventListener('stats-open-item', this.onOpenItem)
 		this.$refs.title.focus()
 		this.listPoller.start()
 	},
 	beforeUnmount() {
 		document.removeEventListener('visibilitychange', this.onVisibility)
+		window.removeEventListener('stats-open-item', this.onOpenItem)
 		this.listPoller.stop()
 		this.seriesPoller.stop()
 	},
@@ -327,7 +333,11 @@ export default {
 		keyOf(item) {
 			return `${item.source}|${item.id}`
 		},
-		stateWord(state) {
+		stateWord(state, kind) {
+			// 'Crashed' is the word for a virtual machine; a container that failed has exited with an error
+			if (state === 'crashed' && kind !== 'vm') {
+				return this.$t('Exited with an error')
+			}
 			return this.$t(STATE_WORDS[state] || 'Unknown')
 		},
 		cpuText(item) {
@@ -408,6 +418,13 @@ export default {
 			}
 			const pick = this.flat[0]
 			this.selectedKey = pick ? this.keyOf(pick) : ''
+		},
+		// An alert notification asked for an item while this window is open: show it, if the list has it.
+		onOpenItem(event) {
+			const asked = typeof event?.detail === 'string' ? this.flat.find(item => this.keyOf(item) === event.detail || item.id === event.detail) : null
+			if (asked) {
+				this.select(this.keyOf(asked))
+			}
 		},
 		select(key) {
 			this.userPicked = true
@@ -574,8 +591,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+// The window is narrow below this width: one column, the select instead of the list
+$stats-narrow: 44rem;
+
 .stats-page {
 	position: relative;
+	// the layout answers to the width of the window (a modal 66rem wide, a tab, a phone), not to the screen
+	container-type: inline-size;
 
 	.modal-card-body {
 		position: relative;
@@ -605,7 +627,7 @@ export default {
 		gap: 1rem;
 		align-items: start;
 
-		@include touch {
+		@container (max-width: #{$stats-narrow}) {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
@@ -625,7 +647,7 @@ export default {
 		background: var(--casa-surface-sunken);
 		border: 1px solid var(--casa-border);
 
-		@include touch {
+		@container (max-width: #{$stats-narrow}) {
 			display: none;
 		}
 	}
@@ -636,7 +658,7 @@ export default {
 		padding: 0.5rem;
 		border-radius: 0.5rem;
 
-		@include touch {
+		@container (max-width: #{$stats-narrow}) {
 			display: block;
 		}
 	}
@@ -645,7 +667,7 @@ export default {
 		padding: 0 0.625rem;
 		font-size: 0.75rem;
 		font-weight: 500;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	.stats-item {
@@ -666,7 +688,7 @@ export default {
 		}
 
 		&.is-selected {
-			border-color: var(--casa-primary, #3b82f6);
+			border-color: var(--stats-accent);
 			background: var(--casa-hover-tile);
 		}
 	}
@@ -688,7 +710,7 @@ export default {
 	.stats-item-cpu {
 		flex-shrink: 0;
 		font-size: 0.75rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	.stats-item-alerts {
@@ -696,8 +718,8 @@ export default {
 		padding: 0 0.4rem;
 		border-radius: 1rem;
 		font-size: 0.7rem;
-		color: #b86e00;
-		background: rgba(245, 166, 35, 0.15);
+		color: var(--casa-text-warning);
+		background: var(--casa-warning-tint);
 	}
 
 	// a shape per state, so that the colour is not the only sign
@@ -754,7 +776,7 @@ export default {
 	.stats-since,
 	.stats-detail {
 		font-size: 0.75rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	.stats-detail {
@@ -780,8 +802,13 @@ export default {
 			padding: 0.25rem 0.75rem;
 			border-radius: 1rem;
 
+			// a finger, not a pointer
+			@media (max-width: 600px) {
+				min-height: 2.25rem;
+			}
+
 			&:focus-visible {
-				outline: 2px solid var(--casa-primary, #3b82f6);
+				outline: 2px solid var(--stats-accent);
 				outline-offset: -2px;
 			}
 			border: 0;
@@ -792,7 +819,7 @@ export default {
 
 			&.is-active {
 				color: #fff;
-				background: var(--casa-primary, #3b82f6);
+				background: var(--stats-accent-fill);
 			}
 		}
 	}
@@ -803,7 +830,7 @@ export default {
 	.stats-no-data {
 		margin-bottom: 0.5rem;
 		font-size: 0.8125rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	.stats-figures {
@@ -812,7 +839,7 @@ export default {
 		gap: 0.5rem;
 		margin-bottom: 1rem;
 
-		@media (max-width: 768px) {
+		@container (max-width: #{$stats-narrow}) {
 			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
@@ -824,7 +851,7 @@ export default {
 
 		dt {
 			font-size: 0.75rem;
-			color: var(--casa-text-dim);
+			color: var(--casa-text-hint);
 		}
 
 		dd {
@@ -843,15 +870,15 @@ export default {
 	}
 
 	.stats-alerts {
-		color: #b86e00;
-		background: rgba(245, 166, 35, 0.15);
+		color: var(--casa-text-warning);
+		background: var(--casa-warning-tint);
 	}
 
 	.stats-alerts-error {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	.stats-charts {
@@ -859,7 +886,7 @@ export default {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.75rem;
 
-		@media (max-width: 960px) {
+		@container (max-width: #{$stats-narrow}) {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
@@ -868,7 +895,36 @@ export default {
 	.stats-note {
 		padding: 0 0.625rem;
 		font-size: 0.75rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
+}
+</style>
+
+<style lang="scss">
+// The modal the page opens in: the same size as the one of the virtual machines.
+.stats-modal {
+	.animation-content {
+		width: 66rem;
+		max-width: calc(100vw - 2rem) !important;
+	}
+
+	.modal-card.stats-page {
+		width: 100%;
+		max-height: calc(100vh - 5rem);
+
+		.modal-card-body {
+			overflow-y: auto;
+		}
+	}
+}
+
+// Blue for text and for a filled pill, both readable (at least 4.5:1) against the surface or against white text.
+.stats-page {
+	--stats-accent: hsl(216, 90%, 40%);
+	--stats-accent-fill: hsl(216, 90%, 40%);
+}
+
+html[data-theme='dark'] .stats-page {
+	--stats-accent: hsl(216, 90%, 72%);
 }
 </style>

@@ -217,7 +217,7 @@ export default {
 .stats-chart-caption,
 .stats-chart-empty {
 	font-size: 0.75rem;
-	color: var(--casa-text-dim);
+	color: var(--casa-text-hint);
 }
 
 .stats-legend {
@@ -234,12 +234,16 @@ export default {
 		border: 0;
 		border-radius: 0.25rem;
 		font-size: 0.75rem;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 		background: transparent;
 		cursor: pointer;
 
 		&:focus-visible {
-			outline: 2px solid var(--casa-primary, #3b82f6);
+			outline: 2px solid var(--stats-accent);
+		}
+
+		@media (max-width: 600px) {
+			min-height: 2.25rem;
 		}
 
 		&.is-hidden {
@@ -278,7 +282,7 @@ export default {
 	margin: 0;
 
 	&:focus-visible {
-		outline: 2px solid var(--casa-primary, #3b82f6);
+		outline: 2px solid var(--stats-accent);
 		outline-offset: 2px;
 	}
 }
@@ -288,9 +292,54 @@ export default {
 	padding: 0;
 	border: 0;
 	font-size: 0.75rem;
-	color: var(--casa-primary, #3b82f6);
+	color: var(--stats-accent);
 	background: transparent;
 	cursor: pointer;
+
+	@media (max-width: 600px) {
+		min-height: 2.25rem;
+	}
+}
+
+// apexcharts paints its own light colours: axes, grid and tooltip follow the theme of the dashboard instead
+.stats-chart {
+	:deep(.apexcharts-text),
+	:deep(.apexcharts-xaxis-label),
+	:deep(.apexcharts-yaxis-label) {
+		fill: var(--casa-text-hint);
+	}
+
+	:deep(.apexcharts-gridline),
+	:deep(.apexcharts-xaxis-tick),
+	:deep(.apexcharts-yaxis-border),
+	:deep(.apexcharts-xaxis-borders) {
+		stroke: var(--casa-border);
+	}
+
+	:deep(.apexcharts-tooltip) {
+		color: var(--casa-text);
+		background: var(--casa-surface-raised);
+		border-color: var(--casa-border);
+		box-shadow: none;
+	}
+
+	:deep(.apexcharts-tooltip-title) {
+		color: var(--casa-text);
+		background: var(--casa-surface-sunken);
+		border-bottom-color: var(--casa-border);
+	}
+
+	:deep(.apexcharts-xaxistooltip),
+	:deep(.apexcharts-yaxistooltip) {
+		color: var(--casa-text);
+		background: var(--casa-surface-raised);
+		border-color: var(--casa-border);
+	}
+
+	:deep(.apexcharts-xaxistooltip-bottom::before),
+	:deep(.apexcharts-xaxistooltip-bottom::after) {
+		border-bottom-color: var(--casa-border);
+	}
 }
 
 .stats-table {
@@ -300,7 +349,7 @@ export default {
 
 	caption {
 		text-align: left;
-		color: var(--casa-text-dim);
+		color: var(--casa-text-hint);
 	}
 
 	th,

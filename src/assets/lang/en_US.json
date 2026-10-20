@@ -2505,5 +2505,7 @@
   "{days} d": "{days} d",
   "{hours} h {minutes} min": "{hours} h {minutes} min",
   "{minutes} min": "{minutes} min",
-  "{seconds} s": "{seconds} s"
+  "{seconds} s": "{seconds} s",
+  "Exited with an error": "Exited with an error",
+  "The settings are applied but could not be kept for good.": "The settings are applied but could not be kept for good."
 }

@@ -974,3 +974,85 @@ describe('a11y: what the page says to a screen reader and a keyboard', () => {
 		expect(all('[tabindex]').filter(el => Number(el.getAttribute('tabindex')) > 0)).toEqual([])
 	})
 })
+
+describe('the charts across a poll of the list', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38, 'memory/rss': 1000 }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+		vi.useRealTimers()
+	})
+
+	it('are not built again when the list answers with new objects', async () => {
+		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		await vi.advanceTimersByTimeAsync(0)
+		const before = wrapper.vm.charts
+		expect(before.length).toBeGreaterThan(0)
+		serve({ app_management: body([anItem({ cpu_percent: 77 }), plex]), virt_management: body([vm]), core: body([host]) })
+		await vi.advanceTimersByTimeAsync(5000)
+		expect(wrapper.vm.selected.cpu_percent).toBe(77)
+		expect(wrapper.vm.charts).toBe(before)
+	})
+})
+
+describe('open statistics from a notification, with the window already open', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockReturnValue(new Promise(() => {}))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+	})
+
+	it('shows the item the notification is about', async () => {
+		await mountPage()
+		expect(pressed()).toEqual(['Jellyfin'])
+		window.dispatchEvent(new CustomEvent('stats-open-item', { detail: 'virt_management|vm-1' }))
+		await flushPromises()
+		expect(pressed()).toEqual(['Debian'])
+		window.dispatchEvent(new CustomEvent('stats-open-item', { detail: 'nothing' }))
+		await flushPromises()
+		expect(pressed()).toEqual(['Debian'])
+	})
+
+	it('stops listening when the page is closed', async () => {
+		await mountPage()
+		const vm = wrapper.vm
+		wrapper.unmount()
+		wrapper = null
+		window.dispatchEvent(new CustomEvent('stats-open-item', { detail: 'virt_management|vm-1' }))
+		await flushPromises()
+		expect(vm.selectedKey).toBe('app_management|app:jellyfin:web:1')
+	})
+})
+
+describe('the word for a crashed item', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockReturnValue(new Promise(() => {}))
+		serve({ app_management: body([anItem({ state: 'crashed' })]), virt_management: body([anItem({ id: 'vm-9', name: 'Broken', kind: 'vm', state: 'crashed' })]), core: body([]) })
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+	})
+
+	it('is "Crashed" for a virtual machine and "Exited with an error" for a container', async () => {
+		await mountPage()
+		const words = [...document.querySelectorAll('.stats-list .is-sr-only')].map(el => el.textContent)
+		expect(words).toEqual(['Exited with an error', 'Crashed'])
+	})
+})

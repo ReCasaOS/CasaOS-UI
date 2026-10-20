@@ -196,6 +196,26 @@ describe('the alert settings dialog', () => {
 		expect(save().disabled).toBe(false)
 	})
 
+	it('says a 503 on save means applied but not kept, and updates the banner when the answer has the active alerts', async () => {
+		const active = [{ key: 'cpu_high', since: '2026-10-20T10:00:00Z', value: 95 }]
+		statsApi.setAlerts.mockRejectedValue(Object.assign(new Error('failed'), { response: { status: 503, data: { message: 'stats_unavailable', active } } }))
+		await open()
+		save().click()
+		await flushPromises()
+		expect(document.querySelector('.stats-dialog-error').textContent).toBe('The settings are applied but could not be kept for good.')
+		expect(wrapper.emitted('saved')[0][0].active).toEqual(active)
+		expect(wrapper.emitted('close')).toBeUndefined()
+	})
+
+	it('says it too when the 503 carries no active alerts, and tells the page nothing', async () => {
+		statsApi.setAlerts.mockRejectedValue(failure(503, 'stats_unavailable'))
+		await open()
+		save().click()
+		await flushPromises()
+		expect(document.querySelector('.stats-dialog-error').textContent).toBe('The settings are applied but could not be kept for good.')
+		expect(wrapper.emitted('saved')).toBeUndefined()
+	})
+
 	it('says the settings could not be read, and reads them again on Retry', async () => {
 		statsApi.alerts.mockRejectedValueOnce(failure(500))
 		await open()

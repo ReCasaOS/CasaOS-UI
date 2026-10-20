@@ -197,6 +197,12 @@ export default {
 				if (e?.response?.status === 400) {
 					this.problem = 'These values were refused.'
 					this.markRefused(e.response.data?.message)
+				} else if (e?.response?.status === 503) {
+					// the contract: applied in memory, but the state file could not be written
+					this.problem = 'The settings are applied but could not be kept for good.'
+					if (Array.isArray(e.response.data?.active)) {
+						this.$emit('saved', e.response.data)
+					}
 				} else {
 					this.problem = 'The settings could not be saved. Try again.'
 				}
@@ -286,7 +292,7 @@ export default {
 
 .stats-dialog-item {
 	font-weight: 400;
-	color: var(--casa-text-dim);
+	color: var(--casa-text-hint);
 }
 
 .stats-dialog-line,
@@ -294,7 +300,7 @@ export default {
 .stats-rule-bound {
 	margin: 0.25rem 0;
 	font-size: 0.8125rem;
-	color: var(--casa-text-dim);
+	color: var(--casa-text-hint);
 }
 
 .stats-rule {

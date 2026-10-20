@@ -537,6 +537,14 @@ describe('the Statistics card count badge', () => {
 		wrapper.unmount()
 	})
 
+	it('is only for the system app, not for an app that is merely called Statistics', async () => {
+		alertBadge.counts.core = 2
+		const wrapper = await card({ ...stats, app_type: 'v1app' })
+
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
 	it('shows nothing at 0', async () => {
 		const wrapper = await card(stats)
 

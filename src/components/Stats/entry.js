@@ -12,6 +12,16 @@ export const STATS_APP_NAME = 'Statistics'
 // Opens the page in a modal, or on a tab of its own when the App launching setting sends apps, or this one, to a new tab.
 // `item` is the id of the item to show first, or 'source|id' when the caller knows the source too.
 export function openStatistics(buefy, state, { item } = {}) {
+	// a window already on screen is the one to use: it shows the item asked for and takes the focus
+	const open = document.querySelector('.stats-modal.is-active .stats-page')
+	if (open && !builtinOpensInNewTab(STATS_LAUNCH_ID, state)) {
+		if (item) {
+			window.dispatchEvent(new CustomEvent('stats-open-item', { detail: item }))
+		}
+		open.querySelector('h3')?.focus({ preventScroll: true })
+		return null
+	}
+
 	if (builtinOpensInNewTab(STATS_LAUNCH_ID, state)) {
 		const query = item ? `?item=${encodeURIComponent(item)}` : ''
 		window.open(`${window.location.pathname}#/stats${query}`, '_blank')

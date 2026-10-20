@@ -251,7 +251,8 @@ export default {
 	computed: {
 		// The count of active resource alerts, for the Statistics card: its number and the sentence that names it.
 		statsBadge() {
-			const total = this.item.name === STATS_APP_NAME ? alertBadge.total() : 0
+			// the system app only: an app a person installed may carry the same name
+			const total = this.item.app_type === 'system' && this.item.name === STATS_APP_NAME ? alertBadge.total() : 0
 			if (!(total > 0)) {
 				return null
 			}
