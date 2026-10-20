@@ -2431,5 +2431,13 @@
   "No data for this period": "No data for this period",
   "{n} alert": "{n} alert",
   "Out of date": "Out of date",
-  "No containers or virtual machines to show": "No containers or virtual machines to show"
+  "No containers or virtual machines to show": "No containers or virtual machines to show",
+  "Series": "Series",
+  "Last": "Last",
+  "Min": "Min",
+  "Average": "Average",
+  "Max": "Max",
+  "Show as a table": "Show as a table",
+  "Hide the table": "Hide the table",
+  "Reset zoom": "Reset zoom"
 }

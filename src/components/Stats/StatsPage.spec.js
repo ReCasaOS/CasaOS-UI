@@ -17,6 +17,7 @@ vi.mock('@/service/stats', () => ({
 	statsApi: { list: vi.fn(), series: vi.fn(), alerts: vi.fn(), setAlerts: vi.fn() },
 }))
 vi.mock('@/components/VirtualMachines/entry', () => ({ hasVirtualMachines: vi.fn() }))
+vi.mock('vue3-apexcharts', () => ({ __esModule: true, default: { name: 'ApexStub', props: ['options', 'series', 'type', 'height'], render: () => null } }))
 
 const jelly = anItem()
 const plex = anItem({ id: 'app:plex:web:1', name: 'Plex' })
@@ -590,5 +591,68 @@ describe('the header, the periods and the figures', () => {
 		expect(document.querySelector('.stats-name').textContent).toBe(HOSTILE)
 		expect(document.querySelector('.stats-kind').textContent).toBe('Container')
 		expect(document.querySelector('.stats-state').textContent).toBe('Running')
+	})
+})
+
+describe('the chart cards of the page', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38, 'memory/rss': 1000 }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+	})
+	const apexes = () => wrapper.findAllComponents({ name: 'ApexStub' })
+	const legendButton = label => [...document.querySelectorAll('.stats-legend button')].find(b => b.textContent.includes(label))
+	const pageButton = label => [...document.querySelectorAll('.stats-toolbar button')].find(b => b.textContent.trim() === label)
+
+	it('draws one card per chart, the processor across the whole width, all in one group', async () => {
+		await mountPage()
+		expect([...document.querySelectorAll('.stats-chart h4')].map(h => h.textContent)).toEqual(['Processor', 'Memory'])
+		expect(document.querySelector('.stats-chart.is-wide h4').textContent).toBe('Processor')
+		expect(apexes().map(a => a.props('options').chart.group)).toEqual(['stats', 'stats'])
+	})
+
+	it('hides a line when its legend entry is pressed and shows it again at the next press', async () => {
+		await mountPage()
+		const resident = () => apexes()[1]?.props('series').map(s => s.name)
+		expect(resident()).toEqual(['Resident'])
+		legendButton('Resident').click()
+		await flushPromises()
+		expect(legendButton('Resident').getAttribute('aria-pressed')).toBe('false')
+		expect(apexes()).toHaveLength(1)
+		legendButton('Resident').click()
+		await flushPromises()
+		expect(resident()).toEqual(['Resident'])
+	})
+
+	it('puts the same window on every card after a zoom, never asks again, and lets it go', async () => {
+		await mountPage()
+		const calls = statsApi.series.mock.calls.length
+		expect(pageButton('Reset zoom')).toBeUndefined()
+		apexes()[0].props('options').chart.events.zoomed({}, { xaxis: { min: 1760000100000, max: 1760000200000 } })
+		await flushPromises()
+		expect(apexes().map(a => a.props('options').xaxis.min)).toEqual([1760000100000, 1760000100000])
+		expect(apexes().map(a => a.props('options').xaxis.max)).toEqual([1760000200000, 1760000200000])
+		pageButton('Reset zoom').click()
+		await flushPromises()
+		expect(apexes().map(a => a.props('options').xaxis.min)).toEqual([null, null])
+		expect(pageButton('Reset zoom')).toBeUndefined()
+		expect(statsApi.series.mock.calls.length).toBe(calls)
+	})
+
+	it('zooms in by halving the window around the middle, as a button', async () => {
+		await mountPage()
+		const { from, to } = aSeries()
+		pageButton('Zoom in').click()
+		await flushPromises()
+		const { min, max } = apexes()[0].props('options').xaxis
+		const middle = (from + to) / 2 * 1000
+		expect(max - min).toBe((to - from) * 1000 / 2)
+		expect((min + max) / 2).toBe(middle)
 	})
 })

@@ -2431,5 +2431,13 @@
   "No data for this period": "Aucune donnée pour cette période",
   "{n} alert": "{n} alerte",
   "Out of date": "Pas à jour",
-  "No containers or virtual machines to show": "Aucun conteneur ni machine virtuelle à afficher"
+  "No containers or virtual machines to show": "Aucun conteneur ni machine virtuelle à afficher",
+  "Series": "Série",
+  "Last": "Dernière",
+  "Min": "Min",
+  "Average": "Moyenne",
+  "Max": "Max",
+  "Show as a table": "Afficher sous forme de tableau",
+  "Hide the table": "Masquer le tableau",
+  "Reset zoom": "Réinitialiser le zoom"
 }

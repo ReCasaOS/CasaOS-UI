@@ -254,11 +254,14 @@ function buildOne(def, byKey, { range, hidden, kind, t }, response) {
 	}
 	const empty = !list.some(f => f.def.kind !== 'ref' && f.points.some(p => p.avg !== null))
 	const series = []
+	// every line the person can toggle, hidden or not (the legend)
+	const legend = []
 	for (const f of list) {
+		const label = labelOf(f)
+		legend.push({ key: f.key, label, color: f.color, kind: f.def.kind, hidden: hidden.has(f.key) })
 		if (hidden.has(f.key)) {
 			continue
 		}
-		const label = labelOf(f)
 		const toData = pick => f.points.map(p => ({ x: p.t * 1000, y: p[pick] }))
 		series.push({ key: f.key, name: escape(label), label, color: f.color, kind: f.def.kind, points: toData('avg'), cleaned: f.points })
 		if ((range === '24h' || range === '7d') && f.def.kind === 'area') {
@@ -274,6 +277,7 @@ function buildOne(def, byKey, { range, hidden, kind, t }, response) {
 		wide: Boolean(def.wide),
 		empty,
 		series,
+		legend,
 		caption: chartCaption(def, response.scale, notes, t),
 		noteCodes: notes.filter(n => own(NOTE_CHART, n) === def.id).map(n => clean(n, 60)),
 	}

@@ -76,6 +76,8 @@
 								</button>
 							</div>
 							<button v-if="range !== 'live'" class="button is-small is-rounded" type="button" @click="restartSeries">{{ $t('Refresh') }}</button>
+							<button v-if="hasData" class="button is-small is-rounded" type="button" @click="zoomIn">{{ $t('Zoom in') }}</button>
+							<button v-if="zoom" class="button is-small is-rounded" type="button" @click="zoom = null">{{ $t('Reset zoom') }}</button>
 						</div>
 
 						<div v-if="seriesState === 'error'" class="stats-series-error" role="status">
@@ -96,6 +98,20 @@
 								</div>
 							</dl>
 							<p v-if="!hasData" class="stats-no-data">{{ $t('No data for this period') }}</p>
+							<div v-if="hasData" class="stats-charts">
+								<stats-chart v-for="chart in charts"
+									:key="chart.id"
+									:chart="chart"
+									:cursor="cursor"
+									:locale="locale"
+									:range="range"
+									:scale="seriesData.scale || null"
+									:zoom="zoom"
+									group="stats"
+									@cursor="cursor = $event"
+									@toggle="toggleSeries"
+									@zoom="zoom = $event" />
+							</div>
 						</template>
 						<b-loading :active="seriesState === 'loading' && !seriesData" :is-full-page="false"></b-loading>
 					</template>
@@ -107,6 +123,7 @@
 
 <script>
 import { createPoller } from './poller'
+import StatsChart from './StatsChart.vue'
 import { buildCharts, figures, groupItems, listNotes, normalizeItems, noteText } from './statsData'
 import { formatDateTime, formatValue, localeTag } from './statsFormat'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
@@ -131,6 +148,9 @@ const RANGES = [
 
 const DETAIL_MAX = 200
 
+// The narrowest window the zoom goes to
+const MIN_WINDOW_MS = 10000
+
 // Failed refreshes in a row before a column that has items says so
 const FAILS_BEFORE_ERROR = 2
 
@@ -153,6 +173,7 @@ function failureCode(e) {
 
 export default {
 	name: 'StatsPage',
+	components: { StatsChart },
 	props: {
 		initialItem: { type: String, default: '' },
 	},
@@ -172,6 +193,8 @@ export default {
 			seriesTicket: 0,
 			zoom: null,
 			cursor: null,
+			// the lines the person hid, by key (the keys are unique across charts)
+			hiddenKeys: [],
 		}
 	},
 	computed: {
@@ -207,7 +230,7 @@ export default {
 			return figures(this.seriesData, this.selected, this.locale, this.$t)
 		},
 		charts() {
-			return buildCharts(this.seriesData, { range: this.range, kind: this.selected?.kind || '', t: (key, params) => this.$t(key, params) })
+			return buildCharts(this.seriesData, { range: this.range, hidden: new Set(this.hiddenKeys), kind: this.selected?.kind || '', t: (key, params) => this.$t(key, params) })
 		},
 		hasData() {
 			return this.charts.some(chart => !chart.empty)
@@ -347,6 +370,20 @@ export default {
 				this.restartSeries()
 			}
 		},
+		toggleSeries(key) {
+			this.hiddenKeys = this.hiddenKeys.includes(key) ? this.hiddenKeys.filter(k => k !== key) : [...this.hiddenKeys, key]
+		},
+		// Halves the window around the cursor, or the middle of the window. Never refetches.
+		zoomIn() {
+			const from = this.zoom ? this.zoom.min : this.seriesData?.from * 1000
+			const to = this.zoom ? this.zoom.max : this.seriesData?.to * 1000
+			if (!Number.isFinite(from) || !Number.isFinite(to) || to - from < 2 * MIN_WINDOW_MS) {
+				return
+			}
+			const half = (to - from) / 4
+			const centre = this.cursor === null ? (from + to) / 2 : Math.min(Math.max(this.cursor * 1000, from + half), to - half)
+			this.zoom = { min: centre - half, max: centre + half }
+		},
 		// A new item or period: the answers still on their way are no longer wanted, and the curves of another item are not kept.
 		restartSeries() {
 			this.seriesTicket++
@@ -354,6 +391,7 @@ export default {
 			this.cursor = null
 			this.seriesPoller.stop()
 			if (this.seriesKey !== this.selectedKey) {
+				this.hiddenKeys = []
 				this.seriesData = null
 				this.seriesKey = ''
 			}
@@ -644,6 +682,10 @@ export default {
 		grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
 		gap: 0.5rem;
 		margin-bottom: 1rem;
+
+		@media (max-width: 768px) {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 	}
 
 	.stats-figure {
@@ -660,6 +702,16 @@ export default {
 			font-size: 1.125rem;
 			font-weight: 600;
 			color: var(--casa-text-strong);
+		}
+	}
+
+	.stats-charts {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+
+		@media (max-width: 960px) {
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 
