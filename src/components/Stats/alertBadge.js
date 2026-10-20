@@ -10,6 +10,7 @@ const listOf = source => import('@/service/stats').then(({ statsApi }) => statsA
 
 const MAX_ITEMS = 500
 const MAX_COUNT = 999
+const AWAY_MS = 60000
 
 const count = n => Math.min(MAX_COUNT, n)
 
@@ -28,16 +29,31 @@ function sumOf(body) {
 	return count(sum)
 }
 
-export function createAlertBadge({ list = listOf, hasVm = hasVirtualMachines, delayMs = 2000, isHidden = () => document.hidden } = {}) {
+export function createAlertBadge({ list = listOf, hasVm = hasVirtualMachines, delayMs = 2000, isHidden = () => document.hidden, now = () => Date.now() } = {}) {
 	const counts = reactive({ app_management: 0, virt_management: 0, core: 0 })
 	let timer = null
 	let flying = false
 	let again = false
 	let waiting = false
 	let generation = 0
+	let hiddenAt = null
+	let watching = false
 
-	// a source that fails or says 404 counts 0
-	const read = source => Promise.resolve().then(() => list(source)).then(sumOf, () => 0)
+	// a source that says 404 (module gone) counts 0; any other failure keeps what it counted before
+	const read = source => Promise.resolve().then(() => list(source)).then(sumOf, e => e?.response?.status === 404 ? 0 : counts[source])
+
+	// The tab shown again after more than a minute: the events it missed are not coming back.
+	function onShown() {
+		if (isHidden()) {
+			hiddenAt = now()
+			return
+		}
+		const away = hiddenAt === null ? 0 : now() - hiddenAt
+		hiddenAt = null
+		if (away > AWAY_MS && !waiting) {
+			load()
+		}
+	}
 
 	function onVisible() {
 		if (isHidden()) {
@@ -60,6 +76,11 @@ export function createAlertBadge({ list = listOf, hasVm = hasVirtualMachines, de
 	}
 
 	async function load() {
+		if (!watching) {
+			watching = true
+			hiddenAt = isHidden() ? now() : null
+			document.addEventListener('visibilitychange', onShown)
+		}
 		if (flying) {
 			again = true
 			return
@@ -114,6 +135,10 @@ export function createAlertBadge({ list = listOf, hasVm = hasVirtualMachines, de
 			flying = false
 			again = false
 			stopWaiting()
+			if (watching) {
+				watching = false
+				document.removeEventListener('visibilitychange', onShown)
+			}
 		},
 	}
 	return badge

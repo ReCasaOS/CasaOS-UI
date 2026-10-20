@@ -9,6 +9,7 @@ import events from '@/events/events'
 import * as entry from '@/components/Stats/entry'
 import { HOSTILE } from '@/components/Stats/__fixtures__/contract'
 import { alertBadge } from '@/components/Stats/alertBadge'
+import { createAlertFeed } from '@/components/Stats/resourceAlerts'
 
 vi.mock('@/components/Stats/alertBadge', () => ({ alertBadge: { load: vi.fn(), refreshSoon: vi.fn(), stop: vi.fn() } }))
 
@@ -361,6 +362,7 @@ describe('resource alert notifications', () => {
 			$buefy: { notification: { open } },
 			$store: { state: { marker: 1 } },
 		}
+		vm.alertFeed = createAlertFeed()
 		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
 		const fire = (event, properties) => CoreService.sockets[event].call(vm, { Properties: properties })
 		return { vm, fire }
@@ -450,6 +452,7 @@ describe('the count badge of the Statistics icon', () => {
 			$buefy: { notification: { open: vi.fn() } },
 			$store: { state: {} },
 		}
+		vm.alertFeed = createAlertFeed()
 		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
 		const props = n => ({ item: `c${n}`, name: 'x', kind: 'container', situation: 'cpu_high', value: '95' })
 
@@ -463,11 +466,33 @@ describe('the count badge of the Statistics icon', () => {
 
 	it('is refreshed for an event that is junk', () => {
 		const vm = { $t: key => key, $buefy: { notification: { open: vi.fn() } } }
+		vm.alertFeed = createAlertFeed()
 		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
 
 		CoreService.sockets['resource:alert-firing'].call(vm, undefined)
 
 		expect(alertBadge.refreshSoon).toHaveBeenCalledTimes(1)
 		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
+	})
+})
+
+describe('the count badge after a reconnection', () => {
+	beforeEach(() => vi.clearAllMocks())
+
+	it('is read again when the socket reconnects', () => {
+		CoreService.sockets.reconnect.call({})
+		expect(alertBadge.load).toHaveBeenCalledTimes(1)
+	})
+
+	it('does not listen to connect, which also fires for the first connection', () => {
+		expect(CoreService.sockets.connect).toBeUndefined()
+	})
+})
+
+describe('the alert feed', () => {
+	it('is declared when the component is created, not on the first event', () => {
+		const vm = { getMessageFromLetter: vi.fn(), initUIEventBus: vi.fn() }
+		CoreService.created.call(vm)
+		expect(typeof vm.alertFeed.accept).toBe('function')
 	})
 })

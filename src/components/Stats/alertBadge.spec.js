@@ -80,11 +80,21 @@ describe('alertBadge.load', () => {
 		expect(sourcesAsked(list)).toEqual(['app_management', 'core'])
 	})
 
-	it('a source that fails later goes back to 0', async () => {
+	it('a source that fails later with a non-404 error keeps its previous count', async () => {
 		const { badge, answers } = make()
 		await badge.load()
 		expect(badge.counts.app_management).toBe(3)
 		answers.app_management = new Error('down')
+		answers.virt_management = Object.assign(new Error('busy'), { response: { status: 503 } })
+		await badge.load()
+		expect(badge.counts.app_management).toBe(3)
+		expect(badge.counts.virt_management).toBe(4)
+	})
+
+	it('a source that answers 404 later goes back to 0', async () => {
+		const { badge, answers } = make()
+		await badge.load()
+		answers.app_management = gone()
 		await badge.load()
 		expect(badge.counts.app_management).toBe(0)
 	})
@@ -159,6 +169,57 @@ describe('alertBadge.refreshSoon', () => {
 		document.dispatchEvent(new Event('visibilitychange'))
 		await vi.advanceTimersByTimeAsync(0)
 		expect(list.mock.calls.filter(c => c[0] === 'core')).toHaveLength(1)
+	})
+})
+
+describe('alertBadge after the tab was hidden', () => {
+	const coreCalls = list => list.mock.calls.filter(c => c[0] === 'core').length
+	const show = async (state, awayMs) => {
+		state.hidden = true
+		document.dispatchEvent(new Event('visibilitychange'))
+		await vi.advanceTimersByTimeAsync(awayMs)
+		state.hidden = false
+		document.dispatchEvent(new Event('visibilitychange'))
+		await vi.advanceTimersByTimeAsync(0)
+	}
+
+	it('is read again when the tab shows after more than 60 s hidden', async () => {
+		const { badge, list, state } = make()
+		await badge.load()
+		expect(coreCalls(list)).toBe(1)
+		await show(state, 61000)
+		expect(coreCalls(list)).toBe(2)
+		badge.stop()
+	})
+
+	it('is not read again after a short absence', async () => {
+		const { badge, list, state } = make()
+		await badge.load()
+		await show(state, 30000)
+		expect(coreCalls(list)).toBe(1)
+		badge.stop()
+	})
+
+	it('is read once, not twice, when an event was waiting for the tab to show', async () => {
+		const { badge, list, state } = make()
+		await badge.load()
+		state.hidden = true
+		document.dispatchEvent(new Event('visibilitychange'))
+		badge.refreshSoon()
+		await vi.advanceTimersByTimeAsync(61000)
+		state.hidden = false
+		document.dispatchEvent(new Event('visibilitychange'))
+		await vi.advanceTimersByTimeAsync(0)
+		expect(coreCalls(list)).toBe(2)
+		badge.stop()
+	})
+
+	it('stops listening with stop()', async () => {
+		const { badge, list, state } = make()
+		await badge.load()
+		badge.stop()
+		await show(state, 61000)
+		expect(coreCalls(list)).toBe(1)
 	})
 })
 

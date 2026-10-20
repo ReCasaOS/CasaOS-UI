@@ -113,6 +113,7 @@ export default {
 	created() {
 		this.getMessageFromLetter()
 		this.initUIEventBus()
+		this.alertFeed = createAlertFeed()
 	},
 	mounted() {
 		this.announceBackupFailures()
@@ -272,7 +273,6 @@ export default {
 		showResourceAlert(state, res) {
 			// the count on the icon follows every event, also one the feed drops as a flood
 			alertBadge.refreshSoon()
-			this.alertFeed ||= createAlertFeed()
 			const note = this.alertFeed.accept(state, res?.Properties)
 			if (!note) {
 				return
@@ -668,6 +668,10 @@ export default {
 
 	},
 	sockets: {
+		// not `connect`: it also fires for the first connection, which mounted() already covers
+		reconnect() {
+			alertBadge.load()
+		},
 		'resource:alert-firing': function (res) {
 			this.showResourceAlert('firing', res)
 		},
