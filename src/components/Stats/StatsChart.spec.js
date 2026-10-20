@@ -102,6 +102,8 @@ describe('the chart card', () => {
 		zoomed({}, { xaxis: { min: Number.NaN, max: 2000 } })
 		expect(wrapper.emitted('zoom')).toEqual([[{ min: 1000, max: 2000 }]])
 		expect(apex().props('options').chart.zoom).toMatchObject({ enabled: true, type: 'x', autoSelected: 'zoom' })
+		// the wheel must keep scrolling the page
+		expect(apex().props('options').chart.zoom.allowMouseWheelZoom).toBe(false)
 	})
 
 	it('applies the zoom window of the page to the x axis', async () => {

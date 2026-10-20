@@ -111,7 +111,7 @@ export default {
 				...base,
 				chart: {
 					...base.chart,
-					zoom: { enabled: true, type: 'x', autoSelected: 'zoom' },
+					zoom: { enabled: true, type: 'x', autoSelected: 'zoom', allowMouseWheelZoom: false },
 					events: {
 						zoomed: (ctx, config) => {
 							const min = config?.xaxis?.min
