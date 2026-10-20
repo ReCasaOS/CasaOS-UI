@@ -10,7 +10,7 @@ const StatsPage = defineAsyncComponent(() => import('./StatsPage.vue'))
 export const STATS_APP_NAME = 'Statistics'
 
 // Opens the page in a modal, or on a tab of its own when the App launching setting sends apps, or this one, to a new tab.
-// `item` is a list key of the page ('source|id' is not needed: the id the service gave).
+// `item` is the id of the item to show first, or 'source|id' when the caller knows the source too.
 export function openStatistics(buefy, state, { item } = {}) {
 	if (builtinOpensInNewTab(STATS_LAUNCH_ID, state)) {
 		const query = item ? `?item=${encodeURIComponent(item)}` : ''

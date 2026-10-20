@@ -2428,5 +2428,8 @@
   "Disk": "Disque",
   "Processes": "Processus",
   "Virtual CPUs": "Processeurs virtuels",
-  "No data for this period": "Aucune donnée pour cette période"
+  "No data for this period": "Aucune donnée pour cette période",
+  "{n} alert": "{n} alerte",
+  "Out of date": "Pas à jour",
+  "No containers or virtual machines to show": "Aucun conteneur ni machine virtuelle à afficher"
 }

@@ -59,7 +59,7 @@ export function normalizeItems(raw, source) {
 			memory_limit: nonNegative(entry.memory_limit),
 			alerts: nonNegative(entry.alerts) ?? 0,
 			started_at: Number.isNaN(started) ? null : entry.started_at,
-			detail: clean(entry.detail, 200) || null,
+			detail: Array.from(clean(entry.detail, 800)).slice(0, 200).join('').trim() || null,
 		})
 	}
 	return items

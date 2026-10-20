@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -201,6 +203,84 @@ describe('the list of the Statistics page', () => {
 		document.querySelectorAll('.stats-list button')[0].click()
 		await flushPromises()
 		expect(select.value).toBe('app_management|app:jellyfin:web:1')
+	})
+
+	it('says so from the second failed refresh in a row, keeps the last items, and clears it on a success', async () => {
+		await mountPage()
+		serve({ ...defaults(), app_management: failure(401) })
+		await wrapper.vm.loadAll()
+		await flushPromises()
+		expect(document.querySelector('.stats-column-error')).toBeNull()
+		serve({ ...defaults(), app_management: failure(502) })
+		await wrapper.vm.loadAll()
+		await flushPromises()
+		expect(document.querySelector('.stats-column-error').textContent).toContain('Containers did not answer.')
+		expect(document.querySelector('.stats-column-error button').textContent).toBe('Retry')
+		expect(names()).toContain('Jellyfin')
+		expect(document.querySelector('.stats-list .stats-item.is-stale')).not.toBeNull()
+		serve(defaults())
+		await wrapper.vm.loadAll()
+		await flushPromises()
+		expect(document.querySelector('.stats-column-error')).toBeNull()
+		expect(document.querySelector('.stats-item.is-stale')).toBeNull()
+	})
+
+	it('restarts the count of failures after a success', async () => {
+		await mountPage()
+		for (const answer of [failure(502), defaults().app_management, failure(502)]) {
+			serve({ ...defaults(), app_management: answer })
+			await wrapper.vm.loadAll()
+			await flushPromises()
+		}
+		expect(document.querySelector('.stats-column-error')).toBeNull()
+	})
+
+	it('selects the initial item as soon as its column is there, and by source|id too', async () => {
+		const slow = deferred()
+		serve({ ...defaults(), virt_management: slow.promise })
+		await mountPage({ initialItem: 'virt_management|vm-1' })
+		expect(pressed()).toEqual(['Jellyfin'])
+		slow.resolve(body([vm]))
+		await flushPromises()
+		expect(pressed()).toEqual(['Debian'])
+	})
+
+	it('does not take the selection back from a person who chose while the column was loading', async () => {
+		const slow = deferred()
+		serve({ ...defaults(), virt_management: slow.promise })
+		await mountPage({ initialItem: 'vm-1' })
+		document.querySelectorAll('.stats-list button')[1].click()
+		slow.resolve(body([vm]))
+		await flushPromises()
+		expect(pressed()).toEqual(['Plex'])
+	})
+
+	it('says 1 alert in the singular', async () => {
+		serve({ ...defaults(), app_management: body([{ ...jelly, alerts: 1 }, { ...plex, alerts: 3 }]) })
+		await mountPage()
+		const badges = [...document.querySelectorAll('.stats-item-alerts')].map(b => b.textContent)
+		expect(badges).toEqual(['1 alert', '3 alerts'])
+	})
+
+	it('says so in the main pane when there is nothing to show', async () => {
+		serve({ app_management: body([]), virt_management: body([]), core: body([]) })
+		await mountPage()
+		expect(document.querySelector('.stats-empty').textContent).toBe('No containers or virtual machines to show')
+	})
+
+	it('cuts the detail at 200 code points, not 200 UTF-16 units', async () => {
+		serve({ ...defaults(), app_management: body([anItem({ detail: '😀'.repeat(300) })]) })
+		await mountPage()
+		const text = document.querySelector('.stats-detail').textContent
+		expect(Array.from(text)).toHaveLength(200)
+		expect(text).toBe('😀'.repeat(200))
+	})
+
+	it('leaves the focus ring of the period buttons visible', () => {
+		const source = readFileSync(join(import.meta.dirname, 'StatsPage.vue'), 'utf8')
+		const block = source.slice(source.indexOf('.stats-ranges {'), source.indexOf('.stats-series-error,'))
+		expect(block).not.toContain('overflow')
+		expect(block).toContain('focus-visible')
 	})
 
 	it('takes the focus on the heading', async () => {
@@ -409,6 +489,24 @@ describe('the header, the periods and the figures', () => {
 		await tick(0)
 		expect(seriesCalls()).toContain('app_management|app:plex:web:1|live')
 		expect(document.querySelector('.stats-name').textContent).toBe('Plex')
+	})
+
+	it('forces at most one list refresh per 30 s for an item the series reports gone while the list still has it', async () => {
+		let now = 1000000
+		vi.spyOn(Date, 'now').mockImplementation(() => now)
+		statsApi.series.mockRejectedValue(failure(404))
+		await open()
+		const forced = vi.spyOn(wrapper.vm.listPoller, 'now')
+		for (let i = 0; i < 5; i++) {
+			now += 5000
+			await tick(5000)
+		}
+		expect(forced).not.toHaveBeenCalled()
+		expect(document.querySelector('.stats-no-data').textContent).toBe('No data for this period')
+		now += 30000
+		await tick(5000)
+		expect(forced).toHaveBeenCalledTimes(1)
+		Date.now.mockRestore()
 	})
 
 	it('shows a retryable error and keeps the shell', async () => {

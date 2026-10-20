@@ -21,15 +21,16 @@
 							<ul>
 								<li v-for="item in group.items" :key="keyOf(item)">
 									<button :aria-pressed="String(keyOf(item) === selectedKey)"
-										:class="{ 'is-selected': keyOf(item) === selectedKey }"
+										:class="{ 'is-selected': keyOf(item) === selectedKey, 'is-stale': columns[item.source].state === 'error' }"
 										class="stats-item"
 										type="button"
 										@click="select(keyOf(item))">
 										<span :class="`state-${item.state}`" aria-hidden="true" class="stats-dot"></span>
 										<span class="is-sr-only">{{ stateWord(item.state) }}</span>
+										<span v-if="columns[item.source].state === 'error'" class="is-sr-only">{{ $t('Out of date') }}</span>
 										<span class="stats-item-name">{{ item.name }}</span>
 										<span class="stats-item-cpu">{{ cpuText(item) }}</span>
-										<span v-if="item.alerts > 0" class="stats-item-alerts">{{ $t('{n} alerts', { n: item.alerts }) }}</span>
+										<span v-if="item.alerts > 0" class="stats-item-alerts">{{ item.alerts === 1 ? $t('{n} alert', { n: 1 }) : $t('{n} alerts', { n: item.alerts }) }}</span>
 									</button>
 								</li>
 							</ul>
@@ -51,6 +52,7 @@
 				</div>
 
 				<div class="stats-main">
+					<p v-if="nothingToShow" class="stats-empty">{{ $t('No containers or virtual machines to show') }}</p>
 					<template v-if="selected">
 						<div class="stats-head">
 							<div class="stats-title">
@@ -80,7 +82,10 @@
 							<p>{{ $t('The measurements could not be read.') }}</p>
 							<button class="button is-small is-rounded" type="button" @click="restartSeries">{{ $t('Retry') }}</button>
 						</div>
-						<p v-else-if="seriesState === 'notfound'" class="stats-series-error" role="status">{{ $t('This item is no longer there.') }}</p>
+						<template v-else-if="seriesState === 'notfound'">
+							<p class="stats-series-error" role="status">{{ $t('This item is no longer there.') }}</p>
+							<p class="stats-no-data">{{ $t('No data for this period') }}</p>
+						</template>
 
 						<template v-if="seriesData">
 							<p v-for="(note, i) in seriesNoteTexts" :key="i" class="stats-series-note">{{ note }}</p>
@@ -126,7 +131,13 @@ const RANGES = [
 
 const DETAIL_MAX = 200
 
-const blank = () => ({ state: 'loading', items: [], notes: [], error: '' })
+// Failed refreshes in a row before a column that has items says so
+const FAILS_BEFORE_ERROR = 2
+
+// At most one forced re-read of the list for an item the series says is gone
+const GONE_RETRY_MS = 30000
+
+const blank = () => ({ state: 'loading', items: [], notes: [], error: '', fails: 0 })
 
 // Why a column could not be read: signin | down | failed
 function failureCode(e) {
@@ -184,7 +195,13 @@ export default {
 			return this.$t('Running since {since}', { since: formatDateTime(item.started_at, this.locale) })
 		},
 		detailText() {
-			return this.selected?.detail ? this.selected.detail.slice(0, DETAIL_MAX) : ''
+			return this.selected?.detail ? Array.from(this.selected.detail).slice(0, DETAIL_MAX).join('') : ''
+		},
+		settled() {
+			return STATS_SOURCES.every(source => this.columns[source].state !== 'loading')
+		},
+		nothingToShow() {
+			return this.settled && this.flat.length === 0 && this.failures.length === 0
 		},
 		figureList() {
 			return figures(this.seriesData, this.selected, this.locale, this.$t)
@@ -219,7 +236,9 @@ export default {
 		},
 	},
 	mounted() {
-		this.initialUsed = false
+		this.initialDone = false
+		this.userPicked = false
+		this.goneAt = {}
 		this.seriesPoller = createPoller({ run: () => this.fetchSeries(), intervalMs: REFRESH_MS })
 		this.listPoller = createPoller({ run: () => this.loadAll(), intervalMs: REFRESH_MS })
 		document.addEventListener('visibilitychange', this.onVisibility)
@@ -264,7 +283,7 @@ export default {
 		},
 		markAbsent(source) {
 			this.listTicket[source]++
-			Object.assign(this.columns[source], { state: 'absent', items: [], notes: [], error: '' })
+			Object.assign(this.columns[source], { state: 'absent', items: [], notes: [], error: '', fails: 0 })
 		},
 		async loadColumn(source) {
 			const ticket = ++this.listTicket[source]
@@ -276,17 +295,18 @@ export default {
 					throw Object.assign(new Error('not a list'), { response: {} })
 				}
 				if (ticket === this.listTicket[source]) {
-					Object.assign(column, { state: 'ok', items: normalizeItems(raw, source), notes: listNotes(raw), error: '' })
+					Object.assign(column, { state: 'ok', items: normalizeItems(raw, source), notes: listNotes(raw), error: '', fails: 0 })
+					this.reconcile()
 				}
 			} catch (e) {
 				if (ticket !== this.listTicket[source]) {
 					return
 				}
 				if (e?.response?.status === 404) {
-					Object.assign(column, { state: 'absent', items: [], notes: [], error: '' })
-				} else if (column.state !== 'ok') {
-					// a refresh that fails keeps what the column already shows
-					Object.assign(column, { state: 'error', items: [], notes: [], error: failureCode(e) })
+					Object.assign(column, { state: 'absent', items: [], notes: [], error: '', fails: 0 })
+				} else if (column.items.length === 0 || ++column.fails >= FAILS_BEFORE_ERROR) {
+					// a column with items keeps them (marked out of date) and says so from the second failure in a row
+					Object.assign(column, { state: 'error', error: failureCode(e) }, column.items.length === 0 ? { items: [], notes: [] } : {})
 				}
 			}
 		},
@@ -298,16 +318,26 @@ export default {
 
 		// The selection: kept while its item exists, else the one asked for at the start, else the first.
 		reconcile() {
-			const first = !this.initialUsed
-			this.initialUsed = true
+			if (!this.initialDone) {
+				// 'source|id' or the id alone; the choice waits for the column that has it, unless the person chose first
+				const asked = this.initialItem ? this.flat.find(item => this.keyOf(item) === this.initialItem || item.id === this.initialItem) : null
+				if (asked && !this.userPicked) {
+					this.initialDone = true
+					this.selectedKey = this.keyOf(asked)
+					return
+				}
+				if (asked || !this.initialItem || this.settled) {
+					this.initialDone = true
+				}
+			}
 			if (this.selectedKey && this.flat.some(item => this.keyOf(item) === this.selectedKey)) {
 				return
 			}
-			const asked = first && this.initialItem ? this.flat.find(item => item.id === this.initialItem) : null
-			const pick = asked || this.flat[0]
+			const pick = this.flat[0]
 			this.selectedKey = pick ? this.keyOf(pick) : ''
 		},
 		select(key) {
+			this.userPicked = true
 			this.selectedKey = key
 		},
 
@@ -363,7 +393,12 @@ export default {
 					this.seriesData = null
 					this.seriesKey = ''
 					this.seriesState = 'notfound'
-					this.listPoller.now()
+					// the list is read again, but not at every poll if it still holds the item
+					const now = Date.now()
+					if (!(now - (this.goneAt[key] ?? -Infinity) < GONE_RETRY_MS)) {
+						this.goneAt[key] = now
+						this.listPoller.now()
+					}
 				} else {
 					this.seriesState = 'error'
 				}
@@ -469,6 +504,10 @@ export default {
 		}
 	}
 
+	.stats-item.is-stale {
+		opacity: 0.6;
+	}
+
 	.stats-item-name {
 		flex-grow: 1;
 		min-width: 0;
@@ -569,10 +608,15 @@ export default {
 		display: inline-flex;
 		border-radius: 1rem;
 		border: 1px solid var(--casa-border);
-		overflow: hidden;
 
 		button {
 			padding: 0.25rem 0.75rem;
+			border-radius: 1rem;
+
+			&:focus-visible {
+				outline: 2px solid var(--casa-primary, #3b82f6);
+				outline-offset: -2px;
+			}
 			border: 0;
 			font-size: 0.75rem;
 			color: inherit;
@@ -587,6 +631,7 @@ export default {
 	}
 
 	.stats-series-error,
+	.stats-empty,
 	.stats-series-note,
 	.stats-no-data {
 		margin-bottom: 0.5rem;
