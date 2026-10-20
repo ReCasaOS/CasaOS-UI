@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { formatDateTime, formatDuration, formatTime, formatValue, localeTag } from './statsFormat'
+import { describe, expect, it, vi } from 'vitest'
+import { formatDateTime, formatDuration, formatNumber, formatTime, formatValue, localeTag } from './statsFormat'
 
 const NNBSP = ' '
 
@@ -81,5 +81,27 @@ describe('formatDateTime', () => {
 	})
 	it.each(['garbage', null, undefined, '', Number.NaN, 1e300, {}])('gives a hyphen for %j', (value) => {
 		expect(formatDateTime(value, 'en')).toBe('-')
+	})
+})
+
+describe('the number formats', () => {
+	it('builds one Intl.NumberFormat per locale and options', () => {
+		const Real = Intl.NumberFormat
+		const spy = vi.spyOn(Intl, 'NumberFormat').mockImplementation(function (...args) { // eslint-disable-line prefer-arrow-callback -- a constructor
+			return new Real(...args)
+		})
+		try {
+			formatValue(1.5, 'count', 'de')
+			formatValue(2.5, 'count', 'de')
+			formatValue(3.5, 'count', 'de')
+			expect(spy.mock.calls.filter(c => c[0] === 'de')).toHaveLength(1)
+		} finally {
+			spy.mockRestore()
+		}
+	})
+
+	it('writes a number with the locale', () => {
+		expect(formatNumber(0.5, 'fr')).toBe('0,5')
+		expect(formatNumber(0.5, 'en')).toBe('0.5')
 	})
 })

@@ -10,12 +10,23 @@ export const FORMAT_KEYS = ['{days} d', '{hours} h {minutes} min', '{minutes} mi
 const isShowable = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= MAX
 const isFrench = locale => typeof locale === 'string' && /^fr/i.test(locale)
 
+// One formatter per locale and options: the page formats dozens of numbers at every poll.
+const formats = new Map()
 function numberFormat(locale, options) {
-	try {
-		return new Intl.NumberFormat(locale, options)
-	} catch {
-		return new Intl.NumberFormat('en', options)
+	const id = `${locale}|${options.maximumFractionDigits}`
+	if (!formats.has(id)) {
+		try {
+			formats.set(id, new Intl.NumberFormat(locale, options))
+		} catch {
+			formats.set(id, new Intl.NumberFormat('en', options))
+		}
 	}
+	return formats.get(id)
+}
+
+// A plain number (cores, counts) with the decimal mark of the locale.
+export function formatNumber(value, locale) {
+	return numberFormat(locale, { maximumFractionDigits: 2 }).format(value)
 }
 
 // One decimal below 10, none above.

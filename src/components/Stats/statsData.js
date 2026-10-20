@@ -6,7 +6,7 @@
  * apexcharts builds its tooltip as HTML, so the series NAME it receives is escaped first (`name`); `label` is for Vue text.
  */
 import escape from 'lodash/escape'
-import { FORMAT_KEYS, formatTime, formatValue } from './statsFormat'
+import { FORMAT_KEYS, formatNumber, formatTime, formatValue } from './statsFormat'
 import { clean } from '@/components/settings/osPlan'
 
 const MAX_ITEMS = 500
@@ -16,6 +16,12 @@ const MAX_VALUE = 1e18
 const STATES = ['running', 'stopped', 'paused', 'crashed', 'unknown']
 const PALETTE = ['#00ab44', '#3b9cf5', '#f5a623', '#e0568a', '#9a6bf0']
 const REF_COLOR = '#8a8f98'
+
+// 45 % towards white
+function lighten(hex) {
+	const channel = i => Math.round(Number.parseInt(hex.slice(1 + (i * 2), 3 + (i * 2)), 16) * 0.55 + (255 * 0.45))
+	return `#${[0, 1, 2].map(i => channel(i).toString(16).padStart(2, '0')).join('')}`
+}
 
 export const GROUPS = [
 	{ id: 'containers', label: 'Containers', kinds: ['app-container'] },
@@ -201,20 +207,27 @@ export function cleanSeries(raw, { stepSeconds } = {}) {
 
 const matches = (base, key) => key === base || key.startsWith(`${base}:`)
 
-function buildOne(def, byKey, { range, hidden, kind, t }, response) {
+function buildOne(def, byKey, { range, hidden, kind, t, locale }, response) {
 	// the series of this chart, in the order of the definition
 	const found = []
-	for (const k of def.keys) {
-		let ordinal = 0
+	// each instance (an interface, a disk) has its own hue; the second line of the chart (sent, write) is the lighter one
+	const instances = []
+	def.keys.forEach((k, defIndex) => {
 		for (const [key, cleaned] of byKey) {
 			if (matches(k.key, key)) {
 				const instance = key.length > k.key.length ? key.slice(k.key.length + 1) : ''
-				const color = k.kind === 'ref' ? k.color : PALETTE[(PALETTE.indexOf(k.color) + ordinal) % PALETTE.length]
+				if (instance && !instances.includes(instance)) {
+					instances.push(instance)
+				}
+				let color = k.color
+				if (instance && k.kind !== 'ref') {
+					color = PALETTE[instances.indexOf(instance) % PALETTE.length]
+					color = defIndex % 2 === 1 ? lighten(color) : color
+				}
 				found.push({ def: k, key, instance, color, points: cleaned.points })
-				ordinal++
 			}
 		}
-	}
+	})
 	if (found.length === 0) {
 		return null
 	}
@@ -278,12 +291,12 @@ function buildOne(def, byKey, { range, hidden, kind, t }, response) {
 		empty,
 		series,
 		legend,
-		caption: chartCaption(def, response.scale, notes, t),
+		caption: chartCaption(def, response.scale, notes, t, locale),
 		noteCodes: notes.filter(n => own(NOTE_CHART, n) === def.id).map(n => clean(n, 60)),
 	}
 }
 
-export function buildCharts(response, { range = 'live', hidden = new Set(), kind = '', t = k => k } = {}) {
+export function buildCharts(response, { range = 'live', hidden = new Set(), kind = '', t = k => k, locale = 'en' } = {}) {
 	if (!isPlain(response) || !Array.isArray(response.series)) {
 		return []
 	}
@@ -293,7 +306,7 @@ export function buildCharts(response, { range = 'live', hidden = new Set(), kind
 			byKey.set(`${s.chart}/${s.name}`, cleanSeries(s.points, { stepSeconds: response.step_seconds }))
 		}
 	}
-	return CHARTS.map(def => buildOne(def, byKey, { range, hidden, kind, t }, response)).filter(Boolean)
+	return CHARTS.map(def => buildOne(def, byKey, { range, hidden, kind, t, locale }, response)).filter(Boolean)
 }
 
 // ---------------------------------------------------------------- scale, options, captions
@@ -327,7 +340,7 @@ export function scaleMax(chart, scale) {
 	if (chart.id === 'fs') {
 		return 100
 	}
-	if (chart.id === 'cpu' && isNumber(scale?.cpu_allocation)) {
+	if (chart.id === 'cpu' && isNumber(scale?.cpu_allocation) && !chart.noteCodes?.includes('no_cpu_limit')) {
 		values.push(scale.cpu_allocation * 100)
 	}
 	if (chart.id === 'memory' && isNumber(scale?.memory_limit)) {
@@ -345,7 +358,7 @@ export function chartCaption(chart, scale, notes, t, locale = 'en') {
 		if (list.includes('no_cpu_limit')) {
 			parts.push(t('no limit set'))
 		} else if (isNumber(scale?.cpu_allocation) && scale.cpu_allocation > 0) {
-			parts.push(t('{n} cores allocated', { n: scale.cpu_allocation }))
+			parts.push(t('{n} cores allocated', { n: formatNumber(scale.cpu_allocation, locale) }))
 		}
 	} else if (chart.id === 'memory') {
 		if (list.includes('no_memory_limit')) {
@@ -372,7 +385,7 @@ export function chartOptions(chart, { zoom, height, locale = 'en', range = 'live
 		legend: { show: false },
 		stroke: { curve: 'straight', width: 2 },
 		dataLabels: { enabled: false },
-		xaxis: { type: 'datetime', min: zoom ? zoom.min : null, max: zoom ? zoom.max : null, labels: { formatter: time } },
+		xaxis: { type: 'datetime', min: zoom ? zoom.min : null, max: zoom ? zoom.max : null, labels: { formatter: time, datetimeUTC: false } },
 		yaxis: { min: 0, max: scaleMax(chart, scale), labels: { formatter: y } },
 		tooltip: { shared: true, x: { formatter: time }, y: { formatter: y } },
 		annotations: {},

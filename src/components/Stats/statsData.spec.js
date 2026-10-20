@@ -321,3 +321,28 @@ describe('stats keys', () => {
 		expect(new Set(STATS_KEYS).size).toBe(STATS_KEYS.length)
 	})
 })
+
+describe('the fixes of the final review', () => {
+	it('draws no allocation term in the scale when the processor has no limit', () => {
+		const cpu = { id: 'cpu', stacked: false, noteCodes: ['no_cpu_limit'], series: [{ key: 'cpu/total', kind: 'area', points: [{ x: 1, y: 10 }] }] }
+		expect(scaleMax(cpu, { cpu_allocation: 8 })).toBeCloseTo(11)
+		expect(scaleMax({ ...cpu, noteCodes: [] }, { cpu_allocation: 8 })).toBeCloseTo(880)
+	})
+
+	it('gives every interface its own colour, received and sent apart', () => {
+		const lines = ['eth0', 'eth1', 'eth2'].flatMap(n => [['network', `rx:${n}`, 'bytes_per_second', pts([1, 2])], ['network', `tx:${n}`, 'bytes_per_second', pts([1, 2])]])
+		const colors = find(buildCharts(resp(lines), { t }), 'network').series.map(s => s.color)
+		expect(colors).toHaveLength(6)
+		expect(new Set(colors).size).toBe(6)
+	})
+
+	it('writes the allocated cores with the locale', () => {
+		const fr = (key, p = {}) => key.replaceAll(/\{(\w+)\}/g, (_, k) => p[k])
+		expect(chartCaption({ id: 'cpu' }, { cpu_allocation: 0.5 }, [], fr, 'fr')).toBe('% of one core · 0,5 cores allocated')
+		expect(chartCaption({ id: 'cpu' }, { cpu_allocation: 0.5 }, [], fr, 'en')).toBe('% of one core · 0.5 cores allocated')
+	})
+
+	it('puts the time on local ticks', () => {
+		expect(chartOptions({ id: 'cpu', unit: 'percent', stacked: false, series: [] }, {}).xaxis.labels.datetimeUTC).toBe(false)
+	})
+})
