@@ -8,7 +8,7 @@ const MAX_VALUE = 10000
 const MAX_FIRING_KEPT = 200
 
 // situation -> [firing key by what is known (value+date, value, date, neither), resolved key]
-const SENTENCES = {
+export const SENTENCES = {
 	cpu_high: {
 		both: 'Processor of {name} at {value} % since {since}',
 		value: 'Processor of {name} at {value} %',

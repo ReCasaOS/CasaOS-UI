@@ -3,7 +3,7 @@
  * grouping, the chart definitions and the mapping of contract series to apexcharts series.
  *
  * A point that is not a finite, non-negative, sane number is a gap (null), never 0. A string from a service is plain text:
- * apexcharts builds its tooltip with innerHTML, so the series NAME it receives is escaped first (`name`); `label` is for Vue text.
+ * apexcharts builds its tooltip as HTML, so the series NAME it receives is escaped first (`name`); `label` is for Vue text.
  */
 import escape from 'lodash/escape'
 import { FORMAT_KEYS, formatTime, formatValue } from './statsFormat'
