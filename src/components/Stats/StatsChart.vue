@@ -5,7 +5,7 @@
 		<p v-for="code in chart.noteCodes" :key="code" class="stats-chart-caption">{{ noteText(code, $t) }}</p>
 
 		<ul v-if="chart.legend.length" :aria-label="$t('Series')" class="stats-legend">
-			<li v-for="entry in chart.legend" :key="entry.key">
+			<li v-for="(entry, i) in chart.legend" :key="`${i}-${entry.key}`">
 				<button :aria-pressed="String(!entry.hidden)"
 					:class="{ 'is-hidden': entry.hidden }"
 					type="button"
@@ -24,6 +24,7 @@
 			role="img"
 			tabindex="0"
 			@keydown="onKeydown"
+			@blur="escaped = false"
 			@keyup="onKeyup">
 			<div aria-hidden="true">
 				<apex-chart v-if="chart.series.length" :height="height" :options="options" :series="series" type="line" />
@@ -69,7 +70,6 @@ export default {
 	},
 	props: {
 		chart: { type: Object, required: true },
-		group: { type: String, default: 'stats' },
 		// {min, max} in milliseconds, the same window for every card, or null
 		zoom: { type: Object, default: null },
 		// the time (seconds) the person points at, or null
@@ -106,7 +106,7 @@ export default {
 		},
 		options() {
 			const shown = this.chart.series
-			const base = chartOptions(this.chart, { group: this.group, zoom: this.zoom, height: this.height, locale: this.locale, range: this.range, scale: this.scale })
+			const base = chartOptions(this.chart, { zoom: this.zoom, height: this.height, locale: this.locale, range: this.range, scale: this.scale })
 			return {
 				...base,
 				chart: {
@@ -137,6 +137,8 @@ export default {
 					dashArray: shown.map(s => s.kind === 'ref' ? 5 : 0),
 				},
 				fill: { opacity: shown.map(s => s.kind === 'area' ? 0.35 : 1) },
+				// the crosshair every card draws at the time the person points at (apexcharts' own group would push one card's options onto the others)
+				annotations: this.cursor === null ? {} : { xaxis: [{ x: this.cursor * 1000, borderColor: '#8a8f98', borderWidth: 1, strokeDashArray: 0 }] },
 			}
 		},
 	},

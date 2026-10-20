@@ -10,6 +10,7 @@
 				{{ $t('Alert settings') }}<span class="stats-dialog-item"> · {{ itemName }}</span>
 			</h4>
 
+			<p v-if="itemGone" class="stats-dialog-error" role="status">{{ $t('This item is gone') }}</p>
 			<p v-if="state === 'loading'" class="stats-dialog-line">{{ $t('Loading...') }}</p>
 			<div v-else-if="state === 'error'" class="stats-dialog-error" role="status">
 				<span>{{ $t('The settings could not be read.') }}</span>
@@ -18,7 +19,7 @@
 
 			<form v-if="state === 'ok'" @submit.prevent="save">
 				<fieldset v-for="(rule, i) in rules" :key="i" class="stats-rule">
-					<legend>{{ ruleName(rule.key) }}</legend>
+					<legend>{{ ruleName(rule) }}</legend>
 					<label class="stats-rule-enabled">
 						<input v-model="rule.enabled" data-field="enabled" type="checkbox">
 						{{ $t('Enabled') }}
@@ -58,7 +59,7 @@
 
 			<div class="stats-dialog-actions">
 				<button :disabled="saving" class="button is-small is-rounded" type="button" @click="$emit('close')">{{ $t('Cancel') }}</button>
-				<button :disabled="state !== 'ok' || saving || !allValid" class="button is-small is-rounded is-primary" type="button" @click="save">{{ $t('Save') }}</button>
+				<button :disabled="state !== 'ok' || saving || !allValid || itemGone" class="button is-small is-rounded is-primary" type="button" @click="save">{{ $t('Save') }}</button>
 			</div>
 		</div>
 	</div>
@@ -83,7 +84,9 @@ function inBounds(value, field) {
 // What the service says about one rule, as the four fields the page edits
 function toRule(raw) {
 	return {
-		key: clean(raw?.key, 60),
+		// the key goes back to the service as it came; only its label is cleaned
+		key: typeof raw?.key === 'string' ? raw.key : '',
+		name: clean(raw?.key, 60),
 		enabled: raw?.enabled === true,
 		threshold: typeof raw?.threshold === 'number' ? raw.threshold : '',
 		minutes: typeof raw?.minutes === 'number' ? raw.minutes : '',
@@ -96,6 +99,8 @@ export default {
 		source: { type: String, required: true },
 		itemId: { type: String, required: true },
 		itemName: { type: String, default: '' },
+		// the item left the list while the dialog was open: nothing more is saved for it
+		itemGone: { type: Boolean, default: false },
 	},
 	emits: ['close', 'saved'],
 	data() {
@@ -115,6 +120,15 @@ export default {
 			return this.rules.every(rule => inBounds(rule.threshold, 'threshold') && inBounds(rule.minutes, 'minutes'))
 		},
 	},
+	watch: {
+		// whatever is edited, the last refusal is no longer about what is there
+		rules: {
+			deep: true,
+			handler() {
+				this.problem = ''
+			},
+		},
+	},
 	mounted() {
 		window.addEventListener('keyup', this.onEscape, true)
 		window.addEventListener('keydown', this.onTab, true)
@@ -127,8 +141,8 @@ export default {
 		this.gone = true
 	},
 	methods: {
-		ruleName(key) {
-			return RULE_NAMES[key] ? this.$t(RULE_NAMES[key]) : this.$t('Rule {key}', { key })
+		ruleName(rule) {
+			return Object.prototype.hasOwnProperty.call(RULE_NAMES, rule.key) ? this.$t(RULE_NAMES[rule.key]) : this.$t('Rule {key}', { key: rule.name })
 		},
 		invalid(row, field) {
 			const rule = this.rules[row]
@@ -161,7 +175,7 @@ export default {
 			}
 		},
 		async save() {
-			if (this.saving || this.state !== 'ok' || !this.allValid) {
+			if (this.saving || this.state !== 'ok' || !this.allValid || this.itemGone) {
 				return
 			}
 			this.saving = true

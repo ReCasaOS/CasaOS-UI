@@ -116,7 +116,6 @@
 									:range="range"
 									:scale="seriesData.scale || null"
 									:zoom="zoom"
-									group="stats"
 									@cursor="cursor = $event"
 									@toggle="toggleSeries"
 									@zoom="zoom = $event" />
@@ -127,11 +126,11 @@
 				</div>
 			</div>
 		</section>
-		<alert-settings-dialog v-if="alertDialog && selected"
-			:key="selectedKey"
-			:item-id="selected.id"
-			:item-name="selected.name"
-			:source="selected.source"
+		<alert-settings-dialog v-if="alertDialog"
+			:item-gone="!flat.some(item => keyOf(item) === alertDialog.key)"
+			:item-id="alertDialog.id"
+			:item-name="alertDialog.name"
+			:source="alertDialog.source"
 			@close="closeAlerts"
 			@saved="onAlertsSaved" />
 	</div>
@@ -217,7 +216,8 @@ export default {
 			alertsState: 'idle',
 			alertsActive: [],
 			alertTicket: 0,
-			alertDialog: false,
+			// the item the open dialog is for, as it was when it opened: {key, id, source, name}
+			alertDialog: null,
 		}
 	},
 	computed: {
@@ -285,7 +285,6 @@ export default {
 	},
 	watch: {
 		selectedKey() {
-			this.alertDialog = false
 			this.restartSeries()
 		},
 		alertSignature() {
@@ -446,18 +445,22 @@ export default {
 			this.alertsActive = list.slice(0, 20).filter(a => a && typeof a === 'object' && typeof a.key === 'string').map(a => ({
 				key: clean(a.key, 60),
 				since: a.since,
-				value: typeof a.value === 'number' ? a.value : Number.NaN,
+				value: typeof a.value === 'number' || (typeof a.value === 'string' && a.value.trim() !== '') ? Number(a.value) : Number.NaN,
 			}))
 			this.alertsState = 'ok'
 		},
 		openAlerts(event) {
+			if (!this.selected) {
+				return
+			}
+			const { id, source, name } = this.selected
 			this.alertOpener = event.currentTarget
-			this.alertDialog = true
+			this.alertDialog = { key: this.selectedKey, id, source, name }
 		},
 		// The focus goes back to the button that opened the dialog, or to the heading when that button is gone.
 		closeAlerts() {
 			const opener = this.alertOpener
-			this.alertDialog = false
+			this.alertDialog = null
 			this.alertOpener = null
 			this.$nextTick(() => {
 				opener?.focus?.({ preventScroll: true })
@@ -468,7 +471,7 @@ export default {
 		},
 		// What the service answered to the save is the state of the banner.
 		onAlertsSaved(response) {
-			if (response && Array.isArray(response.active)) {
+			if (response && Array.isArray(response.active) && this.alertDialog?.key === this.selectedKey) {
 				this.alertTicket++
 				this.setActive(response.active, this.selectedKey)
 			}
@@ -524,6 +527,10 @@ export default {
 					this.seriesData = raw
 					this.seriesKey = key
 					this.seriesState = 'ok'
+					// live data slides: a window it has slid past is of nothing now
+					if (this.range === 'live' && this.zoom && Number.isFinite(raw.from) && this.zoom.min < raw.from * 1000) {
+						this.zoom = null
+					}
 				}
 			} catch (e) {
 				if (ticket !== this.seriesTicket) {

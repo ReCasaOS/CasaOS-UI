@@ -177,13 +177,12 @@ describe('chartOptions', () => {
 	const charts = buildCharts(aSeries(), { t })
 	const scale = { cpu_allocation: 2, memory_limit: 1073741824 }
 
-	it('shares a group and an id per chart, and formats with the formatters', () => {
+	it('has no group, an id per chart, and formats with the formatters', () => {
 		const net = find(charts, 'network')
 		const cpu = find(charts, 'cpu')
-		const a = chartOptions(net, { group: 'g', locale: 'en', range: 'live', height: 200, scale })
-		const b = chartOptions(cpu, { group: 'g', locale: 'en', range: 'live', height: 200, scale })
-		expect(a.chart.group).toBe('g')
-		expect(b.chart.group).toBe('g')
+		const a = chartOptions(net, { locale: 'en', range: 'live', height: 200, scale })
+		const b = chartOptions(cpu, { locale: 'en', range: 'live', height: 200, scale })
+		expect(a.chart.group).toBeUndefined()
 		expect(a.chart.id).toBe('stats-network')
 		expect(a.chart.stacked).toBe(false)
 		expect(b.chart.stacked).toBe(true)
@@ -193,14 +192,14 @@ describe('chartOptions', () => {
 		expect(a.xaxis.type).toBe('datetime')
 		expect(a.yaxis.min).toBe(0)
 		expect(b.yaxis.max).toBe(scaleMax(cpu, scale))
-		const mem = chartOptions(find(charts, 'memory'), { group: 'g', locale: 'en', scale })
+		const mem = chartOptions(find(charts, 'memory'), { locale: 'en', scale })
 		expect(mem.yaxis.labels.formatter(1536)).toBe('1.5 KB')
 		expect(typeof a.tooltip.x.formatter).toBe('function')
 		expect(a.tooltip.shared).toBe(true)
 	})
 
 	it('takes the zoom, and holds no string with markup', () => {
-		const o = chartOptions(find(charts, 'cpu'), { group: 'g', zoom: { min: 1, max: 2 }, scale })
+		const o = chartOptions(find(charts, 'cpu'), { zoom: { min: 1, max: 2 }, scale })
 		expect([o.xaxis.min, o.xaxis.max]).toEqual([1, 2])
 		expect(chartOptions(find(charts, 'cpu'), { group: 'g' }).xaxis.min).toBeNull()
 		expect(JSON.stringify(o)).not.toContain('<')

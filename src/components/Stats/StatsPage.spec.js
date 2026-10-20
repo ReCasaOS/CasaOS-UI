@@ -611,11 +611,35 @@ describe('the chart cards of the page', () => {
 	const legendButton = label => [...document.querySelectorAll('.stats-legend button')].find(b => b.textContent.includes(label))
 	const pageButton = label => [...document.querySelectorAll('.stats-toolbar button')].find(b => b.textContent.trim() === label)
 
-	it('draws one card per chart, the processor across the whole width, all in one group', async () => {
+	it('draws one card per chart, the processor across the whole width', async () => {
 		await mountPage()
 		expect([...document.querySelectorAll('.stats-chart h4')].map(h => h.textContent)).toEqual(['Processor', 'Memory'])
 		expect(document.querySelector('.stats-chart.is-wide h4').textContent).toBe('Processor')
-		expect(apexes().map(a => a.props('options').chart.group)).toEqual(['stats', 'stats'])
+		expect(apexes().map(a => a.props('options').chart.group)).toEqual([undefined, undefined])
+	})
+
+	it('draws the crosshair of the card the mouse is on in every card', async () => {
+		await mountPage()
+		apexes()[0].props('options').chart.events.mouseMove({}, {}, { dataPointIndex: 3 })
+		await flushPromises()
+		const at = aSeries().from * 1000 + 15000
+		expect(apexes().map(a => a.props('options').annotations.xaxis[0].x)).toEqual([at, at])
+		apexes()[0].props('options').chart.events.mouseLeave()
+		await flushPromises()
+		expect(apexes().map(a => a.props('options').annotations)).toEqual([{}, {}])
+	})
+
+	it('lets a live zoom go once the data has slid past its window', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+		await mountPage()
+		const { from, to } = aSeries()
+		apexes()[0].props('options').chart.events.zoomed({}, { xaxis: { min: (from + 100) * 1000, max: (to - 10) * 1000 } })
+		await flushPromises()
+		expect(pageButton('Reset zoom')).toBeDefined()
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38, 'memory/rss': 1000 }, { from: from + 200, to: to + 200 }))
+		await vi.advanceTimersByTimeAsync(5000)
+		expect(pageButton('Reset zoom')).toBeUndefined()
+		vi.useRealTimers()
 	})
 
 	it('hides a line when its legend entry is pressed and shows it again at the next press', async () => {
@@ -768,6 +792,28 @@ describe('the alerts of the page', () => {
 		expect(document.querySelector('.stats-dialog')).toBeNull()
 		expect(lines()).toHaveLength(1)
 		expect(lines()[0]).toMatch(/^Memory at 91 %/)
+	})
+
+	it('keeps the open dialog for its item when the list changes, says the item is gone, and gives the focus back at close', async () => {
+		await open()
+		const button = await openDialog()
+		serve({ ...defaults(), app_management: body([plex]) })
+		await tick(5000)
+		expect(document.querySelector('.stats-name').textContent).toBe('Plex')
+		expect(document.querySelector('.stats-dialog')).not.toBeNull()
+		expect(document.querySelector('.stats-dialog-title').textContent).toContain('Jellyfin')
+		expect(document.querySelector('.stats-dialog-error').textContent).toBe('This item is gone')
+		expect(document.querySelector('.stats-dialog-actions .is-primary').disabled).toBe(true)
+		document.querySelector('.stats-dialog-actions button').click()
+		await tick(0)
+		expect(document.querySelector('.stats-dialog')).toBeNull()
+		expect(button.isConnected).toBe(true)
+	})
+
+	it('writes a numeric string value as a number', async () => {
+		statsApi.alerts.mockResolvedValue(anAlerts({ active: [{ key: 'cpu_high', since, value: '93' }] }))
+		await open()
+		expect(lines()[0]).toMatch(/^Processor at 93 % since /)
 	})
 
 	it('opens the settings from a button of the header, with the focus on the dialog heading', async () => {

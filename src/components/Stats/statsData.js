@@ -357,13 +357,12 @@ export function chartCaption(chart, scale, notes, t, locale = 'en') {
 	return parts.join(' · ')
 }
 
-export function chartOptions(chart, { group, zoom, height, locale = 'en', range = 'live', scale } = {}) {
+export function chartOptions(chart, { zoom, height, locale = 'en', range = 'live', scale } = {}) {
 	const y = v => formatValue(v, chart.unit, locale)
 	const time = v => formatTime(Number(v) / 1000, range, locale)
 	return {
 		chart: {
 			id: `stats-${chart.id}`,
-			group,
 			type: 'line',
 			height,
 			stacked: chart.stacked,

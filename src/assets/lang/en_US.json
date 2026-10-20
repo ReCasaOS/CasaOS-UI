@@ -2456,5 +2456,6 @@
   "The virtual machine crashed since {since}": "The virtual machine crashed since {since}",
   "Alert {key} since {since}": "Alert {key} since {since}",
   "Alerts could not be read.": "Alerts could not be read.",
-  "Active alerts": "Active alerts"
+  "Active alerts": "Active alerts",
+  "This item is gone": "This item is gone"
 }

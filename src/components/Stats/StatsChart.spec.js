@@ -19,7 +19,7 @@ const network = (opts, response = aSeries()) => chartOf(response, 'network', opt
 let wrapper
 async function mountChart(props = {}) {
 	wrapper = mount(StatsChart, {
-		props: { chart: network(), group: 'stats', zoom: null, cursor: null, locale: 'en', range: 'live', ...props },
+		props: { chart: network(), zoom: null, cursor: null, locale: 'en', range: 'live', ...props },
 		attachTo: document.body,
 		global: { plugins: [Buefy, i18n] },
 	})
@@ -37,15 +37,38 @@ function press(target, key, type = 'keydown') {
 afterEach(() => wrapper?.unmount())
 
 describe('the chart card', () => {
-	it('passes the same group to two cards and their own ids', async () => {
+	it('has no apexcharts group (it would push one card\'s options onto the others) and its own id', async () => {
 		const a = await mountChart()
 		const optionsA = apex().props('options')
 		a.unmount()
 		await mountChart({ chart: chartOf(aSeries(), 'disk') })
 		const optionsB = apex().props('options')
-		expect(optionsA.chart.group).toBe('stats')
-		expect(optionsB.chart.group).toBe(optionsA.chart.group)
+		expect(optionsA.chart.group).toBeUndefined()
+		expect(optionsB.chart.group).toBeUndefined()
 		expect(optionsB.chart.id).not.toBe(optionsA.chart.id)
+	})
+
+	it('draws the shared crosshair at the time of the cursor, and none without one', async () => {
+		await mountChart()
+		expect(apex().props('options').annotations).toEqual({})
+		await wrapper.setProps({ cursor: FROM + 15 })
+		expect(apex().props('options').annotations.xaxis).toHaveLength(1)
+		expect(apex().props('options').annotations.xaxis[0]).toMatchObject({ x: (FROM + 15) * 1000, borderWidth: 1 })
+		await wrapper.setProps({ cursor: null })
+		expect(apex().props('options').annotations).toEqual({})
+	})
+
+	it('forgets an Escape pressed down when the figure loses the focus', async () => {
+		await mountChart({ cursor: FROM + 15 })
+		const figure = wrapper.find('figure')
+		press(figure, 'Escape', 'keydown')
+		await wrapper.setProps({ cursor: null })
+		figure.element.dispatchEvent(new Event('blur'))
+		const onDocument = vi.fn()
+		document.addEventListener('keyup', onDocument)
+		press(figure, 'Escape', 'keyup')
+		document.removeEventListener('keyup', onDocument)
+		expect(onDocument).toHaveBeenCalledTimes(1)
 	})
 
 	it('passes the series that are shown, not the hidden ones, and the legend says which is hidden', async () => {

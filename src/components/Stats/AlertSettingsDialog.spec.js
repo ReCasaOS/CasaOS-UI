@@ -115,6 +115,38 @@ describe('the alert settings dialog', () => {
 		expect(wrapper.emitted('close')).toHaveLength(1)
 	})
 
+	it('sends the key of a rule as it came, and cleans it only for the label', async () => {
+		statsApi.alerts.mockResolvedValue(anAlerts({ rules: [{ key: ' odd_rule ', enabled: true, threshold: 50, minutes: 3 }] }))
+		statsApi.setAlerts.mockResolvedValue(anAlerts())
+		await open()
+		expect(rows()[0].querySelector('legend').textContent).toBe('Rule odd_rule')
+		save().click()
+		await flushPromises()
+		expect(statsApi.setAlerts.mock.calls[0][2][0].key).toBe(' odd_rule ')
+	})
+
+	it('takes the refusal away as soon as a field is edited', async () => {
+		statsApi.setAlerts.mockRejectedValue(failure(500))
+		await open()
+		save().click()
+		await flushPromises()
+		expect(document.querySelector('.stats-dialog-error')).not.toBeNull()
+		field(0, 'enabled').click()
+		await flushPromises()
+		expect(document.querySelector('.stats-dialog-error')).toBeNull()
+		save().click()
+		await flushPromises()
+		expect(document.querySelector('.stats-dialog-error')).not.toBeNull()
+		await type(1, 'minutes', '7')
+		expect(document.querySelector('.stats-dialog-error')).toBeNull()
+	})
+
+	it('says the item is gone and cannot be saved', async () => {
+		await open({ itemGone: true })
+		expect(document.querySelector('.stats-dialog-error').textContent).toBe('This item is gone')
+		expect(save().disabled).toBe(true)
+	})
+
 	it('shows what the service holds when it is opened again', async () => {
 		statsApi.setAlerts.mockResolvedValue(anAlerts())
 		await open()

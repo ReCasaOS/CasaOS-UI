@@ -2456,5 +2456,6 @@
   "The virtual machine crashed since {since}": "La machine virtuelle a planté depuis {since}",
   "Alert {key} since {since}": "Alerte {key} depuis {since}",
   "Alerts could not be read.": "Les alertes n'ont pas pu être lues.",
-  "Active alerts": "Alertes en cours"
+  "Active alerts": "Alertes en cours",
+  "This item is gone": "Cet élément n'existe plus"
 }
