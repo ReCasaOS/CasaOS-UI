@@ -2404,5 +2404,14 @@
   "The update of {module} is installed, but its backup is still there": "The update of {module} is installed, but its backup is still there",
   "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.": "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.",
   "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.": "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.",
-  "Statistics": "Statistics"
+  "Statistics": "Statistics",
+  "Statistics items": "Statistics items",
+  "{n} alerts": "{n} alerts",
+  "Sign in again to read {name}.": "Sign in again to read {name}.",
+  "{name} did not answer.": "{name} did not answer.",
+  "{name} could not be read.": "{name} could not be read.",
+  "Machine": "Machine",
+  "Other containers": "Other containers",
+  "Note from the service: {code}": "Note from the service: {code}",
+  "Too many items: some of them are not measured.": "Too many items: some of them are not measured."
 }

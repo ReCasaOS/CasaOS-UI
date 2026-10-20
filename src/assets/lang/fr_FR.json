@@ -2404,5 +2404,14 @@
   "The update of {module} is installed, but its backup is still there": "La mise à jour de {module} est installée, mais sa sauvegarde est restée",
   "The update failed and was rolled back, but some files were left as they are, so the old version is not whole. They are named below and in the log. Press Remove, then Install, to get a clean module.": "La mise à jour a échoué et a été annulée, mais certains fichiers ont été laissés tels quels : l'ancienne version n'est donc pas complète. Ils sont nommés ci-dessous et dans le journal. Appuyez sur Supprimer, puis sur Installer, pour obtenir un module propre.",
   "The update is installed, but its backup folder could not be deleted (its path is below). The next install, update or remove will put the old version back unless the folder is deleted by hand.": "La mise à jour est installée, mais son dossier de sauvegarde n'a pas pu être supprimé (son chemin est ci-dessous). La prochaine installation, mise à jour ou suppression remettra l'ancienne version en place, sauf si le dossier est supprimé à la main.",
-  "Statistics": "Statistiques"
+  "Statistics": "Statistiques",
+  "Statistics items": "Éléments des statistiques",
+  "{n} alerts": "{n} alertes",
+  "Sign in again to read {name}.": "Reconnectez-vous pour lire : {name}.",
+  "{name} did not answer.": "{name} ne répond pas.",
+  "{name} could not be read.": "{name} n'a pas pu être lu.",
+  "Machine": "Machine",
+  "Other containers": "Autres conteneurs",
+  "Note from the service: {code}": "Remarque du service : {code}",
+  "Too many items: some of them are not measured.": "Trop d'éléments : certains ne sont pas mesurés."
 }
