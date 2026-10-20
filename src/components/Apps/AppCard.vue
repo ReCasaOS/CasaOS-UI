@@ -188,6 +188,7 @@ import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -451,6 +452,9 @@ export default {
 					break
 				case VM_APP_NAME:
 					openVirtualMachines(this.$buefy, this.$store.state)
+					break
+				case STATS_APP_NAME:
+					openStatistics(this.$buefy, this.$store.state)
 					break
 				default:
 					break

@@ -209,3 +209,23 @@ describe('app section when a module is installed or removed', () => {
 		expect(names(vm)).toEqual(['App Store', 'Virtual Machines'])
 	})
 })
+
+describe('app section built-in cards', () => {
+	it('always carries Statistics next to Files', async () => {
+		const vm = {
+			$baseIp: 'localhost',
+			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [] } }) } },
+			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: [] } } }) } },
+			appList: [],
+			getLinkAppList: () => Promise.resolve([]),
+			sortApps: AppSection.methods.sortApps,
+			saveSortIfChanged: vi.fn(),
+			addVmCardWhenThere: vi.fn(),
+		}
+		await AppSection.methods.getList.call(vm)
+		const names = vm.appList.map(app => app.name)
+		expect(names).toContain('Files')
+		expect(names).toContain('Statistics')
+		expect(vm.appList.find(app => app.name === 'Statistics')).toMatchObject({ app_type: 'system', status: 'running' })
+	})
+})

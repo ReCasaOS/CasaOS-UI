@@ -12,6 +12,7 @@ export const DEFAULT_APP_LAUNCH_EXCEPTIONS = ['qbittorrent', 'org.icewhale.qbitt
 export const FILES_LAUNCH_ID = 'casaos:files'
 export const APP_STORE_LAUNCH_ID = 'casaos:app-store'
 export const VMS_LAUNCH_ID = 'casaos:virtual-machines'
+export const STATS_LAUNCH_ID = 'casaos:statistics'
 
 function identifiersOf(appInfo) {
 	return [appInfo && appInfo.id, appInfo && appInfo.name]

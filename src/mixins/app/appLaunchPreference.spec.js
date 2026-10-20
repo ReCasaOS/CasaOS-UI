@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	DEFAULT_APP_LAUNCH_EXCEPTIONS,
 	FILES_LAUNCH_ID,
+	STATS_LAUNCH_ID,
 	builtinOpensInNewTab,
 	readAppLaunchPreference,
 	shouldOpenInNewWindow,
@@ -101,5 +102,12 @@ describe('readAppLaunchPreference', () => {
 		const preference = readAppLaunchPreference(fakeStorage({ appLaunchExceptions: '{"a":1}' }))
 
 		expect(preference.exceptions).toEqual(DEFAULT_APP_LAUNCH_EXCEPTIONS)
+	})
+})
+
+describe('builtinOpensInNewTab for Statistics', () => {
+	it('opens it in a new tab when excepted, not otherwise', () => {
+		expect(builtinOpensInNewTab(STATS_LAUNCH_ID, { appLaunchInIframe: true, appLaunchExceptions: [STATS_LAUNCH_ID] })).toBe(true)
+		expect(builtinOpensInNewTab(STATS_LAUNCH_ID, { appLaunchInIframe: true, appLaunchExceptions: [] })).toBe(false)
 	})
 })

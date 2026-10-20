@@ -107,6 +107,7 @@ import ExternalLinkPanel from '@/components/Apps/ExternalLinkPanel'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { STATS_APP_NAME } from '@/components/Stats/entry'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -138,6 +139,16 @@ const builtInApplications = [
 			en_us: 'Files',
 		},
 		icon: require(`@/assets/img/app/files.svg`),
+		status: 'running',
+		app_type: 'system',
+	},
+	{
+		id: '3',
+		name: STATS_APP_NAME,
+		title: {
+			en_us: 'Statistics',
+		},
+		icon: require(`@/assets/img/app/stats.svg`),
 		status: 'running',
 		app_type: 'system',
 	},
