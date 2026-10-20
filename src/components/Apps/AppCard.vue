@@ -131,9 +131,11 @@
 				<div class="has-text-centered is-flex is-justify-content-center is-flex-direction-column pt-5 pb-3px img-c">
 					<div class="is-flex is-justify-content-center">
 						<div class="is-relative">
-							<b-image :class="dotClass(item.status, isLoading)" :src="item.icon"
+							<b-image :alt="statsBadge ? statsBadge.label : undefined" :class="dotClass(item.status, isLoading)" :src="item.icon"
 								:src-fallback="require('@/assets/img/app/default.svg')" class="is-64x64"
 								webp-fallback=".jpg" @click="openApp(item)" />
+							<!-- The number of active resource alerts, on the Statistics card only. Numbers only: the words are the icon's alt. -->
+							<span v-if="statsBadge" aria-hidden="true" class="stats-badge">{{ statsBadge.text }}</span>
 							<!-- Unstable -->
 							<CTooltip v-if="newAppIds.includes(item.name)" class="__position" content="NEW" />
 							<!-- Shown from what the last image check found, so an app nobody has
@@ -188,6 +190,8 @@ import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import { alertBadge } from '@/components/Stats/alertBadge'
+import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -245,6 +249,18 @@ export default {
 	},
 
 	computed: {
+		// The count of active resource alerts, for the Statistics card: its number and the sentence that names it.
+		statsBadge() {
+			// the system app only: an app a person installed may carry the same name
+			const total = this.item.app_type === 'system' && this.item.name === STATS_APP_NAME ? alertBadge.total() : 0
+			if (!(total > 0)) {
+				return null
+			}
+			return {
+				text: total > 99 ? '99+' : String(total),
+				label: this.$t(total === 1 ? 'Statistics, {count} active alert' : 'Statistics, {count} active alerts', { count: total }),
+			}
+		},
 		tooltipLabel() {
 			if (this.isRecreating) {
 				return this.$t('Recreating')
@@ -451,6 +467,9 @@ export default {
 					break
 				case VM_APP_NAME:
 					openVirtualMachines(this.$buefy, this.$store.state)
+					break
+				case STATS_APP_NAME:
+					openStatistics(this.$buefy, this.$store.state)
 					break
 				default:
 					break
@@ -1278,6 +1297,23 @@ export default {
 .dropdown.is-right .dropdown-menu {
   top: 0;
   left: calc(100% + 6px);
+}
+
+.stats-badge {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.5rem;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 0.625rem;
+  background: #d80000;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+  pointer-events: none;
 }
 
 .dropdown.is-left .dropdown-menu {

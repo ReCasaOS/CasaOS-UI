@@ -71,6 +71,16 @@ export default [
 		},
 	},
 	{
+		path: '/stats',
+		name: 'Statistics',
+		hidden: true,
+		component: () => import('@/components/Stats/StatsTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
 		path: '/launch',
 		name: 'AppLauncherCheck',
 		hidden: true,

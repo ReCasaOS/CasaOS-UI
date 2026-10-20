@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '@/plugins/i18n'
 import AppCard from '@/components/Apps/AppCard.vue'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
+import { alertBadge } from '@/components/Stats/alertBadge'
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
@@ -14,6 +15,8 @@ import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 vi.mock('@/assets/lang', () => ({
 	default: {
 		en_us: {
+			'Statistics, {count} active alert': 'Statistics, {count} active alert',
+			'Statistics, {count} active alerts': 'Statistics, {count} active alerts',
 			'Updating {name} failed: {reason}': 'Updating {name} failed: {reason}',
 			'{name} now runs the image that was just pulled.': '{name} now runs the image that was just pulled.',
 			'{name} already runs the newest image, so it was left as it is.': '{name} already runs the newest image, so it was left as it is.',
@@ -491,5 +494,79 @@ describe('a stack CasaOS cannot load', () => {
 	it('says nothing for a stack that loaded', async () => {
 		const wrapper = await card(container)
 		expect(wrapper.text()).not.toContain('CasaOS cannot read its compose file.')
+	})
+})
+
+// The Statistics card carries the number of active resource alerts over its icon: a number, never a word from a service.
+describe('the Statistics card count badge', () => {
+	const stats = { name: 'Statistics', app_type: 'system', status: 'running', title: { en_us: 'Statistics' } }
+	const badge = wrapper => wrapper.find('.stats-badge')
+	afterEach(() => Object.assign(alertBadge.counts, { app_management: 0, virt_management: 0, core: 0 }))
+
+	it('shows the total, hidden from assistive technology, and names it on the icon', async () => {
+		Object.assign(alertBadge.counts, { app_management: 2, core: 1 })
+		const wrapper = await card(stats)
+
+		expect(badge(wrapper).text()).toBe('3')
+		expect(badge(wrapper).attributes('aria-hidden')).toBe('true')
+		expect(wrapper.find('img').attributes('alt')).toBe('Statistics, 3 active alerts')
+		wrapper.unmount()
+	})
+
+	it('says "alert" for one', async () => {
+		alertBadge.counts.core = 1
+		const wrapper = await card(stats)
+
+		expect(wrapper.find('img').attributes('alt')).toBe('Statistics, 1 active alert')
+		wrapper.unmount()
+	})
+
+	it('shows 99+ above 99', async () => {
+		Object.assign(alertBadge.counts, { app_management: 99, core: 1 })
+		const wrapper = await card(stats)
+
+		expect(badge(wrapper).text()).toBe('99+')
+		wrapper.unmount()
+	})
+
+	it('shows 99 as it is', async () => {
+		alertBadge.counts.app_management = 99
+		const wrapper = await card(stats)
+
+		expect(badge(wrapper).text()).toBe('99')
+		wrapper.unmount()
+	})
+
+	it('is only for the system app, not for an app that is merely called Statistics', async () => {
+		alertBadge.counts.core = 2
+		const wrapper = await card({ ...stats, app_type: 'v1app' })
+
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows nothing at 0', async () => {
+		const wrapper = await card(stats)
+
+		expect(badge(wrapper).exists()).toBe(false)
+		expect(wrapper.find('img').attributes('alt') || '').not.toContain('active alert')
+		wrapper.unmount()
+	})
+
+	it('follows the count while the card is on screen', async () => {
+		const wrapper = await card(stats)
+		alertBadge.counts.core = 2
+		await nextTick()
+
+		expect(badge(wrapper).text()).toBe('2')
+		wrapper.unmount()
+	})
+
+	it('is drawn on no other card', async () => {
+		alertBadge.counts.core = 5
+		const wrapper = await card({ name: 'Virtual Machines', app_type: 'system', title: { en_us: 'Virtual Machines' } })
+
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
 	})
 })

@@ -34,6 +34,10 @@ import Business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import DiskLearnMore from '@/components/Storage/DiskLearnMore.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import { ice_i18n } from '@/mixins/base/common-i18n'
+import { alertBadge } from '@/components/Stats/alertBadge'
+import { openStatistics } from '@/components/Stats/entry'
+import { alertMessage, createAlertFeed } from '@/components/Stats/resourceAlerts'
+import { localeTag } from '@/components/Stats/statsFormat'
 
 // The last automatic update this browser was told about: its version.
 const AUTO_UPDATE_SEEN = 'casaos-autoupdate-announced'
@@ -109,13 +113,16 @@ export default {
 	created() {
 		this.getMessageFromLetter()
 		this.initUIEventBus()
+		this.alertFeed = createAlertFeed()
 	},
 	mounted() {
 		this.announceBackupFailures()
 		this.announceTelemetry()
 		this.announceAutoUpdate()
+		alertBadge.load()
 	},
 	beforeUnmount() {
+		alertBadge.stop()
 		this.destroyUIEventBus()
 		this.dropTelemetryNotice?.()
 	},
@@ -257,6 +264,33 @@ export default {
 						target: '_blank',
 						rel: 'noopener noreferrer',
 					}, this.$t('Release notes')),
+				],
+			})
+		},
+
+		// A resource alert from the message bus, as a text-only notification: the sentence and a button, as VNodes with a text
+		// child, so that nothing a service sent is ever read as HTML. The feed drops what is unknown, repeated or a flood.
+		showResourceAlert(state, res) {
+			// the count on the icon follows every event, also one the feed drops as a flood
+			alertBadge.refreshSoon()
+			const note = this.alertFeed.accept(state, res?.Properties)
+			if (!note) {
+				return
+			}
+			this.$buefy.notification.open({
+				position: 'is-top-right',
+				type: note.kind === 'firing' ? 'is-warning' : 'is-success',
+				duration: 15000,
+				queue: false,
+				hasIcon: false,
+				ariaCloseLabel: this.$t('Close'),
+				message: [
+					h('p', alertMessage(note.text, this.$t, localeTag(this.$i18n?.locale))),
+					h('button', {
+						type: 'button',
+						class: 'button is-small is-rounded is-light',
+						onClick: () => openStatistics(this.$buefy, this.$store.state, { item: note.open.item }),
+					}, this.$t('Open statistics')),
 				],
 			})
 		},
@@ -634,6 +668,16 @@ export default {
 
 	},
 	sockets: {
+		// not `connect`: it also fires for the first connection, which mounted() already covers
+		reconnect() {
+			alertBadge.load()
+		},
+		'resource:alert-firing': function (res) {
+			this.showResourceAlert('firing', res)
+		},
+		'resource:alert-resolved': function (res) {
+			this.showResourceAlert('resolved', res)
+		},
 		'app:apply-changes-begin': function (res) {
 			const title = this.appTitle(res)
 			this.transformAppInstallationProgress({

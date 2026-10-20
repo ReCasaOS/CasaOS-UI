@@ -102,7 +102,7 @@
 				<h4 class="has-text-weight-bold mb-3">
 					{{ $t('What to send') }}
 				</h4>
-				<b-field v-for="category in categories" :key="category.key" class="mb-2">
+				<b-field v-for="category in shownCategories" :key="category.key" class="mb-2">
 					<b-checkbox :disabled="saving"
 						:model-value="view.categories[category.key]"
 						size="is-small"
@@ -161,12 +161,17 @@ export default {
 				{ key: 'disks', label: 'A disk is failing, missing or full' },
 				{ key: 'updates', label: 'An update fails or pauses, or a new release is out' },
 				{ key: 'apps', label: 'An app operation fails, or an app stops or keeps restarting' },
+				{ key: 'resources', label: 'A container or a virtual machine uses too much processor or memory, or a virtual machine crashes' },
 			],
 			// the core's bounds
 			thresholds: Array.from({ length: 50 }, (_, i) => 50 + i),
 		}
 	},
 	computed: {
+		// A core older than the category sends no such key: a box for it would be a switch that does nothing.
+		shownCategories() {
+			return this.categories.filter(category => category.key !== 'resources' || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, 'resources'))
+		},
 		kind() {
 			return ALERT_KINDS.find(kind => kind.id === this.draft.kind)
 		},

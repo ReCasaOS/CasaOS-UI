@@ -55,7 +55,7 @@
 </template>
 
 <script>
-import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 
 export default {
@@ -75,6 +75,7 @@ export default {
 			const builtins = [
 				{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') },
 				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
+				{ id: STATS_LAUNCH_ID, title: this.$t('Statistics') },
 			]
 			if (this.hasVMs) {
 				builtins.push({ id: VMS_LAUNCH_ID, title: this.$t('Virtual Machines') })

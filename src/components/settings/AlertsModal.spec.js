@@ -171,6 +171,32 @@ describe('the alerts dialog', () => {
 		expect(wrapper.text()).toContain('Not sent: dial tcp: i/o timeout')
 	})
 
+	// The fields are stubs without their slots: a row is counted, and the rows' keys are read from the dialog.
+	const rows = wrapper => wrapper.findAll('b-field-stub.mb-2')
+	const RESOURCES = 'A container or a virtual machine uses too much processor or memory, or a virtual machine crashes'
+
+	it('shows the resources category only when the core sends that key, and sends it', async () => {
+		const setAlerts = answer({})
+		const wrapper = await open({
+			getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true, resources: true } })),
+			setAlerts,
+		})
+
+		expect(rows(wrapper)).toHaveLength(5)
+		expect(wrapper.vm.shownCategories.map(c => c.key)).toContain('resources')
+		expect(wrapper.vm.shownCategories.find(c => c.key === 'resources').label).toBe(RESOURCES)
+
+		await wrapper.vm.save({ categories: { ...wrapper.vm.view.categories, resources: false } })
+		expect(setAlerts).toHaveBeenLastCalledWith({ categories: { backups: true, disks: true, updates: true, apps: true, resources: false } })
+	})
+
+	it('shows no resources row for a core that does not know the category', async () => {
+		const wrapper = await open({})
+
+		expect(rows(wrapper)).toHaveLength(4)
+		expect(wrapper.vm.shownCategories.map(c => c.key)).not.toContain('resources')
+	})
+
 	it('sends a category or the threshold alone, and goes back when refused', async () => {
 		const setAlerts = answer({})
 		const wrapper = await open({ setAlerts })
