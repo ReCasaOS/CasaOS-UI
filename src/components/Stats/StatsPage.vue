@@ -50,7 +50,51 @@
 					<p v-for="note in listNoteTexts" :key="note.key" class="stats-note">{{ note.text }}</p>
 				</div>
 
-				<div class="stats-main"></div>
+				<div class="stats-main">
+					<template v-if="selected">
+						<div class="stats-head">
+							<div class="stats-title">
+								<h4 class="stats-name">{{ selected.name }}</h4>
+								<span class="stats-kind">{{ kindWord(selected.kind) }}</span>
+								<span class="stats-state">{{ stateWord(selected.state) }}</span>
+								<span v-if="sinceText" class="stats-since">{{ sinceText }}</span>
+							</div>
+							<p v-if="detailText" :title="detailText" class="stats-detail">{{ detailText }}</p>
+						</div>
+
+						<div class="stats-toolbar">
+							<div :aria-label="$t('Period')" class="stats-ranges" role="group">
+								<button v-for="r in ranges"
+									:key="r.id"
+									:aria-pressed="String(r.id === range)"
+									:class="{ 'is-active': r.id === range }"
+									type="button"
+									@click="setRange(r.id)">
+									{{ $t(r.label) }}
+								</button>
+							</div>
+							<button v-if="range !== 'live'" class="button is-small is-rounded" type="button" @click="restartSeries">{{ $t('Refresh') }}</button>
+						</div>
+
+						<div v-if="seriesState === 'error'" class="stats-series-error" role="status">
+							<p>{{ $t('The measurements could not be read.') }}</p>
+							<button class="button is-small is-rounded" type="button" @click="restartSeries">{{ $t('Retry') }}</button>
+						</div>
+						<p v-else-if="seriesState === 'notfound'" class="stats-series-error" role="status">{{ $t('This item is no longer there.') }}</p>
+
+						<template v-if="seriesData">
+							<p v-for="(note, i) in seriesNoteTexts" :key="i" class="stats-series-note">{{ note }}</p>
+							<dl class="stats-figures">
+								<div v-for="figure in figureList" :key="figure.id" class="stats-figure">
+									<dt>{{ figure.label }}</dt>
+									<dd>{{ figure.text }}</dd>
+								</div>
+							</dl>
+							<p v-if="!hasData" class="stats-no-data">{{ $t('No data for this period') }}</p>
+						</template>
+						<b-loading :active="seriesState === 'loading' && !seriesData" :is-full-page="false"></b-loading>
+					</template>
+				</div>
 			</div>
 		</section>
 	</div>
@@ -58,8 +102,8 @@
 
 <script>
 import { createPoller } from './poller'
-import { groupItems, listNotes, normalizeItems, noteText } from './statsData'
-import { formatValue, localeTag } from './statsFormat'
+import { buildCharts, figures, groupItems, listNotes, normalizeItems, noteText } from './statsData'
+import { formatDateTime, formatValue, localeTag } from './statsFormat'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { STATS_SOURCES, statsApi } from '@/service/stats'
 
@@ -69,6 +113,18 @@ const REFRESH_MS = 5000
 const COLUMN_NAMES = { app_management: 'Containers', virt_management: 'Virtual Machines', core: 'Machine' }
 
 const STATE_WORDS = { running: 'Running', stopped: 'Stopped', paused: 'Paused', crashed: 'Crashed', unknown: 'Unknown' }
+
+const KIND_WORDS = { 'app-container': 'Container', 'container': 'Container', 'vm': 'Virtual machine', 'host': 'Machine' }
+
+const RANGES = [
+	{ id: 'live', label: 'Live' },
+	{ id: '15m', label: '15 min' },
+	{ id: '1h', label: '1 h' },
+	{ id: '24h', label: '24 h' },
+	{ id: '7d', label: '7 days' },
+]
+
+const DETAIL_MAX = 200
 
 const blank = () => ({ state: 'loading', items: [], notes: [], error: '' })
 
@@ -96,6 +152,15 @@ export default {
 			selectedKey: '',
 			// the newest ask of each column: an older answer never replaces a newer one
 			listTicket: Object.fromEntries(STATS_SOURCES.map(source => [source, 0])),
+			ranges: RANGES,
+			range: 'live',
+			seriesState: 'loading',
+			seriesData: null,
+			// the item the series belongs to
+			seriesKey: '',
+			seriesTicket: 0,
+			zoom: null,
+			cursor: null,
 		}
 	},
 	computed: {
@@ -107,6 +172,32 @@ export default {
 		},
 		flat() {
 			return this.groups.flatMap(group => group.items)
+		},
+		selected() {
+			return this.flat.find(item => this.keyOf(item) === this.selectedKey) || null
+		},
+		sinceText() {
+			const item = this.selected
+			if (!item || !['running', 'paused'].includes(item.state) || !item.started_at) {
+				return ''
+			}
+			return this.$t('Running since {since}', { since: formatDateTime(item.started_at, this.locale) })
+		},
+		detailText() {
+			return this.selected?.detail ? this.selected.detail.slice(0, DETAIL_MAX) : ''
+		},
+		figureList() {
+			return figures(this.seriesData, this.selected, this.locale, this.$t)
+		},
+		charts() {
+			return buildCharts(this.seriesData, { range: this.range, kind: this.selected?.kind || '', t: (key, params) => this.$t(key, params) })
+		},
+		hasData() {
+			return this.charts.some(chart => !chart.empty)
+		},
+		seriesNoteTexts() {
+			const notes = Array.isArray(this.seriesData?.notes) ? this.seriesData.notes : []
+			return notes.filter(code => typeof code === 'string').slice(0, 10).map(code => noteText(code, this.$t))
 		},
 		loading() {
 			return STATS_SOURCES.some(source => this.columns[source].state === 'loading') && this.flat.length === 0
@@ -122,8 +213,14 @@ export default {
 				: [])
 		},
 	},
+	watch: {
+		selectedKey() {
+			this.restartSeries()
+		},
+	},
 	mounted() {
 		this.initialUsed = false
+		this.seriesPoller = createPoller({ run: () => this.fetchSeries(), intervalMs: REFRESH_MS })
 		this.listPoller = createPoller({ run: () => this.loadAll(), intervalMs: REFRESH_MS })
 		document.addEventListener('visibilitychange', this.onVisibility)
 		this.$refs.title.focus()
@@ -132,6 +229,7 @@ export default {
 	beforeUnmount() {
 		document.removeEventListener('visibilitychange', this.onVisibility)
 		this.listPoller.stop()
+		this.seriesPoller.stop()
 	},
 	methods: {
 		keyOf(item) {
@@ -150,8 +248,12 @@ export default {
 			}
 			return this.$t(code === 'down' ? '{name} did not answer.' : '{name} could not be read.', { name })
 		},
+		kindWord(kind) {
+			return this.$t(KIND_WORDS[kind] || 'Container')
+		},
 		onVisibility() {
 			this.listPoller.visibilityChanged()
+			this.seriesPoller.visibilityChanged()
 		},
 
 		// The three sources at once; the virtual machines only where the module answers.
@@ -207,6 +309,65 @@ export default {
 		},
 		select(key) {
 			this.selectedKey = key
+		},
+
+		setRange(id) {
+			if (id !== this.range) {
+				this.range = id
+				this.restartSeries()
+			}
+		},
+		// A new item or period: the answers still on their way are no longer wanted, and the curves of another item are not kept.
+		restartSeries() {
+			this.seriesTicket++
+			this.zoom = null
+			this.cursor = null
+			this.seriesPoller.stop()
+			if (this.seriesKey !== this.selectedKey) {
+				this.seriesData = null
+				this.seriesKey = ''
+			}
+			this.seriesState = 'loading'
+			if (!this.selected) {
+				return
+			}
+			if (this.range === 'live') {
+				this.seriesPoller.start()
+			} else {
+				this.fetchSeries()
+			}
+		},
+		async fetchSeries() {
+			const item = this.selected
+			if (!item) {
+				return
+			}
+			const ticket = this.seriesTicket
+			const key = this.selectedKey
+			try {
+				const raw = await statsApi.series(item.source, item.id, this.range)
+				if (!raw || !Array.isArray(raw.series)) {
+					throw Object.assign(new Error('not a series'), { response: {} })
+				}
+				if (ticket === this.seriesTicket) {
+					this.seriesData = raw
+					this.seriesKey = key
+					this.seriesState = 'ok'
+				}
+			} catch (e) {
+				if (ticket !== this.seriesTicket) {
+					return
+				}
+				if (e?.response?.status === 404) {
+					// the item went: the list is read again, and the selection falls back
+					this.seriesData = null
+					this.seriesKey = ''
+					this.seriesState = 'notfound'
+					this.listPoller.now()
+				} else {
+					this.seriesState = 'error'
+				}
+			}
 		},
 	},
 }
@@ -359,6 +520,101 @@ export default {
 		&.state-unknown {
 			background: transparent;
 			border: 1px dashed #8a8f98;
+		}
+	}
+
+	.stats-main {
+		position: relative;
+		min-width: 0;
+		min-height: 20rem;
+	}
+
+	.stats-title {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.5rem;
+	}
+
+	.stats-name {
+		font-size: 1.125rem;
+		font-weight: 600;
+		color: var(--casa-text-strong);
+		overflow-wrap: anywhere;
+	}
+
+	.stats-kind,
+	.stats-state,
+	.stats-since,
+	.stats-detail {
+		font-size: 0.75rem;
+		color: var(--casa-text-dim);
+	}
+
+	.stats-detail {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.stats-toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0.75rem 0;
+	}
+
+	.stats-ranges {
+		display: inline-flex;
+		border-radius: 1rem;
+		border: 1px solid var(--casa-border);
+		overflow: hidden;
+
+		button {
+			padding: 0.25rem 0.75rem;
+			border: 0;
+			font-size: 0.75rem;
+			color: inherit;
+			background: transparent;
+			cursor: pointer;
+
+			&.is-active {
+				color: #fff;
+				background: var(--casa-primary, #3b82f6);
+			}
+		}
+	}
+
+	.stats-series-error,
+	.stats-series-note,
+	.stats-no-data {
+		margin-bottom: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--casa-text-dim);
+	}
+
+	.stats-figures {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.stats-figure {
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		border: 1px solid var(--casa-border);
+
+		dt {
+			font-size: 0.75rem;
+			color: var(--casa-text-dim);
+		}
+
+		dd {
+			font-size: 1.125rem;
+			font-weight: 600;
+			color: var(--casa-text-strong);
 		}
 	}
 

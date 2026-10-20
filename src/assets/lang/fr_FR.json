@@ -2413,5 +2413,20 @@
   "Machine": "Machine",
   "Other containers": "Autres conteneurs",
   "Note from the service: {code}": "Remarque du service : {code}",
-  "Too many items: some of them are not measured.": "Trop d'éléments : certains ne sont pas mesurés."
+  "Too many items: some of them are not measured.": "Trop d'éléments : certains ne sont pas mesurés.",
+  "Period": "Période",
+  "Live": "En direct",
+  "15 min": "15 min",
+  "1 h": "1 h",
+  "24 h": "24 h",
+  "7 days": "7 jours",
+  "The measurements could not be read.": "Les mesures n'ont pas pu être lues.",
+  "This item is no longer there.": "Cet élément n'existe plus.",
+  "Running since {since}": "En marche depuis le {since}",
+  "Virtual machine": "Machine virtuelle",
+  "Received": "Reçu",
+  "Disk": "Disque",
+  "Processes": "Processus",
+  "Virtual CPUs": "Processeurs virtuels",
+  "No data for this period": "Aucune donnée pour cette période"
 }

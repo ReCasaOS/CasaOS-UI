@@ -2,7 +2,7 @@
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HOSTILE, anItem } from './__fixtures__/contract'
+import { HOSTILE, aSeries, anItem, makePoints } from './__fixtures__/contract'
 import StatsPage from './StatsPage.vue'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { statsApi } from '@/service/stats'
@@ -268,5 +268,229 @@ describe('the refresh of the list', () => {
 		wrapper.unmount()
 		wrapper = null
 		expect(vi.getTimerCount()).toBe(0)
+	})
+})
+
+// a series answer whose points are the same value all along; null is a gap
+function seriesWith(values, over = {}) {
+	return aSeries({
+		series: Object.entries(values).map(([key, value]) => {
+			const slash = key.indexOf('/')
+			return { chart: key.slice(0, slash), name: key.slice(slash + 1), unit: 'percent', points: makePoints({ fn: () => value }) }
+		}),
+		...over,
+	})
+}
+
+describe('the header, the periods and the figures', () => {
+	let hidden
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+		hidden = false
+		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38 }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+		delete document.hidden
+		vi.useRealTimers()
+	})
+
+	const tick = ms => vi.advanceTimersByTimeAsync(ms)
+	async function open(props = {}) {
+		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		await tick(0)
+		return wrapper
+	}
+	const seriesCalls = () => statsApi.series.mock.calls.map(c => c.join('|'))
+	const rangeButton = label => [...document.querySelectorAll('[aria-label="Period"] button')].find(b => b.textContent.trim() === label)
+	const figureTexts = () => [...document.querySelectorAll('.stats-figures dd')].map(dd => dd.textContent)
+	const figureLabels = () => [...document.querySelectorAll('.stats-figures dt')].map(dt => dt.textContent)
+	const JELLY = 'app_management|app:jellyfin:web:1'
+
+	it('asks the live series of the selected item first, and says so', async () => {
+		await open()
+		expect(seriesCalls()).toEqual([`${JELLY}|live`])
+		expect(rangeButton('Live').getAttribute('aria-pressed')).toBe('true')
+		expect(rangeButton('7 days').getAttribute('aria-pressed')).toBe('false')
+		expect(document.querySelector('[role="group"][aria-label="Period"]')).not.toBeNull()
+	})
+
+	it('asks once for another period, starts no polling, and asks again on Refresh', async () => {
+		await open()
+		rangeButton('7 days').click()
+		await tick(0)
+		expect(seriesCalls()).toEqual([`${JELLY}|live`, `${JELLY}|7d`])
+		await tick(60000)
+		expect(statsApi.series).toHaveBeenCalledTimes(2)
+		;[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Refresh').click()
+		await tick(0)
+		expect(statsApi.series).toHaveBeenCalledTimes(3)
+	})
+
+	it('polls the live series every 5 s, one request at a time', async () => {
+		statsApi.series.mockReturnValue(new Promise(() => {}))
+		await open()
+		await tick(60000)
+		expect(statsApi.series).toHaveBeenCalledTimes(1)
+	})
+
+	it('polls every 5 s once answered, pauses while hidden, asks once when shown', async () => {
+		await open()
+		await tick(5000)
+		expect(statsApi.series).toHaveBeenCalledTimes(2)
+		hidden = true
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(3600000)
+		expect(statsApi.series).toHaveBeenCalledTimes(2)
+		hidden = false
+		document.dispatchEvent(new Event('visibilitychange'))
+		await tick(0)
+		expect(statsApi.series).toHaveBeenCalledTimes(3)
+	})
+
+	it('ignores the late answer of the old item, and never shows its curves under the new name', async () => {
+		const first = deferred()
+		const second = deferred()
+		statsApi.series.mockImplementation((source, id) => id === 'app:jellyfin:web:1' ? first.promise : second.promise)
+		await open()
+		document.querySelectorAll('.stats-list button')[1].click()
+		await tick(0)
+		expect(document.querySelector('.stats-name').textContent).toBe('Plex')
+		first.resolve(seriesWith({ 'cpu/total': 11 }))
+		await tick(0)
+		expect(document.querySelector('.stats-figures')).toBeNull()
+		second.resolve(seriesWith({ 'cpu/total': 22 }))
+		await tick(0)
+		expect(figureTexts()[0]).toBe('22%')
+	})
+
+	it('clears the curves of the old item at once, but keeps them while the period of the same item changes', async () => {
+		await open()
+		expect(figureTexts()[0]).toBe('38%')
+		statsApi.series.mockReturnValue(new Promise(() => {}))
+		rangeButton('1 h').click()
+		await tick(0)
+		expect(figureTexts()[0]).toBe('38%')
+		document.querySelectorAll('.stats-list button')[1].click()
+		await tick(0)
+		expect(document.querySelector('.stats-figures')).toBeNull()
+	})
+
+	it('ignores the late answer of the old period', async () => {
+		const live = deferred()
+		const hour = deferred()
+		statsApi.series.mockImplementation((source, id, range) => range === 'live' ? live.promise : hour.promise)
+		await open()
+		rangeButton('1 h').click()
+		await tick(0)
+		live.resolve(seriesWith({ 'cpu/total': 11 }))
+		await tick(0)
+		expect(document.querySelector('.stats-figures')).toBeNull()
+		hour.resolve(seriesWith({ 'cpu/total': 22 }))
+		await tick(0)
+		expect(figureTexts()[0]).toBe('22%')
+	})
+
+	it('falls back to the first item when the series says the item is gone', async () => {
+		statsApi.series.mockImplementation((source, id) => {
+			if (id === 'app:jellyfin:web:1') {
+				serve({ ...defaults(), app_management: body([plex]) })
+				return Promise.reject(failure(404))
+			}
+			return Promise.resolve(seriesWith({ 'cpu/total': 38 }))
+		})
+		await open()
+		await tick(0)
+		expect(seriesCalls()).toContain('app_management|app:plex:web:1|live')
+		expect(document.querySelector('.stats-name').textContent).toBe('Plex')
+	})
+
+	it('shows a retryable error and keeps the shell', async () => {
+		statsApi.series.mockRejectedValue(failure(500))
+		await open()
+		expect(document.querySelector('.stats-series-error').textContent).toContain('The measurements could not be read.')
+		expect(document.querySelector('.stats-name').textContent).toBe('Jellyfin')
+		expect(names()).toContain('Plex')
+		statsApi.series.mockClear()
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38 }))
+		document.querySelector('.stats-series-error button').click()
+		await tick(0)
+		expect(statsApi.series).toHaveBeenCalledTimes(1)
+		expect(document.querySelector('.stats-series-error')).toBeNull()
+	})
+
+	it('shows six figures, and a dash, not NaN, for a missing value', async () => {
+		await open()
+		expect(figureLabels()).toEqual(['Processor', 'Memory', 'Received', 'Sent', 'Disk', 'Processes'])
+		expect(figureTexts()).toEqual(['38%', '-', '-', '-', '-', '-'])
+		expect(document.querySelector('.stats-figures').textContent).not.toContain('NaN')
+	})
+
+	it('shows virtual processors for a virtual machine in place of processes', async () => {
+		await open({ initialItem: 'vm-1' })
+		expect(figureLabels()).toContain('Virtual CPUs')
+		expect(figureLabels()).not.toContain('Processes')
+	})
+
+	it('shows the notes of the series as text', async () => {
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38 }, { notes: ['vm_memory_used_unavailable', '<b>x</b>'] }))
+		await open()
+		const notes = [...document.querySelectorAll('.stats-series-note')].map(n => n.textContent)
+		expect(notes).toEqual(['The memory used inside the virtual machine is not reported.', 'Note from the service: <b>x</b>'])
+		expect(document.querySelector('.stats-series-note b')).toBeNull()
+	})
+
+	it('says there is no data for a period that is all gaps, and draws no chart', async () => {
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': null, 'memory/rss': null }))
+		await open()
+		expect(document.querySelector('.stats-no-data').textContent).toBe('No data for this period')
+		expect(document.querySelector('.stats-chart')).toBeNull()
+	})
+
+	it('shows since when an item runs, only for a running or paused item that has a start', async () => {
+		serve({ ...defaults(), app_management: body([anItem({ id: 'a', name: 'A' }), anItem({ id: 'b', name: 'B', state: 'stopped' }), anItem({ id: 'c', name: 'C', started_at: null }), anItem({ id: 'd', name: 'D', state: 'paused' })]) })
+		await open()
+		const since = () => document.querySelector('.stats-since')?.textContent
+		expect(since()).toContain('Running since')
+		document.querySelectorAll('.stats-list button')[1].click()
+		await tick(0)
+		expect(document.querySelector('.stats-name').textContent).toBe('B')
+		expect(since()).toBeUndefined()
+		document.querySelectorAll('.stats-list button')[2].click()
+		await tick(0)
+		expect(document.querySelector('.stats-name').textContent).toBe('C')
+		expect(since()).toBeUndefined()
+		document.querySelectorAll('.stats-list button')[3].click()
+		await tick(0)
+		expect(since()).toContain('Running since')
+	})
+
+	it('shows the detail as one line of text, cut at 200 characters, the same in its title', async () => {
+		serve({ ...defaults(), app_management: body([anItem({ detail: HOSTILE })]) })
+		await open()
+		expect(document.querySelector('.stats-detail img')).toBeNull()
+		expect(document.querySelector('.stats-detail').textContent).toBe(HOSTILE)
+		expect(document.querySelector('.stats-detail').getAttribute('title')).toBe(HOSTILE)
+		wrapper.unmount()
+		document.body.innerHTML = ''
+		serve({ ...defaults(), app_management: body([anItem({ detail: 'x'.repeat(300) })]) })
+		await open()
+		expect(document.querySelector('.stats-detail').textContent).toHaveLength(200)
+		expect(document.querySelector('.stats-detail').getAttribute('title')).toHaveLength(200)
+	})
+
+	it('shows the name, the kind and the state of the item as text', async () => {
+		serve({ ...defaults(), app_management: body([anItem({ name: HOSTILE })]) })
+		await open()
+		expect(document.querySelector('.stats-name img')).toBeNull()
+		expect(document.querySelector('.stats-name').textContent).toBe(HOSTILE)
+		expect(document.querySelector('.stats-kind').textContent).toBe('Container')
+		expect(document.querySelector('.stats-state').textContent).toBe('Running')
 	})
 })
