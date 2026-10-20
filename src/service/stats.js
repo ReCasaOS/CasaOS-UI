@@ -1,5 +1,4 @@
 // The statistics clients: one per service prefix, same four calls.
-import { isDots } from '@/components/VirtualMachines/vms'
 import { api } from '@/service/service.js'
 
 export const STATS_SOURCES = ['app_management', 'virt_management', 'core']
@@ -19,6 +18,8 @@ function base(source) {
 	}
 	return PREFIX[source]
 }
+
+const isDots = id => /^\.+$/.test(id)
 
 // An id comes from a service or the bus: it must stay one segment of the route.
 function seg(id) {

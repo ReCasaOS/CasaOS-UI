@@ -35,8 +35,9 @@ export function createPoller({ run, intervalMs = 5000, isHidden = () => document
 			return
 		}
 		flying = false
-		if (again) {
-			again = false
+		const wanted = again
+		again = false
+		if (wanted && !isHidden()) {
 			ask()
 		} else {
 			schedule()

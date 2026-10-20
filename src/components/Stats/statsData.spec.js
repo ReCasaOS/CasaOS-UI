@@ -1,4 +1,5 @@
 import escape from 'lodash/escape'
+import unescape from 'lodash/unescape'
 import { describe, expect, it } from 'vitest'
 import { CONTAINER_SERIES, HOSTILE, HOST_SERIES, VM_SERIES, aSeries, anItem } from './__fixtures__/contract'
 import { GROUPS, STATS_KEYS, buildCharts, chartCaption, chartOptions, cleanSeries, figures, groupItems, listNotes, normalizeItems, noteText, scaleMax, tableRows } from './statsData'
@@ -112,9 +113,11 @@ describe('buildCharts', () => {
 		const charts = buildCharts(resp([['network', 'rx:eth0<img src=x onerror=1>', 'bytes_per_second', pts([1, 2])]]), { t })
 		const s = find(charts, 'network').series[0]
 		expect(s.name).not.toContain('<')
-		expect(s.label).toContain('&lt;img')
+		expect(s.label).toContain('<img')
 		expect(s.name).toBe(escape(s.label))
-		expect(s.name).toContain('&amp;lt;img')
+		expect(s.name).toContain('&lt;img')
+		expect(s.name).not.toContain('<')
+		expect(unescape(s.name)).toBe(s.label)
 		expect(s.name.startsWith('Received · ')).toBe(true)
 	})
 
@@ -281,6 +284,17 @@ describe('figures', () => {
 		expect(text(list, 'vcpus')).toBe('2')
 	})
 
+	it('shows a hyphen when the response has no to or step_seconds', () => {
+		const r = resp([['network', 'rx:eth0', 'bytes_per_second', pts([5, 5])]], { to: undefined })
+		expect(text(figures(r, item, 'en', t), 'rx')).toBe('-')
+		expect(text(figures({ ...r, to: 1005, step_seconds: undefined }, item, 'en', t), 'rx')).toBe('-')
+	})
+
+	it('the processor of a container adds user, system and iowait', () => {
+		const r = resp([['cpu', 'user', 'percent', pts([1, 1])], ['cpu', 'system', 'percent', pts([2, 2])], ['cpu', 'iowait', 'percent', pts([4, 4])]], { to: 1005 })
+		expect(text(figures(r, item, 'en', t), 'cpu')).toBe('7%')
+	})
+
 	it('gives hyphens for nothing', () => {
 		expect(figures(null, item, 'en', t).every(f => f.text === '-')).toBe(true)
 	})
@@ -292,6 +306,13 @@ describe('tableRows', () => {
 		const rows = tableRows(find(buildCharts(response, { t }), 'disk'), 'en')
 		expect(rows[0]).toEqual({ name: 'Read', last: '4 B/s', min: '1 B/s', avg: '3 B/s', max: '8 B/s' })
 		expect(rows[1]).toEqual({ name: 'Write', last: '-', min: '-', avg: '-', max: '-' })
+	})
+
+	it('shows a hyphen as last after a trailing gap', () => {
+		const response = resp([['disk', 'read', 'bytes_per_second', pts([4, 6, null])]])
+		const [row] = tableRows(find(buildCharts(response, { t }), 'disk'), 'en')
+		expect(row.last).toBe('-')
+		expect(row.max).toBe('6 B/s')
 	})
 })
 

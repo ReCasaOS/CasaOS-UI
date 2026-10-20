@@ -81,6 +81,22 @@ describe('createPoller', () => {
 		expect(run).toHaveBeenCalledTimes(2)
 	})
 
+	it('now() during a flight then hidden: nothing until shown, then one', async () => {
+		let hidden = false
+		const { run, calls } = deferred()
+		const p = createPoller({ run, isHidden: () => hidden })
+		p.start()
+		p.now()
+		hidden = true
+		calls[0].resolve()
+		await vi.advanceTimersByTimeAsync(60000)
+		expect(run).toHaveBeenCalledTimes(1)
+		hidden = false
+		p.visibilityChanged()
+		await settle()
+		expect(run).toHaveBeenCalledTimes(2)
+	})
+
 	it('now() without a flight asks at once and re-arms the chain', async () => {
 		const run = vi.fn(() => Promise.resolve())
 		const p = createPoller({ run, isHidden: () => false })

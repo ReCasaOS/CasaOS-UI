@@ -86,7 +86,7 @@ export function groupItems(items) {
 
 // Every key is `chart/name`, matched exactly or with an instance (`:eth0`).
 export const CHARTS = [
-	{ id: 'cpu', title: 'Processor', stacked: true, unit: 'percent', keys: [
+	{ id: 'cpu', title: 'Processor', stacked: true, wide: true, unit: 'percent', keys: [
 		{ key: 'cpu/user', label: 'User', kind: 'area', color: PALETTE[0] },
 		{ key: 'cpu/system', label: 'System', kind: 'area', color: PALETTE[1] },
 		{ key: 'cpu/iowait', label: 'Waiting for disk', kind: 'area', color: PALETTE[2] },
@@ -223,7 +223,7 @@ function buildOne(def, byKey, { range, hidden, kind, t }, response) {
 	const labelOf = (f) => {
 		let base = f.key === 'cpu/vcpus' ? t(kind === 'vm' ? VCPUS_VM : VCPUS_HOST) : t(f.def.label)
 		if (f.instance) {
-			base += ` · ${escape(clean(f.instance, 40))}`
+			base += ` · ${clean(f.instance, 40)}`
 		}
 		return base
 	}
@@ -381,12 +381,15 @@ export function chartOptions(chart, { group, zoom, height, locale = 'en', range 
 function lastFresh(series, response) {
 	const step = response.step_seconds
 	const to = response.to
+	if (!isNumber(to) || !isNumber(step)) {
+		return null
+	}
 	const points = cleanSeries(series.points, { stepSeconds: step }).points
 	const p = [...points].reverse().find(q => q.avg !== null)
 	if (!p) {
 		return null
 	}
-	return isNumber(to) && isNumber(step) && p.t < to - (3 * step) ? null : p.avg
+	return p.t < to - (3 * step) ? null : p.avg
 }
 
 export function figures(response, item, locale, t) {
@@ -398,7 +401,7 @@ export function figures(response, item, locale, t) {
 	}
 	const vm = item?.kind === 'vm'
 	const memory = vm ? (sum(['memory/used']) ?? sum(['memory/assigned'])) : sum(['memory/rss'])
-	const cpu = sum(['cpu/total']) ?? sum(['cpu/user', 'cpu/system'])
+	const cpu = sum(['cpu/total']) ?? sum(['cpu/user', 'cpu/system', 'cpu/iowait'])
 	const last = vm ? { id: 'vcpus', label: t('Virtual CPUs'), value: sum(['cpu/vcpus']), unit: 'count' } : { id: 'processes', label: t('Processes'), value: sum(['pids/count']), unit: 'count' }
 	return [
 		{ id: 'cpu', label: t('Processor'), value: cpu, unit: 'percent' },
@@ -422,7 +425,7 @@ export function tableRows(chart, locale) {
 		const maxs = pick('max')
 		return {
 			name: s.label,
-			last: show(avgs.at(-1)),
+			last: show(s.cleaned.at(-1)?.avg ?? null),
 			min: show(Math.min(...(mins.length > 0 ? mins : avgs))),
 			avg: show(avgs.reduce((a, b) => a + b, 0) / avgs.length),
 			max: show(Math.max(...(maxs.length > 0 ? maxs : avgs))),
