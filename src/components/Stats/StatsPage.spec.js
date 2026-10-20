@@ -913,3 +913,64 @@ describe('resource alert events on the page', () => {
 		expect(statsApi.alerts).not.toHaveBeenCalled()
 	})
 })
+
+describe('a11y: what the page says to a screen reader and a keyboard', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38, 'memory/rss': 1000 }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+	})
+	const all = selector => [...document.querySelectorAll(selector)]
+
+	it('gives every button a name', async () => {
+		await mountPage()
+		all('.stats-table-toggle').forEach(b => b.click())
+		await flushPromises()
+		const buttons = all('button')
+		expect(buttons.length).toBeGreaterThan(10)
+		expect(buttons.filter(b => !(b.textContent.trim() || b.getAttribute('aria-label')?.trim()))).toEqual([])
+	})
+
+	it('tells which pill, which legend line and which item is pressed', async () => {
+		await mountPage()
+		for (const selector of ['.stats-ranges button', '.stats-legend button', '.stats-list button']) {
+			const found = all(selector)
+			expect(found.length, selector).toBeGreaterThan(0)
+			expect(found.filter(b => !['true', 'false'].includes(b.getAttribute('aria-pressed'))), selector).toEqual([])
+		}
+		expect(all('.stats-ranges').every(g => g.getAttribute('role') === 'group' && g.getAttribute('aria-label'))).toBe(true)
+	})
+
+	it('has its heading, and focuses it', async () => {
+		await mountPage()
+		const headings = all('h3').filter(h => h.textContent === 'Statistics')
+		expect(headings).toHaveLength(1)
+		expect(document.activeElement).toBe(headings[0])
+	})
+
+	it('names every chart, and gives it a table with a caption', async () => {
+		await mountPage()
+		const figures = all('.stats-chart figure')
+		expect(figures.length).toBeGreaterThan(0)
+		figures.forEach((f) => {
+			expect(f.getAttribute('role')).toBe('img')
+			expect(f.getAttribute('aria-label')?.trim()).toBeTruthy()
+		})
+		all('.stats-table-toggle').forEach(b => b.click())
+		await flushPromises()
+		const tables = all('table.stats-table')
+		expect(tables).toHaveLength(figures.length)
+		tables.forEach(t => expect(t.querySelector('caption')?.textContent.trim()).toBeTruthy())
+	})
+
+	it('puts nothing above 0 in the tab order', async () => {
+		await mountPage()
+		expect(all('[tabindex]').filter(el => Number(el.getAttribute('tabindex')) > 0)).toEqual([])
+	})
+})
