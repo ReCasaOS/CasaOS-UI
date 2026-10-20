@@ -869,3 +869,47 @@ describe('the alerts of the page', () => {
 		})
 	})
 })
+
+describe('resource alert events on the page', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockReturnValue(new Promise(() => {}))
+		statsApi.alerts.mockResolvedValue(anAlerts({ active: [] }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+	})
+
+	const fire = (event, properties) => StatsPage.sockets[event].call(wrapper.vm, { Properties: properties })
+
+	it('reads the list again, and the alerts too when the event is about the open item', async () => {
+		await mountPage()
+		const open = wrapper.vm.selected
+		statsApi.list.mockClear()
+		statsApi.alerts.mockClear()
+
+		fire('resource:alert-firing', { item: open.id })
+		await flushPromises()
+
+		expect(statsApi.list).toHaveBeenCalledTimes(3)
+		expect(statsApi.alerts).toHaveBeenCalledTimes(1)
+		expect(statsApi.alerts).toHaveBeenCalledWith(open.source, open.id)
+	})
+
+	it('reads only the list when the event is about another item, and survives junk', async () => {
+		await mountPage()
+		statsApi.list.mockClear()
+		statsApi.alerts.mockClear()
+
+		fire('resource:alert-resolved', { item: 'somewhere-else' })
+		expect(() => StatsPage.sockets['resource:alert-firing'].call(wrapper.vm, undefined)).not.toThrow()
+		await flushPromises()
+
+		expect(statsApi.list).toHaveBeenCalled()
+		expect(statsApi.alerts).not.toHaveBeenCalled()
+	})
+})

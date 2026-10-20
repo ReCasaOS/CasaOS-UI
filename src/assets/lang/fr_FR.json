@@ -2457,5 +2457,19 @@
   "Alert {key} since {since}": "Alerte {key} depuis {since}",
   "Alerts could not be read.": "Les alertes n'ont pas pu être lues.",
   "Active alerts": "Alertes en cours",
-  "This item is gone": "Cet élément n'existe plus"
+  "This item is gone": "Cet élément n'existe plus",
+  "Processor of {name} at {value} % since {since}": "Processeur de {name} à {value} % depuis {since}",
+  "Processor of {name} at {value} %": "Processeur de {name} à {value} %",
+  "Processor of {name} high since {since}": "Processeur de {name} élevé depuis {since}",
+  "Processor of {name} is high": "Le processeur de {name} est élevé",
+  "Processor of {name} is back to normal": "Le processeur de {name} est revenu à la normale",
+  "Memory of {name} at {value} % since {since}": "Mémoire de {name} à {value} % depuis {since}",
+  "Memory of {name} at {value} %": "Mémoire de {name} à {value} %",
+  "Memory of {name} high since {since}": "Mémoire de {name} élevée depuis {since}",
+  "Memory of {name} is high": "La mémoire de {name} est élevée",
+  "Memory of {name} is back to normal": "La mémoire de {name} est revenue à la normale",
+  "The virtual machine {name} crashed": "La machine virtuelle {name} a planté",
+  "The virtual machine {name} is running again": "La machine virtuelle {name} fonctionne de nouveau",
+  "Open statistics": "Ouvrir les statistiques",
+  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "Un conteneur ou une machine virtuelle utilise trop de processeur ou de mémoire, ou une machine virtuelle plante"
 }

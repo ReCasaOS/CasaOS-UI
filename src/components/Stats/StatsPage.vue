@@ -306,7 +306,24 @@ export default {
 		this.listPoller.stop()
 		this.seriesPoller.stop()
 	},
+	sockets: {
+		'resource:alert-firing': function (res) {
+			this.onResourceAlert(res)
+		},
+		'resource:alert-resolved': function (res) {
+			this.onResourceAlert(res)
+		},
+	},
 	methods: {
+		// An alert fired or ended: the list is read again (the poller folds a burst into one more ask), and the alerts of the
+		// open item too when the event is about it.
+		onResourceAlert(res) {
+			this.listPoller?.now()
+			const item = res?.Properties?.item
+			if (typeof item === 'string' && this.selected?.id === item) {
+				this.loadAlerts()
+			}
+		},
 		keyOf(item) {
 			return `${item.source}|${item.id}`
 		},

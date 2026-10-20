@@ -2457,5 +2457,19 @@
   "Alert {key} since {since}": "Alert {key} since {since}",
   "Alerts could not be read.": "Alerts could not be read.",
   "Active alerts": "Active alerts",
-  "This item is gone": "This item is gone"
+  "This item is gone": "This item is gone",
+  "Processor of {name} at {value} % since {since}": "Processor of {name} at {value} % since {since}",
+  "Processor of {name} at {value} %": "Processor of {name} at {value} %",
+  "Processor of {name} high since {since}": "Processor of {name} high since {since}",
+  "Processor of {name} is high": "Processor of {name} is high",
+  "Processor of {name} is back to normal": "Processor of {name} is back to normal",
+  "Memory of {name} at {value} % since {since}": "Memory of {name} at {value} % since {since}",
+  "Memory of {name} at {value} %": "Memory of {name} at {value} %",
+  "Memory of {name} high since {since}": "Memory of {name} high since {since}",
+  "Memory of {name} is high": "Memory of {name} is high",
+  "Memory of {name} is back to normal": "Memory of {name} is back to normal",
+  "The virtual machine {name} crashed": "The virtual machine {name} crashed",
+  "The virtual machine {name} is running again": "The virtual machine {name} is running again",
+  "Open statistics": "Open statistics",
+  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes"
 }

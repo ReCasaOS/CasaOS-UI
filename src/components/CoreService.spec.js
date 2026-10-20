@@ -1,9 +1,13 @@
 // @vitest-environment happy-dom
+import Buefy from 'buefy'
 import { flushPromises } from '@vue/test-utils'
+import { createApp } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoreService from '@/components/CoreService.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import events from '@/events/events'
+import * as entry from '@/components/Stats/entry'
+import { HOSTILE } from '@/components/Stats/__fixtures__/contract'
 
 // An update emits app:update-begin, then app:install-progress while the images
 // pull, then app:update-end. All three name the app the same way, in `app:name`.
@@ -340,5 +344,86 @@ describe('the automatic update notice', () => {
 		await announce()
 
 		expect(shown()).toHaveLength(0)
+	})
+})
+
+// A resource alert is a pop-up at the top right: the sentence, and a button that opens Statistics on the item.
+// Every word of it comes from a service, so it is text, drawn from VNodes and never from a string Buefy would read as HTML.
+describe('resource alert notifications', () => {
+	const props = (over = {}) => ({ item: 'app:immich', name: 'Immich / server', kind: 'app-container', situation: 'cpu_high', value: '93', since: '2026-10-20T10:00:00Z', source: 'app_management', ...over })
+
+	function box(open = vi.fn()) {
+		const vm = {
+			$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
+			$buefy: { notification: { open } },
+			$store: { state: { marker: 1 } },
+		}
+		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
+		const fire = (event, properties) => CoreService.sockets[event].call(vm, { Properties: properties })
+		return { vm, fire }
+	}
+
+	it('opens one notification with an array message: the sentence, then the button', () => {
+		const { vm, fire } = box()
+
+		fire('resource:alert-firing', props())
+
+		expect(vm.$buefy.notification.open).toHaveBeenCalledTimes(1)
+		const options = vm.$buefy.notification.open.mock.calls[0][0]
+		expect(Array.isArray(options.message)).toBe(true)
+		expect(typeof options.message[0].children).toBe('string')
+		expect(options.message[0].children).toMatch(/^Processor of Immich \/ server at 93 % since /)
+		expect(options).toMatchObject({ position: 'is-top-right', type: 'is-warning', duration: 15000, queue: false, hasIcon: false, ariaCloseLabel: 'Close' })
+		expect(options.message[1].children).toBe('Open statistics')
+	})
+
+	it('a resolved one is a success, after a firing', () => {
+		const { vm, fire } = box()
+
+		fire('resource:alert-resolved', props({ value: undefined }))
+		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
+		fire('resource:alert-firing', props())
+		fire('resource:alert-resolved', props({ value: undefined }))
+
+		const options = vm.$buefy.notification.open.mock.calls[1][0]
+		expect(options.type).toBe('is-success')
+		expect(options.message[0].children).toBe('Processor of Immich / server is back to normal')
+	})
+
+	it('the button opens Statistics on the item', () => {
+		const { vm, fire } = box()
+		const open = vi.spyOn(entry, 'openStatistics').mockReturnValue(null)
+
+		fire('resource:alert-firing', props())
+		vm.$buefy.notification.open.mock.calls[0][0].message[1].props.onClick()
+
+		expect(open).toHaveBeenCalledWith(vm.$buefy, vm.$store.state, { item: 'app:immich' })
+		open.mockRestore()
+	})
+
+	it.each([
+		['an unknown situation', { situation: 'x' }],
+		['no properties', undefined],
+	])('%s opens nothing and does not throw', (_, over) => {
+		const { vm, fire } = box()
+
+		expect(() => fire('resource:alert-firing', over === undefined ? undefined : props(over))).not.toThrow()
+
+		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
+	})
+
+	it('a hostile name leaves no element in the document, with the real Buefy', async () => {
+		const app = createApp({ render: () => null })
+		app.use(Buefy)
+		const { fire } = box(p => app.config.globalProperties.$buefy.notification.open(p))
+		window.pwned = 0
+
+		fire('resource:alert-firing', props({ name: HOSTILE }))
+		await flushPromises()
+
+		expect(document.querySelectorAll('.notices img, .notification img')).toHaveLength(0)
+		expect(document.querySelector('.notification')).not.toBeNull()
+		expect(document.querySelector('.notification').textContent).toContain('<img')
+		expect(window.pwned).toBe(0)
 	})
 })
