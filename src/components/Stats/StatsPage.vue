@@ -60,8 +60,17 @@
 								<span class="stats-kind">{{ kindWord(selected.kind) }}</span>
 								<span class="stats-state">{{ stateWord(selected.state) }}</span>
 								<span v-if="sinceText" class="stats-since">{{ sinceText }}</span>
+								<button class="button is-small is-rounded ml-auto" type="button" @click="openAlerts">{{ $t('Alert settings') }}</button>
 							</div>
 							<p v-if="detailText" :title="detailText" class="stats-detail">{{ detailText }}</p>
+						</div>
+
+						<section v-if="alertLines.length" :aria-label="$t('Active alerts')" class="stats-alerts" role="status">
+							<p v-for="line in alertLines" :key="line.key">{{ line.text }}</p>
+						</section>
+						<div v-else-if="alertsState === 'error'" class="stats-alerts-error" role="status">
+							<span>{{ $t('Alerts could not be read.') }}</span>
+							<button class="button is-small is-rounded" type="button" @click="loadAlerts">{{ $t('Retry') }}</button>
 						</div>
 
 						<div class="stats-toolbar">
@@ -118,14 +127,23 @@
 				</div>
 			</div>
 		</section>
+		<alert-settings-dialog v-if="alertDialog && selected"
+			:key="selectedKey"
+			:item-id="selected.id"
+			:item-name="selected.name"
+			:source="selected.source"
+			@close="closeAlerts"
+			@saved="onAlertsSaved" />
 	</div>
 </template>
 
 <script>
 import { createPoller } from './poller'
+import AlertSettingsDialog from './AlertSettingsDialog.vue'
 import StatsChart from './StatsChart.vue'
 import { buildCharts, figures, groupItems, listNotes, normalizeItems, noteText } from './statsData'
 import { formatDateTime, formatValue, localeTag } from './statsFormat'
+import { clean } from '@/components/settings/osPlan'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { STATS_SOURCES, statsApi } from '@/service/stats'
 
@@ -173,7 +191,7 @@ function failureCode(e) {
 
 export default {
 	name: 'StatsPage',
-	components: { StatsChart },
+	components: { AlertSettingsDialog, StatsChart },
 	props: {
 		initialItem: { type: String, default: '' },
 	},
@@ -195,6 +213,11 @@ export default {
 			cursor: null,
 			// the lines the person hid, by key (the keys are unique across charts)
 			hiddenKeys: [],
+			// the active alerts of the selected item: idle | ok | error
+			alertsState: 'idle',
+			alertsActive: [],
+			alertTicket: 0,
+			alertDialog: false,
 		}
 	},
 	computed: {
@@ -239,6 +262,13 @@ export default {
 			const notes = Array.isArray(this.seriesData?.notes) ? this.seriesData.notes : []
 			return notes.filter(code => typeof code === 'string').slice(0, 10).map(code => noteText(code, this.$t))
 		},
+		// what changes the alerts: the item, or the count the list gives for it
+		alertSignature() {
+			return this.selected ? `${this.selectedKey}|${this.selected.alerts}` : ''
+		},
+		alertLines() {
+			return this.alertsActive.map((alert, i) => ({ key: i, text: this.alertText(alert) }))
+		},
 		loading() {
 			return STATS_SOURCES.some(source => this.columns[source].state === 'loading') && this.flat.length === 0
 		},
@@ -255,7 +285,11 @@ export default {
 	},
 	watch: {
 		selectedKey() {
+			this.alertDialog = false
 			this.restartSeries()
+		},
+		alertSignature() {
+			this.loadAlerts()
 		},
 	},
 	mounted() {
@@ -370,6 +404,75 @@ export default {
 				this.restartSeries()
 			}
 		},
+		alertText(alert) {
+			const since = formatDateTime(alert.since, this.locale)
+			const value = Number.isFinite(alert.value) ? formatValue(alert.value, 'count', this.locale) : null
+			const named = { cpu_high: ['Processor at {value} % since {since}', 'Processor high since {since}'], mem_high: ['Memory at {value} % since {since}', 'Memory high since {since}'] }[alert.key]
+			if (named) {
+				return value === null ? this.$t(named[1], { since }) : this.$t(named[0], { value, since })
+			}
+			return alert.key === 'vm_crashed' ? this.$t('The virtual machine crashed since {since}', { since }) : this.$t('Alert {key} since {since}', { key: alert.key, since })
+		},
+		// The active alerts of the selected item; an answer for another item (or an older one) is dropped.
+		async loadAlerts() {
+			const item = this.selected
+			const ticket = ++this.alertTicket
+			if (!item) {
+				this.alertsActive = []
+				this.alertsState = 'idle'
+				return
+			}
+			const key = this.selectedKey
+			if (this.alertsKey !== key) {
+				this.alertsActive = []
+			}
+			try {
+				const raw = await statsApi.alerts(item.source, item.id)
+				if (!raw || !Array.isArray(raw.active)) {
+					throw new Error('not alerts')
+				}
+				if (ticket === this.alertTicket) {
+					this.setActive(raw.active, key)
+				}
+			} catch {
+				if (ticket === this.alertTicket) {
+					this.alertsKey = key
+					this.alertsState = 'error'
+				}
+			}
+		},
+		setActive(list, key) {
+			this.alertsKey = key
+			this.alertsActive = list.slice(0, 20).filter(a => a && typeof a === 'object' && typeof a.key === 'string').map(a => ({
+				key: clean(a.key, 60),
+				since: a.since,
+				value: typeof a.value === 'number' ? a.value : Number.NaN,
+			}))
+			this.alertsState = 'ok'
+		},
+		openAlerts(event) {
+			this.alertOpener = event.currentTarget
+			this.alertDialog = true
+		},
+		// The focus goes back to the button that opened the dialog, or to the heading when that button is gone.
+		closeAlerts() {
+			const opener = this.alertOpener
+			this.alertDialog = false
+			this.alertOpener = null
+			this.$nextTick(() => {
+				opener?.focus?.({ preventScroll: true })
+				if (!opener?.isConnected || document.activeElement !== opener) {
+					this.$refs.title?.focus?.({ preventScroll: true })
+				}
+			})
+		},
+		// What the service answered to the save is the state of the banner.
+		onAlertsSaved(response) {
+			if (response && Array.isArray(response.active)) {
+				this.alertTicket++
+				this.setActive(response.active, this.selectedKey)
+			}
+		},
 		toggleSeries(key) {
 			this.hiddenKeys = this.hiddenKeys.includes(key) ? this.hiddenKeys.filter(k => k !== key) : [...this.hiddenKeys, key]
 		},
@@ -448,6 +551,8 @@ export default {
 
 <style lang="scss" scoped>
 .stats-page {
+	position: relative;
+
 	.modal-card-body {
 		position: relative;
 		min-height: 16rem;
@@ -703,6 +808,26 @@ export default {
 			font-weight: 600;
 			color: var(--casa-text-strong);
 		}
+	}
+
+	.stats-alerts,
+	.stats-alerts-error {
+		margin: 0.5rem 0;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+	}
+
+	.stats-alerts {
+		color: #b86e00;
+		background: rgba(245, 166, 35, 0.15);
+	}
+
+	.stats-alerts-error {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--casa-text-dim);
 	}
 
 	.stats-charts {

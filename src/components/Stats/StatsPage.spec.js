@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HOSTILE, aSeries, anItem, makePoints } from './__fixtures__/contract'
+import { HOSTILE, aSeries, anAlerts, anItem, makePoints } from './__fixtures__/contract'
+import { openStatistics } from './entry'
 import StatsPage from './StatsPage.vue'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { statsApi } from '@/service/stats'
@@ -654,5 +655,171 @@ describe('the chart cards of the page', () => {
 		const middle = (from + to) / 2 * 1000
 		expect(max - min).toBe((to - from) * 1000 / 2)
 		expect((min + max) / 2).toBe(middle)
+	})
+})
+
+describe('the alerts of the page', () => {
+	const since = '2026-10-20T08:00:00Z'
+	const active = [{ key: 'cpu_high', since, value: 93.4 }, { key: 'mem_high', since, value: 95 }]
+	let hidden
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+		hidden = false
+		Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+		hasVirtualMachines.mockResolvedValue(true)
+		statsApi.series.mockResolvedValue(seriesWith({ 'cpu/total': 38 }))
+		statsApi.alerts.mockResolvedValue(anAlerts({ active }))
+		serve(defaults())
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		wrapper = null
+		delete document.hidden
+		vi.useRealTimers()
+	})
+
+	const tick = ms => vi.advanceTimersByTimeAsync(ms)
+	async function open(props = {}) {
+		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		await tick(0)
+		return wrapper
+	}
+	const lines = () => [...document.querySelectorAll('.stats-alerts p')].map(p => p.textContent)
+	async function openDialog() {
+		const button = [...document.querySelectorAll('.stats-head button')].find(b => b.textContent.trim() === 'Alert settings')
+		button.focus()
+		button.click()
+		await tick(0)
+		return button
+	}
+
+	it('lists the active alerts of the item as text, with a date', async () => {
+		await open()
+		expect(statsApi.alerts).toHaveBeenCalledWith('app_management', 'app:jellyfin:web:1')
+		expect(document.querySelector('.stats-alerts').getAttribute('role')).toBe('status')
+		expect(lines()).toHaveLength(2)
+		expect(lines()[0]).toMatch(/^Processor at 93 % since .*2026/)
+		expect(lines()[1]).toMatch(/^Memory at 95 % since /)
+	})
+
+	it('shows nothing when no alert is active', async () => {
+		statsApi.alerts.mockResolvedValue(anAlerts())
+		await open()
+		expect(document.querySelector('.stats-alerts')).toBeNull()
+		expect(document.querySelector('.stats-alerts-error')).toBeNull()
+	})
+
+	it('says what it can of an alert without a usable value, the crash of a VM, and one it does not know', async () => {
+		statsApi.alerts.mockResolvedValue(anAlerts({ active: [
+			{ key: 'cpu_high', since, value: 'NaN' },
+			{ key: 'mem_high', since },
+			{ key: 'vm_crashed', since },
+			{ key: HOSTILE, since, value: 1 },
+		] }))
+		await open()
+		expect(lines()[0]).toMatch(/^Processor high since /)
+		expect(lines()[1]).toMatch(/^Memory high since /)
+		expect(lines()[2]).toMatch(/^The virtual machine crashed since /)
+		expect(lines()[3]).toContain(HOSTILE)
+		expect(document.querySelector('.stats-alerts img')).toBeNull()
+	})
+
+	it('reads the alerts again when the count of the list changes, and not otherwise', async () => {
+		await open()
+		expect(statsApi.alerts).toHaveBeenCalledTimes(1)
+		await tick(5000)
+		expect(statsApi.alerts).toHaveBeenCalledTimes(1)
+		serve({ ...defaults(), app_management: body([anItem({ alerts: 2 }), plex]) })
+		await tick(5000)
+		expect(statsApi.alerts).toHaveBeenCalledTimes(2)
+	})
+
+	it('reads them for the new item, and keeps the answer of the old one out', async () => {
+		const first = deferred()
+		statsApi.alerts.mockImplementation((source, id) => id === 'app:jellyfin:web:1' ? first.promise : Promise.resolve(anAlerts()))
+		await open()
+		document.querySelectorAll('.stats-list button')[1].click()
+		await tick(0)
+		first.resolve(anAlerts({ active }))
+		await tick(0)
+		expect(document.querySelector('.stats-name').textContent).toBe('Plex')
+		expect(document.querySelector('.stats-alerts')).toBeNull()
+	})
+
+	it('only says the alerts could not be read, with a Retry that reads them again', async () => {
+		statsApi.alerts.mockRejectedValueOnce(failure(500))
+		await open()
+		expect(document.querySelector('.stats-alerts-error span').textContent).toBe('Alerts could not be read.')
+		expect(document.querySelector('.stats-series-error')).toBeNull()
+		document.querySelector('.stats-alerts-error button').click()
+		await tick(0)
+		expect(document.querySelector('.stats-alerts-error')).toBeNull()
+		expect(lines()).toHaveLength(2)
+	})
+
+	it('shows the alerts the save answered', async () => {
+		statsApi.setAlerts.mockResolvedValue(anAlerts({ active: [{ key: 'mem_high', since, value: 91 }] }))
+		await open()
+		await openDialog()
+		document.querySelector('.stats-dialog-actions .is-primary').click()
+		await tick(0)
+		expect(document.querySelector('.stats-dialog')).toBeNull()
+		expect(lines()).toHaveLength(1)
+		expect(lines()[0]).toMatch(/^Memory at 91 %/)
+	})
+
+	it('opens the settings from a button of the header, with the focus on the dialog heading', async () => {
+		await open()
+		await openDialog()
+		expect(document.querySelector('.stats-dialog[role="dialog"]')).not.toBeNull()
+		expect(document.activeElement).toBe(document.querySelector('.stats-dialog-title'))
+	})
+
+	it('gives the focus back to the button when the dialog closes', async () => {
+		await open()
+		const button = await openDialog()
+		document.querySelector('.stats-dialog-actions button').click()
+		await tick(0)
+		expect(document.querySelector('.stats-dialog')).toBeNull()
+		expect(document.activeElement).toBe(button)
+	})
+
+	it('gives the focus to the page heading when the button is gone', async () => {
+		await open()
+		await openDialog()
+		document.querySelector('.stats-head button').remove()
+		document.querySelector('.stats-dialog-actions button').click()
+		await tick(0)
+		expect(document.activeElement).toBe(document.querySelector('.stats-page h3'))
+	})
+
+	describe('opened the way the app grid opens it', () => {
+		let host
+		const isShown = (selector) => {
+			const modal = document.querySelector(selector)?.closest('.modal')
+			return Boolean(modal) && modal.style.display !== 'none'
+		}
+		const escape = () => document.activeElement.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true }))
+		afterEach(() => host?.unmount())
+
+		it('closes the dialog at the first Escape and the page at the second', async () => {
+			vi.useRealTimers()
+			host = mount({ render: () => null }, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+			openStatistics(host.vm.$buefy, { appLaunchInIframe: true, appLaunchExceptions: [] })
+			await vi.waitFor(() => expect(isShown('.stats-page')).toBe(true))
+			await flushPromises()
+			await vi.waitFor(() => expect(document.querySelector('.stats-head')).not.toBeNull())
+			const button = [...document.querySelectorAll('.stats-head button')].find(b => b.textContent.trim() === 'Alert settings')
+			button.click()
+			await vi.waitFor(() => expect(document.querySelector('.stats-dialog')).not.toBeNull())
+			escape()
+			await flushPromises()
+			expect(document.querySelector('.stats-dialog')).toBeNull()
+			expect(isShown('.stats-page')).toBe(true)
+			escape()
+			await vi.waitFor(() => expect(isShown('.stats-page')).toBe(false))
+		})
 	})
 })

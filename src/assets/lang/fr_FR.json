@@ -2439,5 +2439,22 @@
   "Max": "Max",
   "Show as a table": "Afficher sous forme de tableau",
   "Hide the table": "Masquer le tableau",
-  "Reset zoom": "Réinitialiser le zoom"
+  "Reset zoom": "Réinitialiser le zoom",
+  "Alert settings": "Réglages des alertes",
+  "Loading...": "Chargement...",
+  "The settings could not be read.": "Les réglages n'ont pas pu être lus.",
+  "Rule {key}": "Règle {key}",
+  "Threshold (%)": "Seuil (%)",
+  "Duration (minutes)": "Durée (minutes)",
+  "From {min} to {max}": "De {min} à {max}",
+  "These values were refused.": "Ces valeurs ont été refusées.",
+  "The settings could not be saved. Try again.": "Les réglages n'ont pas pu être enregistrés. Réessayez.",
+  "Processor at {value} % since {since}": "Processeur à {value} % depuis {since}",
+  "Memory at {value} % since {since}": "Mémoire à {value} % depuis {since}",
+  "Processor high since {since}": "Processeur élevé depuis {since}",
+  "Memory high since {since}": "Mémoire élevée depuis {since}",
+  "The virtual machine crashed since {since}": "La machine virtuelle a planté depuis {since}",
+  "Alert {key} since {since}": "Alerte {key} depuis {since}",
+  "Alerts could not be read.": "Les alertes n'ont pas pu être lues.",
+  "Active alerts": "Alertes en cours"
 }
