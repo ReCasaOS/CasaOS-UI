@@ -8,6 +8,9 @@ import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.v
 import events from '@/events/events'
 import * as entry from '@/components/Stats/entry'
 import { HOSTILE } from '@/components/Stats/__fixtures__/contract'
+import { alertBadge } from '@/components/Stats/alertBadge'
+
+vi.mock('@/components/Stats/alertBadge', () => ({ alertBadge: { load: vi.fn(), refreshSoon: vi.fn(), stop: vi.fn() } }))
 
 // An update emits app:update-begin, then app:install-progress while the images
 // pull, then app:update-end. All three name the app the same way, in `app:name`.
@@ -425,5 +428,46 @@ describe('resource alert notifications', () => {
 		expect(document.querySelector('.notification')).not.toBeNull()
 		expect(document.querySelector('.notification').textContent).toContain('<img')
 		expect(window.pwned).toBe(0)
+	})
+})
+
+describe('the count badge of the Statistics icon', () => {
+	beforeEach(() => vi.clearAllMocks())
+
+	it('is read when the dashboard opens and stopped when it closes', () => {
+		const vm = { announceBackupFailures: vi.fn(), announceTelemetry: vi.fn(), announceAutoUpdate: vi.fn(), destroyUIEventBus: vi.fn() }
+
+		CoreService.mounted.call(vm)
+		expect(alertBadge.load).toHaveBeenCalledTimes(1)
+
+		CoreService.beforeUnmount.call(vm)
+		expect(alertBadge.stop).toHaveBeenCalledTimes(1)
+	})
+
+	it.each(['resource:alert-firing', 'resource:alert-resolved'])('is refreshed by %s once, even when the feed drops the event as a flood', (event) => {
+		const vm = {
+			$t: key => key,
+			$buefy: { notification: { open: vi.fn() } },
+			$store: { state: {} },
+		}
+		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
+		const props = n => ({ item: `c${n}`, name: 'x', kind: 'container', situation: 'cpu_high', value: '95' })
+
+		for (let n = 1; n <= 7; n++) {
+			CoreService.sockets[event].call(vm, { Properties: props(n) })
+		}
+		// the feed let at most five firings in; resolved with no firing shows nothing at all
+		expect(vm.$buefy.notification.open.mock.calls.length).toBe(event === 'resource:alert-firing' ? 5 : 0)
+		expect(alertBadge.refreshSoon).toHaveBeenCalledTimes(7)
+	})
+
+	it('is refreshed for an event that is junk', () => {
+		const vm = { $t: key => key, $buefy: { notification: { open: vi.fn() } } }
+		vm.showResourceAlert = CoreService.methods.showResourceAlert.bind(vm)
+
+		CoreService.sockets['resource:alert-firing'].call(vm, undefined)
+
+		expect(alertBadge.refreshSoon).toHaveBeenCalledTimes(1)
+		expect(vm.$buefy.notification.open).not.toHaveBeenCalled()
 	})
 })

@@ -2471,5 +2471,7 @@
   "The virtual machine {name} crashed": "La machine virtuelle {name} a planté",
   "The virtual machine {name} is running again": "La machine virtuelle {name} fonctionne de nouveau",
   "Open statistics": "Ouvrir les statistiques",
-  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "Un conteneur ou une machine virtuelle utilise trop de processeur ou de mémoire, ou une machine virtuelle plante"
+  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "Un conteneur ou une machine virtuelle utilise trop de processeur ou de mémoire, ou une machine virtuelle plante",
+  "Statistics, {count} active alert": "Statistiques, {count} alerte en cours",
+  "Statistics, {count} active alerts": "Statistiques, {count} alertes en cours"
 }

@@ -2471,5 +2471,7 @@
   "The virtual machine {name} crashed": "The virtual machine {name} crashed",
   "The virtual machine {name} is running again": "The virtual machine {name} is running again",
   "Open statistics": "Open statistics",
-  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes"
+  "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes": "A container or a virtual machine uses too much processor or memory, or a virtual machine crashes",
+  "Statistics, {count} active alert": "Statistics, {count} active alert",
+  "Statistics, {count} active alerts": "Statistics, {count} active alerts"
 }

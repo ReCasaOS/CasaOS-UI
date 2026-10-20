@@ -34,6 +34,7 @@ import Business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import DiskLearnMore from '@/components/Storage/DiskLearnMore.vue'
 import TelemetryPreviewModal from '@/components/settings/TelemetryPreviewModal.vue'
 import { ice_i18n } from '@/mixins/base/common-i18n'
+import { alertBadge } from '@/components/Stats/alertBadge'
 import { openStatistics } from '@/components/Stats/entry'
 import { alertMessage, createAlertFeed } from '@/components/Stats/resourceAlerts'
 import { localeTag } from '@/components/Stats/statsFormat'
@@ -117,8 +118,10 @@ export default {
 		this.announceBackupFailures()
 		this.announceTelemetry()
 		this.announceAutoUpdate()
+		alertBadge.load()
 	},
 	beforeUnmount() {
+		alertBadge.stop()
 		this.destroyUIEventBus()
 		this.dropTelemetryNotice?.()
 	},
@@ -267,6 +270,8 @@ export default {
 		// A resource alert from the message bus, as a text-only notification: the sentence and a button, as VNodes with a text
 		// child, so that nothing a service sent is ever read as HTML. The feed drops what is unknown, repeated or a flood.
 		showResourceAlert(state, res) {
+			// the count on the icon follows every event, also one the feed drops as a flood
+			alertBadge.refreshSoon()
 			this.alertFeed ||= createAlertFeed()
 			const note = this.alertFeed.accept(state, res?.Properties)
 			if (!note) {
