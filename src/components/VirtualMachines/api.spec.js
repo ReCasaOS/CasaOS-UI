@@ -117,3 +117,23 @@ describe('the upload of an image', () => {
 		expect(http.put.mock.calls[0][0]).toBe(`${P}/images/upload?name=x.qcow2`)
 	})
 })
+
+// The route asked with no body: what the module answers says whether it takes files.
+describe('the probe of the upload route', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it('puts nothing to the same route, with the same name and checksum, and the signal', async () => {
+		const signal = new AbortController().signal
+		http.put.mockRejectedValue(Object.assign(new Error('411'), { response: { status: 411, data: { message: 'length_required' } } }))
+
+		await expect(vmApi.probeUpload('a b&c.iso', { sha256: 'ab'.repeat(32), signal })).rejects.toMatchObject({ response: { status: 411 } })
+
+		const [url, body, config] = http.put.mock.calls[0]
+		expect(url).toBe(`${P}/images/upload?name=a+b%26c.iso&sha256=${'ab'.repeat(32)}`)
+		expect(body).toBeNull()
+		expect(config).toMatchObject({ headers: { 'Content-Type': 'application/octet-stream' }, signal })
+		expect(config.transformRequest.reduce((data, f) => f(data), null)).toBeNull()
+	})
+})

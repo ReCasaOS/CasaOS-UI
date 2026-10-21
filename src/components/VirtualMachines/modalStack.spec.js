@@ -8,7 +8,7 @@ import { openWithEscape } from './modalStack'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({
-	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder', 'consoleURL', 'uploadImage'].map(name => [name, vi.fn()])),
+	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder', 'consoleURL', 'probeUpload', 'uploadImage'].map(name => [name, vi.fn()])),
 }))
 // the console of a running VM connects as soon as it opens
 vi.mock('@novnc/novnc', () => ({ default: class { addEventListener() {} disconnect() {} focus() {} } }))
@@ -112,6 +112,7 @@ describe('escape in the modals of the virtual machine page', () => {
 	})
 
 	it('asks before closing the create form while an image uploads, and closes it on yes', async () => {
+		vmApi.probeUpload.mockRejectedValue(Object.assign(new Error('411'), { response: { status: 411, data: { message: 'length_required' } } }))
 		vmApi.uploadImage.mockReturnValue(new Promise(() => {}))
 		await openPage()
 		await click('[title="New virtual machine"]')

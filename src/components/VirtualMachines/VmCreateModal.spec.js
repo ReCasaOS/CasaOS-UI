@@ -8,7 +8,7 @@ import vmApi from './api'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('./api', () => ({ default: { images: vi.fn(), host: vi.fn(), create: vi.fn(), uploadImage: vi.fn() } }))
+vi.mock('./api', () => ({ default: { images: vi.fn(), host: vi.fn(), create: vi.fn(), probeUpload: vi.fn(), uploadImage: vi.fn() } }))
 
 // what axios throws on an answer that is not a success
 const failed = (status, message) => () => Promise.reject(Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { message } } }))
@@ -88,6 +88,7 @@ describe('the upload in the create dialog', () => {
 		vi.clearAllMocks()
 		vmApi.images.mockResolvedValue({ data: { data: [] } })
 		vmApi.host.mockResolvedValue({ data: { data: HOST } })
+		vmApi.probeUpload.mockRejectedValue(Object.assign(new Error('411'), { response: { status: 411, data: { message: 'length_required' } } }))
 	})
 	afterEach(() => {
 		wrapper?.unmount()
@@ -126,7 +127,7 @@ describe('the upload in the create dialog', () => {
 
 		// once for the checks, once after
 		expect(vmApi.images).toHaveBeenCalledTimes(3)
-		expect(wrapper.find('.vm-upload-error').text()).toBe('The upload was refused or interrupted.')
+		expect(wrapper.find('.vm-upload-error').text()).toBe('The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.')
 	})
 
 	it('asks before closing while it uploads, with a sentence of its own, and does not make a VM meanwhile', async () => {

@@ -703,16 +703,26 @@ export const UPLOAD_ERRORS = {
 	busy: 'Two uploads are already running. Try again when one is over.',
 	insufficient_storage: 'There is not enough free space for this file. Some free space is always kept for the system.',
 	conflict: 'Another transfer touched this file. Try again.',
-	network: 'The upload was refused or interrupted.',
+	network: 'The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.',
+	module_too_old: 'The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.',
 	failed: 'The upload failed.',
 	many: 'Drop one file at a time.',
 }
+
+// what the dialog finds itself, which the service never answers
+const UPLOAD_OWN_CODES = ['network', 'failed', 'many', 'module_too_old']
 
 // the code of a failed upload: one of UPLOAD_ERRORS
 export function uploadErrorCode(e) {
 	if (!e?.response) {
 		return 'network'
 	}
-	const code = e.response.data?.message
-	return typeof code === 'string' && Object.hasOwn(UPLOAD_ERRORS, code) && !['network', 'failed', 'many'].includes(code) ? code : 'failed'
+	const { status, data } = e.response
+	const code = data?.message
+	// A module older than the upload has no such route: its request validator
+	// answers 400 "no matching operation was found", a router 404 or 405.
+	if (status === 404 || status === 405 || (status === 400 && typeof code === 'string' && code.includes('no matching operation'))) {
+		return 'module_too_old'
+	}
+	return typeof code === 'string' && Object.hasOwn(UPLOAD_ERRORS, code) && !UPLOAD_OWN_CODES.includes(code) ? code : 'failed'
 }

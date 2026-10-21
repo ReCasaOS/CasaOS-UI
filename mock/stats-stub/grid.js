@@ -8,6 +8,8 @@
 //
 // PUT /v2/virt_management/images/upload?name=<file>[&sha256=<hex>] takes the raw file as a Buffer. A file named
 // after an error code (exists.iso, busy.iso, too_large.iso, ...) answers that code, so every refusal can be tried.
+// An empty body answers 411 length_required once the name is good, as the module does to the dashboard's probe, and
+// oldmodule.iso answers as a module older than the upload: 400 "no matching operation was found".
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { imageKind } from '../../src/components/VirtualMachines/vms.js'
@@ -126,6 +128,10 @@ const uploadFails = code => ({ status: UPLOAD_CODES[code], body: { message: code
 function upload({ name = '', sha256 }, body, state) {
 	const bytes = Buffer.isBuffer(body) ? body : Buffer.alloc(0)
 	const stem = name.replace(/\.[^.]*$/, '')
+	// a module older than the upload: its request validator knows no such route
+	if (stem === 'oldmodule') {
+		return { status: 400, body: { message: 'no matching operation was found' } }
+	}
 	if (Object.hasOwn(UPLOAD_CODES, stem)) {
 		return uploadFails(stem)
 	}
@@ -135,6 +141,10 @@ function upload({ name = '', sha256 }, body, state) {
 	}
 	if (sha256 !== undefined && !/^[0-9a-f]{64}$/i.test(sha256)) {
 		return uploadFails('bad_sha256')
+	}
+	// the dashboard's probe, an empty body, gets what the module answers it
+	if (bytes.length === 0) {
+		return uploadFails('length_required')
 	}
 	if (state.images.some(image => image.name.toLowerCase() === name.toLowerCase())) {
 		return uploadFails('exists')
