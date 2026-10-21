@@ -915,3 +915,21 @@ describe('an answer to a call about a VM that comes late', () => {
 		expect(states()).toEqual([])
 	})
 })
+
+// A VM tile of the app grid that cannot show a console opens the page on its VM.
+describe('the page opened on a VM', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+
+	it('selects the VM it was opened on', async () => {
+		const vms = [aVm({ id: 'vm-1', title: 'Alpha' }), aVm({ id: 'vm-2', title: 'Beta', state: 'shut-off' })]
+		const { wrapper } = await mountPage({ vms, props: { selectId: 'vm-2' } })
+
+		expect(wrapper.find('.vm-item.is-selected').text()).toContain('Beta')
+		// opening it on a VM starts nothing
+		expect(vmApi.action).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})

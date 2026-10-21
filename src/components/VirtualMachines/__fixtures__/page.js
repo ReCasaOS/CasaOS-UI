@@ -80,6 +80,7 @@ export async function mountPage(options = {}) {
 	const api = fakeApi()
 	const socket = fakeSocket()
 	const wrapper = mount(VmPage, {
+		props: options.props,
 		attachTo: document.body,
 		global: { plugins: [Buefy, i18n, [socketPlugin, socket]], mocks: { $api: api } },
 	})
