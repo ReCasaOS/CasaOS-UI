@@ -4,13 +4,15 @@
 //
 // Answers /v1/sys/stats, /v2/app_management/stats and /v2/virt_management/stats from handlers.js, with series that end
 // at the current time (a live chart moves). With --upstream, every other request (and the WebSocket upgrade of the
-// message bus) goes to that box; without it, other paths answer 404.
+// message bus) goes to that box. Without it, grid.js answers what the home page asks of a box (the virtual machine
+// module, the app grid, the shell's core calls), and every other path answers 404.
 //
 //   GET /__stub/alerts?on=1   puts 2 active alerts on one container (on=0 takes them off)
 import { Buffer } from 'node:buffer'
 import { createServer, request } from 'node:http'
 import { connect } from 'node:net'
 import process from 'node:process'
+import { handleGrid, newGridState } from './grid.js'
 import { handle } from './handlers.js'
 
 const args = process.argv.slice(2)
@@ -29,6 +31,7 @@ if (!['real', 'bare'].includes(envelope) || !Number.isInteger(port)) {
 const [upstreamHost, upstreamPort = '80'] = upstream.split(':')
 
 const options = { envelope, alerts: false, down: [], rules: new Map() }
+const grid = newGridState()
 const STATS = /^\/v[12]\/(?:sys|app_management|virt_management)\/stats(?:\/|$)/
 
 function send(res, status, body) {
@@ -51,8 +54,9 @@ const server = createServer((req, res) => {
 		options.alerts = url.searchParams.get('on') === '1'
 		return send(res, 200, { alerts: options.alerts })
 	}
-	if (!STATS.test(url.pathname)) {
-		return upstream ? proxy(req, res) : send(res, 404, { message: 'not_found' })
+	const stats = STATS.test(url.pathname)
+	if (!stats && upstream) {
+		return proxy(req, res)
 	}
 	const chunks = []
 	req.on('data', chunk => chunks.push(chunk))
@@ -63,7 +67,8 @@ const server = createServer((req, res) => {
 		} catch {
 			return send(res, 400, { message: 'bad_rules: rules' })
 		}
-		const { status, body: answer } = handle({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body }, options)
+		const request = { method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body }
+		const { status, body: answer } = stats ? handle(request, options) : (handleGrid(request, grid) || { status: 404, body: { message: 'not_found' } })
 		send(res, status, answer)
 	})
 })
