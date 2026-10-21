@@ -1,7 +1,7 @@
 <template>
 	<!-- the virtual machines on a tab of their own, the whole window -->
 	<div class="vm-tab">
-		<VmPage @close="close" />
+		<VmPage :select-id="selectId" @close="close" />
 	</div>
 </template>
 
@@ -12,6 +12,13 @@ export default {
 	name: 'VmTab',
 	components: {
 		VmPage,
+	},
+	computed: {
+		// #/vms?vm=<id>: the tab opened from a VM tile of the app grid
+		selectId() {
+			const vm = this.$route?.query?.vm
+			return typeof vm === 'string' ? vm : ''
+		},
 	},
 	mounted() {
 		this.previousTitle = document.title

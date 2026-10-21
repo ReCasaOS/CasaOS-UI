@@ -7,6 +7,7 @@ import { VMS_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPrefe
 
 // loaded when first opened: a box without the module never downloads the page
 const VmPage = defineAsyncComponent(() => import('./VmPage.vue'))
+const VmConsoleModal = defineAsyncComponent(() => import('./VmConsoleModal.vue'))
 
 let probe = null
 
@@ -54,10 +55,11 @@ export function forgetVirtualMachines() {
 }
 
 // Opens the page in a modal, or on a tab of its own when the App launching
-// setting sends apps, or this one, to a new tab.
-export function openVirtualMachines(buefy, state) {
+// setting sends apps, or this one, to a new tab. With a VM's id, on that VM.
+export function openVirtualMachines(buefy, state, vmId = '') {
 	if (builtinOpensInNewTab(VMS_LAUNCH_ID, state)) {
-		window.open(`${window.location.pathname}#/vms`, '_blank')
+		const query = vmId ? `?vm=${encodeURIComponent(vmId)}` : ''
+		window.open(`${window.location.pathname}#/vms${query}`, '_blank')
 		return null
 	}
 
@@ -68,5 +70,43 @@ export function openVirtualMachines(buefy, state) {
 		scroll: 'keep',
 		animation: 'zoom-in',
 		customClass: 'vm-modal',
+		props: { selectId: vmId },
 	})
+}
+
+// A VM's console, full screen, as the page opens it. Esc belongs to the VM: the
+// console closes from its own button only.
+export function openVmConsole(buefy, vm) {
+	return buefy.modal.open({
+		component: VmConsoleModal,
+		fullScreen: true,
+		canCancel: [],
+		customClass: 'vm-console-modal',
+		props: { vm },
+	})
+}
+
+// Every VM, by title, for the app grid's tiles. The client and the helpers are
+// loaded on the first call: only a grid that has the module makes one.
+export function listVirtualMachines() {
+	return Promise.all([import('./api'), import('./vms')]).then(([{ default: vmApi }, { applyOrder }]) =>
+		vmApi.list().then((res) => {
+			const vms = (res.data?.data || []).filter(vm => typeof vm?.id === 'string')
+			return applyOrder(vms, []).sorted
+		}))
+}
+
+// One VM as the service has it now, given up on after `ms`.
+export function getVirtualMachine(id, ms) {
+	return withTimeout(import('./api').then(({ default: vmApi }) => vmApi.get(id)).then(res => res.data?.data), ms)
+}
+
+// The promise, or a rejection once `ms` has gone by: a call that hangs must not
+// hold up what waits on it for ever. The timer goes with the answer.
+export function withTimeout(promise, ms) {
+	let timer
+	const late = new Promise((resolve, reject) => {
+		timer = setTimeout(() => reject(new Error(`No answer in time (${ms} ms)`)), ms)
+	})
+	return Promise.race([promise, late]).finally(() => clearTimeout(timer))
 }

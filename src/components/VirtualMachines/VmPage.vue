@@ -114,6 +114,10 @@ export default {
 		OsIcon,
 		VmDetail,
 	},
+	props: {
+		// the VM to show first: the app grid's tile of a VM with no console
+		selectId: { type: String, default: '' },
+	},
 	emits: ['close'],
 	data() {
 		return {
@@ -122,7 +126,7 @@ export default {
 			order: [],
 			busy: {},
 			images: [],
-			selectedId: '',
+			selectedId: this.selectId,
 			loading: true,
 			error: '',
 			// How many times each VM was asked for or dropped. An answer that comes
