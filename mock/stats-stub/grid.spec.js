@@ -104,6 +104,16 @@ describe('the stub of the image upload', () => {
 		expect(put('disk.qcow2', [0x51, 0x46, 0x49, 0xFB, 0], newGridState()).status).toBe(201)
 	})
 
+	it('answers the probe of the route, an empty body, as the module does: 411 once the name is good', () => {
+		expect(put('a.iso', [], newGridState())).toEqual({ status: 411, body: { message: 'length_required' } })
+		expect(put('notes.txt', [], newGridState())).toEqual({ status: 400, body: { message: 'bad_name' } })
+	})
+
+	it('answers as a module older than the upload for oldmodule.iso', () => {
+		expect(put('oldmodule.iso', [], newGridState())).toEqual({ status: 400, body: { message: 'no matching operation was found' } })
+		expect(put('oldmodule.iso', iso(), newGridState())).toEqual({ status: 400, body: { message: 'no matching operation was found' } })
+	})
+
 	it('answers the codes of the contract', () => {
 		const state = newGridState()
 		put('Taken.iso', iso(), state)

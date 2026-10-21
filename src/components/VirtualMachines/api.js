@@ -14,6 +14,14 @@ function seg(id) {
 	return encodeURIComponent(id)
 }
 
+function uploadRoute(name, sha256) {
+	const query = new URLSearchParams({ name })
+	if (sha256) {
+		query.set('sha256', sha256)
+	}
+	return `${PREFIX}/images/upload?${query}`
+}
+
 const vmApi = {
 	host() {
 		return api.get(`${PREFIX}/host`)
@@ -96,11 +104,7 @@ const vmApi = {
 	// no form, and no timeout (a big image takes as long as it takes). Aborting
 	// the signal stops it, and the service deletes what it had.
 	async uploadImage(file, { sha256, onProgress, signal } = {}) {
-		const query = new URLSearchParams({ name: file.name })
-		if (sha256) {
-			query.set('sha256', sha256)
-		}
-		const res = await api.put(`${PREFIX}/images/upload?${query}`, file, {
+		const res = await api.put(uploadRoute(file.name, sha256), file, {
 			timeout: 0,
 			headers: { 'Content-Type': 'application/octet-stream' },
 			// as it is: axios makes JSON of anything it does not take for a file
@@ -109,6 +113,17 @@ const vmApi = {
 			onUploadProgress: e => onProgress?.({ loaded: e.loaded, total: e.total || file.size }),
 		})
 		return res.data.data
+	},
+	// The same route with no body, before the file: the module that takes files
+	// answers 411 length_required once the name and the checksum are good,
+	// without reading anything; an older one has no such route and refuses it.
+	// Either way, a refusal costs nothing instead of a whole file.
+	probeUpload(name, { sha256, signal } = {}) {
+		return api.put(uploadRoute(name, sha256), null, {
+			headers: { 'Content-Type': 'application/octet-stream' },
+			transformRequest: [data => data],
+			signal,
+		})
 	},
 	// The console is a WebSocket, which cannot carry an Authorization header,
 	// so the token goes in the query; the service accepts it on this route only.

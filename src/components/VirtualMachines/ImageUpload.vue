@@ -196,6 +196,19 @@ export default {
 				if (refusal) {
 					return this.fail(refusal)
 				}
+				// The route with no body first: only 411 says the file will be taken.
+				// A module too old for it refuses the route without reading the body,
+				// and the browser in the middle of gigabytes sees a reset connection.
+				const probed = await vmApi.probeUpload(file.name, { sha256: sha256 || undefined, signal: controller.signal }).then(
+					() => 'failed',
+					e => controller.signal.aborted ? 'canceled' : uploadErrorCode(e),
+				)
+				if (this.closed || probed === 'canceled') {
+					return canceled()
+				}
+				if (probed !== 'length_required') {
+					return this.fail(probed)
+				}
 
 				this.startedAt = Date.now()
 				this.drawnAt = this.startedAt

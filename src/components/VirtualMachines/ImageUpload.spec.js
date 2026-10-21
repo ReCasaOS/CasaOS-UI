@@ -10,7 +10,7 @@ import fr from '@/assets/lang/fr_FR.json'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('./api', () => ({ default: { images: vi.fn(), host: vi.fn(), uploadImage: vi.fn() } }))
+vi.mock('./api', () => ({ default: { images: vi.fn(), host: vi.fn(), probeUpload: vi.fn(), uploadImage: vi.fn() } }))
 
 const GIB = 1024 ** 3
 // a file of the size the test says, without the bytes
@@ -19,6 +19,8 @@ const anImage = (name, fields = {}) => ({ path: `/DATA/VM/iso/${name}`, name, ki
 // what axios throws on an answer that is not a success, and on no answer at all
 const refused = (status, code) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { message: code } } })
 const networkError = () => Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' })
+// what a module older than the upload answers, from its request validator
+const oldModule = () => refused(400, 'no matching operation was found')
 
 // an answer the test gives when it likes
 function deferred() {
@@ -141,7 +143,19 @@ describe('what an error of the upload says', () => {
 
 	it('says the upload was refused or interrupted when no answer came', () => {
 		expect(uploadErrorCode(networkError())).toBe('network')
-		expect(UPLOAD_ERRORS.network).toBe('The upload was refused or interrupted.')
+		expect(UPLOAD_ERRORS.network).toBe('The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.')
+		expect(fr[UPLOAD_ERRORS.network]).toMatch(/Paramètres → Modules/)
+	})
+
+	it('says the module is too old when it does not know the route', () => {
+		expect(uploadErrorCode(oldModule())).toBe('module_too_old')
+		expect(uploadErrorCode(refused(404, 'not found'))).toBe('module_too_old')
+		expect(uploadErrorCode(refused(405, 'method not allowed'))).toBe('module_too_old')
+		// a 400 of the module that knows the route is its own code
+		expect(uploadErrorCode(refused(400, 'bad_name'))).toBe('bad_name')
+		expect(UPLOAD_ERRORS.module_too_old).toBe('The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.')
+		expect(en[UPLOAD_ERRORS.module_too_old]).toBe(UPLOAD_ERRORS.module_too_old)
+		expect(fr[UPLOAD_ERRORS.module_too_old]).toBe('Le module des machines virtuelles est trop ancien pour recevoir des fichiers. Mettez-le à jour dans Paramètres → Modules, puis réessayez.')
 	})
 })
 
@@ -152,6 +166,8 @@ describe('the upload of an image', () => {
 		vi.clearAllMocks()
 		vmApi.images.mockResolvedValue({ data: { data: [anImage('debian.iso')] } })
 		vmApi.host.mockResolvedValue({ data: { data: { storage_path: '/DATA/VM', storage_free_bytes: 100 * GIB } } })
+		// the module that takes files answers an empty body before reading anything
+		vmApi.probeUpload.mockRejectedValue(refused(411, 'length_required'))
 	})
 	afterEach(() => {
 		wrapper?.unmount()
@@ -281,6 +297,74 @@ describe('the upload of an image', () => {
 		expect(live()).not.toBe('a.iso is uploaded and selected.')
 	})
 
+	describe('asks the route first, with no body', () => {
+		it('and sends the file once the module says it takes one', async () => {
+			vmApi.uploadImage.mockResolvedValue(anImage('a.iso'))
+			open()
+			await send(aFile('a.iso'), 'AB'.repeat(32))
+			expect(vmApi.probeUpload).toHaveBeenCalledTimes(1)
+			const [name, options] = vmApi.probeUpload.mock.calls[0]
+			expect(name).toBe('a.iso')
+			expect(options.sha256).toBe('ab'.repeat(32))
+			expect(options.signal).toBeInstanceOf(AbortSignal)
+			expect(vmApi.uploadImage).toHaveBeenCalledTimes(1)
+		})
+
+		it('and does not send the file to a module too old for it', async () => {
+			vmApi.probeUpload.mockRejectedValue(oldModule())
+			open()
+			await send(aFile('a.iso', 5.4 * GIB))
+			expect(vmApi.uploadImage).not.toHaveBeenCalled()
+			expect(shown()).toBe('The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.')
+			expect(live()).toBe('The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.')
+		})
+
+		it.each([[400, 'bad_name'], [400, 'bad_sha256'], [409, 'exists'], [503, 'busy'], [507, 'insufficient_storage']])('and says %i %s at once, without sending the file', async (status, code) => {
+			vmApi.probeUpload.mockRejectedValue(refused(status, code))
+			open()
+			await send(aFile('a.iso'))
+			expect(vmApi.uploadImage).not.toHaveBeenCalled()
+			expect(shown()).toBe(UPLOAD_ERRORS[code])
+		})
+
+		it('and does not send the file when the route answers anything else', async () => {
+			vmApi.probeUpload.mockResolvedValue({ status: 200, data: {} })
+			open()
+			await send(aFile('a.iso'))
+			expect(vmApi.uploadImage).not.toHaveBeenCalled()
+			expect(shown()).toBe(UPLOAD_ERRORS.failed)
+		})
+
+		it('and does not send the file when the probe gets no answer', async () => {
+			vmApi.probeUpload.mockRejectedValue(networkError())
+			open()
+			await send(aFile('a.iso'))
+			expect(vmApi.uploadImage).not.toHaveBeenCalled()
+			expect(shown()).toBe(UPLOAD_ERRORS.network)
+		})
+
+		it('and says the module is too old when the file itself is refused that way', async () => {
+			vmApi.uploadImage.mockRejectedValue(oldModule())
+			open()
+			await send(aFile('a.iso'))
+			expect(shown()).toBe(UPLOAD_ERRORS.module_too_old)
+		})
+
+		it('and stops there when canceled meanwhile', async () => {
+			const probe = deferred()
+			vmApi.probeUpload.mockReturnValue(probe.promise)
+			open()
+			await send(aFile('a.iso'))
+			await button('Cancel').trigger('click')
+			expect(vmApi.probeUpload.mock.calls[0][1].signal.aborted).toBe(true)
+			probe.reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+			await flushPromises()
+			expect(vmApi.uploadImage).not.toHaveBeenCalled()
+			expect(wrapper.find('.vm-upload-error').exists()).toBe(false)
+			expect(live()).toBe('Upload canceled.')
+		})
+	})
+
 	it('maps the progress to the bar, a few times a second, not at every event', async () => {
 		vi.useFakeTimers({ toFake: ['Date'] })
 		vi.setSystemTime(0)
@@ -327,7 +411,8 @@ describe('the upload of an image', () => {
 		expect(live()).toBe('Upload canceled.')
 	})
 
-	it.each(Object.keys(UPLOAD_ERRORS).filter(code => !['network', 'failed', 'many'].includes(code)))('says the sentence of %s, never the text of the service', async (code) => {
+	// the codes the service answers; the dialog's own (module_too_old included) are tried apart
+	it.each(Object.keys(UPLOAD_ERRORS).filter(code => !['network', 'failed', 'many', 'module_too_old'].includes(code)))('says the sentence of %s, never the text of the service', async (code) => {
 		vmApi.uploadImage.mockRejectedValue(refused(400, code))
 		open()
 		await send(aFile('a.iso'))
@@ -340,7 +425,7 @@ describe('the upload of an image', () => {
 		vmApi.uploadImage.mockRejectedValue(networkError())
 		open()
 		await send(aFile('a.iso', 50 * 1048576))
-		expect(shown()).toBe('The upload was refused or interrupted.')
+		expect(shown()).toBe('The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.')
 		expect(wrapper.emitted('refresh')).toHaveLength(1)
 	})
 
