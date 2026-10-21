@@ -202,6 +202,48 @@ import { normalizeVolume } from './composeVolumes'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 import VolumesInputGroup from '@/components/forms/VolumesInputGroup.vue'
 
+// Compose lets an environment entry be 'KEY=value', a bare 'KEY', a number, or a [key, value]
+// pair out of the map form whose value may be a number, boolean, null or object. The form
+// wants two strings, so everything that is not one is stringified (null is empty, never 'null').
+function scalarToString(value) {
+	if (isNil(value))
+		return ''
+	return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
+function parseEnvItem(item) {
+	let key
+	let value
+	if (Array.isArray(item)) {
+		[key, value] = item
+	} else if (typeof item === 'string') {
+		const at = item.indexOf('=')
+		key = at === -1 ? item : item.slice(0, at)
+		value = at === -1 ? '' : item.slice(at + 1)
+	} else {
+		key = item
+	}
+	return {
+		host: scalarToString(value).replace(/"/g, ''),
+		container: scalarToString(key),
+	}
+}
+
+// A device is 'host', 'host:container' or 'host:container:permissions', or (in tooling that
+// writes the long syntax) an object naming source/target or path_on_host/path_in_container.
+function parseDeviceItem(item) {
+	if (isObject(item)) {
+		const host = scalarToString(item.source ?? item.path_on_host)
+		const permissions = scalarToString(item.permissions)
+		const device = { host, container: scalarToString(item.target ?? item.path_in_container) || host }
+		return permissions ? { ...device, permissions } : device
+	}
+	const [host, container, permissions] = scalarToString(item).split(':')
+	return permissions
+		? { host, container, permissions }
+		: { host, container: container || host }
+}
+
 const data = [
 	'AUDIT_CONTROL',
 	'AUDIT_READ',
@@ -562,13 +604,7 @@ export default {
 				const envArray = Array.isArray(composeServicesItemInput.environment)
 					? composeServicesItemInput.environment
 					: Object.entries(composeServicesItemInput.environment)
-				composeServicesItem.environment = envArray.map((item) => {
-					const ii = typeof item === 'object' ? Array.from(item) : item.split('=')
-					return {
-						host: ii[1].replace(/"/g, ''),
-						container: ii[0],
-					}
-				})
+				composeServicesItem.environment = envArray.map(parseEnvItem)
 			} else {
 				composeServicesItem.environment = []
 			}
@@ -632,13 +668,7 @@ export default {
 			isNil(composeServicesItem.volumes) && (composeServicesItem.volumes = [])
 
 			// Devices
-			composeServicesItem.devices = this.makeArray(composeServicesItemInput.devices).map((item) => {
-				const ii = item.split(':')
-				return {
-					container: ii[1],
-					host: ii[0],
-				}
-			})
+			composeServicesItem.devices = this.makeArray(composeServicesItemInput.devices).map(parseDeviceItem)
 			isNil(composeServicesItem.devices) && (composeServicesItem.devices = [])
 
 			// Network_mode
@@ -806,7 +836,7 @@ export default {
 						return false
 					})
 					.map((device) => {
-						return `${device.host}:${device.container}`
+						return `${device.host}:${device.container}${device.permissions && device.permissions !== 'rwm' ? `:${device.permissions}` : ''}`
 					})
 				outputService.environment = service.environment
 					.filter((env) => {
