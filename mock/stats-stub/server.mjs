@@ -32,6 +32,7 @@ const [upstreamHost, upstreamPort = '80'] = upstream.split(':')
 
 const options = { envelope, alerts: false, down: [], rules: new Map() }
 const grid = newGridState()
+const UPLOAD = '/v2/virt_management/images/upload'
 const STATS = /^\/v[12]\/(?:sys|app_management|virt_management)\/stats(?:\/|$)/
 
 function send(res, status, body) {
@@ -62,10 +63,16 @@ const server = createServer((req, res) => {
 	req.on('data', chunk => chunks.push(chunk))
 	req.on('end', () => {
 		let body = null
-		try {
-			body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null
-		} catch {
-			return send(res, 400, { message: 'bad_rules: rules' })
+		// an image upload is the raw file, every other body is JSON
+		// ponytail: the whole file is held in memory, fine for the few MB tried in a browser
+		if (url.pathname === UPLOAD) {
+			body = Buffer.concat(chunks)
+		} else {
+			try {
+				body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null
+			} catch {
+				return send(res, 400, { message: 'bad_rules: rules' })
+			}
 		}
 		const request = { method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams), body }
 		const { status, body: answer } = stats ? handle(request, options) : (handleGrid(request, grid) || { status: 404, body: { message: 'not_found' } })

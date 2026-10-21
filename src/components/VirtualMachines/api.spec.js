@@ -83,3 +83,37 @@ describe('the routes of the virtual machine service', () => {
 		expect(vmApi.consoleURL('ws:', ODD)).toBe(`ws://${window.location.host}${P}/vms/${SAFE}/console?token=a%20b`)
 	})
 })
+
+// The file itself is the body: no JSON, no form, no timeout, and a way to stop it.
+describe('the upload of an image', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it('puts the raw file with its name, octet-stream, no timeout, the signal and the progress', async () => {
+		const file = new File(['abcd'], 'a b&c.iso')
+		const signal = new AbortController().signal
+		const onProgress = vi.fn()
+		const image = { path: '/DATA/VM/iso/a b&c.iso', name: 'a b&c.iso', kind: 'iso', size_bytes: 4 }
+		http.put.mockResolvedValue({ status: 201, data: { data: image } })
+
+		await expect(vmApi.uploadImage(file, { sha256: 'ab'.repeat(32), onProgress, signal })).resolves.toEqual(image)
+
+		const [url, body, config] = http.put.mock.calls[0]
+		expect(url).toBe(`${P}/images/upload?name=a+b%26c.iso&sha256=${'ab'.repeat(32)}`)
+		expect(body).toBe(file)
+		expect(config).toMatchObject({ timeout: 0, headers: { 'Content-Type': 'application/octet-stream' }, signal })
+		expect(config.transformRequest.reduce((data, f) => f(data), file)).toBe(file)
+
+		// what the browser reports, as what the dialog needs
+		config.onUploadProgress({ loaded: 2, total: 4 })
+		config.onUploadProgress({ loaded: 3, total: 0 })
+		expect(onProgress.mock.calls).toEqual([[{ loaded: 2, total: 4 }], [{ loaded: 3, total: 4 }]])
+	})
+
+	it('leaves the checksum out when there is none', async () => {
+		http.put.mockResolvedValue({ status: 201, data: { data: {} } })
+		await vmApi.uploadImage(new File([''], 'x.qcow2'))
+		expect(http.put.mock.calls[0][0]).toBe(`${P}/images/upload?name=x.qcow2`)
+	})
+})
