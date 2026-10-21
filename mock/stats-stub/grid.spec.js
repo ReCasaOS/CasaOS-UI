@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
 import { handleGrid, newGridState } from './grid.js'
 
@@ -73,5 +74,48 @@ describe('the stub of the shell', () => {
 		expect(ask('GET', '/v1/sys/nothing-here')).toBeNull()
 		expect(ask('DELETE', '/v2/virt_management/vms')).toBeNull()
 		expect(ask('GET', '/v2/virt_management/stats')).toBeNull()
+	})
+})
+
+// The upload of an image: the body is the file, the name says what to answer.
+describe('the stub of the image upload', () => {
+	const UPLOAD = '/v2/virt_management/images/upload'
+	const put = (name, bytes, state, sha256) => handleGrid({ method: 'PUT', path: UPLOAD, query: sha256 ? { name, sha256 } : { name }, body: Buffer.from(bytes) }, state)
+	// an ISO 9660 volume: CD001 at 32769
+	const iso = () => {
+		const bytes = Buffer.alloc(32774)
+		bytes.write('CD001', 32769)
+		return bytes
+	}
+
+	it('keeps the file, lists it and gives the host\'s free space', () => {
+		const state = newGridState()
+		const { status, body } = put('debian.iso', iso(), state)
+
+		expect(status).toBe(201)
+		expect(body.data).toEqual({ path: '/DATA/VM/iso/debian.iso', name: 'debian.iso', kind: 'iso', size_bytes: 32774, sha256: expect.stringMatching(/^[0-9a-f]{64}$/) })
+		expect(handleGrid({ method: 'GET', path: '/v2/virt_management/images' }, state).body.data.map(image => image.name)).toContain('debian.iso')
+		expect(handleGrid({ method: 'GET', path: '/v2/virt_management/host' }, state).body.data.storage_free_bytes).toEqual(expect.any(Number))
+	})
+
+	it('warns of an ISO that is not one, and refuses a qcow2 without its magic', () => {
+		expect(put('notes.iso', 'hello', newGridState()).body.data.warning).toBe('iso_signature_missing')
+		expect(put('disk.qcow2', 'hello', newGridState())).toEqual({ status: 422, body: { message: 'bad_image' } })
+		expect(put('disk.qcow2', [0x51, 0x46, 0x49, 0xFB, 0], newGridState()).status).toBe(201)
+	})
+
+	it('answers the codes of the contract', () => {
+		const state = newGridState()
+		put('Taken.iso', iso(), state)
+
+		expect(put('taken.ISO', iso(), state)).toEqual({ status: 409, body: { message: 'exists' } })
+		expect(put('notes.txt', 'x', state)).toEqual({ status: 400, body: { message: 'bad_name' } })
+		expect(put('a.iso', 'x', state, 'xyz')).toEqual({ status: 400, body: { message: 'bad_sha256' } })
+		expect(put('a.iso', 'x', state, '0'.repeat(64))).toEqual({ status: 422, body: { message: 'checksum_mismatch' } })
+		// a name made of a code answers that code
+		const codes = { exists: 409, too_large: 413, busy: 503, insufficient_storage: 507, stalled: 408, incomplete: 400, too_long: 400, length_required: 411 }
+		for (const [code, status] of Object.entries(codes)) {
+			expect(put(`${code}.iso`, 'x', state)).toEqual({ status, body: { message: code } })
+		}
 	})
 })

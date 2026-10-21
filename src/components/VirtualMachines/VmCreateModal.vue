@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card vm-create">
+	<div class="modal-card vm-create" @vm-escape="onEscape">
 		<header class="modal-card-head b-line">
 			<h3 class="title is-5 has-text-black">{{ $t('New virtual machine') }}</h3>
 		</header>
@@ -27,6 +27,7 @@
 					<b-button icon-left="download" size="is-small" :title="$t('Download from a URL')" @click="download" />
 				</p>
 			</b-field>
+			<image-upload ref="upload" class="mt-2" @busy="uploading = $event" @refresh="loadImages" @uploaded="onUploaded" />
 
 			<!-- then the edit form's tabs, in their order, as sections -->
 			<p class="section-title">{{ $t('General') }}</p>
@@ -61,14 +62,15 @@
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
-			<b-button class="mr-2" rounded @click="$emit('close')">{{ $t('Cancel') }}</b-button>
-			<b-button :loading="busy" rounded type="is-primary" @click="submit">{{ $t('Create') }}</b-button>
+			<b-button class="mr-2" rounded @click="requestClose">{{ $t('Cancel') }}</b-button>
+			<b-button :disabled="uploading" :loading="busy" rounded type="is-primary" @click="submit">{{ $t('Create') }}</b-button>
 		</footer>
 	</div>
 </template>
 
 <script>
 import DownloadModal from './DownloadModal.vue'
+import ImageUpload from './ImageUpload.vue'
 import NetworkField from './NetworkField.vue'
 import OsField from './OsField.vue'
 import PathPicker from './PathPicker.vue'
@@ -78,7 +80,7 @@ import { createDefaults, createRequest, formatBytes, guessOS, imageKind, isUnder
 
 export default {
 	name: 'VmCreateModal',
-	components: { NetworkField, OsField, ResourcesFields },
+	components: { ImageUpload, NetworkField, OsField, ResourcesFields },
 	props: {
 		host: { type: Object, required: true },
 	},
@@ -95,6 +97,8 @@ export default {
 			folderError: '',
 			busy: false,
 			error: '',
+			// an image is on its way from the browser
+			uploading: false,
 		}
 	},
 	computed: {
@@ -112,7 +116,7 @@ export default {
 				case 'disk':
 					return 'Copied into the new disk, which grows to the size below if the image is smaller. The file itself is not changed.'
 				default:
-					return 'An ISO or a disk image under /DATA. Upload one to /DATA/VM/iso with Files.'
+					return 'An ISO or a disk image under /DATA. Upload one below, or put it in /DATA/VM/iso with Files.'
 			}
 		},
 		diskMessage() {
@@ -150,6 +154,34 @@ export default {
 			} catch {
 				// suggestions only: the path can still be typed or browsed
 				this.images = []
+			}
+		},
+		// in the list at once, and the image of the VM
+		onUploaded(image) {
+			this.images = [...this.images.filter(img => img.path !== image.path), image]
+			this.form.image_path = image.path
+		},
+		// closing stops an upload: not without asking
+		requestClose() {
+			if (!this.uploading) {
+				return this.$emit('close')
+			}
+			this.$buefy.dialog.confirm({
+				message: this.$t('An image is still uploading. Close and stop the upload?'),
+				confirmText: this.$t('Stop the upload'),
+				cancelText: this.$t('Keep uploading'),
+				type: 'is-danger',
+				onConfirm: () => {
+					this.$refs.upload?.cancel()
+					this.$emit('close')
+				},
+			})
+		},
+		// Escape, from the modal stack: the upload keeps the dialog open until asked
+		onEscape(e) {
+			if (this.uploading) {
+				e.preventDefault()
+				this.requestClose()
 			}
 		},
 		onSuggestion(option) {

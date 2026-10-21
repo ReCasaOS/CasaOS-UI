@@ -3,10 +3,20 @@
 // HostOK, VMListOK and VMOK), the app grid (WebAppGridItem) and the few core
 // calls the shell reads without a guard. A pure `handleGrid(request, state)`:
 //
-// request: { method, path, body }  ->  { status, body }, or null when the path is not one of these
-// state:   newGridState()             what was put in custom storage
+// request: { method, path, query, body }  ->  { status, body }, or null when the path is not one of these
+// state:   newGridState()                   what was put in custom storage, and the images uploaded
+//
+// PUT /v2/virt_management/images/upload?name=<file>[&sha256=<hex>] takes the raw file as a Buffer. A file named
+// after an error code (exists.iso, busy.iso, too_large.iso, ...) answers that code, so every refusal can be tried.
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
+import { imageKind } from '../../src/components/VirtualMachines/vms.js'
 
 const GIB = 1073741824
+const ISO_FOLDER = '/DATA/VM/iso'
+const UPLOAD_CODES = { bad_name: 400, bad_sha256: 400, incomplete: 400, too_long: 400, stalled: 408, exists: 409, length_required: 411, too_large: 413, checksum_mismatch: 422, bad_image: 422, busy: 503, insufficient_storage: 507 }
+const QCOW2_MAGIC = Buffer.from([0x51, 0x46, 0x49, 0xFB])
+const ISO_MAGIC = Buffer.from('CD001')
 
 const HOST = {
 	libvirt: 'available',
@@ -105,11 +115,48 @@ const CUSTOM = /^\/v1\/users\/current\/custom\/([^/]+)$/
 const ONE_VM = /^\/v2\/virt_management\/vms\/([^/]+)$/
 
 export function newGridState() {
-	return { custom: new Map() }
+	return {
+		custom: new Map(),
+		images: [{ path: `${ISO_FOLDER}/alpine-virt-3.20.iso`, name: 'alpine-virt-3.20.iso', kind: 'iso', size_bytes: 64 * 1048576 }],
+	}
 }
 
-export function handleGrid({ method = 'GET', path = '', body = null } = {}, state = newGridState()) {
+const uploadFails = code => ({ status: UPLOAD_CODES[code], body: { message: code } })
+
+function upload({ name = '', sha256 }, body, state) {
+	const bytes = Buffer.isBuffer(body) ? body : Buffer.alloc(0)
+	const stem = name.replace(/\.[^.]*$/, '')
+	if (Object.hasOwn(UPLOAD_CODES, stem)) {
+		return uploadFails(stem)
+	}
+	const kind = imageKind(name)
+	if (!kind || name.includes('/') || name.startsWith('.')) {
+		return uploadFails('bad_name')
+	}
+	if (sha256 !== undefined && !/^[0-9a-f]{64}$/i.test(sha256)) {
+		return uploadFails('bad_sha256')
+	}
+	if (state.images.some(image => image.name.toLowerCase() === name.toLowerCase())) {
+		return uploadFails('exists')
+	}
+	if (name.toLowerCase().endsWith('.qcow2') && !bytes.subarray(0, 4).equals(QCOW2_MAGIC)) {
+		return uploadFails('bad_image')
+	}
+	const sum = createHash('sha256').update(bytes).digest('hex')
+	if (sha256 && sha256.toLowerCase() !== sum) {
+		return uploadFails('checksum_mismatch')
+	}
+	const image = { path: `${ISO_FOLDER}/${name}`, name, kind, size_bytes: bytes.length, sha256: sum }
+	state.images.push({ path: image.path, name, kind, size_bytes: image.size_bytes })
+	const bootable = bytes.subarray(32769, 32774).equals(ISO_MAGIC)
+	return { status: 201, body: { data: kind === 'iso' && !bootable ? { ...image, warning: 'iso_signature_missing' } : image } }
+}
+
+export function handleGrid({ method = 'GET', path = '', query = {}, body = null } = {}, state = newGridState()) {
 	const verb = method.toUpperCase()
+	if (path === '/v2/virt_management/images/upload') {
+		return verb === 'PUT' ? upload(query, body, state) : null
+	}
 	const custom = path.match(CUSTOM)
 	if (custom) {
 		const key = decodeURIComponent(custom[1])
@@ -131,6 +178,10 @@ export function handleGrid({ method = 'GET', path = '', body = null } = {}, stat
 			return { status: 200, body: { data: HOST } }
 		case '/v2/virt_management/vms':
 			return { status: 200, body: { data: VMS } }
+		case '/v2/virt_management/images':
+			return { status: 200, body: { data: state.images } }
+		case '/v2/virt_management/images/downloads':
+			return { status: 200, body: { data: [] } }
 		case '/v2/app_management/web/appgrid':
 			return { status: 200, body: { data: APPS } }
 	}

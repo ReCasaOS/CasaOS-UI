@@ -24,7 +24,12 @@ export function openWithEscape(buefy, options) {
 	let modal
 	const onKey = (e) => {
 		if ((e.key === 'Escape' || e.key === 'Esc') && isOnTop(mark)) {
-			modal.close()
+			// The component hears it first, as a cancelable vm-escape on its root:
+			// one that must not close yet (an upload runs) says so, and asks.
+			const root = document.querySelector(`.${mark} .animation-content > *`)
+			if (!root || root.dispatchEvent(new CustomEvent('vm-escape', { cancelable: true }))) {
+				modal.close()
+			}
 		}
 	}
 	document.addEventListener('keyup', onKey)

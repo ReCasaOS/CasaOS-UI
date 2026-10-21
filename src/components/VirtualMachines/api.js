@@ -92,6 +92,24 @@ const vmApi = {
 	images() {
 		return api.get(`${PREFIX}/images`)
 	},
+	// The file itself is the body, as the browser reads it from the disk: no JSON,
+	// no form, and no timeout (a big image takes as long as it takes). Aborting
+	// the signal stops it, and the service deletes what it had.
+	async uploadImage(file, { sha256, onProgress, signal } = {}) {
+		const query = new URLSearchParams({ name: file.name })
+		if (sha256) {
+			query.set('sha256', sha256)
+		}
+		const res = await api.put(`${PREFIX}/images/upload?${query}`, file, {
+			timeout: 0,
+			headers: { 'Content-Type': 'application/octet-stream' },
+			// as it is: axios makes JSON of anything it does not take for a file
+			transformRequest: [data => data],
+			signal,
+			onUploadProgress: e => onProgress?.({ loaded: e.loaded, total: e.total || file.size }),
+		})
+		return res.data.data
+	},
 	// The console is a WebSocket, which cannot carry an Authorization header,
 	// so the token goes in the query; the service accepts it on this route only.
 	// It goes to the page's own host: in development that is the dev server,

@@ -8,7 +8,7 @@ import { openWithEscape } from './modalStack'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({
-	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder', 'consoleURL'].map(name => [name, vi.fn()])),
+	default: Object.fromEntries(['host', 'list', 'get', 'images', 'action', 'remove', 'downloads', 'storageFolder', 'consoleURL', 'uploadImage'].map(name => [name, vi.fn()])),
 }))
 // the console of a running VM connects as soon as it opens
 vi.mock('@novnc/novnc', () => ({ default: class { addEventListener() {} disconnect() {} focus() {} } }))
@@ -108,6 +108,32 @@ describe('escape in the modals of the virtual machine page', () => {
 		await openPage()
 		await click('[title="New virtual machine"]')
 		await press()
+		expect(stillOpen('.vm-create', '.vm-page')).toEqual([['.vm-create', false], ['.vm-page', true]])
+	})
+
+	it('asks before closing the create form while an image uploads, and closes it on yes', async () => {
+		vmApi.uploadImage.mockReturnValue(new Promise(() => {}))
+		await openPage()
+		await click('[title="New virtual machine"]')
+		const input = document.querySelector('.vm-create input[type="file"]')
+		Object.defineProperty(input, 'files', { value: [new File(['x'], 'a.iso')], configurable: true })
+		input.dispatchEvent(new Event('change'))
+		await flushPromises()
+		await click('.vm-create button', 'Upload')
+		expect(vmApi.uploadImage).toHaveBeenCalledTimes(1)
+		const { signal } = vmApi.uploadImage.mock.calls[0][1]
+
+		await press()
+		expect(stillOpen('.dialog', '.vm-create', '.vm-page')).toEqual([['.dialog', true], ['.vm-create', true], ['.vm-page', true]])
+		expect(document.querySelector('.dialog .media-content').textContent.trim()).toBe('An image is still uploading. Close and stop the upload?')
+		// Escape is the dialog's: it goes, the form stays and the upload runs on
+		await press()
+		expect(stillOpen('.dialog', '.vm-create')).toEqual([['.dialog', false], ['.vm-create', true]])
+		expect(signal.aborted).toBe(false)
+
+		await press()
+		await click('.dialog button', 'Stop the upload')
+		expect(signal.aborted).toBe(true)
 		expect(stillOpen('.vm-create', '.vm-page')).toEqual([['.vm-create', false], ['.vm-page', true]])
 	})
 
