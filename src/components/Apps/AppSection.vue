@@ -40,7 +40,7 @@
 			their own grid while loading. -->
 		<draggable v-if="!isLoading"
 			v-bind="dragOptions"
-			v-model="appList"
+			v-model="gridList"
 			:draggable="draggable"
 			class="app-list contextmenu-canvas"
 			item-key="name"
@@ -50,7 +50,8 @@
 			<!-- App Icon Card Start -->
 			<template #item="{ element: item }">
 				<div :id="`app-${item.name}`" class="handle">
-					<app-card :item="item"
+					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
+					<app-card v-else :item="item"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -93,6 +94,7 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import draggable from 'vuedraggable'
 import xor from 'lodash/xor'
 import concat from 'lodash/concat'
@@ -108,7 +110,7 @@ import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import { STATS_APP_NAME } from '@/components/Stats/entry'
-import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
+import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
@@ -156,12 +158,17 @@ const builtInApplications = [
 
 const orderConfig = 'app_order'
 
+// how often the VM tiles read the VMs again, while the tab is shown
+const VM_POLL_MS = 5000
+
 export default {
 	components: {
 		AppCard,
 		Draggable: draggable,
 		AppSectionTitleTip,
 		AppCardSkeleton,
+		// loaded with the first VM: a box without the module never downloads it
+		VmTile: defineAsyncComponent(() => import('@/components/VirtualMachines/VmTile.vue')),
 	},
 	mixins: [business_ShowNewAppTag, business_LinkApp],
 	provide() {
@@ -186,6 +193,8 @@ export default {
 			skCount: 0,
 			ListRefreshTimer: null,
 			isCheckingImages: false,
+			// the VMs of the tiles, by title
+			vms: [],
 		}
 	},
 	computed: {
@@ -196,6 +205,26 @@ export default {
 				disabled: false,
 				ghostClass: 'ghost',
 			}
+		},
+		// The grid as drawn: the apps, and a tile per VM right after the Virtual
+		// Machines card. The tiles are not apps: what is dragged comes back here
+		// without them, so the saved order never has them, and they go back after
+		// their card.
+		gridList: {
+			get() {
+				const at = this.appList.findIndex(app => app.name === VM_APP_NAME)
+				if (at < 0 || !this.vms.length) {
+					return this.appList
+				}
+				const tiles = this.vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
+				return [...this.appList.slice(0, at + 1), ...tiles, ...this.appList.slice(at + 1)]
+			},
+			set(list) {
+				this.appList = list.filter(item => !item.vmTile)
+			},
+		},
+		hasVmCard() {
+			return this.appList.some(app => app.name === VM_APP_NAME)
 		},
 		showDragTip() {
 			return this.draggable === '.handle'
@@ -214,6 +243,12 @@ export default {
 			]
 		},
 	},
+	watch: {
+		// the tiles come with the card, not at the next read
+		hasVmCard() {
+			this.pollVms()
+		},
+	},
 	created() {
 		this.getList()
 		this.draggable = this.isMobile() ? '' : '.handle'
@@ -230,6 +265,9 @@ export default {
 		this.ListRefreshTimer = setInterval(() => {
 			this.getList()
 		}, 5000)
+
+		document.addEventListener('visibilitychange', this.onVisibility)
+		this.pollVms()
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
@@ -237,6 +275,10 @@ export default {
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
+
+		this.vmPollStopped = true
+		clearTimeout(this.vmPollTimer)
+		document.removeEventListener('visibilitychange', this.onVisibility)
 	},
 	mounted() {
 		window.addEventListener('resize', this.getSkCount)
@@ -454,6 +496,40 @@ export default {
 					this.saveSortIfChanged(savedOrder)
 				}
 			})
+		},
+
+		// The VMs of the tiles, read again every few seconds while the tab is shown,
+		// one read at a time. Only where the Virtual Machines card is, which is where
+		// the module answers. A list that cannot be read shows no tile, and says
+		// nothing: the card is still there for whoever wants to know why.
+		async pollVms() {
+			clearTimeout(this.vmPollTimer)
+			if (this.vmPollStopped || this.vmPolling || document.hidden) {
+				return
+			}
+			if (!this.appList.some(app => app.name === VM_APP_NAME)) {
+				this.vms = []
+			} else {
+				this.vmPolling = true
+				try {
+					this.vms = await listVirtualMachines()
+				} catch {
+					this.vms = []
+				} finally {
+					this.vmPolling = false
+				}
+			}
+			if (!this.vmPollStopped && !document.hidden) {
+				this.vmPollTimer = setTimeout(() => this.pollVms(), VM_POLL_MS)
+			}
+		},
+
+		onVisibility() {
+			if (document.hidden) {
+				clearTimeout(this.vmPollTimer)
+				return
+			}
+			return this.pollVms()
 		},
 
 		/**

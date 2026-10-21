@@ -2508,5 +2508,7 @@
   "{seconds} s": "{seconds} s",
   "Exited with an error": "Arrêté avec une erreur",
   "The settings are applied but could not be kept for good.": "Les réglages sont appliqués, mais n'ont pas pu être conservés durablement.",
-  "System app": "Application système"
+  "System app": "Application système",
+  "Console of {name}": "Console de {name}",
+  "{name}, {state}: open in Virtual Machines": "{name}, {state} : ouvrir dans Machines virtuelles"
 }
