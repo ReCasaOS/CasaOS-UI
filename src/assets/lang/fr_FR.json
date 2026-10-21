@@ -2507,5 +2507,6 @@
   "{minutes} min": "{minutes} min",
   "{seconds} s": "{seconds} s",
   "Exited with an error": "Arrêté avec une erreur",
-  "The settings are applied but could not be kept for good.": "Les réglages sont appliqués, mais n'ont pas pu être conservés durablement."
+  "The settings are applied but could not be kept for good.": "Les réglages sont appliqués, mais n'ont pas pu être conservés durablement.",
+  "System app": "Application système"
 }

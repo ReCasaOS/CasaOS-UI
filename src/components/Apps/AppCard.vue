@@ -123,6 +123,10 @@
 			</b-dropdown>
 		</div>
 		<!-- Action Button End -->
+		<!-- System apps have no action button: this chip says what they are. The icon is hidden, the chip names it once. -->
+		<span v-if="item.app_type === 'system'" :aria-label="$t('System app')" :title="$t('System app')" class="system-marker" role="img">
+			<b-icon aria-hidden="true" custom-size="mdi-14px" icon="cog-outline" />
+		</span>
 		<div class="blur-background"></div>
 		<div class="cards-content">
 			<!-- Card Content Start -->
@@ -1297,6 +1301,22 @@ export default {
 .dropdown.is-right .dropdown-menu {
   top: 0;
   left: calc(100% + 6px);
+}
+
+.system-marker {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  background: var(--casa-surface);
+  color: var(--casa-text);
+  opacity: 0.9;
 }
 
 .stats-badge {

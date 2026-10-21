@@ -570,3 +570,38 @@ describe('the Statistics card count badge', () => {
 		wrapper.unmount()
 	})
 })
+
+// The system apps carry a small gear chip in the card's top-right corner, where the others have their action button.
+describe('the system app marker', () => {
+	const marker = wrapper => wrapper.find('.system-marker')
+	const system = { name: 'Files', app_type: 'system', status: 'running', title: { en_us: 'Files' } }
+
+	it('marks the system apps, Statistics included, with an accessible name', async () => {
+		for (const name of ['App Store', 'Files', 'Virtual Machines', 'Statistics']) {
+			const wrapper = await card({ ...system, name })
+
+			expect(marker(wrapper).exists()).toBe(true)
+			expect(marker(wrapper).attributes('title')).toBe('System app')
+			expect(marker(wrapper).attributes('aria-label')).toBe('System app')
+			expect(marker(wrapper).find('.icon').attributes('aria-hidden')).toBe('true')
+			wrapper.unmount()
+		}
+	})
+
+	it('keeps the Statistics count badge beside it', async () => {
+		alertBadge.counts.core = 2
+		const wrapper = await card({ ...system, name: 'Statistics' })
+
+		expect(marker(wrapper).exists()).toBe(true)
+		expect(wrapper.find('.stats-badge').text()).toBe('2')
+		alertBadge.counts.core = 0
+		wrapper.unmount()
+	})
+
+	it.each(['v2app', 'container', 'LinkApp'])('is absent on a %s card', async (app_type) => {
+		const wrapper = await card({ app_type })
+
+		expect(marker(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+})
