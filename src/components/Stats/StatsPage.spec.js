@@ -153,6 +153,13 @@ describe('the list of the Statistics page', () => {
 		expect(document.querySelector('.stats-list .stats-item-name').textContent).toBe(HOSTILE)
 	})
 
+	it('shows an application container as "application / service"', async () => {
+		serve({ ...defaults(), app_management: body([anItem({ id: 'app:dozzle:app:1', name: 'app', app: 'dozzle' })]) })
+		await mountPage()
+		expect(document.querySelector('.stats-list .stats-item-name').textContent).toBe('dozzle / app')
+		expect(document.querySelector('.stats-name').textContent).toBe('dozzle / app')
+	})
+
 	it('selects the initial item, else the first one', async () => {
 		await mountPage({ initialItem: 'vm-1' })
 		expect(pressed()).toEqual(['Debian'])

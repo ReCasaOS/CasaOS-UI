@@ -12,6 +12,35 @@ const pts = (values, step = 5, from = 1000) => values.map((v, i) => [from + (i *
 const find = (charts, id) => charts.find(c => c.id === id)
 
 describe('normalizeItems', () => {
+	it('shows an application container as "app / service", and only that kind', () => {
+		const [a, b, c, d] = normalizeItems({ items: [
+			anItem({ id: 'app:dozzle:app:1', name: 'app', app: 'dozzle' }),
+			anItem({ id: 'app:x:app:1', name: 'app' }),
+			anItem({ id: 'app:y:web:1', name: 'web', app: 'web' }),
+			anItem({ id: 'container:z', name: 'z', kind: 'container', app: 'zapp' }),
+		].map(i => i.id === 'app:x:app:1' ? { ...i, app: undefined } : i) }, 'app_management')
+		expect(a).toMatchObject({ name: 'dozzle / app', app: 'dozzle' })
+		expect(b).toMatchObject({ name: 'app', app: null })
+		expect(c.name).toBe('web')
+		expect(d.name).toBe('z')
+	})
+
+	it('numbers the second and later items that still share a display name', () => {
+		const items = normalizeItems({ items: [
+			anItem({ id: 'app:dozzle:app:1', name: 'app', app: 'dozzle' }),
+			anItem({ id: 'app:dozzle:app:2', name: 'app', app: 'dozzle' }),
+			anItem({ id: 'app:dozzle:app:3', name: 'app', app: 'dozzle' }),
+		] }, 'app_management')
+		expect(items.map(i => i.name)).toEqual(['dozzle / app', 'dozzle / app #2', 'dozzle / app #3'])
+	})
+
+	it('cleans a hostile application name into plain text', () => {
+		const [a] = normalizeItems({ items: [anItem({ id: 'app:h:s:1', name: 's', app: `${HOSTILE}‮` })] }, 'app_management')
+		expect(a.app).toBe(clean(HOSTILE, 80))
+		expect(a.name).toBe(`${clean(HOSTILE, 80)} / s`)
+		expect([...a.name].some(c => c.codePointAt(0) === 0x202E)).toBe(false)
+	})
+
 	it('keeps the contract kinds and ignores the service\'s group text', () => {
 		const items = normalizeItems({ items: [anItem({ kind: 'vm', group: 'ANYTHING' })] }, 'virt_management')
 		const groups = groupItems(items)
