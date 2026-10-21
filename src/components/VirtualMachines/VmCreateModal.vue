@@ -116,7 +116,7 @@ export default {
 				case 'disk':
 					return 'Copied into the new disk, which grows to the size below if the image is smaller. The file itself is not changed.'
 				default:
-					return 'An ISO or a disk image under /DATA. Upload one to /DATA/VM/iso with Files.'
+					return 'An ISO or a disk image under /DATA. Upload one below, or put it in /DATA/VM/iso with Files.'
 			}
 		},
 		diskMessage() {

@@ -31,11 +31,43 @@ function deferred() {
 }
 
 describe('what the dialog checks before sending a file', () => {
-	const images = [anImage('Debian-12.iso')]
+	const images = [anImage('Debian-12.iso'), anImage('café.iso'), { ...anImage('elsewhere.iso'), path: '/DATA/Downloads/elsewhere.iso' }]
+	const storagePath = '/DATA/VM'
 
-	it('refuses a name that is already in the list, whatever its case', () => {
-		expect(uploadRefusal(aFile('debian-12.ISO'), { images, freeBytes: 100 * GIB })).toBe('exists')
-		expect(uploadRefusal(aFile('debian-13.iso'), { images, freeBytes: 100 * GIB })).toBe('')
+	it('refuses the name of a file already in the iso folder, as the service compares it', () => {
+		expect(uploadRefusal(aFile('Debian-12.iso'), { images, storagePath })).toBe('exists')
+		// the service's file system tells the case apart
+		expect(uploadRefusal(aFile('debian-12.ISO'), { images, storagePath })).toBe('')
+		// the name the service writes is NFC: a decomposed é is the same file
+		expect(uploadRefusal(aFile('café.iso'), { images, storagePath })).toBe('exists')
+		// an image of that name somewhere else is not in the way
+		expect(uploadRefusal(aFile('elsewhere.iso'), { images, storagePath })).toBe('')
+		// without the folder, the service decides
+		expect(uploadRefusal(aFile('Debian-12.iso'), { images })).toBe('')
+	})
+
+	it.each([
+		['a/b.iso', 'a slash'],
+		['a\\b.iso', 'a backslash'],
+		['a\u0000b.iso', 'a NUL'],
+		['a\nb.iso', 'a newline'],
+		['a‮osi.exe.iso', 'a bidi override'],
+		['a​b.iso', 'a zero-width space'],
+		['.hidden.iso', 'a leading dot'],
+		['a.iso.', 'a trailing dot'],
+		['a.iso ', 'a trailing space'],
+		[' a.iso', 'a leading space'],
+		['CON.iso', 'a Windows device'],
+		['nul.qcow2.xz', 'a Windows device with two extensions'],
+		['com1.iso', 'a COM port'],
+		['LPT9.img', 'an LPT port'],
+		[`${'é'.repeat(124)}.iso`, 'more than 250 bytes of UTF-8'],
+	])('refuses %j, with %s, as the service does', (name) => {
+		expect(uploadRefusal(aFile(name))).toBe('bad_name')
+	})
+
+	it.each(['console.iso', 'com10.iso', 'lpt0.iso', `${'é'.repeat(123)}.iso`, 'a b (1).iso'])('takes %j, which the service takes', (name) => {
+		expect(uploadRefusal(aFile(name))).toBe('')
 	})
 
 	it('refuses a file too large for the free space, keeping 1 GiB free', () => {
@@ -82,7 +114,17 @@ describe('the progress of an upload', () => {
 })
 
 describe('what an error of the upload says', () => {
-	const CODES = ['bad_name', 'bad_sha256', 'incomplete', 'too_long', 'stalled', 'exists', 'length_required', 'too_large', 'checksum_mismatch', 'bad_image', 'busy', 'insufficient_storage']
+	const CODES = ['bad_name', 'bad_sha256', 'incomplete', 'too_long', 'stalled', 'exists', 'length_required', 'too_large', 'checksum_mismatch', 'bad_image', 'busy', 'insufficient_storage', 'conflict']
+
+	it('says what too_long and conflict mean, and does not promise a fixed reserve', () => {
+		expect(UPLOAD_ERRORS.too_long).toBe('More data arrived than announced. Try again.')
+		expect(fr[UPLOAD_ERRORS.too_long]).toBe('Plus de données sont arrivées qu\'annoncé. Réessayez.')
+		expect(UPLOAD_ERRORS.conflict).toBe('Another transfer touched this file. Try again.')
+		expect(fr[UPLOAD_ERRORS.conflict]).toBe('Un autre transfert a touché ce fichier. Réessayez.')
+		expect(uploadErrorCode(refused(500, 'conflict'))).toBe('conflict')
+		expect(UPLOAD_ERRORS.insufficient_storage).not.toMatch(/1 GB/)
+		expect(UPLOAD_ERRORS.insufficient_storage).toMatch(/Some free space is always kept for the system/)
+	})
 
 	it.each(CODES)('has a sentence of its own for %s, in English and in French', (code) => {
 		expect(uploadErrorCode(refused(400, code))).toBe(code)
@@ -109,7 +151,7 @@ describe('the upload of an image', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		vmApi.images.mockResolvedValue({ data: { data: [anImage('debian.iso')] } })
-		vmApi.host.mockResolvedValue({ data: { data: { storage_free_bytes: 100 * GIB } } })
+		vmApi.host.mockResolvedValue({ data: { data: { storage_path: '/DATA/VM', storage_free_bytes: 100 * GIB } } })
 	})
 	afterEach(() => {
 		wrapper?.unmount()
@@ -178,7 +220,7 @@ describe('the upload of an image', () => {
 	describe('does not send', () => {
 		it('a name the folder already has', async () => {
 			open()
-			await send(aFile('Debian.ISO'))
+			await send(aFile('debian.iso'))
 			expect(vmApi.uploadImage).not.toHaveBeenCalled()
 			expect(shown()).toBe(UPLOAD_ERRORS.exists)
 		})
@@ -205,6 +247,38 @@ describe('the upload of an image', () => {
 			expect(vmApi.uploadImage).not.toHaveBeenCalled()
 			expect(shown()).toBe(UPLOAD_ERRORS.bad_sha256)
 		})
+	})
+
+	it('cancels during the checks: nothing is sent', async () => {
+		const checks = deferred()
+		vmApi.images.mockReturnValue(checks.promise)
+		open()
+		await choose(aFile('a.iso'))
+		await button('Upload').trigger('click')
+		expect(wrapper.find('.vm-upload-progress').text()).toBe('Checking…')
+
+		await button('Cancel').trigger('click')
+		checks.resolve({ data: { data: [] } })
+		await flushPromises()
+
+		expect(vmApi.uploadImage).not.toHaveBeenCalled()
+		expect(wrapper.emitted('busy')).toEqual([[true], [false]])
+		expect(live()).toBe('Upload canceled.')
+	})
+
+	it('cancelled once the file was in: does not select it, and asks for the list again', async () => {
+		const pending = deferred()
+		vmApi.uploadImage.mockReturnValue(pending.promise)
+		open()
+		await send(aFile('a.iso'))
+		await button('Cancel').trigger('click')
+		// the answer was already on its way
+		pending.resolve(anImage('a.iso'))
+		await flushPromises()
+
+		expect(wrapper.emitted('uploaded')).toBeUndefined()
+		expect(wrapper.emitted('refresh')).toHaveLength(1)
+		expect(live()).not.toBe('a.iso is uploaded and selected.')
 	})
 
 	it('maps the progress to the bar, a few times a second, not at every event', async () => {

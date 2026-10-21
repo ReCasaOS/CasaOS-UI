@@ -2541,5 +2541,9 @@
   "Drop one file at a time.": "Déposez un seul fichier à la fois.",
   "An image is still uploading. Close and stop the upload?": "Une image est encore en cours d’envoi. Fermer et arrêter l’envoi ?",
   "Stop the upload": "Arrêter l’envoi",
-  "Keep uploading": "Continuer l’envoi"
+  "Keep uploading": "Continuer l’envoi",
+  "More data arrived than announced. Try again.": "Plus de données sont arrivées qu'annoncé. Réessayez.",
+  "There is not enough free space for this file. Some free space is always kept for the system.": "L’espace libre ne suffit pas pour ce fichier. Une part de l’espace reste toujours libre pour le système.",
+  "Another transfer touched this file. Try again.": "Un autre transfert a touché ce fichier. Réessayez.",
+  "An ISO or a disk image under /DATA. Upload one below, or put it in /DATA/VM/iso with Files.": "Une image ISO ou une image disque sous /DATA. Envoyez-en une ci-dessous, ou déposez-la dans /DATA/VM/iso avec Fichiers."
 }

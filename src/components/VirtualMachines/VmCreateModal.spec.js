@@ -156,3 +156,14 @@ describe('the upload in the create dialog', () => {
 		expect(document.querySelector('.dialog')).toBeNull()
 	})
 })
+
+describe('the hint under the image field', () => {
+	it('points to the upload below, now that there is one', async () => {
+		vi.clearAllMocks()
+		vmApi.images.mockResolvedValue({ data: { data: [] } })
+		const wrapper = mount(VmCreateModal, { attachTo: document.body, props: { host: HOST }, global: { plugins: [Buefy, i18n] } })
+		await flushPromises()
+		expect(wrapper.text()).toContain('An ISO or a disk image under /DATA. Upload one below, or put it in /DATA/VM/iso with Files.')
+		wrapper.unmount()
+	})
+})

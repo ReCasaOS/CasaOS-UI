@@ -634,17 +634,37 @@ export function downloadProgress(d) {
 // no space) closes the connection, and a browser in the middle of a big file
 // reports a network error instead of the code: what can be checked is checked
 // before the file is sent.
+//
+// The service keeps max(1 GiB, 2 % of the filesystem) free and counts the
+// transfers already running; the host says neither, so the free space check is
+// a best effort with the 1 GiB floor, and the service has the last word.
 export const UPLOAD_RESERVE_BYTES = 1024 ** 3
 
-export function uploadRefusal(file, { sha256 = '', images = [], freeBytes } = {}) {
-	const name = (file?.name || '').toLowerCase()
-	if (!imageKind(name) || name.startsWith('.')) {
+// as the service's UploadName: a plain name in NFC with an image extension,
+// nothing that hides it, splits it into a path or reads differently
+const UPLOAD_NAME_MAX_BYTES = 250
+const WINDOWS_DEVICES = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+
+export function uploadNameOk(raw) {
+	const name = (raw || '').normalize('NFC')
+	return Boolean(name)
+		&& new TextEncoder().encode(name).length <= UPLOAD_NAME_MAX_BYTES
+		&& !name.startsWith('.') && !name.endsWith('.') && name.trim() === name
+		&& !/[/\\\p{Cc}\p{Cf}]/u.test(name)
+		&& !WINDOWS_DEVICES.test(name.split('.')[0])
+		&& Boolean(imageKind(name))
+}
+
+export function uploadRefusal(file, { sha256 = '', images = [], freeBytes, storagePath } = {}) {
+	const name = (file?.name || '').normalize('NFC')
+	if (!uploadNameOk(name)) {
 		return 'bad_name'
 	}
 	if (sha256 && !/^[0-9a-f]{64}$/i.test(sha256)) {
 		return 'bad_sha256'
 	}
-	if (images.some(image => (image.name || '').toLowerCase() === name)) {
+	// the very file the service would write, case and all
+	if (storagePath && images.some(image => image.path === `${storagePath}/iso/${name}`)) {
 		return 'exists'
 	}
 	if (typeof freeBytes === 'number' && file.size + UPLOAD_RESERVE_BYTES > freeBytes) {
@@ -673,7 +693,7 @@ export const UPLOAD_ERRORS = {
 	bad_name: 'This file is not an image virtual machines can use: an .iso, .qcow2, .img, .raw, .vmdk or .vdi, possibly in .xz, .gz or .zip.',
 	bad_sha256: 'The SHA-256 is 64 hex digits.',
 	incomplete: 'The file arrived incomplete. Try again.',
-	too_long: 'The upload took too long and was stopped.',
+	too_long: 'More data arrived than announced. Try again.',
 	stalled: 'The upload stopped moving and was stopped. Check the connection and try again.',
 	exists: 'An image with this name is already there. Rename the file, or pick the image in the list.',
 	length_required: 'The browser did not give the size of the file. Try another browser.',
@@ -681,7 +701,8 @@ export const UPLOAD_ERRORS = {
 	checksum_mismatch: 'The file does not match the SHA-256 given, and was deleted.',
 	bad_image: 'This file is not a valid disk image.',
 	busy: 'Two uploads are already running. Try again when one is over.',
-	insufficient_storage: 'There is not enough free space for this file (1 GB is kept free).',
+	insufficient_storage: 'There is not enough free space for this file. Some free space is always kept for the system.',
+	conflict: 'Another transfer touched this file. Try again.',
 	network: 'The upload was refused or interrupted.',
 	failed: 'The upload failed.',
 	many: 'Drop one file at a time.',

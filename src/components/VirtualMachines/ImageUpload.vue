@@ -175,35 +175,47 @@ export default {
 			this.warning = false
 			this.progress = null
 			this.uploading = true
+			// Cancel works from the first moment, the checks included
+			const controller = new AbortController()
+			this.controller = controller
+			const canceled = () => {
+				if (!this.closed) {
+					this.announce = this.$t('Upload canceled.')
+				}
+			}
 			try {
 				// a check that cannot be made is left to the service
 				const [images, host] = await Promise.all([
 					vmApi.images().then(res => res.data.data || [], () => []),
 					vmApi.host().then(res => res.data.data || {}, () => ({})),
 				])
-				if (this.closed) {
-					return
+				if (this.closed || controller.signal.aborted) {
+					return canceled()
 				}
-				const refusal = uploadRefusal(file, { sha256, images, freeBytes: host.storage_free_bytes })
+				const refusal = uploadRefusal(file, { sha256, images, freeBytes: host.storage_free_bytes, storagePath: host.storage_path })
 				if (refusal) {
 					return this.fail(refusal)
 				}
 
-				this.controller = new AbortController()
 				this.startedAt = Date.now()
 				this.drawnAt = this.startedAt
 				this.progress = uploadProgress({ loaded: 0, total: file.size }, this.startedAt, this.startedAt)
 				this.announce = this.$t('Uploading {name}…', { name: file.name })
-				const image = await vmApi.uploadImage(file, { sha256: sha256 || undefined, signal: this.controller.signal, onProgress: this.onProgress })
+				const image = await vmApi.uploadImage(file, { sha256: sha256 || undefined, signal: controller.signal, onProgress: this.onProgress })
+				// canceled when the answer was already on its way: the file may be
+				// there, but it was not asked for any more
+				if (controller.signal.aborted) {
+					canceled()
+					return this.$emit('refresh')
+				}
 				this.file = null
 				this.sha = ''
 				this.warning = image.warning === 'iso_signature_missing'
 				this.announce = this.$t('{name} is uploaded and selected.', { name: image.name })
 				this.$emit('uploaded', image)
 			} catch (e) {
-				if (this.controller?.signal.aborted) {
-					this.announce = this.$t('Upload canceled.')
-					return
+				if (controller.signal.aborted) {
+					return canceled()
 				}
 				const code = uploadErrorCode(e)
 				this.fail(code)
