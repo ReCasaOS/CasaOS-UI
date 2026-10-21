@@ -26,10 +26,12 @@
 
 <script>
 import { allowedActions, stateLabel } from './vms'
-import { openVirtualMachines, openVmConsole } from './entry'
+import { getVirtualMachine, openVirtualMachines, openVmConsole } from './entry'
 
 // what a name may take of the card and of what is read out
 const NAME_MAX = 64
+// how long a click waits for the VM's state before going by the one it has
+const READ_MS = 5000
 
 // the dot: running, paused, stopped, or anything else (crashed, starting, stopping...)
 function tileState(state) {
@@ -70,14 +72,37 @@ export default {
 				: this.$t('{name}, {state}: open in Virtual Machines', { name: this.name, state: this.stateText })
 		},
 	},
+	created() {
+		// a click being handled: a second one opens nothing more
+		this.opening = false
+	},
 	methods: {
 		// The console where there is one; the page on this VM otherwise. Never a
-		// start: a click on a tile does not power a machine on.
-		open() {
-			if (this.hasConsole) {
-				openVmConsole(this.$buefy, this.vm)
-			} else {
-				openVirtualMachines(this.$buefy, this.$store.state, this.vm.id)
+		// start: a click on a tile does not power a machine on. The state shown may
+		// be a poll old, so it is read again first; if that read fails, the tile
+		// goes by what it has.
+		async open() {
+			if (this.opening) {
+				return
+			}
+			this.opening = true
+			let vm = this.vm
+			try {
+				const now = await getVirtualMachine(this.vm.id, READ_MS)
+				if (now?.id === this.vm.id) {
+					vm = now
+				}
+			} catch {
+				// the state the tile has
+			}
+			try {
+				if (allowedActions(vm.state).console) {
+					openVmConsole(this.$buefy, vm)
+				} else {
+					openVirtualMachines(this.$buefy, this.$store.state, vm.id)
+				}
+			} finally {
+				this.opening = false
 			}
 		},
 	},

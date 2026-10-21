@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aVm } from './__fixtures__/vm'
 import VmTile from './VmTile.vue'
 import vmApi from './api'
-import { openVirtualMachines, openVmConsole } from './entry'
+import { getVirtualMachine, openVirtualMachines, openVmConsole } from './entry'
 import i18n from '@/plugins/i18n'
 
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('./api', () => ({ default: { action: vi.fn(), list: vi.fn() } }))
-vi.mock('./entry', () => ({ openVirtualMachines: vi.fn(), openVmConsole: vi.fn() }))
+vi.mock('./entry', () => ({ openVirtualMachines: vi.fn(), openVmConsole: vi.fn(), getVirtualMachine: vi.fn() }))
 
 const HOSTILE = '<img src=x onerror="window.pwned = 1">'
 const buefy = { modal: { open: vi.fn() } }
@@ -29,6 +29,8 @@ describe('the tile of a virtual machine', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		delete window.pwned
+		// the read on click fails here: the tile goes by the state it has
+		getVirtualMachine.mockRejectedValue(new Error('not read'))
 	})
 
 	// (1) named like the VM, a VM and not an app
@@ -59,6 +61,7 @@ describe('the tile of a virtual machine', () => {
 		const wrapper = tile({ id: 'vm-1', state: 'running' })
 
 		await wrapper.find('button').trigger('click')
+		await flushPromises()
 
 		expect(openVmConsole).toHaveBeenCalledWith(buefy, expect.objectContaining({ id: 'vm-1' }))
 		expect(openVirtualMachines).not.toHaveBeenCalled()
@@ -68,6 +71,7 @@ describe('the tile of a virtual machine', () => {
 		const wrapper = tile({ state: 'paused' })
 
 		await wrapper.find('button').trigger('click')
+		await flushPromises()
 
 		expect(openVmConsole).toHaveBeenCalledTimes(1)
 	})
@@ -76,6 +80,7 @@ describe('the tile of a virtual machine', () => {
 		const wrapper = tile({ id: 'vm-2', state: 'shut-off' })
 
 		await wrapper.find('button').trigger('click')
+		await flushPromises()
 
 		expect(openVirtualMachines).toHaveBeenCalledWith(buefy, state, 'vm-2')
 		expect(openVmConsole).not.toHaveBeenCalled()
@@ -115,5 +120,73 @@ describe('the tile of a virtual machine', () => {
 		expect(wrapper.find('.app-card-drop').exists()).toBe(false)
 		expect(document.querySelector('.dropdown-menu')).toBeNull()
 		expect(document.body.textContent).not.toContain('Uninstall')
+	})
+})
+
+// (3) the state the tile shows may be a poll old: a click reads it again
+describe('a click on a VM tile, with the state read again', () => {
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+
+	it('reads the VM once, with a 5 s limit, and opens the console it still has', async () => {
+		getVirtualMachine.mockResolvedValue(aVm({ id: 'vm-1', state: 'paused' }))
+		const wrapper = tile({ id: 'vm-1', state: 'running' })
+
+		await wrapper.find('button').trigger('click')
+		await flushPromises()
+
+		expect(getVirtualMachine).toHaveBeenCalledTimes(1)
+		expect(getVirtualMachine).toHaveBeenCalledWith('vm-1', 5000)
+		expect(openVmConsole).toHaveBeenCalledWith(buefy, expect.objectContaining({ id: 'vm-1', state: 'paused' }))
+	})
+
+	it('opens the Virtual Machines window on a VM that went off since, and starts nothing', async () => {
+		getVirtualMachine.mockResolvedValue(aVm({ id: 'vm-1', state: 'shut-off' }))
+		const wrapper = tile({ id: 'vm-1', state: 'running' })
+
+		await wrapper.find('button').trigger('click')
+		await flushPromises()
+
+		expect(openVmConsole).not.toHaveBeenCalled()
+		expect(openVirtualMachines).toHaveBeenCalledWith(buefy, state, 'vm-1')
+		expect(vmApi.action).not.toHaveBeenCalled()
+	})
+
+	it('goes by the state it has when the read fails', async () => {
+		getVirtualMachine.mockRejectedValue(new Error('timeout'))
+		const wrapper = tile({ id: 'vm-1', state: 'running' })
+
+		await wrapper.find('button').trigger('click')
+		await flushPromises()
+
+		expect(openVmConsole).toHaveBeenCalledWith(buefy, expect.objectContaining({ id: 'vm-1', state: 'running' }))
+	})
+
+	it('goes by the state it has when the answer is not that VM', async () => {
+		getVirtualMachine.mockResolvedValue({ id: 'other', state: 'shut-off' })
+		const wrapper = tile({ id: 'vm-1', state: 'running' })
+
+		await wrapper.find('button').trigger('click')
+		await flushPromises()
+
+		expect(openVmConsole).toHaveBeenCalledTimes(1)
+		expect(openVirtualMachines).not.toHaveBeenCalled()
+	})
+
+	it('opens one window for two quick clicks', async () => {
+		let answer
+		getVirtualMachine.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		const wrapper = tile({ id: 'vm-1', state: 'running' })
+
+		await wrapper.find('button').trigger('click')
+		await wrapper.find('button').trigger('click')
+		answer(aVm({ id: 'vm-1', state: 'running' }))
+		await flushPromises()
+
+		expect(openVmConsole).toHaveBeenCalledTimes(1)
 	})
 })

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The card shows only where the module answers through the gateway; a 404
 // means it is not installed, anything else may pass and is asked again.
@@ -91,5 +91,41 @@ describe('the VM tiles of the app grid', () => {
 		openVmConsole({ modal: { open } }, vm)
 
 		expect(open.mock.calls[0][0]).toMatchObject({ fullScreen: true, canCancel: [], customClass: 'vm-console-modal', props: { vm } })
+	})
+})
+
+describe('reading one VM, and the time limits', () => {
+	beforeEach(() => {
+		get.mockReset()
+	})
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	it('reads one VM by its id', async () => {
+		get.mockResolvedValue({ data: { data: { id: 'a/b', state: 'running' } } })
+		const { getVirtualMachine } = await freshEntry()
+
+		expect(await getVirtualMachine('a/b', 5000)).toEqual({ id: 'a/b', state: 'running' })
+		expect(get).toHaveBeenCalledWith('/v2/virt_management/vms/a%2Fb')
+	})
+
+	it('gives up on a call that does not answer in time', async () => {
+		vi.useFakeTimers()
+		const { withTimeout } = await freshEntry()
+
+		const caught = withTimeout(new Promise(() => {}), 5000).catch(e => e)
+		await vi.advanceTimersByTimeAsync(5000)
+
+		expect((await caught).message).toMatch(/time/i)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('lets an answer in time through, and leaves no timer behind', async () => {
+		vi.useFakeTimers()
+		const { withTimeout } = await freshEntry()
+
+		expect(await withTimeout(Promise.resolve(1), 5000)).toBe(1)
+		expect(vi.getTimerCount()).toBe(0)
 	})
 })

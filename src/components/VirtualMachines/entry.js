@@ -95,3 +95,18 @@ export function listVirtualMachines() {
 			return applyOrder(vms, []).sorted
 		}))
 }
+
+// One VM as the service has it now, given up on after `ms`.
+export function getVirtualMachine(id, ms) {
+	return withTimeout(import('./api').then(({ default: vmApi }) => vmApi.get(id)).then(res => res.data?.data), ms)
+}
+
+// The promise, or a rejection once `ms` has gone by: a call that hangs must not
+// hold up what waits on it for ever. The timer goes with the answer.
+export function withTimeout(promise, ms) {
+	let timer
+	const late = new Promise((resolve, reject) => {
+		timer = setTimeout(() => reject(new Error(`No answer in time (${ms} ms)`)), ms)
+	})
+	return Promise.race([promise, late]).finally(() => clearTimeout(timer))
+}

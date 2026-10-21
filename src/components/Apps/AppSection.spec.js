@@ -280,7 +280,10 @@ describe('app section VM tiles', () => {
 		listVirtualMachines.mockRejectedValue(new Error('502'))
 		const vm = section(['Virtual Machines'], [aVm('a')])
 
-		await vm.pollVms()
+		for (let i = 0; i < 3; i++) {
+			await vm.pollVms()
+			clearTimeout(vm.vmPollTimer)
+		}
 
 		expect(shown(vm)).toEqual(['Virtual Machines'])
 		expect(vm.$buefy.toast.open).not.toHaveBeenCalled()
@@ -376,5 +379,137 @@ describe('app section VM tiles', () => {
 		expect(removed).toHaveBeenCalledWith('visibilitychange', vm.onVisibility)
 		expect(vi.getTimerCount()).toBe(0)
 		removed.mockRestore()
+	})
+})
+
+// The tiles are not drop targets: an app is dropped among the apps only, so it
+// never lands where the tiles are redrawn over it.
+describe('app section VM tiles out of the drag', () => {
+	const tileItem = { name: 'vm-tile:a', vmTile: true, vm: { id: 'a' } }
+	const move = (vm, element, willInsertAfter = false) =>
+		AppSection.methods.checkMove.call(vm, { relatedContext: { element }, willInsertAfter })
+
+	it('(1) starts no drag on a tile, and lets its click through', () => {
+		const options = AppSection.computed.dragOptions.call({})
+
+		expect(options.filter).toBe('.vm-tile-item')
+		expect(options.preventOnFilter).toBe(false)
+	})
+
+	it('(1) rejects a move over a tile', () => {
+		expect(move({ vms: [{ id: 'a' }] }, tileItem)).toBe(false)
+		expect(move({ vms: [{ id: 'a' }] }, tileItem, true)).toBe(false)
+	})
+
+	it('(1) rejects a drop right after the Virtual Machines card while tiles follow it', () => {
+		const card = { name: 'Virtual Machines' }
+
+		expect(move({ vms: [{ id: 'a' }] }, card, true)).toBe(false)
+		expect(move({ vms: [{ id: 'a' }] }, card, false)).toBe(true)
+		expect(move({ vms: [] }, card, true)).toBe(true)
+	})
+
+	it('(1) lets an app move among the apps', () => {
+		expect(move({ vms: [{ id: 'a' }] }, { name: 'Files' })).toBe(true)
+		expect(move({ vms: [{ id: 'a' }] }, { name: 'Files' }, true)).toBe(true)
+	})
+})
+
+describe('app section VM tiles riding out a failed poll', () => {
+	const aVm = (id, state = 'running') => ({ id, title: id, state })
+	function section(vms = []) {
+		const vm = { appList: [{ name: 'Virtual Machines' }], vms }
+		vm.pollVms = AppSection.methods.pollVms.bind(vm)
+		return vm
+	}
+	afterEach(() => {
+		vi.useRealTimers()
+		listVirtualMachines.mockReset()
+	})
+	const poll = async (vm) => {
+		await vm.pollVms()
+		clearTimeout(vm.vmPollTimer)
+	}
+
+	it('(2) keeps the last list through one and two failed polls, and drops it on the third', async () => {
+		listVirtualMachines.mockRejectedValue(new Error('502'))
+		const vm = section([aVm('a')])
+
+		await poll(vm)
+		expect(vm.vms).toEqual([aVm('a')])
+		await poll(vm)
+		expect(vm.vms).toEqual([aVm('a')])
+		await poll(vm)
+		expect(vm.vms).toEqual([])
+	})
+
+	it('(2) counts again from nothing once a poll works', async () => {
+		const vm = section([aVm('a')])
+		listVirtualMachines.mockRejectedValueOnce(new Error('502')).mockRejectedValueOnce(new Error('502'))
+			.mockResolvedValueOnce([aVm('b')])
+			.mockRejectedValueOnce(new Error('502')).mockRejectedValueOnce(new Error('502'))
+
+		for (let i = 0; i < 5; i++) {
+			await poll(vm)
+		}
+
+		expect(vm.vms).toEqual([aVm('b')])
+	})
+
+	it('(2) drops the list at once when the module is not there', async () => {
+		listVirtualMachines.mockRejectedValue({ response: { status: 404 } })
+		const vm = section([aVm('a')])
+
+		await poll(vm)
+
+		expect(vm.vms).toEqual([])
+	})
+
+	it('(2) drops the list at once when the card goes', async () => {
+		const vm = section([aVm('a')])
+		vm.appList = []
+
+		await poll(vm)
+
+		expect(vm.vms).toEqual([])
+	})
+
+	it('(4) leaves the list as it is when nothing changed', async () => {
+		const vms = [aVm('a')]
+		listVirtualMachines.mockResolvedValue([aVm('a')])
+		const vm = section(vms)
+
+		await poll(vm)
+
+		expect(vm.vms).toBe(vms)
+	})
+
+	it('(4) gives up on a read that hangs after 15 s, counts it as failed and polls again', async () => {
+		vi.useFakeTimers()
+		listVirtualMachines.mockReturnValueOnce(new Promise(() => {})).mockResolvedValue([aVm('b')])
+		const vm = section([aVm('a')])
+
+		vm.pollVms()
+		await vi.advanceTimersByTimeAsync(15000)
+		expect(vm.vms).toEqual([aVm('a')])
+		expect(vm.vmPolling).toBe(false)
+		expect(vm.vmFailures).toBe(1)
+
+		await vi.advanceTimersByTimeAsync(5000)
+		expect(listVirtualMachines).toHaveBeenCalledTimes(2)
+		expect(vm.vms).toEqual([aVm('b')])
+		clearTimeout(vm.vmPollTimer)
+	})
+
+	it('(5) declares its polling state when the grid is made', () => {
+		const vm = { getList: vi.fn(), isMobile: () => false, $EventBus: { $on: vi.fn() }, pollVms: vi.fn(), onVisibility: vi.fn() }
+		const added = vi.spyOn(document, 'addEventListener')
+
+		AppSection.created.call(vm)
+		clearInterval(vm.ListRefreshTimer)
+
+		expect(vm).toMatchObject({ vmPollStopped: false, vmPolling: false, vmPollTimer: null, vmFailures: 0 })
+		expect(added).toHaveBeenCalledWith('visibilitychange', vm.onVisibility)
+		added.mockRestore()
 	})
 })
