@@ -8,7 +8,7 @@ import vmApi from './api'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('./api', () => ({ default: { images: vi.fn(), create: vi.fn() } }))
+vi.mock('./api', () => ({ default: { images: vi.fn(), host: vi.fn(), create: vi.fn(), uploadImage: vi.fn() } }))
 
 // what axios throws on an answer that is not a success
 const failed = (status, message) => () => Promise.reject(Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { message } } }))
@@ -77,5 +77,82 @@ describe('the images the create dialog suggests', () => {
 		await flushPromises()
 
 		expect(wrapper.vm.suggestions.map(image => image.path)).toEqual(['/DATA/VM/iso/alpine.iso'])
+	})
+})
+
+// An image sent from the browser, in the middle of making a VM
+describe('the upload in the create dialog', () => {
+	let wrapper
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vmApi.images.mockResolvedValue({ data: { data: [] } })
+		vmApi.host.mockResolvedValue({ data: { data: HOST } })
+	})
+	afterEach(() => {
+		wrapper?.unmount()
+		document.querySelectorAll('.dialog').forEach(dialog => dialog.closest('.modal')?.remove())
+	})
+
+	const open = async () => {
+		wrapper = mount(VmCreateModal, { attachTo: document.body, props: { host: HOST }, global: { plugins: [Buefy, i18n] } })
+		await flushPromises()
+	}
+	const button = text => wrapper.findAll('button').find(b => b.text() === text)
+	const upload = async (name) => {
+		const input = wrapper.find('input[type="file"]')
+		Object.defineProperty(input.element, 'files', { value: [new File(['x'], name)], configurable: true })
+		await input.trigger('change')
+		await button('Upload').trigger('click')
+		await flushPromises()
+	}
+
+	it('selects the image it uploaded, and lists it at once', async () => {
+		const image = { path: '/DATA/VM/iso/alpine-3.20.iso', name: 'alpine-3.20.iso', kind: 'iso', size_bytes: 1, sha256: 'a'.repeat(64) }
+		vmApi.uploadImage.mockResolvedValue(image)
+		await open()
+		await upload('alpine-3.20.iso')
+
+		expect(wrapper.vm.form.image_path).toBe(image.path)
+		expect(wrapper.vm.form.title).toBe('alpine-3.20')
+		expect(wrapper.vm.suggestions.map(i => i.path)).toContain(image.path)
+	})
+
+	it('reads the list again when no answer came: the file may be there', async () => {
+		vmApi.uploadImage.mockRejectedValue(new Error('Network Error'))
+		await open()
+		expect(vmApi.images).toHaveBeenCalledTimes(1)
+		await upload('a.iso')
+
+		// once for the checks, once after
+		expect(vmApi.images).toHaveBeenCalledTimes(3)
+		expect(wrapper.find('.vm-upload-error').text()).toBe('The upload was refused or interrupted.')
+	})
+
+	it('asks before closing while it uploads, with a sentence of its own, and does not make a VM meanwhile', async () => {
+		vmApi.uploadImage.mockReturnValue(new Promise(() => {}))
+		await open()
+		await upload('<img src=x onerror=1>.iso')
+		expect(button('Create').attributes('disabled')).toBeDefined()
+
+		// the dialog's own Cancel, not the upload's
+		await wrapper.findAll('footer button').find(b => b.text() === 'Cancel').trigger('click')
+		await flushPromises()
+		expect(wrapper.emitted('close')).toBeUndefined()
+		const dialog = document.querySelector('.dialog')
+		expect(dialog.querySelector('.media-content').textContent.trim()).toBe('An image is still uploading. Close and stop the upload?')
+		expect(dialog.querySelector('img')).toBeNull()
+
+		dialog.querySelectorAll('button').forEach(b => b.textContent.trim() === 'Stop the upload' && b.click())
+		await flushPromises()
+		expect(vmApi.uploadImage.mock.calls[0][1].signal.aborted).toBe(true)
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('closes at once when nothing uploads', async () => {
+		await open()
+		await button('Cancel').trigger('click')
+		expect(wrapper.emitted('close')).toHaveLength(1)
+		expect(document.querySelector('.dialog')).toBeNull()
 	})
 })
