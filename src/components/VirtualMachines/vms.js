@@ -627,3 +627,71 @@ export function downloadProgress(d) {
 	}
 	return { percent: Math.min(100, Math.floor(d.done_bytes / d.total_bytes * 100)) }
 }
+
+// The upload of an image from the browser.
+//
+// A refusal the service gives before reading the body (exists, too large, busy,
+// no space) closes the connection, and a browser in the middle of a big file
+// reports a network error instead of the code: what can be checked is checked
+// before the file is sent.
+export const UPLOAD_RESERVE_BYTES = 1024 ** 3
+
+export function uploadRefusal(file, { sha256 = '', images = [], freeBytes } = {}) {
+	const name = (file?.name || '').toLowerCase()
+	if (!imageKind(name) || name.startsWith('.')) {
+		return 'bad_name'
+	}
+	if (sha256 && !/^[0-9a-f]{64}$/i.test(sha256)) {
+		return 'bad_sha256'
+	}
+	if (images.some(image => (image.name || '').toLowerCase() === name)) {
+		return 'exists'
+	}
+	if (typeof freeBytes === 'number' && file.size + UPLOAD_RESERVE_BYTES > freeBytes) {
+		return 'insufficient_storage'
+	}
+	return ''
+}
+
+// what the browser reports, as the dialog shows it: speed in bytes a second,
+// time left in seconds, both null until there is something to measure
+export function uploadProgress({ loaded, total }, startedAt, now) {
+	const seconds = (now - startedAt) / 1000
+	const speed = seconds > 0 && loaded > 0 ? loaded / seconds : null
+	return {
+		percent: total ? Math.min(100, Math.floor(loaded / total * 100)) : 0,
+		loaded,
+		total,
+		speed,
+		remaining: speed ? Math.max(0, Math.ceil((total - loaded) / speed)) : null,
+	}
+}
+
+// The sentence of each code the service answers, and of what the dialog finds
+// itself. The service's own text is never shown.
+export const UPLOAD_ERRORS = {
+	bad_name: 'This file is not an image virtual machines can use: an .iso, .qcow2, .img, .raw, .vmdk or .vdi, possibly in .xz, .gz or .zip.',
+	bad_sha256: 'The SHA-256 is 64 hex digits.',
+	incomplete: 'The file arrived incomplete. Try again.',
+	too_long: 'The upload took too long and was stopped.',
+	stalled: 'The upload stopped moving and was stopped. Check the connection and try again.',
+	exists: 'An image with this name is already there. Rename the file, or pick the image in the list.',
+	length_required: 'The browser did not give the size of the file. Try another browser.',
+	too_large: 'This file is larger than the service accepts.',
+	checksum_mismatch: 'The file does not match the SHA-256 given, and was deleted.',
+	bad_image: 'This file is not a valid disk image.',
+	busy: 'Two uploads are already running. Try again when one is over.',
+	insufficient_storage: 'There is not enough free space for this file (1 GB is kept free).',
+	network: 'The upload was refused or interrupted.',
+	failed: 'The upload failed.',
+	many: 'Drop one file at a time.',
+}
+
+// the code of a failed upload: one of UPLOAD_ERRORS
+export function uploadErrorCode(e) {
+	if (!e?.response) {
+		return 'network'
+	}
+	const code = e.response.data?.message
+	return typeof code === 'string' && Object.hasOwn(UPLOAD_ERRORS, code) && !['network', 'failed', 'many'].includes(code) ? code : 'failed'
+}
