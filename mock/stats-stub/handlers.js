@@ -25,9 +25,9 @@ const CORE_ALERTING = 'app:immich:server:1'
 
 const ITEMS = {
 	app_management: [
-		anItem({ id: 'app:jellyfin:web:1', name: 'Jellyfin / web', app: 'Jellyfin', seed: 1 }),
-		anItem({ id: 'app:plex:web:1', name: 'Plex / web', app: 'Plex', detail: 'plexinc/pms-docker:latest', seed: 2 }),
-		anItem({ id: CORE_ALERTING, name: 'Immich / server', app: 'Immich', detail: 'immich-app/immich-server:release', seed: 3 }),
+		anItem({ id: 'app:jellyfin:web:1', name: 'web', app: 'Jellyfin', seed: 1 }),
+		anItem({ id: 'app:plex:web:1', name: 'web', app: 'Plex', detail: 'plexinc/pms-docker:latest', seed: 2 }),
+		anItem({ id: CORE_ALERTING, name: 'server', app: 'Immich', detail: 'immich-app/immich-server:release', seed: 3 }),
 		anItem({ id: 'container:postgres', name: 'postgres', kind: 'container', group: 'Autres conteneurs', app: undefined, detail: 'postgres:16', seed: 4 }),
 	],
 	virt_management: [

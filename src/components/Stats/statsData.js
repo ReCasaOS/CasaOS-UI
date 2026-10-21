@@ -53,12 +53,16 @@ export function normalizeItems(raw, source) {
 		if (typeof id !== 'string' || id === '' || id.length > 300 || !KINDS.includes(kind)) {
 			continue
 		}
+		const name = clean(entry.name, 80) || clean(id, 80)
+		const app = clean(entry.app, 80) || null
 		const started = typeof entry.started_at === 'string' ? Date.parse(entry.started_at) : Number.NaN
 		items.push({
 			id,
 			source,
 			kind,
-			name: clean(entry.name, 80) || clean(id, 80),
+			// every CasaOS app calls its service 'app': the list needs the application to tell them apart
+			name: kind === 'app-container' && app && app !== name ? `${app} / ${name}` : name,
+			app,
 			state: STATES.includes(entry.state) ? entry.state : 'unknown',
 			cpu_percent: nonNegative(entry.cpu_percent),
 			memory_used: nonNegative(entry.memory_used),
@@ -67,6 +71,14 @@ export function normalizeItems(raw, source) {
 			started_at: Number.isNaN(started) ? null : entry.started_at,
 			detail: Array.from(clean(entry.detail, 800)).slice(0, 200).join('').trim() || null,
 		})
+	}
+	// two items can still read alike (instances of one service): the second and later get the id's instance number
+	const seen = new Set()
+	for (const item of items) {
+		if (seen.has(item.name)) {
+			item.name = `${item.name} #${/:(\d+)$/.exec(item.id)?.[1] ?? seen.size + 1}`
+		}
+		seen.add(item.name)
 	}
 	return items
 }

@@ -7,7 +7,6 @@ export function anItem(over = {}) {
 		name: 'Jellyfin',
 		kind: 'app-container',
 		group: 'Conteneurs',
-		app: 'Jellyfin',
 		state: 'running',
 		started_at: '2026-10-19T08:00:00Z',
 		detail: 'jellyfin/jellyfin:10.9',
