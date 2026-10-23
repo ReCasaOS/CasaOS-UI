@@ -396,6 +396,15 @@ describe('app section VM tiles out of the drag', () => {
 		expect(options.preventOnFilter).toBe(false)
 	})
 
+	// a swipe on a touch screen scrolls the grid: only a long press starts a drag (a mouse drags at once)
+	it('starts a drag on a touch screen only after a long press', () => {
+		const options = AppSection.computed.dragOptions.call({})
+
+		expect(options.delay).toBeGreaterThanOrEqual(200)
+		expect(options.delayOnTouchOnly).toBe(true)
+		expect(options.touchStartThreshold).toBeGreaterThan(0)
+	})
+
 	it('(1) rejects a move over a tile', () => {
 		expect(move({ vms: [{ id: 'a' }] }, tileItem)).toBe(false)
 		expect(move({ vms: [{ id: 'a' }] }, tileItem, true)).toBe(false)
