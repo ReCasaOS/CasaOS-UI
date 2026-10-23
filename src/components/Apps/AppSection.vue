@@ -398,7 +398,16 @@ export default {
 		 */
 		async getList() {
 			try {
-				const orgAppList = await this.$openAPI.appGrid.getAppGrid().then(res => res.data.data || [])
+				// a failing grid (Docker not up yet: fresh box, no data disk) must not
+				// hide the built-in and link apps: show those, read the grid again
+				let gridFailed = false
+				const orgAppList = await this.$openAPI.appGrid.getAppGrid()
+					.then(res => res.data.data || [])
+					.catch((error) => {
+						console.error(error)
+						gridFailed = true
+						return []
+					})
 				const orgOldAppList = []
 				const orgNewAppList = []
 				orgAppList.forEach((item) => {
@@ -434,8 +443,9 @@ export default {
 
 				this.appList = this.sortApps(casaAppList, lateSortList)
 				// a saved order that has the card is saved again only once the probe
-				// has answered, or the card would lose its place
-				if (hasVmCard || !lateSortList.includes(VM_APP_NAME)) {
+				// has answered, or the card would lose its place; without the grid's
+				// apps, saving would drop them from the order
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
@@ -443,23 +453,31 @@ export default {
 				}
 
 				this.isLoading = false
-				this.retryCount = 0
-				this.appListErrorMessage = ''
+				if (gridFailed) {
+					this.retryList()
+				} else {
+					this.retryCount = 0
+					this.appListErrorMessage = ''
+				}
 			} catch (error) {
 				console.error(error)
 				this.isLoading = true
-				if (this.retryCount < 5) {
-					setTimeout(() => {
-						this.retryCount++
-						this.getList()
-					}, 2000)
-				} else {
-					this.appListErrorMessage = 'Failed to get app list.'
-					this.$buefy.toast.open({
-						message: this.$t(`Failed to load apps, please refresh later.`),
-						type: 'is-danger',
-					})
-				}
+				this.retryList()
+			}
+		},
+
+		retryList() {
+			if (this.retryCount < 5) {
+				setTimeout(() => {
+					this.retryCount++
+					this.getList()
+				}, 2000)
+			} else {
+				this.appListErrorMessage = 'Failed to get app list.'
+				this.$buefy.toast.open({
+					message: this.$t(`Failed to load apps, please refresh later.`),
+					type: 'is-danger',
+				})
 			}
 		},
 

@@ -229,6 +229,30 @@ describe('app section built-in cards', () => {
 		expect(names).toContain('Statistics')
 		expect(vm.appList.find(app => app.name === 'Statistics')).toMatchObject({ app_type: 'system', status: 'running' })
 	})
+	it('shows the built-in apps when the grid fails, keeps the saved order and reads the grid again', async () => {
+		vi.useFakeTimers()
+		const vm = {
+			$baseIp: 'localhost',
+			$openAPI: { appGrid: { getAppGrid: () => Promise.reject(new Error('docker is not running')) } },
+			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: ['syncthing', 'Files'] } } }) } },
+			appList: [],
+			retryCount: 0,
+			getLinkAppList: () => Promise.resolve([]),
+			sortApps: AppSection.methods.sortApps,
+			saveSortIfChanged: vi.fn(),
+			addVmCardWhenThere: vi.fn(),
+			getList: vi.fn(),
+		}
+		vm.retryList = AppSection.methods.retryList.bind(vm)
+		await AppSection.methods.getList.call(vm)
+
+		expect(vm.appList.map(app => app.name)).toContain('Files')
+		expect(vm.isLoading).toBe(false)
+		expect(vm.saveSortIfChanged).not.toHaveBeenCalled()
+		vi.advanceTimersByTime(2000)
+		expect(vm.getList).toHaveBeenCalledTimes(1)
+		vi.useRealTimers()
+	})
 })
 
 // One tile per VM, right after the Virtual Machines card, by title. They are not
