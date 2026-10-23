@@ -394,5 +394,6 @@
   "Legacy app (To be rebuilt).": "Legacy-App (neu aufgebaut).",
   "To be rebuilt.": "Zu erneuern.",
   "launch-and-open": "Starten und öffnen",
-  "Updated with the system image": "Wird mit dem System-Image aktualisiert"
+  "Updated with the system image": "Wird mit dem System-Image aktualisiert",
+  "The first account is created on the machine itself. Once it exists, reload this page to sign in.": "Das erste Konto wird direkt auf dem Gerät angelegt. Sobald es existiert, diese Seite neu laden, um sich anzumelden."
 }

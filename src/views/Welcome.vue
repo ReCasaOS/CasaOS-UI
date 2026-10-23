@@ -21,13 +21,19 @@
 				<h2 v-animate-css="s2Ani" class="title is-2 mb-5 has-text-centered __attached_title">{{
 					$t('Welcome to CasaOS')
 				}}</h2>
-				<h2 v-animate-css="s3Ani" class="subtitle  has-text-centered __attached_sub_title">{{
-					$t(`Let's create your initial account`)
+				<!-- the core creates the first account only on the machine ([app] FirstAdmin = local) -->
+				<h2 v-if="$store.state.firstAdmin === 'local'" v-animate-css="s3Ani" class="subtitle has-text-centered __attached_sub_title">{{
+					$t('The first account is created on the machine itself. Once it exists, reload this page to sign in.')
 				}}</h2>
-				<b-button v-animate-css="s4Ani" class="mt-2" rounded type="is-primary" @click="goToStep(2)">{{
-					$t(`Go →`)
-				}}
-				</b-button>
+				<template v-else>
+					<h2 v-animate-css="s3Ani" class="subtitle  has-text-centered __attached_sub_title">{{
+						$t(`Let's create your initial account`)
+					}}</h2>
+					<b-button v-animate-css="s4Ani" class="mt-2" rounded type="is-primary" @click="goToStep(2)">{{
+						$t(`Go →`)
+					}}
+					</b-button>
+				</template>
 			</div>
 
 			<div v-if="step == 2">

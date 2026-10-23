@@ -1112,5 +1112,6 @@
   "Force reset {name}?": "Reset forzato di {name}?",
   "The virtual machine is switched off at once, as if its power were cut, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "La macchina virtuale viene spenta subito, come se le togliessi la corrente, senza chiudere il suo sistema. Quello che non ha salvato va perso e il suo disco può danneggiarsi.",
   "The virtual machine is restarted at once, as if its reset button were pressed, without shutting down its system. What it has not saved is lost and its disk can be damaged.": "La macchina virtuale viene riavviata subito, come se premessi il tasto di reset, senza chiudere il suo sistema. Quello che non ha salvato va perso e il suo disco può danneggiarsi.",
-  "Updated with the system image": "Aggiornato con l'immagine di sistema"
+  "Updated with the system image": "Aggiornato con l'immagine di sistema",
+  "The first account is created on the machine itself. Once it exists, reload this page to sign in.": "Il primo account si crea sulla macchina stessa. Una volta creato, ricarica questa pagina per accedere."
 }

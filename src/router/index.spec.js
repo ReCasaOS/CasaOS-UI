@@ -54,3 +54,24 @@ describe('forgetting the session', () => {
 		expect(store.state.access_token).toBe('')
 	})
 })
+
+// A core that creates the first account only on the machine says so (first_admin:
+// local) and hands out no key: the welcome page says where, and offers no form.
+describe('a first account made on the machine', () => {
+	it('keeps where the core says it is made', async () => {
+		store.commit('SET_NEED_INITIALIZATION', false)
+		localStorage.clear()
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: false, key: '', first_admin: 'local' } } })
+
+		await router.push('/login')
+
+		expect(router.currentRoute.value.path).toBe('/welcome')
+		expect(store.state.firstAdmin).toBe('local')
+		expect(store.state.initKey).toBe('')
+	})
+
+	it('is the dashboard\'s own form against a core that does not say', () => {
+		store.commit('SET_FIRST_ADMIN', undefined)
+		expect(store.state.firstAdmin).toBe('web')
+	})
+})
