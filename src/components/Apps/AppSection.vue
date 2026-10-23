@@ -210,6 +210,10 @@ export default {
 				group: 'description',
 				disabled: false,
 				ghostClass: 'ghost',
+				// on a touch screen a swipe scrolls the grid: only a long press starts a drag; a mouse drags at once
+				delay: 300,
+				delayOnTouchOnly: true,
+				touchStartThreshold: 8,
 				// a VM tile starts no drag; its click still goes through
 				filter: '.vm-tile-item',
 				preventOnFilter: false,
