@@ -393,5 +393,6 @@
   "Installing {title}": "Installation {title}",
   "Legacy app (To be rebuilt).": "Legacy-App (neu aufgebaut).",
   "To be rebuilt.": "Zu erneuern.",
-  "launch-and-open": "Starten und öffnen"
+  "launch-and-open": "Starten und öffnen",
+  "Updated with the system image": "Wird mit dem System-Image aktualisiert"
 }

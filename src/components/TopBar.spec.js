@@ -30,6 +30,26 @@ describe('top bar settings', () => {
 	})
 })
 
+// A core whose system image owns updates and packages says so in GET /v1/sys/version
+// (image_managed): no package row, and the update row says how it is updated.
+describe('an image-managed core', () => {
+	it('shows no system packages row', () => {
+		expect(source).toMatch(/<!-- System Package Update Start -->\s*<div v-if="!updateInfo.image_managed"/)
+	})
+
+	it('says the image updates it instead of "latest version"', () => {
+		expect(source).toMatch(/v-if="updateInfo.image_managed"[^>]*>\s*\{\{ \$t\("Updated with the system image"\) \}\}/)
+	})
+
+	it('keeps what the core answers', async () => {
+		const vm = { $api: { sys: { getVersion: () => Promise.resolve({ data: { success: 200, data: { current_version: '0.4.81', need_update: false, image_managed: true } } }) } }, $messageBus: vi.fn() }
+		TopBar.methods.checkVersion.call(vm)
+		await flushPromises()
+		expect(vm.updateInfo.image_managed).toBe(true)
+		expect(vm.$messageBus).not.toHaveBeenCalled()
+	})
+})
+
 // The same reason keeps the methods and hooks off a mounted TopBar: they run
 // against the few fields they touch.
 describe('the anonymous statistics switch', () => {
@@ -321,6 +341,8 @@ describe('the automatic update row', () => {
 		// the notice after an automatic update (CoreService)
 		'ReCasaOS updated itself to {version} last night',
 		'Release notes',
+		// an image-managed core
+		'Updated with the system image',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()

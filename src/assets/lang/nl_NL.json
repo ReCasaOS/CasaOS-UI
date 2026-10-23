@@ -393,5 +393,6 @@
   "Installing {title}": "Installeren {title}",
   "Legacy app (To be rebuilt).": "Oudere app (Om opnieuw te bouwen).",
   "To be rebuilt.": "Wordt opnieuw opgebouwd.",
-  "launch-and-open": "Starten en openen"
+  "launch-and-open": "Starten en openen",
+  "Updated with the system image": "Bijgewerkt met de systeemimage"
 }

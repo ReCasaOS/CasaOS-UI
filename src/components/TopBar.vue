@@ -349,7 +349,10 @@
 							</div>
 						</div>
 
-						<div v-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
+						<div v-if="updateInfo.image_managed" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
+							{{ $t("Updated with the system image") }}
+						</div>
+						<div v-else-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
 							{{ $t(latestText) }}
 							<b-icon class="ml-1" custom-size="mdi-18px" icon="check" type="is-success" />
 						</div>
@@ -421,7 +424,7 @@
 					<!-- Automatic update End -->
 
 					<!-- System Package Update Start -->
-					<div
+					<div v-if="!updateInfo.image_managed"
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="package-variant-closed" size="is-20" />
@@ -580,6 +583,8 @@ export default {
 			updateInfo: {
 				current_version: '0',
 				need_update: false,
+				// true from a core whose system image owns updates and packages
+				image_managed: false,
 				version: Object,
 			},
 			isUpdating: false,

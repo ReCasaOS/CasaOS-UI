@@ -2547,5 +2547,6 @@
   "Another transfer touched this file. Try again.": "Un autre transfert a touché ce fichier. Réessayez.",
   "An ISO or a disk image under /DATA. Upload one below, or put it in /DATA/VM/iso with Files.": "Une image ISO ou une image disque sous /DATA. Envoyez-en une ci-dessous, ou déposez-la dans /DATA/VM/iso avec Fichiers.",
   "The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.": "L’envoi a été refusé ou interrompu. Si le module des machines virtuelles n’a pas été mis à jour récemment, mettez-le à jour dans Paramètres → Modules.",
-  "The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.": "Le module des machines virtuelles est trop ancien pour recevoir des fichiers. Mettez-le à jour dans Paramètres → Modules, puis réessayez."
+  "The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.": "Le module des machines virtuelles est trop ancien pour recevoir des fichiers. Mettez-le à jour dans Paramètres → Modules, puis réessayez.",
+  "Updated with the system image": "Mis à jour avec l'image du système"
 }
