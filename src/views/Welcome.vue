@@ -23,7 +23,7 @@
 				}}</h2>
 				<!-- the core creates the first account only on the machine ([app] FirstAdmin = local) -->
 				<h2 v-if="$store.state.firstAdmin === 'local'" v-animate-css="s3Ani" class="subtitle has-text-centered __attached_sub_title">{{
-					$t('The first account is created on the machine itself. Once it exists, reload this page to sign in.')
+					$t('The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.')
 				}}</h2>
 				<template v-else>
 					<h2 v-animate-css="s3Ani" class="subtitle  has-text-centered __attached_sub_title">{{

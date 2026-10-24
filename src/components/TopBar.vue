@@ -350,7 +350,7 @@
 						</div>
 
 						<div v-if="updateInfo.image_managed" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
-							{{ $t("Updated with the system image") }}
+							{{ $t("Updated with the system") }}
 						</div>
 						<div v-else-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
 							{{ $t(latestText) }}

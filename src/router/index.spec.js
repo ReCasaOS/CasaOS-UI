@@ -70,6 +70,23 @@ describe('a first account made on the machine', () => {
 		expect(store.state.initKey).toBe('')
 	})
 
+	// an older core (no first_admin) or one that says web: the dashboard's own form, as today
+	it.each([
+		['an older core', { initialized: false, key: 'k1' }],
+		['a core that says web', { initialized: false, key: 'k1', first_admin: 'web' }],
+	])('%s: the welcome page with its form and the key', async (_, status) => {
+		store.commit('SET_NEED_INITIALIZATION', false)
+		store.commit('SET_FIRST_ADMIN', 'local')
+		localStorage.clear()
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: status } })
+
+		await router.push('/login')
+
+		expect(router.currentRoute.value.path).toBe('/welcome')
+		expect(store.state.firstAdmin).toBe('web')
+		expect(store.state.initKey).toBe('k1')
+	})
+
 	it('is the dashboard\'s own form against a core that does not say', () => {
 		store.commit('SET_FIRST_ADMIN', undefined)
 		expect(store.state.firstAdmin).toBe('web')

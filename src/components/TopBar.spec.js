@@ -38,7 +38,18 @@ describe('an image-managed core', () => {
 	})
 
 	it('says the image updates it instead of "latest version"', () => {
-		expect(source).toMatch(/v-if="updateInfo.image_managed"[^>]*>\s*\{\{ \$t\("Updated with the system image"\) \}\}/)
+		expect(source).toMatch(/v-if="updateInfo.image_managed"[^>]*>\s*\{\{ \$t\("Updated with the system"\) \}\}/)
+	})
+
+	it('an older core (no image_managed): the package row and the update row as today', async () => {
+		const vm = { $api: { sys: { getVersion: () => Promise.resolve({ data: { success: 200, data: { current_version: '0.4.81', need_update: false } } }) } }, $messageBus: vi.fn() }
+		TopBar.methods.checkVersion.call(vm)
+		await flushPromises()
+		expect(vm.updateInfo.current_version).toBe('0.4.81')
+		expect(vm.updateInfo.image_managed).toBeFalsy()
+		// the rows' conditions read the field as it came: absent is not image-managed
+		expect(source).toMatch(/<div v-if="!updateInfo.image_managed"/)
+		expect(source).toMatch(/v-else-if="!updateInfo.need_update"/)
 	})
 
 	it('keeps what the core answers', async () => {
@@ -342,7 +353,7 @@ describe('the automatic update row', () => {
 		'ReCasaOS updated itself to {version} last night',
 		'Release notes',
 		// an image-managed core
-		'Updated with the system image',
+		'Updated with the system',
 	])('says "%s" in English and French', (key) => {
 		expect(en[key]).toBe(key)
 		expect(fr[key]).toBeTruthy()
