@@ -167,6 +167,20 @@ const VM_LIST_MS = 15000
 // failed reads in a row after which the tiles go
 const VM_POLL_FAILURES = 3
 
+// shown (the new order) + the saved names not shown, each behind the name saved
+// before it (first where none is shown)
+function keepUnshown(shown, saved) {
+	const order = [...shown]
+	saved.forEach((name, i) => {
+		if (order.includes(name)) {
+			return
+		}
+		const before = saved.slice(0, i).reverse().find(previous => order.includes(previous))
+		order.splice(before === undefined ? 0 : order.indexOf(before) + 1, 0, name)
+	})
+	return order
+}
+
 export default {
 	components: {
 		AppCard,
@@ -196,6 +210,10 @@ export default {
 			draggable: '.handle',
 			retryCount: 0,
 			appListErrorMessage: '',
+			// the list shown lacks the grid's apps (the grid failed when it was read)
+			gridMissing: false,
+			// the order last read or saved: what saving keeps for apps not shown
+			savedOrder: [],
 			skCount: 0,
 			ListRefreshTimer: null,
 			isCheckingImages: false,
@@ -398,7 +416,22 @@ export default {
 		 */
 		async getList() {
 			try {
-				const orgAppList = await this.$openAPI.appGrid.getAppGrid().then(res => res.data.data || [])
+				// a failing grid (Docker not up yet: fresh box, no data disk) must not
+				// hide the built-in and link apps: show those, read the grid again
+				let gridFailed = false
+				const orgAppList = await this.$openAPI.appGrid.getAppGrid()
+					.then(res => res.data.data || [])
+					.catch((error) => {
+						console.error(error)
+						gridFailed = true
+						return []
+					})
+				// read every 5 s: a passing failure keeps the apps already shown
+				if (gridFailed && this.appList.length > 0) {
+					this.isLoading = false
+					this.retryList()
+					return
+				}
 				const orgOldAppList = []
 				const orgNewAppList = []
 				orgAppList.forEach((item) => {
@@ -432,34 +465,46 @@ export default {
 					.getCustomStorage(orderConfig)
 					.then(res => res.data.data.data || [])
 
+				this.savedOrder = lateSortList
 				this.appList = this.sortApps(casaAppList, lateSortList)
+				this.gridMissing = gridFailed
 				// a saved order that has the card is saved again only once the probe
-				// has answered, or the card would lose its place
-				if (hasVmCard || !lateSortList.includes(VM_APP_NAME)) {
+				// has answered, or the card would lose its place; without the grid's
+				// apps, saving would drop them from the order
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
-					this.addVmCardWhenThere(lateSortList)
+					this.addVmCardWhenThere(lateSortList, gridFailed)
 				}
 
 				this.isLoading = false
-				this.retryCount = 0
-				this.appListErrorMessage = ''
+				if (gridFailed) {
+					this.retryList()
+				} else {
+					this.retryCount = 0
+					this.appListErrorMessage = ''
+				}
 			} catch (error) {
 				console.error(error)
 				this.isLoading = true
-				if (this.retryCount < 5) {
-					setTimeout(() => {
-						this.retryCount++
-						this.getList()
-					}, 2000)
-				} else {
-					this.appListErrorMessage = 'Failed to get app list.'
-					this.$buefy.toast.open({
-						message: this.$t(`Failed to load apps, please refresh later.`),
-						type: 'is-danger',
-					})
-				}
+				this.retryList()
+			}
+		},
+
+		retryList() {
+			if (this.retryCount < 5) {
+				setTimeout(() => {
+					this.retryCount++
+					this.getList()
+				}, 2000)
+			} else if (!this.appListErrorMessage) {
+				// once per failure: the list is still read every 5 s
+				this.appListErrorMessage = 'Failed to get app list.'
+				this.$buefy.toast.open({
+					message: this.$t(`Failed to load apps, please refresh later.`),
+					type: 'is-danger',
+				})
 			}
 		},
 
@@ -505,12 +550,15 @@ export default {
 			})
 		},
 
-		addVmCardWhenThere(savedOrder) {
+		// gridFailed: the list lacks the grid's apps → the order is not saved
+		addVmCardWhenThere(savedOrder, gridFailed = false) {
 			return hasVirtualMachines().then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, vmApplication()), savedOrder)
-					this.saveSortIfChanged(savedOrder)
-				} else if (!available && savedOrder.includes(VM_APP_NAME)) {
+					if (!gridFailed) {
+						this.saveSortIfChanged(savedOrder)
+					}
+				} else if (!available && savedOrder.includes(VM_APP_NAME) && !gridFailed) {
 					this.saveSortIfChanged(savedOrder)
 				}
 			})
@@ -579,10 +627,16 @@ export default {
 		 * @return {*}
 		 */
 		saveSortData() {
-			const newList = this.appList.map((item) => {
+			let newList = this.appList.map((item) => {
 				// compose milestone :: name is unique, global index.
 				return item.name
 			})
+			// the grid's apps are not shown (a drag while the grid fails): they keep
+			// their saved place, behind the app saved before them
+			if (this.gridMissing) {
+				newList = keepUnshown(newList, this.savedOrder || [])
+			}
+			this.savedOrder = newList
 			const data = {
 				data: newList,
 			}
