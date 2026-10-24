@@ -212,6 +212,10 @@ describe('app section when a module is installed or removed', () => {
 })
 
 describe('app section built-in cards', () => {
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
 	it('always carries Statistics next to Files', async () => {
 		const vm = {
 			$baseIp: 'localhost',
@@ -229,29 +233,89 @@ describe('app section built-in cards', () => {
 		expect(names).toContain('Statistics')
 		expect(vm.appList.find(app => app.name === 'Statistics')).toMatchObject({ app_type: 'system', status: 'running' })
 	})
-	it('shows the built-in apps when the grid fails, keeps the saved order and reads the grid again', async () => {
-		vi.useFakeTimers()
+
+	// the section with the real order-saving methods; the grid fails, the order is saved
+	function failingGrid(savedOrder, appList = []) {
+		const toast = vi.fn()
+		const setCustomStorage = vi.fn()
 		const vm = {
 			$baseIp: 'localhost',
+			$t: text => text,
+			$buefy: { toast: { open: toast } },
 			$openAPI: { appGrid: { getAppGrid: () => Promise.reject(new Error('docker is not running')) } },
-			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: ['syncthing', 'Files'] } } }) } },
-			appList: [],
+			$api: { users: {
+				getCustomStorage: () => Promise.resolve({ data: { data: { data: savedOrder } } }),
+				setCustomStorage,
+			} },
+			appList,
 			retryCount: 0,
+			appListErrorMessage: '',
+			gridMissing: false,
+			savedOrder: [],
 			getLinkAppList: () => Promise.resolve([]),
 			sortApps: AppSection.methods.sortApps,
-			saveSortIfChanged: vi.fn(),
-			addVmCardWhenThere: vi.fn(),
 			getList: vi.fn(),
 		}
-		vm.retryList = AppSection.methods.retryList.bind(vm)
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'onSortEnd']) {
+			vm[method] = AppSection.methods[method].bind(vm)
+		}
+		return { vm, toast, setCustomStorage }
+	}
+
+	it('shows the built-in apps when the grid fails, keeps the saved order and reads the grid again', async () => {
+		vi.useFakeTimers()
+		hasVirtualMachines.mockResolvedValue(false)
+		const { vm, setCustomStorage } = failingGrid(['syncthing', 'Files'])
 		await AppSection.methods.getList.call(vm)
 
 		expect(vm.appList.map(app => app.name)).toContain('Files')
 		expect(vm.isLoading).toBe(false)
-		expect(vm.saveSortIfChanged).not.toHaveBeenCalled()
+		expect(setCustomStorage).not.toHaveBeenCalled()
 		vi.advanceTimersByTime(2000)
 		expect(vm.getList).toHaveBeenCalledTimes(1)
-		vi.useRealTimers()
+	})
+
+	it('does not save the order when the Virtual Machines card comes while the grid fails', async () => {
+		hasVirtualMachines.mockResolvedValue(true)
+		const { vm, setCustomStorage } = failingGrid(['syncthing', 'Virtual Machines', 'Files'])
+		await AppSection.methods.getList.call(vm)
+		await vi.waitFor(() => expect(vm.appList.map(app => app.name)).toContain('Virtual Machines'))
+
+		expect(setCustomStorage).not.toHaveBeenCalled()
+	})
+
+	it('a drag while the grid fails keeps the grid apps in the saved order, at their place', async () => {
+		hasVirtualMachines.mockResolvedValue(false)
+		const { vm, setCustomStorage } = failingGrid(['App Store', 'syncthing', 'Files', 'jellyfin', 'Statistics'])
+		await AppSection.methods.getList.call(vm)
+
+		// Statistics dragged to the front
+		const statistics = vm.appList.find(app => app.name === 'Statistics')
+		vm.appList = [statistics, ...vm.appList.filter(app => app !== statistics)]
+		vm.onSortEnd()
+
+		const saved = setCustomStorage.mock.calls.at(-1)[1].data
+		expect(saved[0]).toBe('Statistics')
+		expect(saved.indexOf('syncthing')).toBe(saved.indexOf('App Store') + 1)
+		expect(saved.indexOf('jellyfin')).toBe(saved.indexOf('Files') + 1)
+	})
+
+	it('a failure after a good read keeps the apps shown', async () => {
+		const shown = [{ name: 'Files' }, { name: 'jellyfin' }]
+		const { vm } = failingGrid(['Files', 'jellyfin'], shown)
+		await AppSection.methods.getList.call(vm)
+
+		expect(vm.appList).toBe(shown)
+		expect(vm.gridMissing).toBe(false)
+	})
+
+	it('says once that the apps cannot be loaded, not at every read', async () => {
+		const { vm, toast } = failingGrid([], [{ name: 'Files' }])
+		vm.retryCount = 5
+		await AppSection.methods.getList.call(vm)
+		await AppSection.methods.getList.call(vm)
+
+		expect(toast).toHaveBeenCalledTimes(1)
 	})
 })
 
