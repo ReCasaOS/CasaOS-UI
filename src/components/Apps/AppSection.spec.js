@@ -275,13 +275,16 @@ describe('app section built-in cards', () => {
 		expect(vm.getList).toHaveBeenCalledTimes(1)
 	})
 
-	it('does not save the order when the Virtual Machines card comes while the grid fails', async () => {
+	it('the Virtual Machines card coming while the grid fails keeps the grid apps in the saved order', async () => {
 		hasVirtualMachines.mockResolvedValue(true)
-		const { vm, setCustomStorage } = failingGrid(['syncthing', 'Virtual Machines', 'Files'])
+		const { vm, setCustomStorage } = failingGrid(['syncthing', 'Virtual Machines', 'Files', 'jellyfin'])
 		await AppSection.methods.getList.call(vm)
 		await vi.waitFor(() => expect(vm.appList.map(app => app.name)).toContain('Virtual Machines'))
 
-		expect(setCustomStorage).not.toHaveBeenCalled()
+		// saved or not, never without the grid's apps
+		for (const [, { data }] of setCustomStorage.mock.calls) {
+			expect(data).toEqual(expect.arrayContaining(['syncthing', 'jellyfin']))
+		}
 	})
 
 	it('a drag while the grid fails keeps the grid apps in the saved order, at their place', async () => {
@@ -307,6 +310,23 @@ describe('app section built-in cards', () => {
 
 		expect(vm.appList).toBe(shown)
 		expect(vm.gridMissing).toBe(false)
+	})
+
+	it('says it again when the apps fail again after a good read', async () => {
+		const { vm, toast } = failingGrid([], [{ name: 'Files' }])
+		vm.retryCount = 5
+		await AppSection.methods.getList.call(vm)
+		expect(toast).toHaveBeenCalledTimes(1)
+
+		// a good read clears the failure
+		vm.$openAPI.appGrid.getAppGrid = () => Promise.resolve({ data: { data: [] } })
+		await AppSection.methods.getList.call(vm)
+		expect(vm.appListErrorMessage).toBe('')
+
+		vm.$openAPI.appGrid.getAppGrid = () => Promise.reject(new Error('docker is not running'))
+		vm.retryCount = 5
+		await AppSection.methods.getList.call(vm)
+		expect(toast).toHaveBeenCalledTimes(2)
 	})
 
 	it('says once that the apps cannot be loaded, not at every read', async () => {
