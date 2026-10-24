@@ -475,7 +475,7 @@ export default {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
-					this.addVmCardWhenThere(lateSortList, gridFailed)
+					this.addVmCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -550,15 +550,13 @@ export default {
 			})
 		},
 
-		// gridFailed: the list lacks the grid's apps → the order is not saved
-		addVmCardWhenThere(savedOrder, gridFailed = false) {
+		// a save while the grid's apps are missing keeps them (saveSortData, gridMissing)
+		addVmCardWhenThere(savedOrder) {
 			return hasVirtualMachines().then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, vmApplication()), savedOrder)
-					if (!gridFailed) {
-						this.saveSortIfChanged(savedOrder)
-					}
-				} else if (!available && savedOrder.includes(VM_APP_NAME) && !gridFailed) {
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(VM_APP_NAME)) {
 					this.saveSortIfChanged(savedOrder)
 				}
 			})
