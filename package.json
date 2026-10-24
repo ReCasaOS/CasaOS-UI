@@ -37,7 +37,7 @@
     "dateformat": "^5.0.3",
     "dayjs": "^1.11.9",
     "docx-preview": "^0.3.0",
-    "dompurify": "^3.4.15",
+    "dompurify": "^3.4.16",
     "file-saver": "^2.0.5",
     "gsap": "^3.12.2",
     "hitbox-js": "^1.0.2",
@@ -54,7 +54,7 @@
     "marked": "^4.3.0",
     "mime": "^3.0.0",
     "mitt": "^3.0.1",
-    "music-metadata": "^11.15.0",
+    "music-metadata": "^11.16.0",
     "nanoid": "^5.1.16",
     "qrcode": "^1.5.4",
     "qs": "^6.16.0",
@@ -128,11 +128,16 @@
   "pnpm": {
     "overrides": {
       "@vue/cli-service>webpack-dev-server": "^5.2.6",
+      "follow-redirects@<1.16.1": "^1.16.1",
       "lodash@<4.18.0": "^4.18.1",
       "minimatch@<3.1.4": "^3.1.5",
-      "serialize-javascript@<7.0.5": "^7.1.1",
+      "proxy-addr@<2.0.8": "^2.0.8",
+      "serialize-javascript@<7.1.2": "^7.1.2",
+      "shell-quote@<1.11.0": "^1.11.0",
       "sockjs>uuid": "^11.1.1",
-      "vite@<6.4.3": "^6.4.3"
+      "source-map-js@<1.2.2": "^1.2.2",
+      "vite@<6.4.3": "^6.4.3",
+      "webpack-dev-middleware@<7.4.6": "^7.4.6"
     }
   },
   "browserslist": [
