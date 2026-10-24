@@ -31,6 +31,10 @@ const mutations = {
 		state.initKey = key
 	},
 
+	SET_FIRST_ADMIN(state, where) {
+		state.firstAdmin = where === 'local' ? 'local' : 'web'
+	},
+
 	// Site
 	SET_SITE_LOADING(state, loading) {
 		state.siteLoading = loading

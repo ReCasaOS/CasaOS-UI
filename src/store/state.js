@@ -18,6 +18,8 @@ const state = {
 		username: '',
 	},
 	initKey: '', // Initialization key for reg
+	// where the first account is created: 'web' (here) or 'local' (on the machine)
+	firstAdmin: 'web',
 
 	sidebarOpen: false,
 

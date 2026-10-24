@@ -393,5 +393,7 @@
   "Installing {title}": "Installation {title}",
   "Legacy app (To be rebuilt).": "Legacy-App (neu aufgebaut).",
   "To be rebuilt.": "Zu erneuern.",
-  "launch-and-open": "Starten und öffnen"
+  "launch-and-open": "Starten und öffnen",
+  "Updated with the system": "Wird mit dem System aktualisiert",
+  "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.": "Das erste Konto wird auf dem Gerät angelegt, auf dem ReCasaOS läuft. Sobald es existiert, diese Seite neu laden, um sich anzumelden."
 }

@@ -45,6 +45,7 @@ async function needInit() {
 		if (userStatusRes.data.success === 200 && !userStatusRes.data.data.initialized) {
 			store.commit('SET_NEED_INITIALIZATION', true)
 			store.commit('SET_INIT_KEY', userStatusRes.data.data.key)
+			store.commit('SET_FIRST_ADMIN', userStatusRes.data.data.first_admin)
 			forgetTokens()
 			return true
 		} else {
