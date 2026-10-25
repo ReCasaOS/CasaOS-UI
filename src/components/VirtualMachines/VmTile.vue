@@ -10,7 +10,7 @@
 					<!-- the mark of the system it runs, in that system's colour; a screen,
 						drawn in the theme's own colours, when it runs no system the list knows -->
 					<span aria-hidden="true" class="vm-tile-screen">
-						<i v-if="os" :class="`mdi mdi-${os.icon}`" :style="os.color ? { color: os.color } : {}" class="vm-tile-os"></i>
+						<i v-if="os" :class="`mdi mdi-${os.icon}`" :style="os.color ? { color: osColor } : {}" class="vm-tile-os"></i>
 						<svg v-else fill="none" height="36" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
 							viewBox="0 0 24 24" width="36">
 							<rect height="13" rx="2" width="18" x="3" y="4" />
@@ -63,6 +63,11 @@ export default {
 		os() {
 			const info = osInfo(this.vm.os)
 			return info.value ? info : null
+		},
+		// the brand colour taken 30 % toward the theme's text: darker on light, lighter on dark,
+		// so every mark keeps 3:1 on the square (Debian, CentOS, Alpine fell to 1.9 on dark)
+		osColor() {
+			return `color-mix(in srgb, ${this.os.color} 70%, var(--casa-text))`
 		},
 		hasConsole() {
 			return allowedActions(this.vm.state).console

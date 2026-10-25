@@ -48,7 +48,8 @@ describe('the tile of a virtual machine', () => {
 
 		const mark = wrapper.find('.vm-tile-screen .vm-tile-os')
 		expect(mark.classes()).toContain('mdi-debian')
-		expect(mark.attributes('style')).toContain('color: #a81d33')
+		// the brand colour mixed toward the theme's text (the test DOM drops color-mix, so read what is bound)
+		expect(wrapper.vm.osColor).toBe('color-mix(in srgb, #a81d33 70%, var(--casa-text))')
 		expect(wrapper.find('.vm-tile-screen svg').exists()).toBe(false)
 		expect(wrapper.find('.vm-tile-chip').text()).toBe('VM')
 		expect(wrapper.find('.vm-tile-dot').exists()).toBe(true)
