@@ -7,9 +7,11 @@
 		<div class="cards-content">
 			<div class="has-text-centered is-flex is-justify-content-center is-flex-direction-column pt-5 pb-3px img-c">
 				<div class="is-flex is-justify-content-center">
-					<!-- a screen, not an app's picture: drawn in the theme's own colours -->
+					<!-- the mark of the system it runs, in that system's colour; a screen,
+						drawn in the theme's own colours, when it runs no system the list knows -->
 					<span aria-hidden="true" class="vm-tile-screen">
-						<svg fill="none" height="36" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+						<i v-if="os" :class="`mdi mdi-${os.icon}`" :style="os.color ? { color: osColor } : {}" class="vm-tile-os"></i>
+						<svg v-else fill="none" height="36" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
 							viewBox="0 0 24 24" width="36">
 							<rect height="13" rx="2" width="18" x="3" y="4" />
 							<path d="M8 21h8M12 17v4" />
@@ -25,7 +27,7 @@
 </template>
 
 <script>
-import { allowedActions, stateLabel } from './vms'
+import { allowedActions, osInfo, stateLabel } from './vms'
 import { getVirtualMachine, openVirtualMachines, openVmConsole } from './entry'
 
 // what a name may take of the card and of what is read out
@@ -56,6 +58,16 @@ export default {
 		name() {
 			const chars = [...String(this.vm.title || this.vm.name || '')]
 			return chars.length > NAME_MAX ? `${chars.slice(0, NAME_MAX - 1).join('')}…` : chars.join('')
+		},
+		// the system's entry of OS_LIST, or null for none or one the list does not have
+		os() {
+			const info = osInfo(this.vm.os)
+			return info.value ? info : null
+		},
+		// the brand colour taken 30 % toward the theme's text: darker on light, lighter on dark,
+		// so every mark keeps 3:1 on the square (Debian, CentOS, Alpine fell to 1.9 on dark)
+		osColor() {
+			return `color-mix(in srgb, ${this.os.color} 70%, var(--casa-text))`
 		},
 		hasConsole() {
 			return allowedActions(this.vm.state).console
@@ -145,6 +157,13 @@ export default {
 	color: var(--casa-text);
 	background: var(--casa-surface);
 	transition: all 0.3s;
+}
+
+// as large as the screen it stands for; a system with no colour of its own
+// (Linux) takes --casa-text, as the screen does
+.vm-tile-os {
+	font-size: 2.25rem;
+	line-height: 1;
 }
 
 .img-c:hover .vm-tile-screen {

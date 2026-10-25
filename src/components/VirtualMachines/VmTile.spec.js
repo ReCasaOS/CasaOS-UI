@@ -43,6 +43,32 @@ describe('the tile of a virtual machine', () => {
 		expect(wrapper.find('.vm-tile-screen svg').exists()).toBe(true)
 	})
 
+	it('shows the mark of the system the VM runs, in its colour, in place of the screen', () => {
+		const wrapper = tile({ os: 'debian' })
+
+		const mark = wrapper.find('.vm-tile-screen .vm-tile-os')
+		expect(mark.classes()).toContain('mdi-debian')
+		// the brand colour mixed toward the theme's text (the test DOM drops color-mix, so read what is bound)
+		expect(wrapper.vm.osColor).toBe('color-mix(in srgb, #a81d33 70%, var(--casa-text))')
+		expect(wrapper.find('.vm-tile-screen svg').exists()).toBe(false)
+		expect(wrapper.find('.vm-tile-chip').text()).toBe('VM')
+		expect(wrapper.find('.vm-tile-dot').exists()).toBe(true)
+	})
+
+	it('takes the theme\'s colour for a system with none of its own', () => {
+		const wrapper = tile({ os: 'linux' })
+
+		expect(wrapper.find('.vm-tile-os').classes()).toContain('mdi-linux')
+		expect(wrapper.find('.vm-tile-os').attributes('style')).toBeUndefined()
+	})
+
+	it.each(['', 'plan9'])('keeps the screen for the system %j, which the list does not know', (os) => {
+		const wrapper = tile({ os })
+
+		expect(wrapper.find('.vm-tile-os').exists()).toBe(false)
+		expect(wrapper.find('.vm-tile-screen svg').exists()).toBe(true)
+	})
+
 	it.each([
 		['running', 'running'],
 		['paused', 'paused'],
