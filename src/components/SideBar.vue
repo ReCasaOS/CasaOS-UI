@@ -174,11 +174,15 @@ export default {
         left: 0rem;
         width: auto;
         margin: 0 0 0 1rem !important;
-        transform: translateX(-100vw);
-        transition: all 0.3s ease-in-out;
+        // its own width and the 2rem it starts from: -100vw left a strip of it on screen
+        transform: translateX(calc(-100% - 2rem));
+        visibility: hidden;
+        transition: transform 0.3s ease-in-out, visibility 0s 0.3s;
 
         &.open {
             transform: translateX(0);
+            visibility: visible;
+            transition: transform 0.3s ease-in-out;
         }
     }
 }
