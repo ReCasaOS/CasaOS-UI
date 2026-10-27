@@ -2549,5 +2549,20 @@
   "The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.": "The upload was refused or interrupted. If the virtual machines module was not updated recently, update it in Settings → Modules.",
   "The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.": "The virtual machines module is too old to receive files. Update it in Settings → Modules, then try again.",
   "Updated with the system": "Updated with the system",
-  "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.": "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in."
+  "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.": "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.",
+  "Trash": "Trash",
+  "Empty the trash": "Empty the trash",
+  "The trash is empty.": "The trash is empty.",
+  "{size} in the trash. Items are deleted for good after {days} days.": "{size} in the trash. Items are deleted for good after {days} days.",
+  "Deleted from": "Deleted from",
+  "Deleted on": "Deleted on",
+  "Delete permanently": "Delete permanently",
+  "Restored to {path}": "Restored to {path}",
+  "Delete {name} permanently? This cannot be undone.": "Delete {name} permanently? This cannot be undone.",
+  "Empty the trash? Everything in it is deleted for good.": "Empty the trash? Everything in it is deleted for good.",
+  "These items go to the trash, where you can restore them for {days} days.": "These items go to the trash, where you can restore them for {days} days.",
+  "Delete permanently instead: this cannot be undone": "Delete permanently instead: this cannot be undone",
+  "Cannot move to the trash": "Cannot move to the trash",
+  "These items cannot go to the trash:": "These items cannot go to the trash:",
+  "Delete them permanently? This cannot be undone.": "Delete them permanently? This cannot be undone."
 }

@@ -1,8 +1,12 @@
 import qs from 'qs'
 import has from 'lodash/has'
+import escape from 'lodash/escape'
 import union from 'lodash/union'
 import copy from 'clipboard-copy'
 import { renderSize } from './file_utils'
+
+// the core's answer when an item cannot go to the trash (common_err.TRASH_UNAVAILABLE)
+const TRASH_UNAVAILABLE = 60007
 
 const typeMap = {
 	'image-x-generic': ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'svg', 'tiff'],
@@ -259,11 +263,12 @@ export const mixin = {
 		},
 
 		/**
-		 * @description: Delete File
+		 * @description: Delete File: to the trash of its disk, or for good when permanent
 		 * @param {Object,Array} items
+		 * @param {boolean} permanent
 		 * @return {void}
 		 */
-		deleteItem(items) {
+		deleteItem(items, permanent = false) {
 			const deleteShare = async (shareId) => {
 				try {
 					await this.$api.samba.deleteShare(shareId)
@@ -281,33 +286,72 @@ export const mixin = {
 				}
 			}
 
+			// a disk that is read-only, or a trash folder that is not ours: say which, and offer the permanent delete of those only
+			const offerPermanentDelete = (refused) => {
+				const list = refused.map(r => `<li><b>${escape(r.path)}</b><br><span class="is-size-7">${escape(r.reason)}</span></li>`).join('')
+				this.$buefy.dialog.confirm({
+					title: this.$t('Cannot move to the trash'),
+					message: `${this.$t('These items cannot go to the trash:')}<ul class="my-3">${list}</ul>${this.$t('Delete them permanently? This cannot be undone.')}`,
+					confirmText: this.$t('Delete permanently'),
+					type: 'is-danger',
+					hasIcon: true,
+					onConfirm: () => this.deleteItem(refused.map(r => ({ path: r.path })), true),
+				})
+			}
+
+			// closed, not toggled: after a refusal this runs twice, and a toggle would open the menu again
+			const reload = () => {
+				if (this.$refs.dropDown !== undefined) {
+					this.$refs.dropDown.isActive = false
+					this.$emit('reload')
+				}
+				if (typeof this.reload === 'function') {
+					this.reload()
+				}
+			}
+
+			// the paths are gone from where they were: their shortcuts go, and the list is read again
+			const removed = async (paths) => {
+				const shotcutData = this.$store.state.shortcutData
+				const updatedShotcutData = shotcutData.filter((item) => {
+					if (paths.includes(item.path)) {
+						deleteShortcut(item)
+						return false
+					}
+					return true
+				})
+				await this.$store.dispatch('SET_SHORTCUT_DATA', updatedShotcutData)
+				reload()
+			}
+
 			const deleteItems = async (paths) => {
 				try {
-					const res = await this.$api.batch.delete(JSON.stringify(paths))
+					const res = await this.$api.batch.delete(JSON.stringify(paths), !permanent)
 					if (res.data.success === 200) {
-						const shotcutData = this.$store.state.shortcutData
-						const updatedShotcutData = shotcutData.filter((item) => {
-							if (paths.includes(item.path)) {
-								deleteShortcut(item)
-								return false
-							}
-							return true
-						})
-						await this.$store.dispatch('SET_SHORTCUT_DATA', updatedShotcutData)
-						if (this.$refs.dropDown !== undefined) {
-							this.$refs.dropDown.toggle()
-							this.$emit('reload')
-						}
-						if (typeof this.reload === 'function') {
-							this.reload()
-						}
+						await removed(paths)
 					} else {
 						this.$buefy.toast.open({
-							message: res.data.message,
+							message: escape(res.data.message),
 							type: 'is-danger',
 						})
 					}
 				} catch (e) {
+					const data = e?.response?.data
+					if (!permanent && data?.success === TRASH_UNAVAILABLE) {
+						// the others went to the trash
+						const refused = data.data || []
+						const kept = refused.map(r => r.path)
+						await removed(paths.filter(p => !kept.includes(p)))
+						offerPermanentDelete(refused)
+						return
+					}
+					if (data?.message) {
+						this.$buefy.toast.open({ message: escape(data.message), type: 'is-danger' })
+					}
+					if (!permanent) {
+						// the core moves what it can before it answers an error
+						reload()
+					}
 					console.log(`${e} in deleteItem`)
 				}
 			}
