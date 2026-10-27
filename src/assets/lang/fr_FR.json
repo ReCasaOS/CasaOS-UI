@@ -2577,5 +2577,16 @@
   "Faulty": "En panne",
   "Missing: {count}": "Absents : {count}",
   "{minutes} min left": "encore {minutes} min",
-  "{hours} h {minutes} min left": "encore {hours} h {minutes} min"
+  "{hours} h {minutes} min left": "encore {hours} h {minutes} min",
+  "Add a disk": "Ajouter un disque",
+  "Take out": "Retirer",
+  "Add a disk to {name}": "Ajouter un disque à {name}",
+  "No blank disk is big enough: it must hold at least {size}.": "Aucun disque vierge n'est assez grand : il doit contenir au moins {size}.",
+  "Everything on {disk} is erased, then {name} rebuilds onto it.": "Tout ce que contient {disk} est effacé, puis {name} se reconstruit dessus.",
+  "Type {disk} to confirm": "Tapez {disk} pour confirmer",
+  "Erase and add": "Effacer et ajouter",
+  "{disk} is added: {name} rebuilds onto it.": "{disk} est ajouté : {name} se reconstruit dessus.",
+  "Take {disk} out of {name}?": "Retirer {disk} de {name} ?",
+  "It has failed: the array goes on with its other disks. You can then unplug it.": "Il est en panne : la grappe continue avec ses autres disques. Vous pourrez ensuite le débrancher.",
+  "{disk} is taken out of {name}.": "{disk} est retiré de {name}."
 }

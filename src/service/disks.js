@@ -34,5 +34,15 @@ const disks = {
 	raid() {
 		return api.get(`${PREFIX}/raid`)
 	},
+
+	// erases the blank disk at path and adds it to the array name; confirm is its name typed again
+	addToRaid(name, path, confirm) {
+		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/disks`, { path, confirm })
+	},
+
+	// takes the failed member (sdc1) out of the array name
+	removeFromRaid(name, member) {
+		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}/disks/${encodeURIComponent(member)}`)
+	},
 }
 export default disks
