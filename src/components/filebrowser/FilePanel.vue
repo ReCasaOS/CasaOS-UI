@@ -64,6 +64,8 @@
 								@open="showDropPage"></drop-entry-button>
 							<share-entry-button :active="pageType == `share`"
 								@open="showSharedList"></share-entry-button>
+							<trash-entry-button :active="pageType == `trash`"
+								@open="showTrash"></trash-entry-button>
 						</div>
 						<!-- Bottom Action End -->
 					</div>
@@ -219,6 +221,10 @@
 					<drop-page @close="$emit('close')"></drop-page>
 				</template>
 				<!-- Drop Page End -->
+
+				<template v-else-if="pageType == `trash`">
+					<trash-page @close="$emit('close')"></trash-page>
+				</template>
 				<!-- Main Content End -->
 			</section>
 			<!-- Modal-Card Body End -->
@@ -238,6 +244,7 @@ import TreeList from './sidebar/TreeList.vue'
 import MountList from './sidebar/MountList.vue'
 import ShareEntryButton from './shared/ShareEntryButton.vue'
 import ShareListPage from './shared/ShareListPage.vue'
+import TrashEntryButton from './trash/TrashEntryButton.vue'
 
 import SelectShareModal from './shared/SelectShareModal.vue'
 import ShareDetial from './shared/ShareDetial.vue'
@@ -304,6 +311,8 @@ export default {
 		// Shared
 		ShareEntryButton,
 		ShareListPage,
+		TrashEntryButton,
+		TrashPage: defineAsyncComponent(() => import('./trash/TrashPage.vue')),
 		MountList,
 		MountActionButton,
 		// Drop
@@ -436,6 +445,7 @@ export default {
 					this.destroyedAction()
 					break
 				case 'drop':
+				case 'trash':
 					this.destroyedAction()
 					break
 				default:
@@ -541,6 +551,11 @@ export default {
 
 		showDropPage() {
 			this.pageType = 'drop'
+			this.hideMobileSidebar()
+		},
+
+		showTrash() {
+			this.pageType = 'trash'
 			this.hideMobileSidebar()
 		},
 
@@ -972,14 +987,15 @@ export default {
 		handleRemove() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Deleting files'),
-				message: this.$t(
-					'Are you sure you want to <b>delete</b> these files? This action cannot be undone.',
-				),
+				// 30: trash.Retention in the core
+				message: `${this.$t('These items go to the trash, where you can restore them for {days} days.', { days: 30 })}
+					<label class="checkbox is-flex is-align-items-center mt-4"><input id="deletePermanently" class="mr-2" type="checkbox">${this.$t('Delete permanently instead: this cannot be undone')}</label>`,
 				confirmText: this.$t('Delete'),
 				type: 'is-danger',
 				hasIcon: true,
 				onConfirm: () => {
-					this.deleteItem(this.selectedArray)
+					const permanent = document.getElementById('deletePermanently')?.checked === true
+					this.deleteItem(this.selectedArray, permanent)
 					this.handleClose()
 				},
 			})

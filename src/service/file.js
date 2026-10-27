@@ -43,6 +43,24 @@ const file = {
 		})
 	},
 
+	// the trash of every disk: { items, size, retention_days }
+	trash() {
+		return api.get(`${PREFIX}/trash`)
+	},
+
+	// items are [{ trash, name }] as trash() gives them
+	restoreTrash(items) {
+		return api.post(`${PREFIX}/trash/restore`, items)
+	},
+
+	deleteTrash(items) {
+		return api.delete(`${PREFIX}/trash`, items)
+	},
+
+	emptyTrash() {
+		return api.delete(`${PREFIX}/trash/all`)
+	},
+
 }
 
 export default file
