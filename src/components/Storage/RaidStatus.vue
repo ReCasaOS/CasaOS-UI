@@ -52,7 +52,6 @@ export default {
 	methods: {
 		openAddDisk() {
 			this.$buefy.modal.open({
-				parent: this,
 				component: RaidAddDisk,
 				props: { array: this.array },
 				hasModalCard: true,
