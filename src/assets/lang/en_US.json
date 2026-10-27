@@ -2588,5 +2588,6 @@
   "{disk} is added: {name} rebuilds onto it.": "{disk} is added: {name} rebuilds onto it.",
   "Take {disk} out of {name}?": "Take {disk} out of {name}?",
   "It has failed: the array goes on with its other disks. You can then unplug it.": "It has failed: the array goes on with its other disks. You can then unplug it.",
-  "{disk} is taken out of {name}.": "{disk} is taken out of {name}."
+  "{disk} is taken out of {name}.": "{disk} is taken out of {name}.",
+  "As with docker compose, COMPOSE_FILE names the compose file to deploy (docker-compose.prod.yml) and COMPOSE_PROFILES turns profiles on. The summary above shows the default file until the first deployment.": "As with docker compose, COMPOSE_FILE names the compose file to deploy (docker-compose.prod.yml) and COMPOSE_PROFILES turns profiles on. The summary above shows the default file until the first deployment."
 }

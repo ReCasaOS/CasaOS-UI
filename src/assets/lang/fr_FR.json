@@ -2588,5 +2588,6 @@
   "{disk} is added: {name} rebuilds onto it.": "{disk} est ajouté : {name} se reconstruit dessus.",
   "Take {disk} out of {name}?": "Retirer {disk} de {name} ?",
   "It has failed: the array goes on with its other disks. You can then unplug it.": "Il est en panne : la grappe continue avec ses autres disques. Vous pourrez ensuite le débrancher.",
-  "{disk} is taken out of {name}.": "{disk} est retiré de {name}."
+  "{disk} is taken out of {name}.": "{disk} est retiré de {name}.",
+  "As with docker compose, COMPOSE_FILE names the compose file to deploy (docker-compose.prod.yml) and COMPOSE_PROFILES turns profiles on. The summary above shows the default file until the first deployment.": "Comme avec docker compose, COMPOSE_FILE désigne le fichier compose à déployer (docker-compose.prod.yml) et COMPOSE_PROFILES active des profils. Le résumé ci-dessus montre le fichier par défaut jusqu'au premier déploiement."
 }
