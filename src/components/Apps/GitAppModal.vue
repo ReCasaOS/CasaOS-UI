@@ -85,6 +85,9 @@
 				</b-message>
 
 				<p class="has-text-weight-bold is-size-7 mt-4 mb-2">.env</p>
+				<p class="is-size-7 _has-text-gray mb-2">
+					{{ $t('As with docker compose, COMPOSE_FILE names the compose file to deploy (docker-compose.prod.yml) and COMPOSE_PROFILES turns profiles on. The summary above shows the default file until the first deployment.') }}
+				</p>
 				<p v-if="app.env_tracked" class="is-size-7 _has-text-gray mb-2">
 					{{ $t('The repository tracks its .env file, so it cannot be edited here: an edit would modify a tracked file and block every later deployment.') }}
 				</p>
