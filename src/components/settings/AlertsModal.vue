@@ -158,7 +158,7 @@ export default {
 			draft: blankDraft('ntfy'),
 			categories: [
 				{ key: 'backups', label: 'A backup or a restore fails' },
-				{ key: 'disks', label: 'A disk is failing, missing or full' },
+				{ key: 'disks', label: 'A disk is failing, missing or full, or a RAID array lacks a disk' },
 				{ key: 'updates', label: 'An update fails or pauses, or a new release is out' },
 				{ key: 'apps', label: 'An app operation fails, or an app stops or keeps restarting' },
 				{ key: 'resources', label: 'A container or a virtual machine uses too much processor or memory, or a virtual machine crashes' },

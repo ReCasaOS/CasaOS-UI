@@ -28,11 +28,15 @@
 					</div>
 					<b-tabs v-model="activeTab" :animated="false">
 						<b-tab-item :label="$t('Storage')" class="scrollbars-light-auto tab-item">
+							<!-- an array with no storage mounted on it (stopped, or never formatted) is still shown -->
+							<div v-for="array in unmountedArrays" :key="array.path" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item">
+								<raid-status :array="array"></raid-status>
+							</div>
 							<template v-if="storageData.length">
 								<storage-item v-for="(item, index) in storageData" :key="`storage${index}`" :item="item"
 									@getDiskList="getDiskList"></storage-item>
 							</template>
-							<div v-else class="has-text-centered has-text-grey-light mt-6">
+							<div v-else-if="!unmountedArrays.length" class="has-text-centered has-text-grey-light mt-6">
 								{{ $t('No standalone storage is available.') }}
 							</div>
 						</b-tab-item>
@@ -173,6 +177,7 @@ import { Field as VeeField, Form as VeeForm } from 'vee-validate'
 import DriveItem from './DriveItem.vue'
 import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
+import RaidStatus from './RaidStatus.vue'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -187,6 +192,7 @@ export default {
 		DriveItem,
 		StorageItem,
 		StorageCombination,
+		RaidStatus,
 		CToolTip: cToolTip,
 	},
 	mixins: [smoothReflow, mixin],
@@ -205,12 +211,16 @@ export default {
 			diskData: [],
 			unDiskData: [],
 			storageData: [],
+			raidArrays: [],
 			mergeConbinationsStorageData: [],
 			hasMergeState: false,
 		}
 	},
 
 	computed: {
+		unmountedArrays() {
+			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
+		},
 		title() {
 			return this.creatIsShow ? this.$t('Create Storage') : this.$t('Storage Manager')
 		},
@@ -315,6 +325,17 @@ export default {
 				console.log(e)
 			}
 
+			// silent on failure: an older LocalStorage has no such route, and the storages show anyway
+			const raidByPath = {}
+			try {
+				this.raidArrays = (await this.$api.disks.raid()).data.data || []
+				this.raidArrays.forEach((array) => {
+					raidByPath[array.path] = array
+				})
+			} catch {
+				this.raidArrays = []
+			}
+
 			try {
 				// get storage list info
 				const storageRes = await this.$api.storage.list({ system: 'show' }).then(v => v.data.data)
@@ -384,6 +405,7 @@ export default {
 						diskModel: storage.diskModel,
 						disk: storage.disk,
 						persistedIn: storage.persisted_in,
+						raid: raidByPath[storage.disk],
 						isMergeSource: storage.diskName !== 'System' && mergeConbinations.some(item => item.uuid === storage.uuid),
 					}
 				}

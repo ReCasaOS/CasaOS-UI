@@ -885,7 +885,7 @@
   "Add channel": "Add channel",
   "What to send": "What to send",
   "A backup or a restore fails": "A backup or a restore fails",
-  "A disk is failing, missing or full": "A disk is failing, missing or full",
+  "A disk is failing, missing or full, or a RAID array lacks a disk": "A disk is failing, missing or full, or a RAID array lacks a disk",
   "An update fails or pauses, or a new release is out": "An update fails or pauses, or a new release is out",
   "An app operation fails, or an app stops or keeps restarting": "An app operation fails, or an app stops or keeps restarting",
   "A disk counts as full above": "A disk counts as full above",
@@ -2564,5 +2564,18 @@
   "Delete permanently instead: this cannot be undone": "Delete permanently instead: this cannot be undone",
   "Cannot move to the trash": "Cannot move to the trash",
   "These items cannot go to the trash:": "These items cannot go to the trash:",
-  "Delete them permanently? This cannot be undone.": "Delete them permanently? This cannot be undone."
+  "Delete them permanently? This cannot be undone.": "Delete them permanently? This cannot be undone.",
+  "Degraded": "Degraded",
+  "Rebuilding {percent} %": "Rebuilding {percent} %",
+  "Resyncing": "Resyncing",
+  "Resyncing {percent} %": "Resyncing {percent} %",
+  "Checking": "Checking",
+  "Checking {percent} %": "Checking {percent} %",
+  "Reshaping": "Reshaping",
+  "Not running": "Not running",
+  "Spare": "Spare",
+  "Faulty": "Faulty",
+  "Missing: {count}": "Missing: {count}",
+  "{minutes} min left": "{minutes} min left",
+  "{hours} h {minutes} min left": "{hours} h {minutes} min left"
 }

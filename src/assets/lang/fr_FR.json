@@ -885,7 +885,7 @@
   "Add channel": "Ajouter le canal",
   "What to send": "Envoyer une alerte quand",
   "A backup or a restore fails": "Une sauvegarde ou une restauration échoue",
-  "A disk is failing, missing or full": "Un disque est défaillant, absent ou plein",
+  "A disk is failing, missing or full, or a RAID array lacks a disk": "Un disque est défaillant, absent ou plein, ou une grappe RAID a perdu un disque",
   "An update fails or pauses, or a new release is out": "Une mise à jour échoue ou se met en pause, ou une nouvelle version est sortie",
   "An app operation fails, or an app stops or keeps restarting": "Une opération sur une application échoue, ou une application s'arrête ou redémarre sans cesse",
   "A disk counts as full above": "Un disque est considéré comme plein au-delà de",
@@ -2564,5 +2564,18 @@
   "Delete permanently instead: this cannot be undone": "Supprimer définitivement à la place : cette action est irréversible",
   "Cannot move to the trash": "Impossible de mettre à la corbeille",
   "These items cannot go to the trash:": "Ces éléments ne peuvent pas aller dans la corbeille :",
-  "Delete them permanently? This cannot be undone.": "Les supprimer définitivement ? Cette action est irréversible."
+  "Delete them permanently? This cannot be undone.": "Les supprimer définitivement ? Cette action est irréversible.",
+  "Degraded": "Dégradé",
+  "Rebuilding {percent} %": "Reconstruction {percent} %",
+  "Resyncing": "Synchronisation",
+  "Resyncing {percent} %": "Synchronisation {percent} %",
+  "Checking": "Vérification",
+  "Checking {percent} %": "Vérification {percent} %",
+  "Reshaping": "Restructuration",
+  "Not running": "Arrêté",
+  "Spare": "De secours",
+  "Faulty": "En panne",
+  "Missing: {count}": "Absents : {count}",
+  "{minutes} min left": "encore {minutes} min",
+  "{hours} h {minutes} min left": "encore {hours} h {minutes} min"
 }
