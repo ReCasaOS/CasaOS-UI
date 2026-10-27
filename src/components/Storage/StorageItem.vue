@@ -14,7 +14,7 @@
 						</b-tag>
 					</h4>
 
-					<p class="has-text-left has-text-full-04 has-text-grey-light mt-1">{{ $t('Single Drive Storage') }},
+					<p class="has-text-left has-text-full-04 has-text-grey-light mt-1">{{ item.raid ? raidLevel(item.raid.level) : $t('Single Drive Storage') }},
 						<span class="is-uppercase">{{ item.fsType }}</span>
 						<b-tooltip :label="$t('CasaOS reserves 1% of file space when creating storage in EXT4 format.')"
 							append-to-body>
@@ -34,6 +34,7 @@
 							total: renderSize(item.size),
 						})
 					}}</p>
+					<raid-status v-if="item.raid" :array="item.raid" class="mt-2"></raid-status>
 				</div>
 
 			</div>
@@ -61,10 +62,13 @@
 
 <script>
 import delay from 'lodash/delay'
+import RaidStatus from './RaidStatus.vue'
+import { raidLevel } from './raid'
 import { mixin } from '@/mixins/mixin'
 
 export default {
 	name: 'storage-item',
+	components: { RaidStatus },
 	mixins: [mixin],
 	props: {
 		item: {
@@ -80,6 +84,7 @@ export default {
 		}
 	},
 	methods: {
+		raidLevel,
 		renameStorage(path, currentName) {
 			this.isRenaming = true
 

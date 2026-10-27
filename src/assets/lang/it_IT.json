@@ -885,7 +885,7 @@
   "Add channel": "Aggiungi canale",
   "What to send": "Cosa inviare",
   "A backup or a restore fails": "Un backup o un ripristino non riesce",
-  "A disk is failing, missing or full": "Un disco è guasto, mancante o pieno",
+  "A disk is failing, missing or full, or a RAID array lacks a disk": "Un disco è guasto, mancante o pieno, o a un array RAID manca un disco",
   "An update fails or pauses, or a new release is out": "Un aggiornamento non riesce o va in pausa, o esce una nuova versione",
   "An app operation fails, or an app stops or keeps restarting": "Un'operazione su un'app non riesce, o un'app si ferma o continua a riavviarsi",
   "A disk counts as full above": "Un disco è considerato pieno oltre",

@@ -142,3 +142,37 @@ describe('reclaimable disk space', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('the RAID tag of the storage widget', () => {
+	function mountWith(arrays) {
+		const $store = { state: { hardwareInfo: { sys_disk: { size: 100, used: 40, health: true, smart_status: 'passed' }, sys_usb: [] } } }
+		const $api = { disks: { raid: vi.fn().mockResolvedValue({ data: { data: arrays } }) } }
+		return mount(Disks, { global: { plugins: [Buefy, i18n], mocks: { $store, $openAPI, $api } } })
+	}
+
+	beforeEach(() => {
+		danglingImages.mockReset().mockResolvedValue({ data: { data: { count: 0, size: 0 } } })
+	})
+
+	it('names an array that lacks a disk, and stays quiet about healthy ones', async () => {
+		const wrapper = mountWith([
+			{ name: 'md0', level: 'raid1', state: 'ok', progress: -1 },
+			{ name: 'md1', level: 'raid5', state: 'rebuilding', progress: 42.7 },
+		])
+		await flushPromises()
+		expect(wrapper.find('.raid-tag').text()).toBe('RAID: Rebuilding 42 %')
+		wrapper.unmount()
+	})
+
+	it('shows nothing when every array is fine, or when LocalStorage has no such route', async () => {
+		const fine = mountWith([{ name: 'md0', level: 'raid1', state: 'checking', progress: 10 }])
+		await flushPromises()
+		expect(fine.find('.raid-tag').exists()).toBe(false)
+		fine.unmount()
+
+		const older = mountWidget({ health: true }) // no $api: the call throws, and is ignored
+		await flushPromises()
+		expect(older.find('.raid-tag').exists()).toBe(false)
+		older.unmount()
+	})
+})

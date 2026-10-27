@@ -241,7 +241,7 @@ describe('the alerts dialog\'s words', () => {
 		'Add channel',
 		'What to send',
 		'A backup or a restore fails',
-		'A disk is failing, missing or full',
+		'A disk is failing, missing or full, or a RAID array lacks a disk',
 		'An update fails or pauses, or a new release is out',
 		'An app operation fails, or an app stops or keeps restarting',
 		'A disk counts as full above',

@@ -25,6 +25,7 @@
 									<b-tag v-if="health === 'passed'" type="is-success">{{ $t('Healthy') }}</b-tag>
 									<b-tag v-else-if="health === 'failed'" type="is-danger">{{ $t('Damage') }}</b-tag>
 									<b-tag v-else type="is-light">{{ $t('No SMART data') }}</b-tag>
+									<b-tag v-if="raidTag" :type="raidTag.type" class="ml-2 raid-tag">RAID: {{ raidTag.text }}</b-tag>
 								</h4>
 								<p class="has-text-left is-size-14px disk-info">
 									{{ $t('Used') }}: {{ renderSize(totalUsed) }}<br>
@@ -81,6 +82,7 @@
 
 <script>
 import StorageManagerPanel from '@/components/Storage/StorageManagerPanel.vue'
+import { raidNeedsAttention, raidTag } from '@/components/Storage/raid'
 import { mixin } from '@/mixins/mixin'
 
 export default {
@@ -97,6 +99,8 @@ export default {
 			totalPercent: 0,
 			health: 'passed',
 			usbDisks: [],
+			raidArrays: [],
+			raidTimer: null,
 			reclaimable: { count: 0, size: 0 },
 			// The prune is synchronous and answers with the bytes it actually freed, so
 			// there is nothing to report until the daemon has finished walking the layers
@@ -110,6 +114,18 @@ export default {
 		this.getDiskInfo(this.$store.state.hardwareInfo.sys_disk)
 		this.usbDisks = this.$store.state.hardwareInfo.sys_usb
 		this.loadReclaimable()
+		this.loadRAID()
+		this.raidTimer = setInterval(this.loadRAID, 60 * 1000)
+	},
+	beforeUnmount() {
+		clearInterval(this.raidTimer)
+	},
+	computed: {
+		// the first array that needs someone (a disk missing or failed, a rebuild, an array stopped); none when all are fine
+		raidTag() {
+			const array = this.raidArrays.find(raidNeedsAttention)
+			return array ? raidTag(array, this.$t) : null
+		},
 	},
 	methods: {
 		getDiskInfo(diskInfo) {
@@ -138,6 +154,13 @@ export default {
 		// Silent on failure. This is an offer, not a reading: a dashboard that pops an
 		// error because it could not reach the Docker socket helps nobody, and the row
 		// simply stays hidden.
+		// silent on failure, as the line above: an older LocalStorage has no such route
+		loadRAID() {
+			Promise.resolve().then(() => this.$api.disks.raid()).then((res) => {
+				this.raidArrays = res.data.data || []
+			}).catch(() => {})
+		},
+
 		loadReclaimable() {
 			this.$openAPI.appManagement.image.danglingImages().then((res) => {
 				this.reclaimable = res.data.data ?? { count: 0, size: 0 }

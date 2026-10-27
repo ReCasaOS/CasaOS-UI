@@ -29,5 +29,10 @@ const disks = {
 	umountUsb(data) {
 		return api.delete(`${PREFIX}/usb`, data)
 	},
+
+	// the software RAID arrays and their state (LocalStorage reads them from sysfs)
+	raid() {
+		return api.get(`${PREFIX}/raid`)
+	},
 }
 export default disks
