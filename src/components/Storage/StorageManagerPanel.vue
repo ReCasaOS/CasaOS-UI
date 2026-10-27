@@ -30,7 +30,7 @@
 						<b-tab-item :label="$t('Storage')" class="scrollbars-light-auto tab-item">
 							<!-- an array with no storage mounted on it (stopped, or never formatted) is still shown -->
 							<div v-for="array in unmountedArrays" :key="array.path" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item">
-								<raid-status :array="array"></raid-status>
+								<raid-status :array="array" @changed="getDiskList"></raid-status>
 							</div>
 							<template v-if="storageData.length">
 								<storage-item v-for="(item, index) in storageData" :key="`storage${index}`" :item="item"

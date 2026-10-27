@@ -2577,5 +2577,16 @@
   "Faulty": "Faulty",
   "Missing: {count}": "Missing: {count}",
   "{minutes} min left": "{minutes} min left",
-  "{hours} h {minutes} min left": "{hours} h {minutes} min left"
+  "{hours} h {minutes} min left": "{hours} h {minutes} min left",
+  "Add a disk": "Add a disk",
+  "Take out": "Take out",
+  "Add a disk to {name}": "Add a disk to {name}",
+  "No blank disk is big enough: it must hold at least {size}.": "No blank disk is big enough: it must hold at least {size}.",
+  "Everything on {disk} is erased, then {name} rebuilds onto it.": "Everything on {disk} is erased, then {name} rebuilds onto it.",
+  "Type {disk} to confirm": "Type {disk} to confirm",
+  "Erase and add": "Erase and add",
+  "{disk} is added: {name} rebuilds onto it.": "{disk} is added: {name} rebuilds onto it.",
+  "Take {disk} out of {name}?": "Take {disk} out of {name}?",
+  "It has failed: the array goes on with its other disks. You can then unplug it.": "It has failed: the array goes on with its other disks. You can then unplug it.",
+  "{disk} is taken out of {name}.": "{disk} is taken out of {name}."
 }
