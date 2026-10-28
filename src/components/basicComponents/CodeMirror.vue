@@ -25,6 +25,11 @@ import CodeMirror from 'codemirror'
 
 export default {
 	name: 'CodeMirrorEditor',
+	// Declared, or Vue 3 also passes `@input` down to the root element as a native listener: the
+	// hidden textarea of CodeMirror fires a real `input` event that bubbles up to it, and the
+	// parent's handler then received that Event where it expected the text (the .env editor sent
+	// the JSON of an Event as the app's .env).
+	emits: ['input', 'ready'],
 	props: {
 		value: {
 			type: String,

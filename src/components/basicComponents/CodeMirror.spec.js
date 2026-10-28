@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { h } from 'vue'
 import CodeMirrorEditor from './CodeMirror.vue'
 import ComposeEditor from '@/components/Apps/ComposeEditor.vue'
+import EnvEditor from '@/components/Apps/EnvEditor.vue'
 
 /**
  * The compose editor is where users type their app's YAML, so the only failures
@@ -64,6 +66,39 @@ describe('codeMirror wrapper', () => {
 		wrapper.unmount()
 		expect(wrapper.element.querySelector('.CodeMirror')).toBeNull()
 		expect(wrapper.element.querySelector('textarea')).not.toBeNull()
+	})
+})
+
+// The editors listen with `@input="onInput"` and expect the text. Vue 3 also hands an `@input` the
+// component does not declare to its root element as a native listener, and the hidden textarea of
+// CodeMirror fires real `input` events that bubble up to it: the handler received an Event, and the
+// .env editor sent the JSON of it ({"isTrusted":true,"_vts":...}) as the app's .env.
+describe('native input events inside the editor', () => {
+	function typed(wrapper) {
+		wrapper.element.querySelector('.CodeMirror textarea').dispatchEvent(new Event('input', { bubbles: true }))
+	}
+
+	it('never reach the parent as if they were the text', () => {
+		const seen = []
+		const wrapper = mount({ render: () => h(CodeMirrorEditor, { value: 'A=1\n', onInput: value => seen.push(value) }) }, { attachTo: document.body })
+		typed(wrapper)
+
+		expect(seen).toEqual([])
+		wrapper.unmount()
+	})
+
+	it('leave the draft of the .env editor a string', async () => {
+		const wrapper = mount(EnvEditor, {
+			propsData: { appId: 'demo', value: 'A=1\n' },
+			global: { mocks: { $t: key => key, $buefy: { toast: { open: () => {} } }, $api: {} }, stubs: { 'b-message': true } },
+			attachTo: document.body,
+		})
+		typed(wrapper)
+		await wrapper.vm.$nextTick()
+
+		expect(wrapper.vm.draft).toBe('A=1\n')
+		expect(wrapper.vm.localError).toBe('')
+		wrapper.unmount()
 	})
 })
 
