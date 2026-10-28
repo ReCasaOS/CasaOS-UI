@@ -29,6 +29,21 @@
 							</div>
 						</section>
 					</b-upload>
+
+					<!-- the app's .env, installed with it: what an env_file: .env and the ${KEY} of the compose read -->
+					<p class="has-text-weight-bold is-size-7 mt-4 mb-1">
+						.env <span class="has-text-weight-normal has-text-full-04">({{ $t('optional') }})</span>
+					</p>
+					<b-input v-model="envText" :placeholder="$t('KEY=value, one per line: installed with the app as its .env')" class="import-env" type="textarea" />
+					<b-upload v-model="envFile" class="mt-2 env-drop" drag-drop expanded @update:model-value="onSelectEnv">
+						<p class="has-text-centered has-text-full-03 is-size-7 py-2">
+							{{ $t('Drop the .env file here or click to upload') }}
+						</p>
+					</b-upload>
+
+					<b-field v-if="needsName" :label="$t('App name')" :message="$t('The compose file has no name: installing it as written needs one (lowercase letters, digits, - and _).')" class="mt-3 app-name">
+						<b-input v-model="appName" placeholder="byepixel" />
+					</b-field>
 				</b-tab-item>
 				<b-tab-item label="Docker CLI">
 					<b-field :message="errors" :type="{ 'is-danger': !!errors }" class="mb-0">
@@ -55,9 +70,14 @@
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
 		<footer class="modal-card-foot is-flex is-align-items-center">
-			<div class="is-flex-grow-1 has-text-full-04"></div>
-			<div>
+			<div class="is-flex-grow-1 has-text-full-04 is-size-7 pr-3">
+				<template v-if="activeTab === 0">
+					{{ $t('Install as written skips the form, which keeps only part of each service.') }}
+				</template>
+			</div>
+			<div class="is-flex-shrink-0">
 				<b-button :label="$t('Cancel')" rounded @click="$emit('close')" />
+				<b-button v-if="activeTab === 0" :disabled="!canInstallAsWritten" :label="$t('Install as written')" rounded @click="emitInstall" />
 				<b-button :label="$t('Submit')" rounded type="is-primary" @click="emitSubmit" />
 			</div>
 		</footer>
@@ -68,6 +88,7 @@
 <script>
 import { parse, stringify } from 'yaml'
 import composerize from 'composerize'
+import { APP_NAME, asWritten, composeInfo, withInstallEnv } from './installEnv'
 
 export default {
 	props: {
@@ -75,7 +96,8 @@ export default {
 		oriNetWorks: Array,
 		deviceMemory: Number,
 	},
-	emits: ['update', 'close'],
+	// update: the compose for the form, and the .env to install with it; install: the text to install as written
+	emits: ['update', 'install', 'close'],
 	data() {
 		return {
 			activeTab: 0,
@@ -87,9 +109,45 @@ export default {
 			errors: '',
 			dropText: this.$t('Drop your Docker Compose file here or click to upload'),
 			uploadIcon: 'upload',
+			envText: '',
+			envFile: {},
+			appName: '',
 		}
 	},
+	computed: {
+		// a compose without a name: installing it as written needs one
+		needsName() {
+			try {
+				return this.dockerComposeCommands.trim() !== '' && !composeInfo(this.dockerComposeCommands).name
+			} catch {
+				return false
+			}
+		},
+		canInstallAsWritten() {
+			return this.dockerComposeCommands.trim() !== '' && (!this.needsName || APP_NAME.test(this.appName))
+		},
+	},
 	methods: {
+		// the compose goes to AppManagement as it is, with its .env: nothing of it goes through the form
+		emitInstall() {
+			let text
+			try {
+				text = asWritten(this.dockerComposeCommands, this.appName)
+			} catch (e) {
+				this.errors = e.message
+				return
+			}
+			this.errors = ''
+			this.$emit('install', withInstallEnv(text, this.envText))
+			this.$emit('close')
+		},
+		onSelectEnv(file) {
+			const reader = new FileReader()
+			reader.onload = () => {
+				this.envText = reader.result
+			}
+			reader.readAsText(file)
+		},
 		/**
 		 * @description: Emit Event to tell parent Update
 		 * @return {*} void
@@ -99,7 +157,7 @@ export default {
 				case 0:
 					this.dockerComposeCommands = this.addTitleToYaml(this.dockerComposeCommands)
 					this.errors = ''
-					this.$emit('update', this.dockerComposeCommands)
+					this.$emit('update', this.dockerComposeCommands, this.envText)
 					this.$emit('close')
 					break
 				case 1: {
@@ -255,6 +313,19 @@ export default {
 
   .section {
     padding: 0.84375rem;
+  }
+}
+
+// the .env is a few lines: its drop zone is a strip, not a second compose area; the name is one line
+.control.env-drop,
+.app-name .control {
+  min-height: 0;
+}
+
+.import-env {
+  ::v-deep .textarea {
+    height: 6rem;
+    font-family: monospace;
   }
 }
 </style>

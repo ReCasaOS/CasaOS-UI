@@ -647,7 +647,9 @@ import { Autoplay, Navigation } from 'swiper/modules'
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
 import { parse } from 'yaml'
 import { vOnClickOutside } from '@vueuse/components'
+import escape from 'lodash/escape'
 import ImportPanel from '../forms/ImportPanel.vue'
+import { withInstallEnv } from '../forms/installEnv'
 import AppSideBar from './AppSideBar.vue'
 import AppTerminalPanel from './AppTerminalPanel.vue'
 import AppStoreSourceManagement from '@/components/Apps/AppStoreSourceManagement.vue'
@@ -759,6 +761,8 @@ export default {
 			// Every panel open, in any tab, hears every install on the message bus:
 			// this one follows only the install it asked for.
 			installStarted: false,
+			// the .env imported with a compose, sent with the install of the form (see installEnv.js)
+			importedEnv: '',
 			currentInstallAppError: false,
 			currentInstallAppType: null,
 			currentInstallAppText: '',
@@ -1418,11 +1422,27 @@ export default {
 				})
 		},
 
+		// A compose installed as written, its .env with it (ImportPanel): the form never sees it,
+		// and a refusal is said as AppManagement words it.
+		async installAsWritten(text) {
+			this.installStarted = true
+			this.isLoading = true
+			try {
+				await this.$openAPI.appManagement.compose.installComposeApp(text, false, true)
+			} catch (e) {
+				this.installStarted = false
+				const data = e?.response?.data
+				this.$buefy.toast.open({ message: escape(data?.message || String(e)), type: 'is-danger', duration: 10000 })
+			} finally {
+				this.isLoading = false
+			}
+		},
+
 		checkComposeAppAndInstallComposeApp(dockerComposeCommands, appName) {
 			this.$refs.ComposeConfig.checkStep().then((valid) => {
 				if (valid.every(v => v === true)) {
 					this.isLoading = true
-					this.installComposeApp(dockerComposeCommands, appName)
+					this.installComposeApp(withInstallEnv(dockerComposeCommands, this.importedEnv), appName)
 						.finally(() => {
 							this.isLoading = false
 						})
@@ -1533,8 +1553,10 @@ export default {
 				scroll: 'keep',
 				animation: 'zoom-in',
 				events: {
-					update: (e) => {
+					// the .env goes with the install of what the form makes of the compose
+					update: (e, env) => {
 						this.dockerComposeConfig = e
+						this.importedEnv = env || ''
 						this.$buefy.dialog.alert({
 							title: `⚠️ ${this.$t('Attention')}`,
 							message:
@@ -1569,6 +1591,7 @@ export default {
 							type: 'is-dark',
 						})
 					},
+					install: text => this.installAsWritten(text),
 				},
 				props: {
 					netWorks: this.networks,
