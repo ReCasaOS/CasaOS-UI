@@ -552,7 +552,9 @@ export default {
 		 */
 		async parseComposeYaml(val) {
 			try {
-				const yaml = YAML.parse(val)
+				// merge keys too: a stack that shares its settings through an anchor (`<<: *php`)
+				// otherwise reached the form with no image, environment or volumes
+				const yaml = YAML.parse(val, { merge: true })
 				if (!yaml) {
 					return
 				}
@@ -850,7 +852,7 @@ export default {
 					})
 			}
 			if (this.dockerComposeCommands) {
-				const yaml = YAML.parse(this.dockerComposeCommands)
+				const yaml = YAML.parse(this.dockerComposeCommands, { merge: true })
 				Object.keys(yaml.services).forEach((key) => {
 					yaml.services[key].ports = []
 					yaml.services[key].volumes = []

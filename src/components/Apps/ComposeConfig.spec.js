@@ -117,6 +117,24 @@ services:
 		return context.configData
 	}
 
+	it('takes what a service shares through an anchor', () => {
+		const configData = load(`name: vecto
+x-php: &php
+  image: vecto-php:latest
+  environment:
+    DB_HOST: db
+services:
+  app:
+    <<: *php
+  queue:
+    <<: *php
+    command: php artisan queue:work
+`)
+		expect(configData.services.app.image).toBe('vecto-php:latest')
+		expect(configData.services.queue.image).toBe('vecto-php:latest')
+		expect(configData.services.queue.environment.map(e => e.container)).toEqual(['DB_HOST'])
+	})
+
 	it('falls back to the compose project name', () => {
 		const configData = load(handWritten)
 		expect(configData['x-casaos'].title.custom).toBe('gluetun-stack')
