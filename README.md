@@ -74,6 +74,14 @@ pnpm dev:mock
 
 It starts the stub on port 8099 and the dev server on 8080, and signs you in as `casaos`. The stub answers the home page, the app grid, the VM tiles, stats, login and refresh. It does not run Docker, serve files, share disks, or speak the message-bus WebSocket.
 
+With the Go component repositories cloned next to this one, the dashboard can talk to a real local Gateway instead of the stub:
+
+```sh
+pnpm dev:stack
+```
+
+That starts `../CasaOS/dev/stack.sh` (Gateway on 8081) and the Vue server on 8080. The first visit is welcome: create the account there. `pnpm dev:mock` remains the path that needs no Go services. Do not run `dev:mock` and `dev:stack` at the same time; both use port 8080. The Files view opens `/DATA` and may 403 on the local stack; the Gateway file API is limited to `.dev-runtime/data` (ManagementRoots), not the path the UI starts at.
+
 To point the development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
 
 ```sh
