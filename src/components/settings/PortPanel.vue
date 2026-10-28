@@ -71,7 +71,8 @@ export default {
 				return
 			}
 			this.$messageBus('dashboardsetting_webuiport', this.port.toString())
-			this.$api.sys.editServerPort({ port: this.port }).then((res) => {
+			// a number input gives a number, and the gateway reads the port as text
+			this.$api.sys.editServerPort({ port: String(this.port) }).then((res) => {
 				if (res.data.success == 200) {
 					this.errorType = ''
 					this.errors = ''
