@@ -56,17 +56,25 @@ Since alvins82's v0.4.30. The full list per release is in [CHANGELOG.md](CHANGEL
 
 ## Development
 
-Node 20 and pnpm 9.0.6 — what CI uses and what `packageManager` declares.
+Node 24 and pnpm 9.0.6 — what CI uses and what `packageManager` declares. `engines` allows Node 20 and 22; 26 is outside the range (Vue CLI on 26 is untested).
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm vitest run                 # 37 tests
+pnpm exec vitest run
 pnpm build                      # writes build/sysroot/...
 ```
 
-`pnpm test` starts vitest in watch mode; `pnpm vitest run` is the one-shot form CI runs.
+`pnpm test` starts vitest in watch mode; `pnpm exec vitest run` is the one-shot form CI runs.
 
-To point a development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
+Without a CasaOS box, run the dashboard against the in-repo stub:
+
+```sh
+pnpm dev:mock
+```
+
+It starts the stub on port 8099 and the dev server on 8080, and signs you in as `casaos`. The stub answers the home page, the app grid, the VM tiles, stats, login and refresh. It does not run Docker, serve files, share disks, or speak the message-bus WebSocket.
+
+To point the development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
 
 ```sh
 pnpm dev

@@ -77,6 +77,27 @@ describe('the stub of the shell', () => {
 	})
 })
 
+describe('the stub of login and refresh', () => {
+	it('answers POST /v1/users/login in the Login.vue envelope', () => {
+		const { status, body } = ask('POST', '/v1/users/login', { username: 'x', password: 'secret' })
+		expect(status).toBe(200)
+		expect(body.data.token.access_token).toBe('mock-access')
+		expect(body.data.user.username).toBe('casaos')
+		expect(body.success).toBe(200)
+	})
+
+	it('answers POST /v1/users/refresh without a nested token', () => {
+		const { status, body } = ask('POST', '/v1/users/refresh', { refresh_token: 'x' })
+		expect(status).toBe(200)
+		expect(body.data.access_token).toBe('mock-access')
+		expect(body.data.token).toBeUndefined()
+	})
+
+	it('still leaves an unrelated POST to the caller', () => {
+		expect(ask('POST', '/v1/samba/shares')).toBeNull()
+	})
+})
+
 // The upload of an image: the body is the file, the name says what to answer.
 describe('the stub of the image upload', () => {
 	const UPLOAD = '/v2/virt_management/images/upload'

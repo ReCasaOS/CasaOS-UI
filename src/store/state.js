@@ -52,7 +52,7 @@ const state = {
 	},
 
 	// Samba and nfs data
-	networkStorage: JSON.parse(localStorage.getItem('networkStorage')) || [],
+	networkStorage: (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('networkStorage'))) || [],
 
 	// shortcut data
 	shortcutData: [],
