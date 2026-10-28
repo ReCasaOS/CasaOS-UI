@@ -72,7 +72,7 @@
 		<footer class="modal-card-foot is-flex is-align-items-center">
 			<div class="is-flex-grow-1 has-text-full-04 is-size-7 pr-3">
 				<template v-if="activeTab === 0">
-					{{ $t('Install as written skips the form, which keeps only part of each service.') }}
+					{{ $t('Install as written skips the form, which rewrites the ports, the commands and the limits of every service.') }}
 				</template>
 			</div>
 			<div class="is-flex-shrink-0">

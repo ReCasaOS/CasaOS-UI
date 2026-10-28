@@ -2594,6 +2594,6 @@
   "KEY=value, one per line: installed with the app as its .env": "CLÉ=valeur, une par ligne : installé avec l'app comme son .env",
   "Drop the .env file here or click to upload": "Déposez le fichier .env ici ou cliquez pour le choisir",
   "The compose file has no name: installing it as written needs one (lowercase letters, digits, - and _).": "Le fichier compose n'a pas de nom : l'installer tel quel en demande un (minuscules, chiffres, - et _).",
-  "Install as written skips the form, which keeps only part of each service.": "Installer tel quel évite le formulaire, qui ne garde qu'une partie de chaque service.",
+  "Install as written skips the form, which rewrites the ports, the commands and the limits of every service.": "Installer tel quel évite le formulaire, qui réécrit les ports, les commandes et les limites de chaque service.",
   "Install as written": "Installer tel quel"
 }
