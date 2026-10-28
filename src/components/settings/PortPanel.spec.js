@@ -33,4 +33,28 @@ describe('web UI port', () => {
 		expect(wrapper.text()).toContain('The setting could not be saved.')
 		expect(wrapper.vm.isLoading).toBe(false)
 	})
+
+	// The field is a number input: what it holds after an edit is a number, and the gateway
+	// (PUT /v1/gateway/port, ChangePortRequest) reads the port as text and answers 400 to a number.
+	it.each([[8081], ['8081']])('sends the port as text when the field holds %j', async (port) => {
+		const editServerPort = vi.fn(() => Promise.resolve({ data: { success: 200 } }))
+		const wrapper = open(editServerPort)
+		wrapper.vm.checkUpdate = vi.fn()
+		wrapper.vm.port = port
+		wrapper.vm.savePort()
+		await flushPromises()
+
+		expect(editServerPort).toHaveBeenCalledWith({ port: '8081' })
+	})
+
+	it('sends nothing for a port out of range', async () => {
+		const editServerPort = vi.fn()
+		const wrapper = open(editServerPort)
+		wrapper.vm.port = 79
+		wrapper.vm.savePort()
+		await flushPromises()
+
+		expect(editServerPort).not.toHaveBeenCalled()
+		expect(wrapper.vm.isLoading).toBe(false)
+	})
 })
