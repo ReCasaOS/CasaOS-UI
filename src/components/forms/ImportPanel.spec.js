@@ -92,7 +92,7 @@ const KEYS = [
 	'KEY=value, one per line: installed with the app as its .env',
 	'Drop the .env file here or click to upload',
 	'The compose file has no name: installing it as written needs one (lowercase letters, digits, - and _).',
-	'Install as written skips the form, which keeps only part of each service.',
+	'Install as written skips the form, which rewrites the ports, the commands and the limits of every service.',
 	'Install as written',
 ]
 
