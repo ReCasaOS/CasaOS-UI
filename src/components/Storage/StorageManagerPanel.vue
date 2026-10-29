@@ -59,6 +59,10 @@
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
 							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
 						</b-tab-item>
+						<!-- the storage layer (GET /v2/storage), where the storage service has it -->
+						<b-tab-item v-if="poolView" :label="$t('Pool')" class="scrollbars-light-auto tab-item">
+							<storage-pool :view="poolView" @changed="refreshPool"></storage-pool>
+						</b-tab-item>
 					</b-tabs>
 
 				</div>
@@ -178,6 +182,8 @@ import DriveItem from './DriveItem.vue'
 import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
 import RaidStatus from './RaidStatus.vue'
+import StoragePool from './StoragePool.vue'
+import { poolWorking } from './pools'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -193,6 +199,7 @@ export default {
 		StorageItem,
 		StorageCombination,
 		RaidStatus,
+		StoragePool,
 		CToolTip: cToolTip,
 	},
 	mixins: [smoothReflow, mixin],
@@ -212,6 +219,10 @@ export default {
 			unDiskData: [],
 			storageData: [],
 			raidArrays: [],
+			// GET /v2/storage's data; null: the storage service has no storage layer
+			poolView: null,
+			poolTimer: null,
+			poolWorked: false,
 			mergeConbinationsStorageData: [],
 			hasMergeState: false,
 		}
@@ -283,9 +294,35 @@ export default {
 
 	beforeUnmount() {
 		this.$EventBus.$off(events.REFRESH_DISKLIST)
+		clearTimeout(this.poolTimer)
 	},
 
 	methods: {
+		// the storage layer's view; looked at again every few seconds while the pool works (a rebuild,
+		// a conversion, a check); a service without it answers 404 and the tab stays hidden
+		async refreshPool() {
+			clearTimeout(this.poolTimer)
+			const first = this.poolView === null
+			try {
+				this.poolView = (await this.$api.pools.overview()).data.data
+			} catch {
+				this.poolView = null
+				return
+			}
+			if (first) {
+				// the Pool tab, after Storage, Merged Storage and Drive: once rendered, or b-tabs ignores the index
+				await this.$nextTick()
+				this.activeTab = 3
+			}
+			const working = poolWorking(this.poolView)
+			if (working) {
+				this.poolTimer = setTimeout(() => this.refreshPool(), 3000)
+			} else if (this.poolWorked) {
+				this.getDiskList() // done: the storages and drives changed too
+			}
+			this.poolWorked = working
+		},
+
 		async showMergedStorage() {
 			await this.getDiskList()
 			this.activeTab = 1
@@ -324,6 +361,8 @@ export default {
 				mergeStorageList = []
 				console.log(e)
 			}
+
+			await this.refreshPool()
 
 			// silent on failure: an older LocalStorage has no such route, and the storages show anyway
 			const raidByPath = {}

@@ -6,6 +6,7 @@ import gitApps from './gitApps.js'
 import batch from './batch.js'
 import container from './container.js'
 import disks from './disks.js'
+import pools from './pools.js'
 import file from './file.js'
 import folder from './folder.js'
 import image from './image.js'
@@ -33,6 +34,7 @@ export default {
 	batch,
 	// Devices
 	disks,
+	pools,
 	storage,
 	samba,
 	driver,
