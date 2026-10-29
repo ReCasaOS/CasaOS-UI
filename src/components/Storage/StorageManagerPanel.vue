@@ -310,7 +310,9 @@ export default {
 				return
 			}
 			if (first) {
-				this.activeTab = 3 // the Pool tab, after Storage, Merged Storage and Drive
+				// the Pool tab, after Storage, Merged Storage and Drive: once rendered, or b-tabs ignores the index
+				await this.$nextTick()
+				this.activeTab = 3
 			}
 			const working = poolWorking(this.poolView)
 			if (working) {
