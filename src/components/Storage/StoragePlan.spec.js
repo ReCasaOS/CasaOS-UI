@@ -53,6 +53,8 @@ describe('a storage plan', () => {
 		await wrapper.vm.preview()
 		expect(api.plan).toHaveBeenCalledWith({ verb: 'create-pool', disks: ['vdb', 'vdc'], layout: { kind: 'mirror', copies: 2 } })
 		expect(wrapper.text()).toContain('Everything on vdb, vdc is erased.')
+		expect(wrapper.text()).toContain('Show the commands')
+		expect(wrapper.text()).not.toContain('mkfs.btrfs') // only when asked
 		expect(wrapper.vm.confirmed).toBe(false)
 		wrapper.vm.typed = 'vdb'
 		expect(wrapper.vm.confirmed).toBe(false)

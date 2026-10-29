@@ -69,7 +69,7 @@
 				<ol class="ml-5 mb-3">
 					<li v-for="s in plan.steps" :key="s">{{ s }}</li>
 				</ol>
-				<b-collapse :open="false" class="mb-3">
+				<b-collapse v-model="showCommands" class="mb-3">
 					<template #trigger="{ open }">
 						<a class="is-size-7">{{ open ? $t('Hide the commands') : $t('Show the commands') }}</a>
 					</template>
@@ -120,6 +120,7 @@ export default {
 			plan: null,
 			refusal: '',
 			typed: '',
+			showCommands: false,
 			isLoading: false,
 			isApplying: false,
 		}
@@ -229,6 +230,7 @@ export default {
 				const body = intent(this.verb, { disks: this.chosenDisks, member: this.asks.member ? this.memberName : '', layout: this.asks.layout ? this.chosenLayout : null })
 				this.plan = (await this.$api.pools.plan(body)).data.data
 				this.typed = ''
+				this.showCommands = false
 			} catch (e) {
 				this.refusal = e?.response?.data?.message || String(e)
 			} finally {
