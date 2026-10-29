@@ -422,8 +422,8 @@ function checkView(raw, refused, locale, kind = '') {
 		mark,
 		markText: TEXT.marks[mark],
 		message: failed ? failureMessage(code, refused, detail, kind) : null,
-		// the core allows 400 characters to what apt says
-		detail: failed ? line(detail, 400) : '',
+		// the core allows 400 characters to what apt says; of a check that passed only the os check of a derivative says something, the release the box was read as and what it is
+		detail: failed || (ok && code === 'os') ? line(detail, 400) : '',
 		detailMessage: failed ? detailMessage(code, detail, locale) : null,
 	}
 }

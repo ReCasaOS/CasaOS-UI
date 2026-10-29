@@ -568,6 +568,13 @@ describe('the view of the plan', () => {
 			expect(ok.detailMessage).toBeNull()
 			expect(ok.detail).toBe('')
 		})
+
+		it('shows what the os check of a derivative says when it passed, as it came, and nothing of the other checks that passed', () => {
+			const detail = 'ubuntu:24.04 (linuxmint:22.2, UBUNTU_CODENAME=noble)'
+			const view = plan({ checks: okChecks().map(check => ({ ...check, detail: check.code === 'os' ? detail : 'x' })) })
+			expect(view.checks.find(check => check.code === 'os')).toMatchObject({ mark: 'passed', message: null, detailMessage: null, detail })
+			expect(view.checks.filter(check => check.code !== 'os').every(check => check.detail === '')).toBe(true)
+		})
 	})
 
 	describe('a release that ReCasaOS cannot tell', () => {
