@@ -77,6 +77,10 @@ export default {
 	mixins: [mixin],
 	props: {
 		currentPath: String,
+		rootPath: {
+			type: String,
+			default: '/DATA',
+		},
 	},
 	data() {
 		return {
@@ -93,7 +97,7 @@ export default {
 	},
 	computed: {
 		isRootorDATA() {
-			return this.currentPath === '/' || this.currentPath === '/DATA'
+			return this.currentPath === '/' || this.currentPath === this.rootPath
 		},
 	},
 	mounted() {

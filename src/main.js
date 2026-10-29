@@ -3,7 +3,7 @@ import { createApp } from 'vue'
 import Buefy from 'buefy'
 import VueFullscreen from 'vue-fullscreen'
 import VueDOMPurifyHTML from 'vue-dompurify-html'
-import { seedMockSession } from '../mock/session.js'
+import { seedMockSession, clearMockSession } from '../mock/session.js'
 import App from '@/App.vue'
 import router from '@/router'
 import store from '@/store'
@@ -65,5 +65,7 @@ app.use(store)
 app.use(i18n)
 if (process.env.VUE_APP_MOCK === '1') {
 	seedMockSession()
+} else {
+	clearMockSession()
 }
 app.mount('#app')

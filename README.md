@@ -80,7 +80,7 @@ With the Go component repositories cloned next to this one, the dashboard can ta
 pnpm dev:stack
 ```
 
-That starts `../CasaOS/dev/stack.sh` (Gateway on 8081) and the Vue server on 8080. The first visit is welcome: create the account there. `pnpm dev:mock` remains the path that needs no Go services. Do not run `dev:mock` and `dev:stack` at the same time; both use port 8080. The Files view opens `/DATA` and may 403 on the local stack; the Gateway file API is limited to `.dev-runtime/data` (ManagementRoots), not the path the UI starts at.
+That starts `../CasaOS/dev/stack.sh` (Gateway on 8081) and the Vue server on 8080. The first visit is welcome: create the account there. `pnpm dev:mock` remains the path that needs no Go services. Do not run `dev:mock` and `dev:stack` at the same time; both use port 8080. Files follows the managed roots (CasaOS `.dev-runtime/data` on the local stack). rclone is optional; without it, Locations has no cloud drives.
 
 To point the development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
 
