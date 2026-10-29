@@ -18,6 +18,8 @@
 				</p>
 			</template>
 			<p v-else-if="!pool.mounted" class="has-text-danger mt-2">{{ $t('The pool is not mounted: its data cannot be reached.') }}</p>
+			<!-- the service's own words: data not in the layout, and the like -->
+			<p v-if="pool.problem" class="has-text-danger mt-2">{{ pool.problem }}</p>
 
 			<!-- its disks -->
 			<table class="table is-fullwidth is-narrow mt-3 pool-members">
@@ -36,7 +38,7 @@
 
 			<!-- what can be done -->
 			<div class="buttons mt-2">
-				<b-button v-for="verb in poolVerbs" :key="verb" :type="verb === 'mount-degraded' ? 'is-danger' : ''" rounded size="is-small"
+				<b-button v-for="verb in poolVerbs" :key="verb" :type="verb === 'mount-degraded' || verb === 'restore-layout' ? 'is-danger' : ''" rounded size="is-small"
 					@click="open(verb)">
 					{{ verbTitle(verb, $t) }}
 				</b-button>
@@ -72,7 +74,7 @@ import { layoutName, poolTag, poolWorking, survives, verbTitle } from './pools'
 import { renderSize } from '@/mixins/file_utils'
 
 // the pool's own actions, shown as buttons under it (members and drives have theirs)
-const POOL_VERBS = ['add-disk', 'change-layout', 'check', 'cancel-check', 'mount-degraded']
+const POOL_VERBS = ['restore-layout', 'add-disk', 'change-layout', 'check', 'cancel-check', 'mount-degraded']
 
 export default {
 	name: 'storage-pool',

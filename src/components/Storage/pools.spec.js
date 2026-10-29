@@ -27,6 +27,7 @@ describe('what the dashboard says about the pool', () => {
 		expect(survives(1, t)).toBe('Survives 1 disk failing')
 		expect(survives(2, t)).toBe('Survives 2 disks failing')
 		expect(verbTitle('replace-disk', t)).toBe('Replace a disk')
+		expect(verbTitle('restore-layout', t)).toBe('Restore protection')
 	})
 
 	it('asks each action only what it needs', () => {

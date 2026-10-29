@@ -35,6 +35,7 @@ export function verbTitle(verb, t) {
 		'replace-disk': t('Replace a disk'),
 		'remove-disk': t('Take a disk out'),
 		'change-layout': t('Change protection'),
+		'restore-layout': t('Restore protection'),
 		'check': t('Check now'),
 		'cancel-check': t('Stop the check'),
 		'mount-degraded': t('Mount with a disk missing'),

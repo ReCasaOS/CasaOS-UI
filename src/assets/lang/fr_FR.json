@@ -2639,5 +2639,6 @@
   "needs {n} disks": "il faut {n} disques",
   "{size} for data": "{size} pour les données",
   "{summary} failed: {error}": "{summary} a échoué : {error}",
-  "{used} used of {size}": "{used} utilisés sur {size}"
+  "{used} used of {size}": "{used} utilisés sur {size}",
+  "Restore protection": "Rétablir la protection"
 }
