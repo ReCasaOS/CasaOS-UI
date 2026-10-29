@@ -557,6 +557,18 @@ describe('the plan of an install', () => {
 		expect(text('.modules-check-detail')).toBe(html)
 	})
 
+	it('shows what the os check says of a derivative that passed, as it came', async () => {
+		const detail = 'ubuntu:24.04 (linuxmint:22.2, UBUNTU_CODENAME=noble)'
+		await open()
+		await installDialog({ checks: okChecks().map(check => check.code === 'os' ? { ...check, detail } : check) })
+
+		const row = wrapper.findAll('.modules-check').find(check => check.find('code').text() === 'os')
+		expect(row.classes()).toContain('is-passed')
+		expect(row.find('.modules-check-detail').text()).toBe(detail)
+		expect(texts('.modules-check-detail')).toEqual([detail])
+		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(true)
+	})
+
 	it('gives up the plan when Cancel is pressed: the wait is cancelled, the answer that comes later is for nobody, and the focus is back on Install', async () => {
 		const out = deferred()
 		calls.planModule.mockReturnValue(out.promise)
