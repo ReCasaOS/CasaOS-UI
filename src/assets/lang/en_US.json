@@ -2613,5 +2613,11 @@
   "Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.": "Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.",
   "Type {name} to confirm": "Type {name} to confirm",
   "Erase and create": "Erase and create",
-  "{name} is created: it synchronizes in the background.": "{name} is created: it synchronizes in the background."
+  "{name} is created: it synchronizes in the background.": "{name} is created: it synchronizes in the background.",
+  "RAID 0 - no protection, from 2 drives": "RAID 0 - no protection, from 2 drives",
+  "Holds {size}. One failed drive loses everything.": "Holds {size}. One failed drive loses everything.",
+  "I understand that if one drive fails, everything on {name} is lost.": "I understand that if one drive fails, everything on {name} is lost.",
+  "Everything on the chosen drives is erased. {name} is usable at once.": "Everything on the chosen drives is erased. {name} is usable at once.",
+  "{name} is created.": "{name} is created.",
+  "No protection": "No protection"
 }

@@ -2,6 +2,7 @@
 	<div class="raid-status has-text-full-04">
 		<p class="is-flex is-align-items-center is-flex-wrap-wrap">
 			<b-tag :type="tag.type" class="mr-2">{{ tag.text }}</b-tag>
+			<b-tag v-if="array.level === 'raid0'" class="mr-2" type="is-warning">{{ $t('No protection') }}</b-tag>
 			<span class="mr-2">{{ title }}</span>
 			<span v-if="remaining" class="has-text-grey-light">{{ remaining }}</span>
 		</p>

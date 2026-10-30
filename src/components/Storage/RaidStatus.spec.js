@@ -30,6 +30,16 @@ describe('the state of an array', () => {
 		expect(text).toContain('sdc (Faulty)')
 		expect(text).toContain('sdd (Rebuilding)')
 		expect(text).toContain('Missing: 1')
+		expect(text).not.toContain('No protection')
+	})
+
+	it('says a RAID 0 has no protection, though it runs', () => {
+		const array = { name: 'md0', level: 'raid0', state: 'ok', action: 'idle', progress: -1, remaining: -1, missing: 0, members: [{ name: 'sdb', disk: 'sdb', state: 'active' }, { name: 'sdc', disk: 'sdc', state: 'active' }] }
+		const wrapper = mount(RaidStatus, { props: { array }, global: { plugins: [Buefy, i18n] } })
+		const text = wrapper.text().replace(/\s+/g, ' ')
+		expect(text).toContain('Healthy')
+		expect(text).toContain('No protection')
+		expect(text).toContain('RAID 0 · md0')
 	})
 })
 

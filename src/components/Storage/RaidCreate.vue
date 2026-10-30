@@ -24,7 +24,10 @@
 					<p v-if="selected.length < least" class="help">{{ $t('This level needs at least {count} drives.', { count: least }) }}</p>
 				</div>
 				<p v-if="estimate" class="mb-3">{{ estimateText }}</p>
-				<p class="has-text-danger mb-3">{{ $t('Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.', { name: name || '…' }) }}</p>
+				<p class="has-text-danger mb-3">{{ erasedText }}</p>
+				<b-checkbox v-if="noProtection" v-model="acceptLoss" class="mb-3" type="is-danger">
+					{{ $t('I understand that if one drive fails, everything on {name} is lost.', { name: name || '…' }) }}
+				</b-checkbox>
 				<b-field :label="$t('Type {name} to confirm', { name: name || '…' })">
 					<b-input v-model="typed" autocomplete="off"></b-input>
 				</b-field>
@@ -52,6 +55,7 @@ export default {
 			level: 'raid1',
 			selected: [],
 			typed: '',
+			acceptLoss: false,
 			isLoading: true,
 			isCreating: false,
 		}
@@ -64,6 +68,10 @@ export default {
 		least() {
 			return RAID_LEVELS[this.level]
 		},
+		// a RAID 0 survives nothing: it is made only for whoever says they know
+		noProtection() {
+			return this.level === 'raid0'
+		},
 		validName() {
 			return /^\w{1,16}$/.test(this.name)
 		},
@@ -72,12 +80,27 @@ export default {
 		},
 		estimateText() {
 			const holds = renderSize(this.estimate.capacity)
+			if (this.estimate.survives === 0) {
+				return this.$t('Holds {size}. One failed drive loses everything.', { size: holds })
+			}
 			return this.estimate.survives === 1
 				? this.$t('Holds {size}. One failed drive loses nothing.', { size: holds })
 				: this.$t('Holds {size}. Up to {count} failed drives lose nothing.', { size: holds, count: this.estimate.survives })
 		},
+		erasedText() {
+			const name = this.name || '…'
+			return this.noProtection
+				? this.$t('Everything on the chosen drives is erased. {name} is usable at once.', { name })
+				: this.$t('Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.', { name })
+		},
 		ready() {
-			return this.validName && this.typed === this.name && this.estimate !== null && !this.isCreating
+			return this.validName && this.typed === this.name && this.estimate !== null && (!this.noProtection || this.acceptLoss) && !this.isCreating
+		},
+	},
+	watch: {
+		// the consent is for the RAID 0 that was on the screen when it was given
+		level() {
+			this.acceptLoss = false
 		},
 	},
 	mounted() {
@@ -91,6 +114,7 @@ export default {
 				raid5: this.$t('RAID 5 - one drive may fail, from 3 drives'),
 				raid6: this.$t('RAID 6 - two drives may fail, from 4 drives'),
 				raid10: this.$t('RAID 10 - mirrored pairs, from 4 drives'),
+				raid0: this.$t('RAID 0 - no protection, from 2 drives'),
 			}[level] || raidLevel(level)
 		},
 		// the blank drives LocalStorage offers for a new storage
@@ -107,8 +131,11 @@ export default {
 		async create() {
 			this.isCreating = true
 			try {
-				await this.$api.disks.createRaid(this.name, this.level, this.selected, this.typed)
-				this.$buefy.toast.open({ message: escape(this.$t('{name} is created: it synchronizes in the background.', { name: this.name })), type: 'is-success' })
+				await this.$api.disks.createRaid(this.name, this.level, this.selected, this.typed, this.noProtection && this.acceptLoss)
+				const made = this.noProtection
+					? this.$t('{name} is created.', { name: this.name })
+					: this.$t('{name} is created: it synchronizes in the background.', { name: this.name })
+				this.$buefy.toast.open({ message: escape(made), type: 'is-success' })
 				this.$emit('changed')
 				this.$emit('close')
 			} catch (e) {
