@@ -43,3 +43,19 @@ export function raidRemaining(seconds, t) {
 	}
 	return t('{hours} h {minutes} min left', { hours: Math.floor(minutes / 60), minutes: minutes % 60 })
 }
+
+// The levels a new array can be made at, each with the least number of disks it takes. raid0 is not here: one failed disk loses everything on it.
+export const RAID_LEVELS = { raid1: 2, raid5: 3, raid6: 4, raid10: 4 }
+
+// What an array of disks of these sizes holds, and how many failed disks it is sure to survive; null when there are too few disks for the level.
+export function raidEstimate(level, sizes) {
+	const count = sizes.length
+	if (!(count >= RAID_LEVELS[level])) {
+		return null
+	}
+	const smallest = Math.min(...sizes)
+	// raid10 keeps two copies: a failed disk is lost with its twin only, but only one is certain
+	const data = { raid1: 1, raid5: count - 1, raid6: count - 2, raid10: count / 2 }[level]
+	const survives = { raid1: count - 1, raid5: 1, raid6: 2, raid10: 1 }[level]
+	return { capacity: data * smallest, survives }
+}

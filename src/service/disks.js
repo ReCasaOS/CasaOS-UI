@@ -35,6 +35,12 @@ const disks = {
 		return api.get(`${PREFIX}/raid`)
 	},
 
+	// erases the blank disks (their paths), makes one array of them at level (raid1, raid5, raid6, raid10), formats it
+	// and mounts it as the storage name; confirm is that name typed again. Formatting can be long, hence the 10 minutes
+	createRaid(name, level, disks, confirm) {
+		return api.post(`${PREFIX}/raid`, { name, level, disks, confirm }, { timeout: 600000 })
+	},
+
 	// erases the blank disk at path and adds it to the array name; confirm is its name typed again
 	addToRaid(name, path, confirm) {
 		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/disks`, { path, confirm })
