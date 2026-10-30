@@ -31,6 +31,8 @@ describe('what an array of some disks holds', () => {
 		['raid6', [2, 2, 2, 4], 4, 2],
 		['raid10', [2, 2, 2, 4], 4, 1],
 		['raid10', [2, 2, 2, 2, 2], 5, 1],
+		['raid0', [2, 4], 4, 0],
+		['raid0', [2, 2, 4], 6, 0],
 	])('%s on %j holds %i and survives %i', (level, sizes, capacity, survives) => {
 		expect(raidEstimate(level, sizes.map(s => s * TB))).toEqual({ capacity: capacity * TB, survives })
 	})
@@ -38,8 +40,10 @@ describe('what an array of some disks holds', () => {
 	it('says nothing for too few disks, and for a level that is not offered', () => {
 		expect(raidEstimate('raid5', [TB, TB])).toBeNull()
 		expect(raidEstimate('raid10', [TB, TB, TB])).toBeNull()
-		expect(raidEstimate('raid0', [TB, TB])).toBeNull()
-		expect(Object.keys(RAID_LEVELS)).toEqual(['raid1', 'raid5', 'raid6', 'raid10'])
+		expect(raidEstimate('raid0', [TB])).toBeNull()
+		expect(raidEstimate('linear', [TB, TB])).toBeNull()
+		// raid0 comes last: the level the window starts on is one that survives a failed disk
+		expect(Object.keys(RAID_LEVELS)).toEqual(['raid1', 'raid5', 'raid6', 'raid10', 'raid0'])
 	})
 })
 
@@ -47,7 +51,7 @@ describe('making an array', () => {
 	it('offers the levels the blank disks are enough for, and none to start with selected', async () => {
 		const { wrapper } = create({}, [avail[0], avail[1], avail[2]])
 		await flushPromises()
-		expect(wrapper.vm.levels).toEqual(['raid1', 'raid5'])
+		expect(wrapper.vm.levels).toEqual(['raid1', 'raid5', 'raid0'])
 		expect(wrapper.vm.level).toBe('raid1')
 		expect(wrapper.vm.selected).toEqual([])
 		expect(wrapper.vm.ready).toBe(false)
@@ -72,10 +76,57 @@ describe('making an array', () => {
 		wrapper.vm.typed = 'pool'
 
 		await wrapper.vm.create()
-		expect(createRaid).toHaveBeenCalledWith('pool', 'raid5', ['/dev/sdb', '/dev/sdc', '/dev/sdd'], 'pool')
+		expect(createRaid).toHaveBeenCalledWith('pool', 'raid5', ['/dev/sdb', '/dev/sdc', '/dev/sdd'], 'pool', false)
 		expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: 'is-success' }))
 		expect(wrapper.emitted('changed')).toHaveLength(1)
 		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('makes a RAID 0 only once the loss is accepted, and says so to the API', async () => {
+		const createRaid = vi.fn().mockResolvedValue({})
+		const { wrapper, toast } = create({ createRaid })
+		await flushPromises()
+		wrapper.vm.name = 'fast'
+		wrapper.vm.level = 'raid0'
+		wrapper.vm.selected = ['/dev/sdb', '/dev/sdc']
+		wrapper.vm.typed = 'fast'
+		await wrapper.vm.$nextTick()
+		expect(wrapper.vm.estimate).toEqual({ capacity: 4 * TB, survives: 0 })
+		expect(wrapper.vm.estimateText).toContain('loses everything')
+		expect(wrapper.vm.ready).toBe(false)
+		expect(wrapper.text()).toContain('I understand that if one drive fails, everything on fast is lost.')
+
+		wrapper.vm.acceptLoss = true
+		expect(wrapper.vm.ready).toBe(true)
+
+		await wrapper.vm.create()
+		expect(createRaid).toHaveBeenCalledWith('fast', 'raid0', ['/dev/sdb', '/dev/sdc'], 'fast', true)
+		expect(toast.mock.calls[0][0].message).toBe('fast is created.')
+	})
+
+	it('forgets the consent when the level changes, and never sends it for another level', async () => {
+		const createRaid = vi.fn().mockResolvedValue({})
+		const { wrapper } = create({ createRaid })
+		await flushPromises()
+		wrapper.vm.name = 'pool'
+		wrapper.vm.level = 'raid0'
+		await wrapper.vm.$nextTick()
+		wrapper.vm.acceptLoss = true
+		wrapper.vm.level = 'raid1'
+		await wrapper.vm.$nextTick()
+		expect(wrapper.vm.acceptLoss).toBe(false)
+		wrapper.vm.level = 'raid0'
+		await wrapper.vm.$nextTick()
+		wrapper.vm.selected = ['/dev/sdb', '/dev/sdc']
+		wrapper.vm.typed = 'pool'
+		expect(wrapper.vm.ready).toBe(false)
+
+		wrapper.vm.acceptLoss = true
+		wrapper.vm.level = 'raid1'
+		await wrapper.vm.$nextTick()
+		wrapper.vm.acceptLoss = true // a stale consent on a level that does not ask for it
+		await wrapper.vm.create()
+		expect(createRaid).toHaveBeenCalledWith('pool', 'raid1', ['/dev/sdb', '/dev/sdc'], 'pool', false)
 	})
 
 	it.each(['', 'my pool', 'pool;', 'école', 'seventeen_letters'])('refuses the name "%s"', async (name) => {
@@ -125,6 +176,12 @@ const KEYS = [
 	'RAID 6 - two drives may fail, from 4 drives',
 	'RAID 10 - mirrored pairs, from 4 drives',
 	'Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.',
+	'RAID 0 - no protection, from 2 drives',
+	'Holds {size}. One failed drive loses everything.',
+	'I understand that if one drive fails, everything on {name} is lost.',
+	'Everything on the chosen drives is erased. {name} is usable at once.',
+	'{name} is created.',
+	'No protection',
 	'Type {name} to confirm',
 	'Erase and create',
 	'{name} is created: it synchronizes in the background.',

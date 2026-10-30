@@ -2613,5 +2613,11 @@
   "Everything on the chosen drives is erased. {name} is usable at once, while the RAID synchronizes in the background.": "Tout ce que contiennent les disques choisis est effacé. {name} est utilisable tout de suite, pendant que le RAID se synchronise en arrière-plan.",
   "Type {name} to confirm": "Tapez {name} pour confirmer",
   "Erase and create": "Effacer et créer",
-  "{name} is created: it synchronizes in the background.": "{name} est créé et se synchronise en arrière-plan."
+  "{name} is created: it synchronizes in the background.": "{name} est créé et se synchronise en arrière-plan.",
+  "RAID 0 - no protection, from 2 drives": "RAID 0 - aucune protection, dès 2 disques",
+  "Holds {size}. One failed drive loses everything.": "Contient {size}. La panne d'un disque fait tout perdre.",
+  "I understand that if one drive fails, everything on {name} is lost.": "Je comprends que si un disque tombe en panne, tout ce que contient {name} est perdu.",
+  "Everything on the chosen drives is erased. {name} is usable at once.": "Tout ce que contiennent les disques choisis est effacé. {name} est utilisable tout de suite.",
+  "{name} is created.": "{name} est créé.",
+  "No protection": "Sans protection"
 }
