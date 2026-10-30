@@ -24,6 +24,15 @@
 								</b-button>
 							</div>
 						</b-tooltip>
+						<b-tooltip :active="unDiskData.length < 2"
+							:label="$t('Plug at least two blank drives to make a RAID.')" append-to-body
+							content-class="create-storage-tip" position="is-bottom" type="is-dark">
+							<div class="ml-2">
+								<b-button :disabled="unDiskData.length < 2" class="o" rounded size="is-small"
+									type="is-link is-light" @click="showCreateRaid">{{ $t('Create RAID') }}
+								</b-button>
+							</div>
+						</b-tooltip>
 
 					</div>
 					<b-tabs v-model="activeTab" :animated="false">
@@ -178,6 +187,7 @@ import DriveItem from './DriveItem.vue'
 import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
 import RaidStatus from './RaidStatus.vue'
+import RaidCreate from './RaidCreate.vue'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -289,6 +299,15 @@ export default {
 		async showMergedStorage() {
 			await this.getDiskList()
 			this.activeTab = 1
+		},
+
+		showCreateRaid() {
+			this.$buefy.modal.open({
+				component: RaidCreate,
+				hasModalCard: true,
+				trapFocus: true,
+				events: { changed: () => this.getDiskList() },
+			})
 		},
 
 		/**
