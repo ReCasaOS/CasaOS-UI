@@ -2619,5 +2619,14 @@
   "I understand that if one drive fails, everything on {name} is lost.": "I understand that if one drive fails, everything on {name} is lost.",
   "Everything on the chosen drives is erased. {name} is usable at once.": "Everything on the chosen drives is erased. {name} is usable at once.",
   "{name} is created.": "{name} is created.",
-  "No protection": "No protection"
+  "No protection": "No protection",
+  "Change to RAID 5": "Change to RAID 5",
+  "Use the new space": "Use the new space",
+  "Change {name} to RAID 5": "Change {name} to RAID 5",
+  "The mirror becomes a RAID 5 of three drives: it holds twice as much and still survives one failed drive. It stays usable while it reorganizes onto the new drive, which takes hours for large drives, so do not switch the box off before it is over.": "The mirror becomes a RAID 5 of three drives: it holds twice as much and still survives one failed drive. It stays usable while it reorganizes onto the new drive, which takes hours for large drives, so do not switch the box off before it is over.",
+  "Everything on {disk} is erased.": "Everything on {disk} is erased.",
+  "Erase and change": "Erase and change",
+  "{name} is changing to RAID 5: it reorganizes in the background.": "{name} is changing to RAID 5: it reorganizes in the background.",
+  "Reshaping {percent} %": "Reshaping {percent} %",
+  "The filesystem now uses the room of {name}.": "The filesystem now uses the room of {name}."
 }

@@ -34,7 +34,7 @@
 							total: renderSize(item.size),
 						})
 					}}</p>
-					<raid-status v-if="item.raid" :array="item.raid" class="mt-2" @changed="$emit('getDiskList')"></raid-status>
+					<raid-status v-if="item.raid" :array="item.raid" :fs-size="Number(item.size) || 0" class="mt-2" @changed="$emit('getDiskList')"></raid-status>
 				</div>
 
 			</div>

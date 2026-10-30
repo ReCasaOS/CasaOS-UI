@@ -21,10 +21,21 @@ export function raidTag(array, t) {
 		case 'checking':
 			return { type: 'is-info', text: withPercent('Checking {percent} %', 'Checking') }
 		case 'reshaping':
-			return { type: 'is-info', text: t('Reshaping') }
+			return { type: 'is-info', text: withPercent('Reshaping {percent} %', 'Reshaping') }
 		default:
 			return { type: 'is-danger', text: t('Not running') }
 	}
+}
+
+// A RAID 1 of two disks that is whole and doing nothing else can become a RAID 5 with a third disk.
+export function raidCanBecomeRaid5(array) {
+	return array.level === 'raid1' && array.disks === 2 && array.state === 'ok' && array.action === 'idle'
+}
+
+// An array that holds clearly more than the filesystem on it, after a reshape: the room is there to be used. fsSize is the filesystem's own size, always a bit under its
+// device's (inodes, journal), hence the quarter of margin; a RAID 5 made of a mirror holds twice as much.
+export function raidRoomLeft(array, fsSize) {
+	return array.state === 'ok' && array.action === 'idle' && fsSize > 0 && array.size > fsSize * 1.25
 }
 
 // An array that needs someone: one that lacks a disk, has a failed one, is rebuilding or does not run.

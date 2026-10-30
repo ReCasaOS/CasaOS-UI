@@ -46,6 +46,17 @@ const disks = {
 		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/disks`, { path, confirm })
 	},
 
+	// erases the blank disk at path and changes the RAID 1 name to a RAID 5 of three disks with it; confirm is the disk's name typed again.
+	// The call ends when the reshape has started; it goes on in the background
+	raidToRaid5(name, path, confirm) {
+		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/level`, { level: 'raid5', path, confirm }, { timeout: 600000 })
+	},
+
+	// makes the filesystem on the array name take all the room the array has (after a reshape); it can take minutes
+	growRaidFilesystem(name) {
+		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/filesystem`, {}, { timeout: 600000 })
+	},
+
 	// takes the failed member (sdc1) out of the array name
 	removeFromRaid(name, member) {
 		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}/disks/${encodeURIComponent(member)}`)
