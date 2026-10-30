@@ -99,6 +99,10 @@ server.on('upgrade', (req, socket, head) => {
 	socket.on('error', () => tunnel.destroy())
 })
 
+server.on('error', (err) => {
+	console.error(err.message)
+	process.exit(1)
+})
 server.listen(port, () => {
 	console.log(`stats stub on http://127.0.0.1:${port} (envelope ${envelope}${upstream ? `, upstream ${upstream}` : ', no upstream'})`)
 })

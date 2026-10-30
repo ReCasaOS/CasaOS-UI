@@ -18,6 +18,7 @@ import has from 'lodash/has'
 import TreeListItem from './TreeListItem.vue'
 import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
+import { homeFolders } from '../fileRoot.js'
 
 export default {
 	mixins: [mixin],
@@ -53,57 +54,21 @@ export default {
 				},
 			],
 
-			initFolders: [
-				{
-					name: 'DATA',
-					icon: 'data-outline',
-					pack: 'casa',
-					path: '/DATA',
-					visible: true,
-					selected: true,
-					extensions: null,
-				},
-				{
-					name: 'Documents',
-					icon: 'files-outline',
-					pack: 'casa',
-					path: '/DATA/Documents',
-					visible: true,
-					selected: true,
-					extensions: null,
-				},
-				{
-					name: 'Downloads',
-					icon: 'downloads-outline',
-					pack: 'casa',
-					path: '/DATA/Downloads',
-					visible: true,
-					selected: true,
-					extensions: null,
-				},
-				{
-					name: 'Gallery',
-					icon: 'gallery-outline',
-					pack: 'casa',
-					path: '/DATA/Gallery',
-					visible: true,
-					selected: true,
-					extensions: null,
-				},
-				{
-					name: 'Media',
-					icon: 'media-outline',
-					pack: 'casa',
-					path: '/DATA/Media',
-					visible: true,
-					selected: true,
-					extensions: null,
-				},
-
-			],
 			dataList: [],
 			shortcutList: [],
 		}
+	},
+	computed: {
+		initFolders() {
+			return homeFolders(this.filePanel.rootPath || '/DATA')
+		},
+	},
+	watch: {
+		'filePanel.fileRootReady'(ready) {
+			if (ready) {
+				this.getNewList()
+			}
+		},
 	},
 	async created() {
 		// Get the shortcut detail for the first time and save it to store
@@ -112,7 +77,9 @@ export default {
 		} catch (e) {
 			console.log(e)
 		}
-		this.getNewList()
+		if (this.filePanel.fileRootReady) {
+			this.getNewList()
+		}
 	},
 
 	mounted() {

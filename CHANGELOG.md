@@ -2,6 +2,18 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`pnpm dev:mock`** runs the dashboard against an in-repo stub (home, app grid, stats, login) without a CasaOS box. Node 24, as CI.
+- **`pnpm dev:stack`** starts the sibling Go stack (`../CasaOS/dev/stack.sh`) and the Vue server on 8080. Welcome creates the first account. Files follows the managed roots the stack publishes.
+
+### Fixed
+
+- Leaving mock mode clears leftover `mock-access` / `mock-refresh` tokens so a real Gateway is not sent a stub session.
+- Locations does not overlay an error when rclone is absent: the cloud list becomes empty.
+
 ## [0.4.65] - 2026-09-15
 
 ### Fixed

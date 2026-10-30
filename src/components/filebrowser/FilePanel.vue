@@ -277,6 +277,7 @@ import events from '@/events/events'
 import VueBreakpointMixin from '@/mixins/breakpoint'
 import { filterHiddenFiles } from '@/mixins/file_utils'
 import { mixin } from '@/mixins/mixin'
+import { fileRootFrom } from './fileRoot.js'
 
 const SHOW_HIDDEN_FILES_STORAGE_KEY = 'casaos-filebrowser-show-hidden-files'
 
@@ -333,6 +334,7 @@ export default {
 			panelType: null,
 			currentItem: null,
 			rootPath: '/DATA',
+			fileRootReady: false,
 			currentPath: '',
 			currentPathName: '',
 			isViewGird: true,
@@ -461,7 +463,9 @@ export default {
 		},
 	},
 
-	mounted() {
+	async mounted() {
+		await this.resolveFileRoot()
+		this.$EventBus.$emit(events.RELOAD_FILE_LIST)
 		this.init()
 		// on a tab of its own nobody calls init(path): the folder comes in the
 		// address (#/files?path=/DATA/...)
@@ -557,6 +561,16 @@ export default {
 		showTrash() {
 			this.pageType = 'trash'
 			this.hideMobileSidebar()
+		},
+
+		async resolveFileRoot() {
+			try {
+				const res = await this.$api.file.getRoots()
+				this.rootPath = fileRootFrom(res?.data?.data?.roots)
+			} catch {
+				this.rootPath = '/DATA'
+			}
+			this.fileRootReady = true
 		},
 
 		/**
@@ -898,6 +912,7 @@ export default {
 				animation: 'zoom-in',
 				props: {
 					currentPath: this.currentPath,
+					rootPath: this.rootPath,
 				},
 				events: {
 					reload: () => {
@@ -1180,7 +1195,7 @@ export default {
 		},
 		'local-storage:disk:added': function () {
 			setTimeout(() => {
-				if (this.currentPath == '/DATA') {
+				if (this.currentPath == this.rootPath) {
 					this.reload()
 				}
 			}, 500)
