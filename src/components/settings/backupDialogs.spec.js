@@ -89,3 +89,64 @@ describe('the destination form', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('a destination kept with restic', () => {
+	const state = states => name => Promise.resolve({ data: { data: states[name] } })
+	const buttons = wrapper => wrapper.findAll('.destination .button').map(button => button.text())
+
+	it('offers the switch only where this box has restic and the destination is not switched', async () => {
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer(['nas', 'offsite', 'old']),
+			getResticState: state({ nas: { available: true, enabled: false }, offsite: { available: true, enabled: true }, old: { available: false, enabled: false } }),
+		})
+		const rows = wrapper.findAll('.destination')
+		expect(rows[0].text()).toContain('Keep with restic')
+		expect(rows[1].text()).not.toContain('Keep with restic')
+		expect(rows[1].text()).toContain('Kept with restic')
+		expect(rows[2].text()).not.toContain('restic')
+		wrapper.unmount()
+	})
+
+	it('is no button and no error where the box does not know the call', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer(['nas']) })
+		expect(buttons(wrapper).join(' ')).not.toContain('restic')
+		expect(wrapper.text()).not.toContain('Destinations could not be loaded')
+		wrapper.unmount()
+	})
+
+	it('shows the password it is given back once, and not one the person typed', async () => {
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer(['nas']),
+			getResticState: state({ nas: { available: true, enabled: false } }),
+			enableRestic: vi.fn(() => Promise.resolve({ data: { data: { password: 'Zm9vYmFy-_' } } })),
+		})
+		const alert = vi.fn()
+		wrapper.vm.$buefy.dialog.alert = alert
+		const toast = vi.fn()
+		wrapper.vm.$buefy.toast.open = toast
+
+		await wrapper.vm.enableRestic('nas', '')
+		expect(alert).toHaveBeenCalledOnce()
+		expect(alert.mock.calls[0][0].message).toContain('<code>Zm9vYmFy-_</code>')
+
+		alert.mockClear()
+		await wrapper.vm.enableRestic('nas', 'from-the-old-box')
+		expect(alert).not.toHaveBeenCalled()
+		expect(toast).toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('puts nothing a destination can be called into the markup of the password dialog', async () => {
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer([]),
+			enableRestic: () => Promise.resolve({ data: { data: { password: 'abc' } } }),
+			getResticState: state({}),
+		})
+		const alert = vi.fn()
+		wrapper.vm.$buefy.dialog.alert = alert
+
+		await wrapper.vm.enableRestic('<img src=x onerror=alert(1)>', '')
+		expect(alert.mock.calls[0][0].message).not.toContain('<img')
+		wrapper.unmount()
+	})
+})
