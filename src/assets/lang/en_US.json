@@ -2628,5 +2628,6 @@
   "Erase and change": "Erase and change",
   "{name} is changing to RAID 5: it reorganizes in the background.": "{name} is changing to RAID 5: it reorganizes in the background.",
   "Reshaping {percent} %": "Reshaping {percent} %",
-  "The filesystem now uses the room of {name}.": "The filesystem now uses the room of {name}."
+  "The filesystem now uses the room of {name}.": "The filesystem now uses the room of {name}.",
+  "The mirror of three drives becomes a RAID 5 of three drives: it holds twice as much, but survives one failed drive instead of two. {disk} comes out of the mirror, is erased and goes back in as the third drive, so no drive is needed. It stays usable while it reorganizes, which takes hours for large drives, so do not switch the box off before it is over.": "The mirror of three drives becomes a RAID 5 of three drives: it holds twice as much, but survives one failed drive instead of two. {disk} comes out of the mirror, is erased and goes back in as the third drive, so no drive is needed. It stays usable while it reorganizes, which takes hours for large drives, so do not switch the box off before it is over."
 }

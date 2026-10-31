@@ -2628,5 +2628,6 @@
   "Erase and change": "Effacer et changer",
   "{name} is changing to RAID 5: it reorganizes in the background.": "{name} passe en RAID 5 et se réorganise en arrière-plan.",
   "Reshaping {percent} %": "Restructuration {percent} %",
-  "The filesystem now uses the room of {name}.": "Le système de fichiers utilise maintenant tout l'espace de {name}."
+  "The filesystem now uses the room of {name}.": "Le système de fichiers utilise maintenant tout l'espace de {name}.",
+  "The mirror of three drives becomes a RAID 5 of three drives: it holds twice as much, but survives one failed drive instead of two. {disk} comes out of the mirror, is erased and goes back in as the third drive, so no drive is needed. It stays usable while it reorganizes, which takes hours for large drives, so do not switch the box off before it is over.": "Le miroir de trois disques devient un RAID 5 de trois disques, qui contient deux fois plus mais ne survit qu'à la panne d'un disque au lieu de deux. {disk} sort du miroir, est effacé et revient comme troisième disque, donc aucun disque n'est nécessaire. Il reste utilisable pendant qu'il se réorganise, ce qui prend des heures pour de gros disques, donc n'éteignez pas la machine avant la fin."
 }

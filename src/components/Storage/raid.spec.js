@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { raidCanBecomeRaid5, raidLevel, raidNeedsAttention, raidRemaining, raidRoomLeft, raidTag } from './raid'
+import { raidCanBecomeRaid5, raidFreedMember, raidLevel, raidNeedsAttention, raidRemaining, raidRoomLeft, raidTag } from './raid'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 
@@ -37,6 +37,20 @@ describe('what the dashboard says about an array', () => {
 		for (const change of [{ level: 'raid5' }, { level: 'raid0' }, { disks: 3 }, { state: 'degraded' }, { state: 'resyncing', action: 'resync' }, { action: 'check' }]) {
 			expect(raidCanBecomeRaid5({ ...mirror, ...change })).toBe(false)
 		}
+	})
+
+	it('offers RAID 5 to a healthy mirror of three drives too, which gives back its last one', () => {
+		const members = [{ disk: 'sdb', state: 'active', slot: 0 }, { disk: 'sdc', state: 'active', slot: 1 }, { disk: 'sdd', state: 'active', slot: 2 }]
+		const trio = { level: 'raid1', disks: 3, state: 'ok', action: 'idle', members }
+		expect(raidCanBecomeRaid5(trio)).toBe(true)
+		expect(raidFreedMember(trio)).toBe('sdd')
+		expect(raidFreedMember({ disks: 3, members: [...members].reverse() })).toBe('sdd') // the order of the list does not matter, the slot does
+		expect(raidCanBecomeRaid5({ ...trio, members: [...members, { disk: 'sde', state: 'spare', slot: -1 }] })).toBe(false)
+		expect(raidCanBecomeRaid5({ ...trio, members: members.slice(0, 2) })).toBe(false)
+		expect(raidCanBecomeRaid5({ ...trio, members: [members[0], members[1], { ...members[2], slot: 5 }] })).toBe(false)
+		expect(raidCanBecomeRaid5({ ...trio, state: 'degraded' })).toBe(false)
+		expect(raidCanBecomeRaid5({ ...trio, disks: 4 })).toBe(false)
+		expect(raidFreedMember({ disks: 2, members: [] })).toBe('')
 	})
 
 	it('says there is room to use when the array holds clearly more than the filesystem on it', () => {

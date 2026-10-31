@@ -6,14 +6,17 @@
 		</header>
 		<section class="modal-card-body">
 			<b-loading v-model="isLoading" :is-full-page="false"></b-loading>
-			<p v-if="!isLoading && !candidates.length">
+			<p v-if="!isLoading && !isTrio && !candidates.length">
 				{{ $t('No blank disk is big enough: it must hold at least {size}.', { size: renderSize(array.component_size) }) }}
 			</p>
 			<template v-else-if="!isLoading">
-				<p class="mb-3">
+				<p v-if="isTrio" class="mb-3">
+					{{ $t('The mirror of three drives becomes a RAID 5 of three drives: it holds twice as much, but survives one failed drive instead of two. {disk} comes out of the mirror, is erased and goes back in as the third drive, so no drive is needed. It stays usable while it reorganizes, which takes hours for large drives, so do not switch the box off before it is over.', { disk: name }) }}
+				</p>
+				<p v-else class="mb-3">
 					{{ $t('The mirror becomes a RAID 5 of three drives: it holds twice as much and still survives one failed drive. It stays usable while it reorganizes onto the new drive, which takes hours for large drives, so do not switch the box off before it is over.') }}
 				</p>
-				<b-field :label="$t('Drive')">
+				<b-field v-if="!isTrio" :label="$t('Drive')">
 					<b-select v-model="path" expanded>
 						<option v-for="disk in candidates" :key="disk.path" :value="disk.path">
 							{{ disk.name }} ({{ disk.model }} - {{ renderSize(disk.size) }})
@@ -35,6 +38,7 @@
 
 <script>
 import escape from 'lodash/escape'
+import { raidFreedMember } from './raid'
 import { renderSize } from '@/mixins/file_utils'
 
 export default {
@@ -56,6 +60,10 @@ export default {
 		}
 	},
 	computed: {
+		// a mirror of three has no drive to add: it gives one back
+		isTrio() {
+			return this.array.disks === 3
+		},
 		// the disk's short name, sdd: what has to be typed again
 		name() {
 			return this.path.replace('/dev/', '')
@@ -76,6 +84,12 @@ export default {
 		renderSize,
 		// the blank disks LocalStorage offers for a new storage, big enough for the array
 		async load() {
+			if (this.isTrio) {
+				const freed = raidFreedMember(this.array)
+				this.path = freed ? `/dev/${freed}` : ''
+				this.isLoading = false
+				return
+			}
 			try {
 				const avail = (await this.$api.disks.getDiskList()).data.data.avail || []
 				this.candidates = avail.filter(disk => disk.size >= (this.array.component_size || 0))

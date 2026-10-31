@@ -57,6 +57,43 @@ describe('changing a mirror to RAID 5', () => {
 	})
 })
 
+describe('changing a mirror of three to RAID 5', () => {
+	const trio = {
+		...mirror,
+		disks: 3,
+		members: [{ name: 'sdb', disk: 'sdb', state: 'active', slot: 0 }, { name: 'sdc', disk: 'sdc', state: 'active', slot: 1 }, { name: 'sdd', disk: 'sdd', state: 'active', slot: 2 }],
+	}
+
+	function changeTrio(api) {
+		const toast = vi.fn()
+		const wrapper = mount(RaidToRaid5, { props: { array: trio }, global: { plugins: [Buefy, i18n], mocks: { $api: { disks: api } } } })
+		wrapper.vm.$buefy.toast.open = toast
+		return { wrapper, toast }
+	}
+
+	it('asks for no new drive: it names the last drive of the mirror and goes only once that name is typed again', async () => {
+		const getDiskList = vi.fn()
+		const raidToRaid5 = vi.fn().mockResolvedValue({})
+		const { wrapper } = changeTrio({ getDiskList, raidToRaid5 })
+		await flushPromises()
+
+		expect(getDiskList).not.toHaveBeenCalled()
+		expect(wrapper.vm.path).toBe('/dev/sdd')
+		expect(wrapper.text()).toContain('survives one failed drive instead of two')
+		expect(wrapper.text()).not.toContain('No blank disk')
+		expect(wrapper.find('select').exists()).toBe(false)
+		wrapper.vm.typed = 'sdb'
+		expect(wrapper.vm.ready).toBe(false)
+		wrapper.vm.typed = 'sdd'
+		expect(wrapper.vm.ready).toBe(true)
+
+		await wrapper.vm.change()
+		expect(raidToRaid5).toHaveBeenCalledWith('md0', '/dev/sdd', 'sdd')
+		expect(wrapper.emitted('changed')).toHaveLength(1)
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+})
+
 describe('the buttons of a whole array', () => {
 	function status(array, fsSize, api = {}) {
 		const wrapper = mount(RaidStatus, { props: { array, fsSize }, global: { plugins: [Buefy, i18n], mocks: { $api: { disks: api } } } })
@@ -67,6 +104,8 @@ describe('the buttons of a whole array', () => {
 
 	it('offer RAID 5 on a whole mirror, and the new room once a RAID 5 holds more than its filesystem', () => {
 		expect(buttons(status(mirror, 940))).toEqual(['Change to RAID 5'])
+		const trioMembers = [{ name: 'sdb', disk: 'sdb', state: 'active', slot: 0 }, { name: 'sdc', disk: 'sdc', state: 'active', slot: 1 }, { name: 'sdd', disk: 'sdd', state: 'active', slot: 2 }]
+		expect(buttons(status({ ...mirror, disks: 3, members: trioMembers }, 940))).toEqual(['Change to RAID 5'])
 		expect(buttons(status(raid5, 940))).toEqual(['Use the new space'])
 		expect(buttons(status(raid5, 1900))).toEqual([])
 		expect(buttons(status({ ...raid5, state: 'reshaping', action: 'reshape' }, 940))).toEqual([])
@@ -92,6 +131,7 @@ describe('the buttons of a whole array', () => {
 })
 
 const KEYS = [
+	'The mirror of three drives becomes a RAID 5 of three drives: it holds twice as much, but survives one failed drive instead of two. {disk} comes out of the mirror, is erased and goes back in as the third drive, so no drive is needed. It stays usable while it reorganizes, which takes hours for large drives, so do not switch the box off before it is over.',
 	'Change to RAID 5',
 	'Use the new space',
 	'Change {name} to RAID 5',
