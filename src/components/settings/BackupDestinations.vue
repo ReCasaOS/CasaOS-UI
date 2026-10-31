@@ -30,6 +30,7 @@
 						<div class="_text mr-3">
 							<p class="has-text-weight-medium">{{ name }}</p>
 							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
+							<p v-if="restic[name] && restic[name].enabled" class="_has-text-gray is-size-7">{{ $t('Kept with restic') }}</p>
 						</div>
 
 						<!-- ml-auto: on a line of their own, the buttons stay on the right -->
@@ -37,6 +38,10 @@
 							<b-button :loading="busy === `check:${name}`" class="mr-1" rounded size="is-small"
 								@click="check(name)">
 								{{ $t('Check') }}
+							</b-button>
+							<b-button v-if="restic[name] && restic[name].available && !restic[name].enabled"
+								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="confirmRestic(name)">
+								{{ $t('Keep with restic\u2026') }}
 							</b-button>
 							<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
 								{{ $t('Restore\u2026') }}
@@ -156,6 +161,9 @@ export default {
 			destinations: [],
 			// name -> what the last check said about it
 			checked: {},
+			// name -> { available, enabled }: whether this box has restic, and whether
+			// the destination keeps its backups with it
+			restic: {},
 			isLoading: false,
 			error: '',
 			busy: '',
@@ -224,11 +232,67 @@ export default {
 			try {
 				const res = await this.$api.backup.getDestinations()
 				this.destinations = res.data.data || []
+				await this.loadRestic()
 			} catch (error) {
 				this.error = this.$t('Destinations could not be loaded: {error}', { error: this.messageOf(error) })
 			} finally {
 				this.isLoading = false
 			}
+		},
+
+		// Optional: a box without the call, or a destination that does not answer it,
+		// is a destination without the button, not an error.
+		async loadRestic() {
+			const states = {}
+			await Promise.all(this.destinations.map(async (name) => {
+				try {
+					states[name] = (await this.$api.backup.getResticState(name)).data.data
+				} catch {
+					// no button for this one
+				}
+			}))
+			this.restic = states
+		},
+
+		// Said before it is done: what changes, what stays, and that the password
+		// comes back once. A repository's password is also what reaches it again
+		// from another box, so the dialog takes one.
+		confirmRestic(name) {
+			this.$buefy.dialog.prompt({
+				title: this.$t('Keep backups to {name} with restic?', { name }),
+				message: this.$t('Backups to this destination will go into a restic repository: each costs only what changed since the last one, and files keep their owners and permissions. Backups already there stay where they are and can still be restored. A password is made for the repository and shown once. To reach a repository that is already there, for instance from another box, type its password below.'),
+				inputAttrs: { type: 'password', autocomplete: 'new-password', placeholder: this.$t('Password of an existing repository, empty for a new one'), required: false },
+				confirmText: this.$t('Switch to restic'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: password => this.enableRestic(name, (password || '').trim()),
+			})
+		},
+
+		async enableRestic(name, password) {
+			this.busy = `restic:${name}`
+			try {
+				const res = await this.$api.backup.enableRestic(name, password)
+				await this.loadRestic()
+				const made = res.data.data && res.data.data.password
+				if (password || !made) {
+					this.$buefy.toast.open({ message: this.$t('Backups to {name} are now kept with restic.', { name }), type: 'is-success', duration: 5000 })
+				} else {
+					// shown once, and never again: without it the repository cannot be read
+					this.$buefy.dialog.alert({
+						title: this.$t('Write this password down'),
+						message: `${this.$t('This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.', { name: this.htmlEscape(name) })}<br><br><code>${this.htmlEscape(made)}</code>`,
+						confirmText: this.$t('I have written it down'),
+					})
+				}
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		htmlEscape(text) {
+			return String(text).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 		},
 
 		async save() {

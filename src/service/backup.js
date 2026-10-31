@@ -75,6 +75,18 @@ const backup = {
 	// What a destination holds: the apps it has backups of, their runs newest
 	// first, and whether this box runs each app now. For a box whose own run
 	// log is empty.
+	// Whether a destination keeps its backups with restic, and whether this box has it.
+	getResticState(name) {
+		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`)
+	},
+
+	// Switches a destination to restic. Without a password a repository is made and
+	// its password comes back, once; with one, the destination is attached to the
+	// repository already there.
+	enableRestic(name, password = '') {
+		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`, password ? { password } : {})
+	},
+
 	getDestinationRuns(name) {
 		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
 	},
