@@ -2619,5 +2619,14 @@
   "I understand that if one drive fails, everything on {name} is lost.": "Je comprends que si un disque tombe en panne, tout ce que contient {name} est perdu.",
   "Everything on the chosen drives is erased. {name} is usable at once.": "Tout ce que contiennent les disques choisis est effacé. {name} est utilisable tout de suite.",
   "{name} is created.": "{name} est créé.",
-  "No protection": "Sans protection"
+  "No protection": "Sans protection",
+  "Change to RAID 5": "Passer en RAID 5",
+  "Use the new space": "Utiliser le nouvel espace",
+  "Change {name} to RAID 5": "Passer {name} en RAID 5",
+  "The mirror becomes a RAID 5 of three drives: it holds twice as much and still survives one failed drive. It stays usable while it reorganizes onto the new drive, which takes hours for large drives, so do not switch the box off before it is over.": "Le miroir devient un RAID 5 de trois disques, qui contient deux fois plus et survit toujours à la panne d'un disque. Il reste utilisable pendant qu'il se réorganise sur le nouveau disque, ce qui prend des heures pour de gros disques, donc n'éteignez pas la machine avant la fin.",
+  "Everything on {disk} is erased.": "Tout ce que contient {disk} est effacé.",
+  "Erase and change": "Effacer et changer",
+  "{name} is changing to RAID 5: it reorganizes in the background.": "{name} passe en RAID 5 et se réorganise en arrière-plan.",
+  "Reshaping {percent} %": "Restructuration {percent} %",
+  "The filesystem now uses the room of {name}.": "Le système de fichiers utilise maintenant tout l'espace de {name}."
 }

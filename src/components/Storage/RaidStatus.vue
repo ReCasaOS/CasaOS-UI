@@ -16,6 +16,8 @@
 			</span>
 			<span v-if="array.missing > 0" class="member has-text-danger mr-3">{{ $t('Missing: {count}', { count: array.missing }) }}</span>
 			<b-button v-if="canAdd" class="mt-1" rounded size="is-small" @click="openAddDisk">{{ $t('Add a disk') }}</b-button>
+			<b-button v-if="canChange" class="mt-1" rounded size="is-small" @click="openChange">{{ $t('Change to RAID 5') }}</b-button>
+			<b-button v-if="roomLeft" :loading="isGrowing" class="mt-1" rounded size="is-small" type="is-link" @click="growFilesystem">{{ $t('Use the new space') }}</b-button>
 		</p>
 	</div>
 </template>
@@ -23,7 +25,8 @@
 <script>
 import escape from 'lodash/escape'
 import RaidAddDisk from './RaidAddDisk.vue'
-import { raidLevel, raidRemaining, raidTag } from './raid'
+import RaidToRaid5 from './RaidToRaid5.vue'
+import { raidCanBecomeRaid5, raidLevel, raidRemaining, raidRoomLeft, raidTag } from './raid'
 
 export default {
 	name: 'raid-status',
@@ -32,10 +35,24 @@ export default {
 			type: Object,
 			required: true,
 		},
+		// the size of the filesystem mounted on the array, when there is one: more room in the array than in it is room to use
+		fsSize: {
+			type: Number,
+			default: 0,
+		},
 	},
-	// changed: a disk was added or taken out; the list is to be read again
+	// changed: a disk was added or taken out, the level changed; the list is to be read again
 	emits: ['changed'],
+	data() {
+		return { isGrowing: false }
+	},
 	computed: {
+		canChange() {
+			return raidCanBecomeRaid5(this.array)
+		},
+		roomLeft() {
+			return raidRoomLeft(this.array, this.fsSize)
+		},
 		// where a disk is missing, or a failed one is still in the array (the new one waits as a spare)
 		canAdd() {
 			return this.array.state !== 'inactive' && (this.array.missing > 0 || this.array.members.some(m => m.state === 'faulty'))
@@ -59,6 +76,27 @@ export default {
 				trapFocus: true,
 				events: { added: () => this.$emit('changed') },
 			})
+		},
+		openChange() {
+			this.$buefy.modal.open({
+				component: RaidToRaid5,
+				props: { array: this.array },
+				hasModalCard: true,
+				trapFocus: true,
+				events: { changed: () => this.$emit('changed') },
+			})
+		},
+		async growFilesystem() {
+			this.isGrowing = true
+			try {
+				await this.$api.disks.growRaidFilesystem(this.array.name)
+				this.$buefy.toast.open({ message: escape(this.$t('The filesystem now uses the room of {name}.', { name: this.array.name })), type: 'is-success' })
+				this.$emit('changed')
+			} catch (e) {
+				this.$buefy.toast.open({ message: escape(e?.response?.data?.message || String(e)), type: 'is-danger' })
+			} finally {
+				this.isGrowing = false
+			}
 		},
 		confirmTakeOut(member) {
 			this.$buefy.dialog.confirm({
