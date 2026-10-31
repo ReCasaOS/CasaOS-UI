@@ -27,9 +27,18 @@ export function raidTag(array, t) {
 	}
 }
 
-// A RAID 1 of two disks that is whole and doing nothing else can become a RAID 5 with a third disk.
+// A RAID 1 that is whole and doing nothing else can become a RAID 5: of two disks with a third blank one, of three disks (all active, no spare) with the last of them
+// given back as the third.
 export function raidCanBecomeRaid5(array) {
-	return array.level === 'raid1' && array.disks === 2 && array.state === 'ok' && array.action === 'idle'
+	const settled = array.level === 'raid1' && array.state === 'ok' && array.action === 'idle'
+	return settled && (array.disks === 2 || (array.disks === 3 && (array.members || []).length === 3 && raidFreedMember(array) !== ''))
+}
+
+// The disk (sdd) of the drive a mirror of three gives up to become a RAID 5: the active member in its last slot, the only one mdadm can take out when it cuts the mirror
+// down to two. '' when there is none.
+export function raidFreedMember(array) {
+	const member = (array.members || []).find(m => m.state === 'active' && m.slot === array.disks - 1)
+	return member ? member.disk : ''
 }
 
 // An array that holds clearly more than the filesystem on it, after a reshape: the room is there to be used. fsSize is the filesystem's own size, always a bit under its
