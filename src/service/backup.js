@@ -91,6 +91,12 @@ const backup = {
 		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`, password ? { password } : {})
 	},
 
+	// Checks the restic repository of a destination now, in the background: it is read
+	// whole, so it ends when it ends. The result is `last_check` of the restic state.
+	checkRestic(name) {
+		return api.post(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic/check`)
+	},
+
 	getDestinationRuns(name) {
 		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
 	},

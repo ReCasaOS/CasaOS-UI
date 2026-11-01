@@ -31,6 +31,10 @@
 							<p class="has-text-weight-medium">{{ name }}</p>
 							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
 							<p v-if="restic[name] && restic[name].enabled" class="_has-text-gray is-size-7">{{ $t('Kept with restic') }}</p>
+							<p v-if="restic[name] && restic[name].last_check" class="is-size-7"
+								:class="restic[name].last_check.ok ? '_has-text-gray' : 'has-text-danger'">
+								{{ resticCheckText(restic[name].last_check) }}
+							</p>
 						</div>
 
 						<!-- ml-auto: on a line of their own, the buttons stay on the right -->
@@ -42,6 +46,10 @@
 							<b-button v-if="restic[name] && restic[name].available && !restic[name].enabled"
 								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="confirmRestic(name)">
 								{{ $t('Keep with restic\u2026') }}
+							</b-button>
+							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticcheck:${name}`" class="mr-1"
+								rounded size="is-small" @click="checkRestic(name)">
+								{{ $t('Check repository') }}
 							</b-button>
 							<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
 								{{ $t('Restore\u2026') }}
@@ -157,6 +165,9 @@ import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import BackupSchedules from './BackupSchedules.vue'
 import { BACKUP_BACKENDS, backendHelp, parametersFrom, suggestedFields } from './backupBackends'
 import { renderSize } from '@/mixins/file_utils'
+
+const CHECK_POLL_MS = 3000
+const CHECK_WAIT_MS = 120000
 
 export default {
 	name: 'backup-destinations',
@@ -290,6 +301,36 @@ export default {
 						message: `${this.$t('This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.', { name: this.htmlEscape(name) })}<br><br><code>${this.htmlEscape(made)}</code>`,
 						confirmText: this.$t('I have written it down'),
 					})
+				}
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		resticCheckText(check) {
+			const when = new Date(check.at).toLocaleString()
+			return check.ok
+				? this.$t('Repository checked {when}: sound.', { when })
+				: this.$t('Repository check failed {when}: {error}', { when, error: check.error || '' })
+		},
+
+		// The check starts and returns; it reads the whole repository, so it ends when it
+		// ends. The state is asked again until the last check is a new one, for as long as
+		// two minutes: past that the answer is there the next time the list is opened.
+		async checkRestic(name) {
+			this.busy = `resticcheck:${name}`
+			this.error = ''
+			const before = this.restic[name] && this.restic[name].last_check && this.restic[name].last_check.at
+			try {
+				await this.$api.backup.checkRestic(name)
+				for (let waited = 0; waited < CHECK_WAIT_MS; waited += CHECK_POLL_MS) {
+					await new Promise(resolve => setTimeout(resolve, CHECK_POLL_MS))
+					await this.loadRestic()
+					const now = this.restic[name] && this.restic[name].last_check && this.restic[name].last_check.at
+					if (now !== before)
+						break
 				}
 			} catch (error) {
 				this.error = this.messageOf(error)

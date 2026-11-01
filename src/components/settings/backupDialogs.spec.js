@@ -125,6 +125,72 @@ describe('the root of a destination', () => {
 	})
 })
 
+describe('the check of a restic repository', () => {
+	const state = states => name => Promise.resolve({ data: { data: states[name] } })
+
+	it('says how the last one went, and in red when it found a fault', async () => {
+		// the sentence is a key with holes in it, and a key that no language file has is not filled
+		i18n.global.mergeLocaleMessage(i18n.global.locale.value || i18n.global.locale, {
+			'Repository check failed {when}: {error}': 'Repository check failed {when}: {error}',
+		})
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer(['nas', 'offsite']),
+			getResticState: state({
+				nas: { available: true, enabled: true, last_check: { at: '2026-11-01T04:00:00Z', ok: true } },
+				offsite: { available: true, enabled: true, last_check: { at: '2026-11-01T04:00:00Z', ok: false, error: 'pack 1a2b: does not exist' } },
+			}),
+		})
+		const rows = wrapper.findAll('.destination')
+		expect(rows[0].text()).toContain('sound.')
+		expect(rows[0].find('.has-text-danger').exists()).toBe(false)
+		expect(rows[1].text()).toContain('pack 1a2b: does not exist')
+		expect(rows[1].find('.has-text-danger').exists()).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('is offered only where the destination is kept with restic', async () => {
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer(['nas', 'old']),
+			getResticState: state({ nas: { available: true, enabled: true }, old: { available: true, enabled: false } }),
+		})
+		const rows = wrapper.findAll('.destination')
+		expect(rows[0].text()).toContain('Check repository')
+		expect(rows[1].text()).not.toContain('Check repository')
+		wrapper.unmount()
+	})
+
+	it('waits for a new result after it starts one', async () => {
+		vi.useFakeTimers()
+		try {
+			const answers = [
+				{ available: true, enabled: true, last_check: { at: '2026-10-25T04:00:00Z', ok: true } },
+				{ available: true, enabled: true, last_check: { at: '2026-10-25T04:00:00Z', ok: true } },
+				{ available: true, enabled: true, last_check: { at: '2026-11-01T04:00:00Z', ok: false, error: 'boom' } },
+			]
+			let asked = 0
+			const checkRestic = vi.fn(() => Promise.resolve({}))
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas']),
+				getResticState: () => Promise.resolve({ data: { data: answers[Math.min(asked++, answers.length - 1)] } }),
+				checkRestic,
+			})
+
+			const done = wrapper.vm.checkRestic('nas')
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(wrapper.vm.busy).toBe('resticcheck:nas')
+			await vi.advanceTimersByTimeAsync(3000)
+			await done
+
+			expect(checkRestic).toHaveBeenCalledWith('nas')
+			expect(wrapper.vm.restic.nas.last_check.ok).toBe(false)
+			expect(wrapper.vm.busy).toBe('')
+			wrapper.unmount()
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+})
+
 describe('a destination kept with restic', () => {
 	const state = states => name => Promise.resolve({ data: { data: states[name] } })
 	const buttons = wrapper => wrapper.findAll('.destination .button').map(button => button.text())
