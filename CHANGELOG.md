@@ -2,6 +2,19 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`pnpm dev:mock`** runs the dashboard against an in-repo stub (home, app grid, stats, login) without a CasaOS box. Node 24, as CI.
+- **`pnpm dev:stack`** starts the sibling Go stack (`../CasaOS/dev/stack.sh`) and the Vue server on 8080. Welcome creates the first account. Files follows the managed roots the stack publishes.
+
+### Fixed
+
+- Leaving mock mode clears leftover `mock-access` / `mock-refresh` tokens so a real Gateway is not sent a stub session.
+- Locations does not overlay an error when rclone is absent: the cloud list becomes empty.
+- Files waits at most three seconds for `GET /v1/file/roots` and then opens `/DATA`, so a slow or silent core does not leave the panel empty. Only the first `[file] ManagementRoots` entry is used; later roots are not in the sidebar.
+
 ## [0.4.65] - 2026-09-15
 
 ### Fixed

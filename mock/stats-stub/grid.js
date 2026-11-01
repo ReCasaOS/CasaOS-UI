@@ -177,6 +177,30 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 		// what was never put is an empty string, as the core answers
 		return verb === 'GET' ? core(state.custom.has(key) ? state.custom.get(key) : '') : null
 	}
+	if (verb === 'POST' && path === '/v1/users/login') {
+		return core({
+			token: {
+				access_token: 'mock-access',
+				refresh_token: 'mock-refresh',
+				expires_at: 2000000000,
+			},
+			user: {
+				id: 1,
+				username: 'casaos',
+				nickname: 'casaos',
+				role: 'admin',
+				avatar: '',
+				description: '',
+			},
+		})
+	}
+	if (verb === 'POST' && path === '/v1/users/refresh') {
+		return core({
+			access_token: 'mock-access',
+			refresh_token: 'mock-refresh',
+			expires_at: 2000000000,
+		})
+	}
 	if (verb !== 'GET') {
 		return null
 	}

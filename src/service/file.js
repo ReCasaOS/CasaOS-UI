@@ -61,6 +61,10 @@ const file = {
 		return api.delete(`${PREFIX}/trash/all`)
 	},
 
+	getRoots() {
+		return api.get(`${PREFIX}/roots`)
+	},
+
 }
 
 export default file

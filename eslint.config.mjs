@@ -17,6 +17,8 @@ export default antfu(
 			// Imported translations and exported animations: data, not code.
 			'src/assets/lang/*.json',
 			'src/assets/ani/*.json',
+			// Specs and plans: markdown with fenced JS that is not the dashboard.
+			'docs/**',
 		],
 	},
 	{
