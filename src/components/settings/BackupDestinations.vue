@@ -83,6 +83,13 @@
 						</b-select>
 					</b-field>
 
+					<b-field :label="draft.backend === 's3' ? $t('Bucket') : $t('Folder (optional)')" label-position="on-border">
+						<b-input v-model="draft.root" :placeholder="draft.backend === 's3' ? 'my-box-backups' : ''" expanded size="is-small" />
+					</b-field>
+					<p v-if="draft.backend === 's3'" class="_has-text-gray is-size-7 mb-2">
+						{{ $t('The bucket you made at your provider. Without one, each app is put in a bucket named after it, which most providers refuse because bucket names are shared by everyone.') }}
+					</p>
+
 					<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
 						{{ $t(backendHelp(draft.backend)) }}
 					</p>
@@ -168,7 +175,7 @@ export default {
 			error: '',
 			busy: '',
 			backends: BACKUP_BACKENDS,
-			draft: { name: '', backend: 's3', rows: suggestedFields('s3'), encrypt: false, password: '' },
+			draft: { name: '', backend: 's3', root: '', rows: suggestedFields('s3'), encrypt: false, password: '' },
 			systemDestination: '',
 		}
 	},
@@ -305,10 +312,11 @@ export default {
 					parametersFrom(this.draft.rows),
 					this.draft.encrypt,
 					this.draft.password,
+					this.draft.root,
 				)
 
 				const saved = this.draft.name.trim()
-				this.draft = { name: '', backend: this.draft.backend, rows: suggestedFields(this.draft.backend), encrypt: false, password: '' }
+				this.draft = { name: '', backend: this.draft.backend, root: '', rows: suggestedFields(this.draft.backend), encrypt: false, password: '' }
 				await this.load()
 				// Checked straight away: a destination that cannot be reached is worth
 				// knowing about now rather than the first time a backup needs it.

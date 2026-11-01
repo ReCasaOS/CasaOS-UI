@@ -90,6 +90,41 @@ describe('the destination form', () => {
 	})
 })
 
+describe('the root of a destination', () => {
+	const save = async (backend, root) => {
+		const saveDestination = vi.fn(() => Promise.resolve({}))
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer([]),
+			saveDestination,
+			checkDestination: answer({}),
+		})
+		wrapper.vm.draft.name = 'offsite'
+		wrapper.vm.draft.backend = backend
+		wrapper.vm.draft.root = root
+		await wrapper.vm.save()
+		wrapper.unmount()
+		return saveDestination.mock.calls[0]
+	}
+
+	it('is asked for as the bucket of an s3 destination, and sent', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]) })
+		expect(wrapper.text()).toContain('Bucket')
+		wrapper.unmount()
+
+		const [name, backend, , , , root] = await save('s3', ' my-bucket ')
+		expect([name, backend, root]).toEqual(['offsite', 's3', ' my-bucket '])
+	})
+
+	it('is a folder, optional, on any other backend', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]) })
+		wrapper.vm.draft.backend = 'sftp'
+		await flushPromises()
+		expect(wrapper.text()).toContain('Folder (optional)')
+		expect(wrapper.text()).not.toContain('The bucket you made')
+		wrapper.unmount()
+	})
+})
+
 describe('a destination kept with restic', () => {
 	const state = states => name => Promise.resolve({ data: { data: states[name] } })
 	const buttons = wrapper => wrapper.findAll('.destination .button').map(button => button.text())
