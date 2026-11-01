@@ -31,6 +31,9 @@
 							<p class="has-text-weight-medium">{{ name }}</p>
 							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
 							<p v-if="restic[name] && restic[name].enabled" class="_has-text-gray is-size-7">{{ $t('Kept with restic') }}</p>
+							<p v-if="restic[name] && restic[name].kept && !restic[name].enabled" class="_has-text-gray is-size-7">
+								{{ $t('Switched back to rclone: the restic repository is still read') }}
+							</p>
 							<p v-if="restic[name] && restic[name].last_check" class="is-size-7"
 								:class="restic[name].last_check.ok ? '_has-text-gray' : 'has-text-danger'">
 								{{ resticCheckText(restic[name].last_check) }}
@@ -43,13 +46,21 @@
 								@click="check(name)">
 								{{ $t('Check') }}
 							</b-button>
-							<b-button v-if="restic[name] && restic[name].available && !restic[name].enabled"
+							<b-button v-if="restic[name] && restic[name].available && !restic[name].kept"
 								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="confirmRestic(name)">
 								{{ $t('Keep with restic\u2026') }}
 							</b-button>
-							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticcheck:${name}`" class="mr-1"
+							<b-button v-if="restic[name] && restic[name].available && restic[name].kept && !restic[name].enabled"
+								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="enableRestic(name, '')">
+								{{ $t('Resume restic') }}
+							</b-button>
+							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticcheck:${name}`" class="mr-1"
 								rounded size="is-small" @click="checkRestic(name)">
 								{{ $t('Check repository') }}
+							</b-button>
+							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticback:${name}`" class="mr-1"
+								rounded size="is-small" @click="confirmSwitchBack(name)">
+								{{ $t('Switch back to rclone\u2026') }}
 							</b-button>
 							<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
 								{{ $t('Restore\u2026') }}
@@ -264,7 +275,10 @@ export default {
 			const states = {}
 			await Promise.all(this.destinations.map(async (name) => {
 				try {
-					states[name] = (await this.$api.backup.getResticState(name)).data.data
+					const state = (await this.$api.backup.getResticState(name)).data.data
+					// a box older than the switch back does not say `kept`: the repository it
+					// reads is the one it is enabled for
+					states[name] = { ...state, kept: state.kept ?? state.enabled }
 				} catch {
 					// no button for this one
 				}
@@ -302,6 +316,32 @@ export default {
 						confirmText: this.$t('I have written it down'),
 					})
 				}
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		// Said before it is done: nothing is deleted, the repository and its password stay,
+		// and what it holds stays listed and restorable, so this is not a leap.
+		confirmSwitchBack(name) {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Go back to rclone for backups to {name}?', { name }),
+				message: this.$t('The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule\'s retention counts the copies of both kinds. You can switch to restic again whenever you want.'),
+				confirmText: this.$t('Switch back'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.disableRestic(name),
+			})
+		},
+
+		async disableRestic(name) {
+			this.busy = `resticback:${name}`
+			this.error = ''
+			try {
+				await this.$api.backup.disableRestic(name)
+				await this.loadRestic()
+				this.$buefy.toast.open({ message: this.$t('Backups to {name} are stamped copies again. The restic repository is kept.', { name }), type: 'is-success', duration: 5000 })
 			} catch (error) {
 				this.error = this.messageOf(error)
 			} finally {

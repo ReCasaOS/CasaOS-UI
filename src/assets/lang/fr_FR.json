@@ -2645,5 +2645,12 @@
   "Backups to {name} are now kept with restic.": "Les sauvegardes vers {name} sont désormais gardées avec restic.",
   "Write this password down": "Notez ce mot de passe",
   "This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.": "Voici le mot de passe du dépôt restic de {name}. Il n'est affiché qu'une fois. Sans lui, les sauvegardes qui s'y trouvent sont illisibles, et cette box n'en garde de copie nulle part ailleurs.",
-  "I have written it down": "Je l'ai noté"
+  "I have written it down": "Je l'ai noté",
+  "Switched back to rclone: the restic repository is still read": "Revenu à rclone : le dépôt restic est toujours lu",
+  "Resume restic": "Reprendre restic",
+  "Switch back to rclone…": "Revenir à rclone…",
+  "Go back to rclone for backups to {name}?": "Revenir à rclone pour les sauvegardes vers {name} ?",
+  "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.": "Les prochaines sauvegardes vers cette destination seront de nouveau des copies horodatées. Rien n'est supprimé : le dépôt restic reste sur la destination, cette box en garde le mot de passe, et ce qu'il contient reste listé et restaurable. La rétention d'une planification compte les copies des deux sortes. Vous pouvez repasser à restic quand vous voulez.",
+  "Switch back": "Revenir",
+  "Backups to {name} are stamped copies again. The restic repository is kept.": "Les sauvegardes vers {name} sont de nouveau des copies horodatées. Le dépôt restic est conservé."
 }

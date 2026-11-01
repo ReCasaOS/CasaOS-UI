@@ -250,4 +250,85 @@ describe('a destination kept with restic', () => {
 		expect(alert.mock.calls[0][0].message).not.toContain('<img')
 		wrapper.unmount()
 	})
+
+	describe('on the way back to rclone', () => {
+		it('offers the way back where it is enabled, and says what it does before doing it', async () => {
+			const disableRestic = vi.fn(() => Promise.resolve({}))
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas']),
+				getResticState: state({ nas: { available: true, enabled: true, kept: true } }),
+				disableRestic,
+			})
+			expect(buttons(wrapper)).toContain('Switch back to rclone…')
+
+			const confirm = vi.fn()
+			wrapper.vm.$buefy.dialog.confirm = confirm
+			wrapper.vm.confirmSwitchBack('nas')
+			expect(confirm).toHaveBeenCalledOnce()
+			// nothing is deleted, and it is said so before anything is done
+			expect(confirm.mock.calls[0][0].message).toContain('Nothing is deleted')
+			expect(disableRestic).not.toHaveBeenCalled()
+
+			confirm.mock.calls[0][0].onConfirm()
+			await flushPromises()
+			expect(disableRestic).toHaveBeenCalledWith('nas')
+			wrapper.unmount()
+		})
+
+		it('keeps the repository in view after it: checked, resumed, and not offered as new', async () => {
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas']),
+				getResticState: state({ nas: { available: true, enabled: false, kept: true } }),
+			})
+			const row = wrapper.find('.destination')
+			expect(row.text()).toContain('the restic repository is still read')
+			expect(row.text()).not.toContain('Kept with restic')
+			expect(buttons(wrapper)).toEqual(expect.arrayContaining(['Resume restic', 'Check repository']))
+			expect(buttons(wrapper).join(' ')).not.toContain('Keep with restic')
+			expect(buttons(wrapper).join(' ')).not.toContain('Switch back')
+			wrapper.unmount()
+		})
+
+		it('resumes without a password, so the repository is taken up and not remade', async () => {
+			const enableRestic = vi.fn(() => Promise.resolve({ data: { data: { password: '' } } }))
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas']),
+				getResticState: state({ nas: { available: true, enabled: false, kept: true } }),
+				enableRestic,
+			})
+			const alert = vi.fn()
+			wrapper.vm.$buefy.dialog.alert = alert
+
+			await wrapper.findAll('.destination .button').find(button => button.text() === 'Resume restic').trigger('click')
+			await flushPromises()
+			expect(enableRestic).toHaveBeenCalledWith('nas', '')
+			// the password is not new: there is nothing to write down
+			expect(alert).not.toHaveBeenCalled()
+			wrapper.unmount()
+		})
+
+		it('treats a box that does not say `kept` as kept where it is enabled', async () => {
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas', 'new']),
+				getResticState: state({ nas: { available: true, enabled: true }, new: { available: true, enabled: false } }),
+			})
+			const rows = wrapper.findAll('.destination')
+			expect(rows[0].text()).toContain('Check repository')
+			expect(rows[1].text()).toContain('Keep with restic')
+			expect(rows[1].text()).not.toContain('Resume restic')
+			wrapper.unmount()
+		})
+
+		it('shows why it could not, and stops loading', async () => {
+			const wrapper = await open(BackupDestinations, {
+				getDestinations: answer(['nas']),
+				getResticState: state({ nas: { available: true, enabled: true, kept: true } }),
+				disableRestic: fail,
+			})
+			await wrapper.vm.disableRestic('nas')
+			expect(wrapper.text()).toContain('permission denied')
+			expect(wrapper.vm.busy).toBe('')
+			wrapper.unmount()
+		})
+	})
 })
