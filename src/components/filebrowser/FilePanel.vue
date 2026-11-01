@@ -270,6 +270,7 @@ import GlobalActionButton from './components/GlobalActionButton.vue'
 import MountActionButton from './components/MountActionButton.vue'
 // storage settings requirement document
 import DropEntryButton from './drop/DropEntryButton.vue'
+import { FILE_ROOTS_TIMEOUT_MS, fileRootFrom, withTimeout } from './fileRoot.js'
 import MergeStorages from '@/components/Storage/MergeStorages.vue'
 
 // Drop
@@ -323,6 +324,7 @@ export default {
 	data() {
 		return {
 			isCreated: false,
+			isUnmounted: false,
 			isLoading: true,
 			isModalOpen: false,
 			isDragIn: false,
@@ -333,6 +335,7 @@ export default {
 			panelType: null,
 			currentItem: null,
 			rootPath: '/DATA',
+			fileRootReady: false,
 			currentPath: '',
 			currentPathName: '',
 			isViewGird: true,
@@ -462,13 +465,7 @@ export default {
 	},
 
 	mounted() {
-		this.init()
-		// on a tab of its own nobody calls init(path): the folder comes in the
-		// address (#/files?path=/DATA/...)
-		if (this.$route.path == '/files') {
-			this.init(this.$route.query.path)
-		}
-
+		// everything that listens is set up now; only the first folder waits for the root
 		if (this.pageType == 'file') {
 			this.beforeInit()
 		}
@@ -484,8 +481,11 @@ export default {
 		this.$EventBus.$on(events.UN_SHARE, this.handleUnShare)
 		this.$EventBus.$on(events.SHOW_FILES_SIDEBAR, this.handleShowSideBar)
 		this.$EventBus.$on(events.HIDE_FILES_SIDEBAR, this.handleHideSideBar)
+
+		this.openFirstFolder()
 	},
 	unmounted() {
+		this.isUnmounted = true
 		this.$EventBus.$off(events.SHOW_FILES_SIDEBAR, this.handleShowSideBar)
 		this.$EventBus.$off(events.HIDE_FILES_SIDEBAR, this.handleHideSideBar)
 		this.destroyedAction()
@@ -557,6 +557,31 @@ export default {
 		showTrash() {
 			this.pageType = 'trash'
 			this.hideMobileSidebar()
+		},
+
+		async openFirstFolder() {
+			await this.resolveFileRoot()
+			// the panel was closed while the root was being asked
+			if (this.isUnmounted) {
+				return
+			}
+			this.init()
+			this.$EventBus.$emit(events.RELOAD_FILE_LIST)
+			// on a tab of its own nobody calls init(path): the folder comes in the
+			// address (#/files?path=/DATA/...)
+			if (this.$route.path == '/files') {
+				this.init(this.$route.query.path)
+			}
+		},
+
+		async resolveFileRoot() {
+			try {
+				const res = await withTimeout(this.$api.file.getRoots(), FILE_ROOTS_TIMEOUT_MS)
+				this.rootPath = fileRootFrom(res?.data?.data?.roots)
+			} catch {
+				this.rootPath = '/DATA'
+			}
+			this.fileRootReady = true
 		},
 
 		/**
@@ -898,6 +923,7 @@ export default {
 				animation: 'zoom-in',
 				props: {
 					currentPath: this.currentPath,
+					rootPath: this.rootPath,
 				},
 				events: {
 					reload: () => {
@@ -1180,7 +1206,7 @@ export default {
 		},
 		'local-storage:disk:added': function () {
 			setTimeout(() => {
-				if (this.currentPath == '/DATA') {
+				if (this.currentPath == this.rootPath) {
 					this.reload()
 				}
 			}, 500)
