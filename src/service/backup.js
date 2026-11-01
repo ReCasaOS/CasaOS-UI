@@ -14,12 +14,16 @@ const backup = {
 	// `encrypt` puts rclone's crypt backend on top: names and contents are
 	// ciphertext before they leave this box. The password is kept by rclone and
 	// never comes back; losing it loses every backup at that destination.
-	saveDestination(name, backend, parameters, encrypt = false, password = '') {
+	// `root` is where on the backend everything is put: a folder, or for s3 the
+	// bucket. Without it an object store gets one bucket per app, named after the
+	// app, which a provider where bucket names are shared by everyone refuses.
+	saveDestination(name, backend, parameters, encrypt = false, password = '', root = '') {
 		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}`, {
 			backend,
 			parameters,
 			encrypt,
 			password: encrypt ? password : undefined,
+			root: root.trim() || undefined,
 		})
 	},
 
