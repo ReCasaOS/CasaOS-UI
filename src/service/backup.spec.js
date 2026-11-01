@@ -28,3 +28,14 @@ describe('saving a destination', () => {
 		expect(JSON.parse(adapter.mock.calls[1][0].data)).not.toHaveProperty('root')
 	})
 })
+
+describe('checking a restic repository', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('posts to the check of that destination', async () => {
+		await backup.checkRestic('my nas')
+		const request = adapter.mock.calls[0][0]
+		expect(request.method).toBe('post')
+		expect(request.url).toBe('/v2/app_management/backup/destinations/my%20nas/restic/check')
+	})
+})
