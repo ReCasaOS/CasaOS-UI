@@ -17,8 +17,8 @@
 		<section v-if="currentStep === 0"
 			class="notification is-overlay mr-5 ml-5 mb-0 pr-0 pl-0 pt-5 pb-3 non-backgroud">
 			<div v-if="currentStep === 0" class="_is-normal _has-text-gray-600 mb-4">
-				{{ $t('Selected external storage will be merged into CasaOS HD.') }}
-				<div class="mt-1">{{ $t('System AppData remains available at /DATA/AppData.') }}</div>
+				{{ isPool ? $t('Selected external storage will be merged into CasaOS HD.') : $t('Selected storage will be merged in {folder}.', { folder: mountPoint }) }}
+				<div v-if="isPool" class="mt-1">{{ $t('System AppData remains available at /DATA/AppData.') }}</div>
 			</div>
 
 			<div v-if="systemStorage" class="is-flex mb-1 radius system-storage-row">
@@ -99,7 +99,7 @@
 			<div class="is-flex left ml-3 mr-2 is-align-items-center">
 				<b-icon class="is-16x16" custom-size="casa-19px" icon="danger" pack="casa"></b-icon>
 			</div>
-			{{ $t('Removing merged storage hides external files from /DATA but does not delete them. System AppData will be restored.') }}
+			{{ isPool ? $t('Removing merged storage hides external files from /DATA but does not delete them. System AppData will be restored.') : $t('Removing the merged storage empties {folder}. The files stay on their drives.', { folder: mountPoint }) }}
 		</div>
 		<div v-if="currentStep === 0 && checkBoxGroup.length > 0"
 			class="_has-background-yellow-default _has-text-white _is-normal is-flex is-align-items-center font ml-5 mr-5 mb-4 pt-2 pb-2 _radius-line">
@@ -115,7 +115,7 @@
 			</div>
 			{{ $t('Please back up your data in storage, otherwise the data may be lost.') }}
 		</div>
-		<div v-if="currentStep === 0"
+		<div v-if="currentStep === 0 && isPool"
 			class="_has-background-red-default _has-text-white _is-normal is-flex is-align-items-center ml-5 mr-5 mb-4 pt-2 pb-2 _radius-line">
 			<div class="is-flex left ml-3 mr-2 is-align-items-center">
 				<b-icon custom-size="casa-19px" icon="danger" pack="casa"></b-icon>
@@ -194,6 +194,11 @@ export default {
 			required: true,
 			default: () => [],
 		},
+		// where the merged storage appears: /DATA is the apps' own folder, any other is left to itself
+		mountPoint: {
+			type: String,
+			default: '/DATA',
+		},
 	},
 	components: {
 		CToolTip: cToolTip,
@@ -235,6 +240,9 @@ export default {
 		},
 	},
 	computed: {
+		isPool() {
+			return this.mountPoint === '/DATA'
+		},
 		extended() {
 			return this.checkBoxGroup.join(':')
 		},
@@ -396,7 +404,7 @@ export default {
 			try {
 				await this.$api.local_storage.updateMergerfsInfo({
 					fstype: 'fuse.mergerfs',
-					mount_point: '/DATA',
+					mount_point: this.mountPoint,
 					source_base_path: '',
 					source_volume_uuids: sourceVolumeUuids,
 				})
@@ -456,7 +464,8 @@ export default {
 			this.isConnecting = true
 			// submit
 			this.$messageBus('storagemanager_mergestorage')
-			this.notEmpty = await this.$api.folder.getFolderSize('/DATA').then((res) => {
+			const folderSize = this.isPool ? this.$api.folder.getFolderSize('/DATA') : Promise.resolve({ data: { data: false } })
+			this.notEmpty = await folderSize.then((res) => {
 				return res.data.data
 			}).catch((e) => {
 				this.$buefy.toast.open({
@@ -484,6 +493,10 @@ export default {
 			// operation : split the mergerfs
 			const notSplit = this.mergeStorageList.every(item => this.checkBoxGroup.includes(item) || this.checkBoxMissGroup.includes(item))
 			if (this.isRemovingMerge || notSplit || nextStep) {
+				if (!this.isPool) {
+					this.restart()
+					return
+				}
 				// get docker info
 				let dockerInfo = await this.$openAPI.appGrid.getAppGrid().then(res => res.data.data || [])
 				dockerInfo = filter(dockerInfo, { status: 'running' })
@@ -509,6 +522,10 @@ export default {
 		async restart() {
 			this.isConnecting = true
 			try {
+				if (!this.isPool) {
+					await this.updateMerge([])
+					return
+				}
 				// 将所有应用重启。
 				// 1、 获取应用信息，主要是运行中的应用. 2、关闭应用 3、合并磁盘 4、启动应用
 				let dockerInfo = await this.$openAPI.appGrid.getAppGrid().then(res => res.data.data || [])

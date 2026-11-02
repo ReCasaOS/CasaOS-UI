@@ -16,7 +16,7 @@
 					</p>
 					<p class="has-text-left has-text-full-04 mt-1">{{
 						$t("Available Total", {
-							name: '/DATA',
+							name: mountPoint,
 							avl: renderSize(availableSize),
 							total: renderSize(totalSize),
 						})
@@ -59,6 +59,11 @@ export default {
 		type: {
 			type: String,
 			default: 'is-link',
+		},
+		// the folder the merged storage appears in
+		mountPoint: {
+			type: String,
+			default: '/DATA',
 		},
 	},
 	computed: {
@@ -127,6 +132,7 @@ export default {
 				},
 				props: {
 					mergeStorageList,
+					mountPoint: this.mountPoint,
 				},
 			})
 		},

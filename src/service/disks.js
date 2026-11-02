@@ -67,6 +67,11 @@ const disks = {
 		return api.put(`${PREFIX}/snapraid`, { pool, parity })
 	},
 
+	// the same with the storages at data (their mount points) in place of a pool, for disks that are not merged yet; nothing is written to the disks
+	protectDisks(data, parity) {
+		return api.put(`${PREFIX}/snapraid`, { data, parity })
+	},
+
 	// forgets the protection; the parity files stay where they are
 	removeSnapraid() {
 		return api.delete(`${PREFIX}/snapraid`)

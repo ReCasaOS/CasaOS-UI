@@ -37,6 +37,11 @@
 					</div>
 					<b-tabs v-model="activeTab" :animated="false">
 						<b-tab-item :label="$t('Storage')" class="scrollbars-light-auto tab-item">
+							<!-- the way to a merged storage that survives a drive failing: nobody looks for it under Merged Storage -->
+							<div v-if="canCreateSnapRaid" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item is-flex is-align-items-center">
+								<p class="is-flex-grow-1 mr-3 has-text-full-04">{{ $t('Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.') }}</p>
+								<b-button rounded size="is-small" type="is-link" @click="showCreateSnapRaid">{{ $t('Create SnapRAID') }}</b-button>
+							</div>
 							<!-- an array with no storage mounted on it (stopped, or never formatted) is still shown -->
 							<div v-for="array in unmountedArrays" :key="array.path" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item">
 								<raid-status :array="array" @changed="getDiskList"></raid-status>
@@ -52,19 +57,22 @@
 						<b-tab-item :label="$t('Merged Storage')" class="scrollbars-light-auto tab-item">
 							<storage-combination v-if="mergeConbinationsStorageData.length"
 								:storage-data="mergeConbinationsStorageData"
+								:mount-point="mergeMountPoint"
 								:type="state_mainstorage_operability"
 								@merge-success="showMergedStorage"
 								@reload="getDiskList"></storage-combination>
 							<div v-else class="has-text-centered has-text-grey-light mt-6">
 								<p>{{ $t('No merged storage has been configured.') }}</p>
 								<div class="is-flex is-justify-content-center mt-4">
+									<b-button v-if="canCreateSnapRaid" class="mr-2" rounded type="is-link" @click="showCreateSnapRaid">{{ $t('Create SnapRAID') }}
+									</b-button>
 									<b-button :type="state_mainstorage_operability" rounded
 										@click="showStorageSettingsModal">{{ $t('Merge Storages') }}
 									</b-button>
 									<cToolTip is-block></cToolTip>
 								</div>
 							</div>
-							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates"></snap-raid-panel>
+							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates" :pool="mergeMountPoint"></snap-raid-panel>
 						</b-tab-item>
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
 							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
@@ -190,6 +198,8 @@ import StorageCombination from './StorageCombination.vue'
 import RaidStatus from './RaidStatus.vue'
 import RaidCreate from './RaidCreate.vue'
 import SnapRaidPanel from './SnapRaidPanel.vue'
+import SnapRaidCreate from './SnapRaidCreate.vue'
+import { POOL, poolDisks } from './snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -226,6 +236,8 @@ export default {
 			storageData: [],
 			raidArrays: [],
 			mergeConbinationsStorageData: [],
+			// the folder the merged storage appears in, read with the merge
+			mergeMountPoint: POOL,
 			hasMergeState: false,
 		}
 	},
@@ -233,6 +245,10 @@ export default {
 	computed: {
 		unmountedArrays() {
 			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
+		},
+		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet
+		canCreateSnapRaid() {
+			return poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
 		},
 		// the storages of their own that could hold a SnapRAID parity: mounted, not the system's, not a disk of the merge
 		parityCandidates() {
@@ -308,6 +324,17 @@ export default {
 			this.activeTab = 1
 		},
 
+		showCreateSnapRaid() {
+			this.$buefy.modal.open({
+				component: SnapRaidCreate,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				props: { storages: this.storageData, drives: this.unDiskData },
+				events: { changed: () => this.showMergedStorage() },
+			})
+		},
+
 		showCreateRaid() {
 			this.$buefy.modal.open({
 				component: RaidCreate,
@@ -350,6 +377,8 @@ export default {
 				mergeStorageList = []
 				console.log(e)
 			}
+
+			this.mergeMountPoint = mergeInfo?.mount_point || POOL
 
 			// silent on failure: an older LocalStorage has no such route, and the storages show anyway
 			const raidByPath = {}
