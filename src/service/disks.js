@@ -86,5 +86,10 @@ const disks = {
 	removeFromRaid(name, member) {
 		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}/disks/${encodeURIComponent(member)}`)
 	},
+
+	// unmounts the array name, stops it and erases the RAID header of its disks, which read blank after; confirm is the name typed again
+	deleteRaid(name, confirm) {
+		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}`, { confirm })
+	},
 }
 export default disks
