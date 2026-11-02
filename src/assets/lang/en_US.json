@@ -2723,5 +2723,8 @@
   "This folder is a storage, holds one or lies inside one.": "This folder is a storage, holds one or lies inside one.",
   "The merged storage appears in {folder}. Your apps keep running.": "The merged storage appears in {folder}. Your apps keep running.",
   "Selected storage will be merged in {folder}.": "Selected storage will be merged in {folder}.",
-  "Removing the merged storage empties {folder}. The files stay on their drives.": "Removing the merged storage empties {folder}. The files stay on their drives."
+  "Removing the merged storage empties {folder}. The files stay on their drives.": "Removing the merged storage empties {folder}. The files stay on their drives.",
+  "New dashboard (beta)": "New dashboard (beta)",
+  "Back to the classic dashboard": "Back to the classic dashboard",
+  "Built into CasaOS.": "Built into CasaOS."
 }
