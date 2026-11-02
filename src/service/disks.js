@@ -57,6 +57,31 @@ const disks = {
 		return api.post(`${PREFIX}/raid/${encodeURIComponent(name)}/filesystem`, {}, { timeout: 600000 })
 	},
 
+	// SnapRAID: how the protection of the merged storage stands (set up or not, the action at work, how each ended)
+	snapraid() {
+		return api.get(`${PREFIX}/snapraid`)
+	},
+
+	// protects the pool (its mount point) with the storages at parity (one or two mount points)
+	setSnapraid(pool, parity) {
+		return api.put(`${PREFIX}/snapraid`, { pool, parity })
+	},
+
+	// forgets the protection; the parity files stay where they are
+	removeSnapraid() {
+		return api.delete(`${PREFIX}/snapraid`)
+	},
+
+	// starts diff, sync, scrub or fix in the background (202); options: { force } for sync, { full } for scrub, { disk, confirm } for fix
+	runSnapraid(action, options = {}) {
+		return api.post(`${PREFIX}/snapraid/${action}`, options)
+	},
+
+	// interrupts the action at work; SnapRAID saves where it was
+	stopSnapraid() {
+		return api.delete(`${PREFIX}/snapraid/job`)
+	},
+
 	// takes the failed member (sdc1) out of the array name
 	removeFromRaid(name, member) {
 		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}/disks/${encodeURIComponent(member)}`)

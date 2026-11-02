@@ -64,6 +64,7 @@
 									<cToolTip is-block></cToolTip>
 								</div>
 							</div>
+							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates"></snap-raid-panel>
 						</b-tab-item>
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
 							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
@@ -188,6 +189,7 @@ import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
 import RaidStatus from './RaidStatus.vue'
 import RaidCreate from './RaidCreate.vue'
+import SnapRaidPanel from './SnapRaidPanel.vue'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -203,6 +205,7 @@ export default {
 		StorageItem,
 		StorageCombination,
 		RaidStatus,
+		SnapRaidPanel,
 		CToolTip: cToolTip,
 	},
 	mixins: [smoothReflow, mixin],
@@ -230,6 +233,10 @@ export default {
 	computed: {
 		unmountedArrays() {
 			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
+		},
+		// the storages of their own that could hold a SnapRAID parity: mounted, not the system's, not a disk of the merge
+		parityCandidates() {
+			return this.storageData.filter(storage => !storage.isSystem && !storage.isMergeSource && storage.mount_point)
 		},
 		title() {
 			return this.creatIsShow ? this.$t('Create Storage') : this.$t('Storage Manager')
