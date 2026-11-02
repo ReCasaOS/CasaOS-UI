@@ -1,5 +1,24 @@
 <template>
 	<div class="home-section has-text-left">
+		<!-- System row (beta dashboard): the built-ins first, out of the draggable grid -->
+		<template v-if="systemFirst && systemApps.length > 0">
+			<div class="is-flex is-align-items-center mb-4">
+				<app-section-title-tip id="appTitleSystem"
+					class="is-flex-grow-1 has-text-sub-04"
+					label="Built into CasaOS."
+					title="System">
+				</app-section-title-tip>
+			</div>
+			<div class="app-list contextmenu-canvas mb-5">
+				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" class="handle">
+					<app-card :item="item"
+						@configApp="showConfigPanel"
+						@importApp="showContainerPanel"
+						@updateState="getList"></app-card>
+				</div>
+			</div>
+		</template>
+
 		<!-- Title Bar Start -->
 		<div class="is-flex is-align-items-center mb-4">
 			<app-section-title-tip id="appTitle1"
@@ -158,6 +177,8 @@ const builtInApplications = [
 	},
 ]
 
+const isSystemApp = app => app.app_type === 'system'
+
 const orderConfig = 'app_order'
 
 // how often the VM tiles read the VMs again, while the tab is shown
@@ -195,6 +216,13 @@ export default {
 		return {
 			openAppStore: this.showInstall,
 		}
+	},
+	props: {
+		// beta dashboard: Files and the App Store in their own row above the grid
+		systemFirst: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	data() {
 		return {
@@ -241,18 +269,25 @@ export default {
 		// Machines card. The tiles are not apps: what is dragged comes back here
 		// without them, so the saved order never has them, and they go back after
 		// their card.
+		// With the System row (beta dashboard) the built-ins leave the grid the same
+		// way: appList, and so the saved order, keeps them first.
 		gridList: {
 			get() {
-				const at = this.appList.findIndex(app => app.name === VM_APP_NAME)
+				const apps = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
+				const at = apps.findIndex(app => app.name === VM_APP_NAME)
 				if (at < 0 || !this.vms.length) {
-					return this.appList
+					return apps
 				}
 				const tiles = this.vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
-				return [...this.appList.slice(0, at + 1), ...tiles, ...this.appList.slice(at + 1)]
+				return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
 			},
 			set(list) {
-				this.appList = list.filter(item => !item.vmTile)
+				const system = this.systemFirst ? this.appList.filter(isSystemApp) : []
+				this.appList = concat(system, list.filter(item => !item.vmTile))
 			},
+		},
+		systemApps() {
+			return this.systemFirst ? this.appList.filter(isSystemApp) : []
 		},
 		hasVmCard() {
 			return this.appList.some(app => app.name === VM_APP_NAME)

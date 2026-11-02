@@ -630,3 +630,36 @@ describe('app section VM tiles riding out a failed poll', () => {
 		added.mockRestore()
 	})
 })
+
+describe('app section with the system row (beta dashboard)', () => {
+	const store = { name: 'App Store', app_type: 'system' }
+	const files = { name: 'Files', app_type: 'system' }
+	const jellyfin = { name: 'jellyfin', app_type: 'v2app' }
+	const nextcloud = { name: 'nextcloud', app_type: 'v2app' }
+	const { get, set } = AppSection.computed.gridList
+	const systemApps = AppSection.computed.systemApps
+
+	it('draws the built-ins in their own row and keeps them out of the grid', () => {
+		const vm = { systemFirst: true, vms: [], appList: [store, jellyfin, files, nextcloud] }
+		vm.systemApps = systemApps.call(vm)
+
+		expect(vm.systemApps).toEqual([store, files])
+		expect(get.call(vm)).toEqual([jellyfin, nextcloud])
+	})
+
+	it('puts the built-ins back first after a drag, so the saved order keeps them', () => {
+		const vm = { systemFirst: true, vms: [], appList: [store, jellyfin, files, nextcloud] }
+
+		set.call(vm, [nextcloud, jellyfin])
+
+		expect(vm.appList).toEqual([store, files, nextcloud, jellyfin])
+	})
+
+	it('changes nothing on the classic dashboard', () => {
+		const vm = { systemFirst: false, vms: [], appList: [store, jellyfin, files, nextcloud] }
+		vm.systemApps = systemApps.call(vm)
+
+		expect(vm.systemApps).toEqual([])
+		expect(get.call(vm)).toEqual([store, jellyfin, files, nextcloud])
+	})
+})

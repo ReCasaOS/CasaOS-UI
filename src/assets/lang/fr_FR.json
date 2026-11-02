@@ -2723,5 +2723,8 @@
   "This folder is a storage, holds one or lies inside one.": "Ce dossier est un stockage, en contient un ou se trouve dans un.",
   "The merged storage appears in {folder}. Your apps keep running.": "Le stockage fusionné apparaît dans {folder}. Vos applications continuent de tourner.",
   "Selected storage will be merged in {folder}.": "Les stockages choisis seront fusionnés dans {folder}.",
-  "Removing the merged storage empties {folder}. The files stay on their drives.": "Supprimer le stockage fusionné vide {folder}. Les fichiers restent sur leurs disques."
+  "Removing the merged storage empties {folder}. The files stay on their drives.": "Supprimer le stockage fusionné vide {folder}. Les fichiers restent sur leurs disques.",
+  "New dashboard (beta)": "Nouveau tableau de bord (bêta)",
+  "Back to the classic dashboard": "Revenir au tableau de bord classique",
+  "Built into CasaOS.": "Intégré à CasaOS."
 }
