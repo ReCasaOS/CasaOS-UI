@@ -2652,5 +2652,17 @@
   "Go back to rclone for backups to {name}?": "Go back to rclone for backups to {name}?",
   "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.": "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.",
   "Switch back": "Switch back",
-  "Backups to {name} are stamped copies again. The restic repository is kept.": "Backups to {name} are stamped copies again. The restic repository is kept."
+  "Backups to {name} are stamped copies again. The restic repository is kept.": "Backups to {name} are stamped copies again. The restic repository is kept.",
+  "Choose files…": "Choose files…",
+  "Put back files of {app}": "Put back files of {app}",
+  "The backup taken on {when}. Open a folder by clicking its name, tick what to put back. Nothing else is touched.": "The backup taken on {when}. Open a folder by clicking its name, tick what to put back. Nothing else is touched.",
+  "This backup": "This backup",
+  "This folder is empty.": "This folder is empty.",
+  "{count} chosen": "{count} chosen",
+  "Clear": "Clear",
+  "Put back…": "Put back…",
+  "The backup could not be read: {error}": "The backup could not be read: {error}",
+  "Put these back in {app}?": "Put these back in {app}?",
+  "{count} chosen from the backup taken on {when} go back to where {app} keeps them now, over the files that are there. Nothing else is deleted. The app is stopped while they are copied. This cannot be undone.": "{count} chosen from the backup taken on {when} go back to where {app} keeps them now, over the files that are there. Nothing else is deleted. The app is stopped while they are copied. This cannot be undone.",
+  "Put back": "Put back"
 }

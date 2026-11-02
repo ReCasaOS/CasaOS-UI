@@ -35,6 +35,12 @@
 							{{ $t('Restore') }}
 						</b-button>
 					</p>
+					<!-- only an app that is here: putting some files back needs somewhere to put them -->
+					<p v-if="entry.installed && entry.app !== 'casaos-system'" class="control">
+						<b-button rounded size="is-small" @click="chooseFiles(entry)">
+							{{ $t('Choose files…') }}
+						</b-button>
+					</p>
 					<p class="control">
 						<b-button :aria-label="$t('Delete')" :loading="deleting === entry.app" :title="$t('Delete')"
 							icon-left="trash-outline" icon-pack="casa" rounded size="is-small" @click="confirmDelete(entry)" />
@@ -50,6 +56,8 @@
 </template>
 
 <script>
+import RestoreFilesModal from './RestoreFilesModal.vue'
+
 export default {
 	name: 'restore-from-destination-modal',
 	props: {
@@ -101,6 +109,19 @@ export default {
 				type: 'is-danger',
 				hasIcon: true,
 				onConfirm: () => this.restore(entry, stamp),
+			})
+		},
+
+		chooseFiles(entry) {
+			this.$buefy.modal.open({
+				component: RestoreFilesModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				customClass: 'backup-modal',
+				props: { destination: this.destination, app: entry.app, stamp: this.chosen[entry.app] },
 			})
 		},
 

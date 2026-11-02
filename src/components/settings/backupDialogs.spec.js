@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import BackupDestinations from './BackupDestinations.vue'
 import BackupSchedules from './BackupSchedules.vue'
+import RestoreFilesModal from './RestoreFilesModal.vue'
 import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import i18n from '@/plugins/i18n'
 import BackupAppModal from '@/components/Apps/BackupAppModal.vue'
@@ -330,5 +331,100 @@ describe('a destination kept with restic', () => {
 			expect(wrapper.vm.busy).toBe('')
 			wrapper.unmount()
 		})
+	})
+})
+
+describe('choosing files of a backup', () => {
+	const stamp = '2026-09-13T02-29-56Z'
+	const props = { destination: 'nas', app: 'blog', stamp }
+	const file = (name, directory = false, size = 0) => ({ name, directory, size })
+	const tree = {
+		'': [file('volumes', true), file('binds', true)],
+		'volumes': [file('data', true)],
+		'volumes/data': [file('docs', true), file('a.txt', false, 2048)],
+	}
+	const browse = vi.fn((_n, _a, _s, path = '') => Promise.resolve({ data: { data: tree[path] || [] } }))
+
+	it('lists the top of the backup, folders opening on a click and files with their size', async () => {
+		browse.mockClear()
+		const wrapper = await open(RestoreFilesModal, { browse }, props)
+		expect(browse).toHaveBeenCalledWith('nas', 'blog', stamp, '')
+		expect(wrapper.text()).toContain('volumes/')
+		expect(wrapper.text()).toContain('binds/')
+
+		await wrapper.vm.open(tree[''][0])
+		await wrapper.vm.open(tree.volumes[0])
+		await flushPromises()
+		expect(browse).toHaveBeenLastCalledWith('nas', 'blog', stamp, 'volumes/data')
+		expect(wrapper.text()).toContain('a.txt')
+		expect(wrapper.text()).toContain('2 KB')
+
+		await wrapper.vm.goTo(-1)
+		await flushPromises()
+		expect(browse).toHaveBeenLastCalledWith('nas', 'blog', stamp, '')
+		wrapper.unmount()
+	})
+
+	it('keeps what was ticked from folder to folder, and puts back those paths and no others', async () => {
+		browse.mockClear()
+		const restore = vi.fn(() => Promise.resolve({}))
+		const wrapper = await open(RestoreFilesModal, { browse, restore }, props)
+		const confirm = vi.fn()
+		wrapper.vm.$buefy.dialog.confirm = confirm
+
+		wrapper.vm.toggle(file('binds', true))
+		await wrapper.vm.open(file('volumes', true))
+		await wrapper.vm.open(file('data', true))
+		wrapper.vm.toggle(file('a.txt'))
+		await flushPromises()
+		expect(wrapper.vm.chosen).toEqual(['binds', 'volumes/data/a.txt'])
+
+		// asked before it is done, and said what it does
+		wrapper.vm.confirmRestore()
+		expect(confirm.mock.calls[0][0].message).toContain('Nothing else is deleted')
+		expect(restore).not.toHaveBeenCalled()
+
+		confirm.mock.calls[0][0].onConfirm()
+		await flushPromises()
+		expect(restore).toHaveBeenCalledWith('nas', 'blog', stamp, ['binds', 'volumes/data/a.txt'])
+		wrapper.unmount()
+	})
+
+	it('cannot put back nothing', async () => {
+		const wrapper = await open(RestoreFilesModal, { browse }, props)
+		const button = wrapper.findAll('.modal-card-foot .button').find(candidate => candidate.text().startsWith('Put back'))
+		expect(button.attributes('disabled')).toBeDefined()
+		wrapper.unmount()
+	})
+
+	it('says why a backup could not be read, and lists nothing', async () => {
+		// the sentence is a key with a hole in it, and a key that no language file has is not filled
+		i18n.global.mergeLocaleMessage(i18n.global.locale.value || i18n.global.locale, {
+			'The backup could not be read: {error}': 'The backup could not be read: {error}',
+		})
+		const wrapper = await open(RestoreFilesModal, { browse: fail }, props)
+		expect(wrapper.text()).toContain('The backup could not be read')
+		expect(wrapper.text()).toContain('permission denied')
+		wrapper.unmount()
+	})
+
+	it('is offered, in the list of a destination, only for an app that is installed here', async () => {
+		const wrapper = await open(RestoreFromDestinationModal, {
+			getDestinationRuns: answer([
+				{ app: 'blog', installed: true, stamps: [stamp] },
+				{ app: 'wiki', installed: false, stamps: [stamp] },
+				{ app: 'casaos-system', installed: true, stamps: [stamp] },
+			]),
+		}, { destination: 'nas' })
+		const rows = wrapper.findAll('.held')
+		expect(rows[0].text()).toContain('Choose files')
+		expect(rows[1].text()).not.toContain('Choose files')
+		expect(rows[2].text()).not.toContain('Choose files')
+
+		const opened = vi.fn()
+		wrapper.vm.$buefy.modal.open = opened
+		wrapper.vm.chooseFiles({ app: 'blog' })
+		expect(opened.mock.calls[0][0].props).toEqual({ destination: 'nas', app: 'blog', stamp })
+		wrapper.unmount()
 	})
 })

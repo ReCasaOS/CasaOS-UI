@@ -39,3 +39,29 @@ describe('checking a restic repository', () => {
 		expect(request.url).toBe('/v2/app_management/backup/destinations/my%20nas/restic/check')
 	})
 })
+
+describe('looking inside a backup, and putting some of it back', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('asks for one level of one backup, the path in the query', async () => {
+		await backup.browse('my nas', 'blog', '2026-09-13T02-29-56Z', 'volumes/data')
+		const request = adapter.mock.calls[0][0]
+		expect(request.method).toBe('get')
+		expect(request.url).toBe('/v2/app_management/backup/destinations/my%20nas/runs/blog/2026-09-13T02-29-56Z/files')
+		expect(request.params).toEqual({ path: 'volumes/data' })
+	})
+
+	it('asks for the top of the backup with no path at all', async () => {
+		await backup.browse('nas', 'blog', '2026-09-13T02-29-56Z')
+		expect(adapter.mock.calls[0][0].params).toBeUndefined()
+	})
+
+	it('sends paths only when some were chosen, so a whole restore stays a whole restore', async () => {
+		await backup.restore('nas', 'blog', 'stamp')
+		expect(body()).toEqual({ destination: 'nas', app: 'blog', stamp: 'stamp' })
+
+		adapter.mockClear()
+		await backup.restore('nas', 'blog', 'stamp', ['volumes/data/a.txt'])
+		expect(body()).toEqual({ destination: 'nas', app: 'blog', stamp: 'stamp', paths: ['volumes/data/a.txt'] })
+	})
+})
