@@ -173,7 +173,7 @@ export default {
 			const names = this.state.config.data.map(disk => `${disk.name} (${disk.path})`).join(', ')
 			this.$buefy.dialog.prompt({
 				title: escape(this.$t('Repair a disk')),
-				message: escape(this.$t('Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. Type the name of the disk to repair, or "all". Disks: {names}', { names })),
+				message: escape(this.$t('Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. The files come back owned by root and readable by root only: SnapRAID does not keep the owner or the permissions, so set them again if an app has to read them. Type the name of the disk to repair, or "all". Disks: {names}', { names })),
 				inputAttrs: { placeholder: 'd1' },
 				confirmText: this.$t('Repair'),
 				cancelText: this.$t('Cancel'),
