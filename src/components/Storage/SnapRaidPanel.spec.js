@@ -128,6 +128,7 @@ describe('the panel', () => {
 		}
 		await wrapper.findAll('button').find(b => b.text() === 'Repair…').trigger('click')
 		expect(prompt.message).toContain('d1 (/media/a), d2 (/media/b)')
+		expect(prompt.message).toContain('readable by root only')
 		await prompt.onConfirm(' d2 ')
 		expect(runSnapraid).toHaveBeenLastCalledWith('fix', { disk: 'd2', confirm: 'd2' })
 		await prompt.onConfirm('all')

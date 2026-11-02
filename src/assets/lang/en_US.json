@@ -2681,7 +2681,7 @@
   "Repair…": "Repair…",
   "Remove protection": "Remove protection",
   "Repair a disk": "Repair a disk",
-  "Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. Type the name of the disk to repair, or \"all\". Disks: {names}": "Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. Type the name of the disk to repair, or \"all\". Disks: {names}",
+  "Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. The files come back owned by root and readable by root only: SnapRAID does not keep the owner or the permissions, so set them again if an app has to read them. Type the name of the disk to repair, or \"all\". Disks: {names}": "Files lost from a disk come back from the parity, as they were at the last sync: what changed since is undone. For a disk you replaced, mount the new one where the old one was. The files come back owned by root and readable by root only: SnapRAID does not keep the owner or the permissions, so set them again if an app has to read them. Type the name of the disk to repair, or \"all\". Disks: {names}",
   "Repair": "Repair",
   "Remove the protection?": "Remove the protection?",
   "The disks and their files are not touched. The parity files stay on the parity disks, where they take room until you delete them.": "The disks and their files are not touched. The parity files stay on the parity disks, where they take room until you delete them.",
