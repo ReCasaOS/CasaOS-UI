@@ -2645,5 +2645,12 @@
   "Backups to {name} are now kept with restic.": "Backups to {name} are now kept with restic.",
   "Write this password down": "Write this password down",
   "This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.": "This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.",
-  "I have written it down": "I have written it down"
+  "I have written it down": "I have written it down",
+  "Switched back to rclone: the restic repository is still read": "Switched back to rclone: the restic repository is still read",
+  "Resume restic": "Resume restic",
+  "Switch back to rclone…": "Switch back to rclone…",
+  "Go back to rclone for backups to {name}?": "Go back to rclone for backups to {name}?",
+  "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.": "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.",
+  "Switch back": "Switch back",
+  "Backups to {name} are stamped copies again. The restic repository is kept.": "Backups to {name} are stamped copies again. The restic repository is kept."
 }

@@ -91,6 +91,13 @@ const backup = {
 		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`, password ? { password } : {})
 	},
 
+	// Sends the next backups of a destination back to rclone. Nothing is deleted: the
+	// repository and its password stay, and what it holds is still listed and restored.
+	// Enabling again, without a password, takes it up.
+	disableRestic(name) {
+		return api.delete(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`)
+	},
+
 	// Checks the restic repository of a destination now, in the background: it is read
 	// whole, so it ends when it ends. The result is `last_check` of the restic state.
 	checkRestic(name) {
