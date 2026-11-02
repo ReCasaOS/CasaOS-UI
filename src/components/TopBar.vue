@@ -204,6 +204,24 @@
 					</div>
 					<!-- Recommended modules Switch End  -->
 
+					<!-- Beta dashboard Switch Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="flask-outline" size="is-20" />
+							{{ $t("New dashboard (beta)") }}
+						</div>
+						<div>
+							<b-field>
+								<b-switch v-model="barData.dashboard_beta"
+									class="is-flex-direction-row-reverse mr-0 _small"
+									type="is-dark"
+									@update:model-value="saveData" />
+							</b-field>
+						</div>
+					</div>
+					<!-- Beta dashboard Switch End -->
+
 					<!-- App Launching Start -->
 					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center">
@@ -579,6 +597,7 @@ export default {
 				shortcuts_switch: false, // Not used
 				widgets_switch: false, // Not used
 				existing_apps_switch: true,
+				dashboard_beta: false,
 			},
 			updateInfo: {
 				current_version: '0',
