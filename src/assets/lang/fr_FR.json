@@ -2652,5 +2652,17 @@
   "Go back to rclone for backups to {name}?": "Revenir à rclone pour les sauvegardes vers {name} ?",
   "The next backups to this destination will be stamped copies again. Nothing is deleted: the restic repository stays on the destination, this box keeps its password, and what the repository holds stays listed and restorable. A schedule's retention counts the copies of both kinds. You can switch to restic again whenever you want.": "Les prochaines sauvegardes vers cette destination seront de nouveau des copies horodatées. Rien n'est supprimé : le dépôt restic reste sur la destination, cette box en garde le mot de passe, et ce qu'il contient reste listé et restaurable. La rétention d'une planification compte les copies des deux sortes. Vous pouvez repasser à restic quand vous voulez.",
   "Switch back": "Revenir",
-  "Backups to {name} are stamped copies again. The restic repository is kept.": "Les sauvegardes vers {name} sont de nouveau des copies horodatées. Le dépôt restic est conservé."
+  "Backups to {name} are stamped copies again. The restic repository is kept.": "Les sauvegardes vers {name} sont de nouveau des copies horodatées. Le dépôt restic est conservé.",
+  "Choose files…": "Choisir des fichiers…",
+  "Put back files of {app}": "Remettre des fichiers de {app}",
+  "The backup taken on {when}. Open a folder by clicking its name, tick what to put back. Nothing else is touched.": "La sauvegarde du {when}. Ouvrez un dossier en cliquant sur son nom, cochez ce qu'il faut remettre. Rien d'autre n'est touché.",
+  "This backup": "Cette sauvegarde",
+  "This folder is empty.": "Ce dossier est vide.",
+  "{count} chosen": "{count} choisi(s)",
+  "Clear": "Effacer",
+  "Put back…": "Remettre…",
+  "The backup could not be read: {error}": "La sauvegarde n'a pas pu être lue : {error}",
+  "Put these back in {app}?": "Les remettre dans {app} ?",
+  "{count} chosen from the backup taken on {when} go back to where {app} keeps them now, over the files that are there. Nothing else is deleted. The app is stopped while they are copied. This cannot be undone.": "{count} choisi(s) dans la sauvegarde du {when} retournent là où {app} les garde maintenant, par-dessus les fichiers qui s'y trouvent. Rien d'autre n'est supprimé. L'app est arrêtée pendant la copie. Cette action est irréversible.",
+  "Put back": "Remettre"
 }

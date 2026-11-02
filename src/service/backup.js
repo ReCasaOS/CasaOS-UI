@@ -72,8 +72,19 @@ const backup = {
 	// app is stopped for the copy, and files added since the backup are removed:
 	// a restore means "as it was". An app that is not installed is installed
 	// first, from the compose file the backup holds.
-	restore(destination, app, stamp) {
-		return api.post(`${PREFIX}/backup/restore`, { destination, app, stamp })
+	// `paths`, when there are any, put back only those paths of the backup -- as browse()
+	// names them -- onto the app as it is, over what is there and deleting nothing.
+	restore(destination, app, stamp, paths = []) {
+		return api.post(`${PREFIX}/backup/restore`, { destination, app, stamp, ...(paths.length ? { paths } : {}) })
+	},
+
+	// One level inside a backup: the folders that lead to its copies at the top (an
+	// empty `path`), then what each copy holds. Folders first.
+	browse(name, app, stamp, path = '') {
+		return api.get(
+			`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs/${encodeURIComponent(app)}/${encodeURIComponent(stamp)}/files`,
+			path ? { path } : undefined,
+		)
 	},
 
 	// What a destination holds: the apps it has backups of, their runs newest
