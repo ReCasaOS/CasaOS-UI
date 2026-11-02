@@ -2693,5 +2693,7 @@
   "Sync held back": "Sync held back",
   "The last sync failed": "The last sync failed",
   "The last check found a problem": "The last check found a problem",
-  "Not synced yet": "Not synced yet"
+  "Not synced yet": "Not synced yet",
+  "Everything on {name} is erased and its disks are left blank. This cannot be undone. Type {name} to delete it.": "Everything on {name} is erased and its disks are left blank. This cannot be undone. Type {name} to delete it.",
+  "{name} is deleted. Its disks are blank.": "{name} is deleted. Its disks are blank."
 }

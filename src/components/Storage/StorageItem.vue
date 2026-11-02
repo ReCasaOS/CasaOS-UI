@@ -48,7 +48,7 @@
 					{{ $t('Rename') }}
 				</b-button>
 				<b-button :disabled="isFormating || isRenaming" :loading="isRemoving" :type="isRemoving ? 'is-primary' : ''" class="ml-2"
-					rounded size="is-small" @click="removeStorage(item.disk)"> {{ $t('Remove') }}
+					rounded size="is-small" @click="item.raid ? deleteRaid(item.raid.name) : removeStorage(item.disk)"> {{ $t('Remove') }}
 				</b-button>
 			</div>
 			<p v-else-if="item.isSystem && item.usePercent >= 80" class="has-text-right is-flex is-flex-direction-column-reverse">
@@ -62,6 +62,7 @@
 
 <script>
 import delay from 'lodash/delay'
+import escape from 'lodash/escape'
 import RaidStatus from './RaidStatus.vue'
 import { raidLevel } from './raid'
 import { mixin } from '@/mixins/mixin'
@@ -184,6 +185,41 @@ export default {
 						})
 						console.error(e)
 					})
+				},
+			})
+		},
+
+		// an array is not a disk to unmount: deleting it stops it and leaves its disks blank, which the person confirms by typing its name
+		deleteRaid(name) {
+			this.isRemoving = true
+			this.$buefy.dialog.prompt({
+				title: escape(this.$t('Delete {name}?', { name })),
+				message: escape(this.$t('Everything on {name} is erased and its disks are left blank. This cannot be undone. Type {name} to delete it.', { name })),
+				inputAttrs: {
+					type: 'text',
+					placeholder: name,
+					required: true,
+					pattern: `^${name}$`,
+					autocomplete: 'off',
+				},
+				type: 'is-danger',
+				hasIcon: true,
+				trapFocus: true,
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onCancel: () => {
+					this.isRemoving = false
+				},
+				onConfirm: async (value) => {
+					try {
+						await this.$api.disks.deleteRaid(name, value)
+						this.$buefy.toast.open({ message: escape(this.$t('{name} is deleted. Its disks are blank.', { name })), type: 'is-success' })
+						this.$emit('getDiskList')
+					} catch (e) {
+						this.$buefy.toast.open({ duration: 5000, message: escape(e?.response?.data?.message || String(e)), type: 'is-danger' })
+					} finally {
+						this.isRemoving = false
+					}
 				},
 			})
 		},
