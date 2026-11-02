@@ -2716,5 +2716,12 @@
   "Starting the first sync": "Starting the first sync",
   "The SnapRAID storage is created: the first sync is running.": "The SnapRAID storage is created: the first sync is running.",
   "The SnapRAID storage is created, but the first sync did not start: {reason}. The daily sync will do it.": "The SnapRAID storage is created, but the first sync did not start: {reason}. The daily sync will do it.",
-  "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.": "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails."
+  "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.": "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.",
+  "Folder": "Folder",
+  "Where the merged storage appears. What you put there is spread over the drives.": "Where the merged storage appears. What you put there is spread over the drives.",
+  "Use an absolute folder such as /media/Pool, with letters, digits, dots, dashes and underscores only.": "Use an absolute folder such as /media/Pool, with letters, digits, dots, dashes and underscores only.",
+  "This folder is a storage, holds one or lies inside one.": "This folder is a storage, holds one or lies inside one.",
+  "The merged storage appears in {folder}. Your apps keep running.": "The merged storage appears in {folder}. Your apps keep running.",
+  "Selected storage will be merged in {folder}.": "Selected storage will be merged in {folder}.",
+  "Removing the merged storage empties {folder}. The files stay on their drives.": "Removing the merged storage empties {folder}. The files stay on their drives."
 }

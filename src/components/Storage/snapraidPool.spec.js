@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createSnapRaid, parityChoices, poolDisks, suggestParity } from './snapraidPool'
+import { createSnapRaid, folderProblem, normalizeFolder, parityChoices, poolDisks, suggestParity } from './snapraidPool'
 
 const GB = 1e9
 const storage = (name, size, extra = {}) => ({ name, size, uuid: `uuid-${name}`, mount_point: `/media/${name}`, persistedIn: 'casaos', isSystem: false, isMergeSource: false, ...extra })
@@ -122,10 +122,50 @@ describe('making a SnapRAID storage', () => {
 		expect(result).toEqual({ syncStarted: false, reason: 'sync refused' })
 	})
 
+	it('merges in a folder of its own without touching the apps', async () => {
+		const apps = [{ name: 'plex', app_type: 'v2app', status: 'running' }]
+		const { ctx, calls } = box({ apps })
+		await createSnapRaid(ctx, { data, parity, folder: '/media/Pool' }, () => {})
+		expect(ctx.$api.local_storage.updateMergerfsInfo).toHaveBeenCalledWith({ fstype: 'fuse.mergerfs', mount_point: '/media/Pool', source_base_path: '', source_volume_uuids: ['uuid-A', 'uuid-B'] })
+		// no apps stopped, no /DATA to initialize
+		expect(calls).toEqual(['create', 'list', 'protect', 'merge', 'sync'])
+		expect(ctx.$openAPI.appCompose.setComposeAppStatus).not.toHaveBeenCalled()
+	})
+
+	it('a refused merge in a folder of its own is a failure like any other', async () => {
+		const { ctx, calls } = box({ failAt: 'merge' })
+		await expect(createSnapRaid(ctx, { data, parity, folder: '/media/Pool' }, () => {})).rejects.toThrow('merge')
+		expect(calls).not.toContain('sync')
+	})
+
 	it('does not initialize a merged storage that is already', async () => {
 		const { ctx } = box()
 		ctx.$api.local_storage.getInitMergerfsStatus.mockResolvedValue({ data: { data: 'initialized' } })
 		await createSnapRaid(ctx, { data, parity }, () => {})
 		expect(ctx.$api.local_storage.initMergerfs).not.toHaveBeenCalled()
+	})
+})
+
+describe('the folder of the merged storage', () => {
+	const stores = [storage('Movies', 4000 * GB), storage('Series', 4000 * GB), storage('System', 100 * GB, { mount_point: '/' })]
+
+	it('accepts a folder of plain names, and /DATA', () => {
+		for (const folder of ['/media/Pool', '/media/Pool/', ' /media/Pool ', '/DATA', '/srv/my-pool_2.0']) {
+			expect(folderProblem(folder, stores)).toBe('')
+		}
+		expect(normalizeFolder(' /media/Pool/ ')).toBe('/media/Pool')
+	})
+
+	it('refuses what is not an absolute path of plain names', () => {
+		for (const folder of ['', '/', 'media/Pool', '/media//Pool', '/media/../etc', '/media/./Pool', '/media/My Pool', '/media/$(id)', '/media/Pool;ls']) {
+			expect(folderProblem(folder, stores)).toBe('path')
+		}
+	})
+
+	it('refuses a folder that is, holds or lies inside a storage, but not because of the system storage at /', () => {
+		for (const folder of ['/media/Movies', '/media/Movies/pool', '/media']) {
+			expect(folderProblem(folder, stores)).toBe('taken')
+		}
+		expect(folderProblem('/srv/pool', stores)).toBe('')
 	})
 })

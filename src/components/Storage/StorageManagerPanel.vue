@@ -57,6 +57,7 @@
 						<b-tab-item :label="$t('Merged Storage')" class="scrollbars-light-auto tab-item">
 							<storage-combination v-if="mergeConbinationsStorageData.length"
 								:storage-data="mergeConbinationsStorageData"
+								:mount-point="mergeMountPoint"
 								:type="state_mainstorage_operability"
 								@merge-success="showMergedStorage"
 								@reload="getDiskList"></storage-combination>
@@ -71,7 +72,7 @@
 									<cToolTip is-block></cToolTip>
 								</div>
 							</div>
-							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates"></snap-raid-panel>
+							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates" :pool="mergeMountPoint"></snap-raid-panel>
 						</b-tab-item>
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
 							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
@@ -198,7 +199,7 @@ import RaidStatus from './RaidStatus.vue'
 import RaidCreate from './RaidCreate.vue'
 import SnapRaidPanel from './SnapRaidPanel.vue'
 import SnapRaidCreate from './SnapRaidCreate.vue'
-import { poolDisks } from './snapraidPool'
+import { POOL, poolDisks } from './snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -235,6 +236,8 @@ export default {
 			storageData: [],
 			raidArrays: [],
 			mergeConbinationsStorageData: [],
+			// the folder the merged storage appears in, read with the merge
+			mergeMountPoint: POOL,
 			hasMergeState: false,
 		}
 	},
@@ -374,6 +377,8 @@ export default {
 				mergeStorageList = []
 				console.log(e)
 			}
+
+			this.mergeMountPoint = mergeInfo?.mount_point || POOL
 
 			// silent on failure: an older LocalStorage has no such route, and the storages show anyway
 			const raidByPath = {}

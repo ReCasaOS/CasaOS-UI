@@ -88,7 +88,7 @@ describe('the SnapRAID dialog', () => {
 		await flushPromises()
 		expect($api.storage.create).toHaveBeenCalledWith({ path: '/dev/sdc', name: 'Parity1', format: true })
 		expect($api.disks.protectDisks).toHaveBeenCalledWith(['/media/Movies', '/media/Series'], ['/media/Parity1'])
-		expect($api.local_storage.updateMergerfsInfo).toHaveBeenCalled()
+		expect($api.local_storage.updateMergerfsInfo).toHaveBeenCalledWith(expect.objectContaining({ mount_point: '/media/Pool' }))
 		expect($api.disks.runSnapraid).toHaveBeenCalledWith('sync')
 		expect(toast.mock.calls[0][0]).toMatchObject({ message: 'The SnapRAID storage is created: the first sync is running.', type: 'is-success' })
 		expect(wrapper.emitted('changed')).toHaveLength(1)
@@ -112,5 +112,50 @@ describe('the SnapRAID dialog', () => {
 		await wrapper.findAll('button').find(b => b.text() === 'Close').trigger('click')
 		expect(wrapper.emitted('changed')).toHaveLength(1)
 		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+})
+
+describe('the folder of the merged storage', () => {
+	async function ready(folder, apiOverrides) {
+		const made = dialog({ storages, drives }, apiOverrides)
+		made.wrapper.vm.dataKeys = ['/media/Movies', '/media/Series']
+		made.wrapper.vm.typed = 'I AM SURE'
+		if (folder !== undefined) {
+			made.wrapper.vm.folder = folder
+		}
+		await flushPromises()
+		return made
+	}
+
+	it('is /media/Pool unless said otherwise, and leaves the apps alone there', async () => {
+		const { wrapper, $api } = await ready()
+		expect(wrapper.vm.folder).toBe('/media/Pool')
+		expect(wrapper.text()).toContain('The merged storage appears in /media/Pool. Your apps keep running.')
+		expect(wrapper.text()).not.toContain('Your apps are stopped')
+		expect(wrapper.text()).not.toContain('may be hidden')
+		expect(wrapper.vm.ready).toBe(true)
+		await wrapper.findAll('button').find(b => b.text() === 'Create and protect').trigger('click')
+		await flushPromises()
+		expect($api.local_storage.updateMergerfsInfo).toHaveBeenCalledWith(expect.objectContaining({ mount_point: '/media/Pool' }))
+	})
+
+	it('warns about the apps and the hidden files on /DATA, and merges there', async () => {
+		const { wrapper, $api } = await ready(' /DATA/ ')
+		expect(wrapper.text()).toContain('Your apps are stopped for a moment')
+		expect(wrapper.text()).toContain('may be hidden')
+		await wrapper.findAll('button').find(b => b.text() === 'Create and protect').trigger('click')
+		await flushPromises()
+		expect($api.local_storage.updateMergerfsInfo).toHaveBeenCalledWith(expect.objectContaining({ mount_point: '/DATA' }))
+	})
+
+	it('cannot be made with a folder that is no path, or that is a storage', async () => {
+		const bad = await ready('media/Pool')
+		expect(bad.wrapper.vm.ready).toBe(false)
+		expect(bad.wrapper.text()).toContain('Use an absolute folder such as /media/Pool')
+		const taken = await ready('/media/Movies/pool')
+		expect(taken.wrapper.vm.ready).toBe(false)
+		expect(taken.wrapper.text()).toContain('This folder is a storage, holds one or lies inside one.')
+		const fine = await ready('/srv/pool')
+		expect(fine.wrapper.vm.ready).toBe(true)
 	})
 })

@@ -2716,5 +2716,12 @@
   "Starting the first sync": "Lancement de la première synchronisation",
   "The SnapRAID storage is created: the first sync is running.": "Le stockage SnapRAID est créé : la première synchronisation est en cours.",
   "The SnapRAID storage is created, but the first sync did not start: {reason}. The daily sync will do it.": "Le stockage SnapRAID est créé, mais la première synchronisation n'a pas démarré : {reason}. La synchronisation quotidienne s'en chargera.",
-  "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.": "Plusieurs disques ? SnapRAID les fusionne en un seul stockage et garde un disque capable de reconstruire n'importe lequel d'entre eux s'il tombe en panne."
+  "Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.": "Plusieurs disques ? SnapRAID les fusionne en un seul stockage et garde un disque capable de reconstruire n'importe lequel d'entre eux s'il tombe en panne.",
+  "Folder": "Dossier",
+  "Where the merged storage appears. What you put there is spread over the drives.": "Où apparaît le stockage fusionné. Ce que vous y mettez est réparti sur les disques.",
+  "Use an absolute folder such as /media/Pool, with letters, digits, dots, dashes and underscores only.": "Indiquez un dossier absolu comme /media/Pool, avec des lettres, chiffres, points, tirets et tirets bas seulement.",
+  "This folder is a storage, holds one or lies inside one.": "Ce dossier est un stockage, en contient un ou se trouve dans un.",
+  "The merged storage appears in {folder}. Your apps keep running.": "Le stockage fusionné apparaît dans {folder}. Vos applications continuent de tourner.",
+  "Selected storage will be merged in {folder}.": "Les stockages choisis seront fusionnés dans {folder}.",
+  "Removing the merged storage empties {folder}. The files stay on their drives.": "Supprimer le stockage fusionné vide {folder}. Les fichiers restent sur leurs disques."
 }
