@@ -1,7 +1,8 @@
 {
-    "name": "CasaOS",
-    "short_name": "CasaOS",
-    "icons": [{
+    "name": "ReCasaOS",
+    "short_name": "ReCasaOS",
+    "icons": [
+        {
             "src": "/img/icon/android-chrome-192x192.png",
             "sizes": "192x192",
             "type": "image/png"
@@ -13,6 +14,6 @@
         }
     ],
     "theme_color": "#ffffff",
-    "background_color": "#ffffff",
+    "background_color": "#151515",
     "display": "standalone"
 }

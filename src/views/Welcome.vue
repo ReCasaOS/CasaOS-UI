@@ -13,9 +13,9 @@
 
 			<div v-if="step == 1" class="has-text-centered">
 				<div v-animate-css="s1Ani" class=" is-flex is-justify-content-center">
-					<!-- The same mark twice: navy ink for the light panel, white for the dark one. -->
-					<b-image :src="require('@/assets/img/logo/casa-dark.svg')" class="is-128x128 mb-4 logo-on-light"></b-image>
-					<b-image :src="require('@/assets/img/logo/casa-light.svg')" class="is-128x128 mb-4 logo-on-dark"></b-image>
+					<!-- The dark tile keeps the lime mark legible in both themes. -->
+					<b-image :src="require('@/assets/img/logo/casa-dark.svg')" alt="ReCasaOS" class="is-128x128 mb-4 logo-on-light"></b-image>
+					<b-image :src="require('@/assets/img/logo/casa-light.svg')" alt="ReCasaOS" class="is-128x128 mb-4 logo-on-dark"></b-image>
 				</div>
 
 				<h2 v-animate-css="s2Ani" class="title is-2 mb-5 has-text-centered __attached_title">{{
