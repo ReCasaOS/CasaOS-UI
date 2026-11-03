@@ -1,7 +1,7 @@
 <template>
 	<div class="brand-bar is-flex is-align-items-flex-end has-text-white">
 		<figure class="image _is-136x26 mb-3">
-			<img alt="logo" srcset="../assets/img/logo/logo.svg 2x, ../assets/img/logo/logo.png 1x">
+			<img alt="ReCasaOS" srcset="../assets/img/logo/logo.svg 2x, ../assets/img/logo/logo.png 1x">
 		</figure>
 		<!-- Two lines, because they answer two different questions: who publishes this
 			build, and whose work it stands on. The README says the same thing in more
@@ -80,7 +80,7 @@ export default {
 }
 
 ._is-136x26 {
-	width: 8.5rem;
+	width: 11.25rem;
 	height: 1.625rem;
 }
 </style>
