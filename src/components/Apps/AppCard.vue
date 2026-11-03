@@ -36,6 +36,9 @@
 								$t('launch-and-open') }}
 						</b-button>
 					</template>
+					<b-button v-if="compact && !isContainerApp" expanded type="is-text" @click="toggleFavorite">
+						{{ favorite ? $t('Remove from favorites') : $t('Add to favorites') }}
+					</b-button>
 					<b-button v-if="isV2App" expanded icon-pack="casa" icon-right="question-outline" size="is-16"
 						type="is-text" @click="openTips(item.name)">
 						{{ $t('Tips') }}
@@ -178,6 +181,8 @@
 						<!-- Docker hands out names like `adoring_antonelli`, and a container
 							whose name it never set falls back to its id. For those cards the
 							name identifies nothing, and the image does. -->
+						<p v-if="compact && subtitle" class="one-line app-state">{{ subtitle }}</p>
+
 						<p v-if="facts.length" class="one-line has-text-full-03 _facts">
 							{{ facts.join(' · ') }}
 						</p>
@@ -245,6 +250,15 @@ export default {
 		compact: {
 			type: Boolean,
 			default: false,
+		},
+		// beta dashboard: pinned in the favorites; the second line of a system card
+		favorite: {
+			type: Boolean,
+			default: false,
+		},
+		subtitle: {
+			type: String,
+			default: '',
 		},
 	},
 	data() {
@@ -422,6 +436,10 @@ export default {
 		 * @param {string} index App access index
 		 * @return {*} void
 		 */
+		toggleFavorite() {
+			this.$refs.dro.isActive = false
+			this.$emit('toggleFavorite', this.item)
+		},
 		// the menu button has its own click; a card at work is not opened a second time
 		openFromCard(event) {
 			if (this.isLoading || (event.target.closest && event.target.closest('.action-btn'))) {
