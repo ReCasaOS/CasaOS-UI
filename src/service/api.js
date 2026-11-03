@@ -17,6 +17,7 @@ import users from './users.js'
 import local_storage from './local_storage.js'
 import driver from './driver.js'
 import cloud from './cloud.js'
+import fleetStatus from './fleetStatus.js'
 
 export default {
 	// Apps
@@ -37,6 +38,7 @@ export default {
 	samba,
 	driver,
 	cloud,
+	fleet: fleetStatus,
 	// System
 	sys,
 	port,
