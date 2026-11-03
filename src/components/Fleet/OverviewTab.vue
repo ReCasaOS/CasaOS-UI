@@ -18,6 +18,7 @@
 					<span :class="row.online ? 'is-online' : 'is-offline'" aria-hidden="true" class="fleet-dot"></span>
 					<span class="is-sr-only">{{ row.online ? $t('Online') : $t('Offline') }}</span>
 					<span class="has-text-weight-medium">{{ row.name }}</span>
+					<b-tag v-if="row.needsRecode" class="ml-1" size="is-small" type="is-warning">{{ $t('New code needed') }}</b-tag>
 					<div v-if="!row.online" class="has-text-full-03">{{ offlineText(row) }}</div>
 					<div v-else-if="row.pending" class="has-text-full-03">{{ $t('Loading…') }}</div>
 				</b-table-column>
@@ -66,7 +67,7 @@
 				<b-table-column v-slot="{ row }" label="">
 					<b-dropdown :mobile-modal="false" append-to-body aria-role="list" position="is-bottom-left">
 						<template #trigger>
-							<button :aria-label="$t('Actions')" class="button is-small is-text" type="button">
+							<button :aria-label="$t('Actions')" :class="row.needsRecode ? 'is-warning' : 'is-text'" class="button is-small" type="button">
 								<b-icon icon="dots-vertical-outline" pack="casa" />
 							</button>
 						</template>
@@ -74,7 +75,7 @@
 							<a :href="row.url" rel="noopener" target="_blank">{{ $t('Open') }}</a>
 						</b-dropdown-item>
 						<b-dropdown-item aria-role="listitem" @click="rename(row)">{{ $t('Rename') }}</b-dropdown-item>
-						<b-dropdown-item aria-role="listitem" @click="newCode(row)">{{ $t('New code') }}</b-dropdown-item>
+						<b-dropdown-item :class="{ 'has-text-warning': row.needsRecode }" aria-role="listitem" @click="newCode(row)">{{ $t('New code') }}</b-dropdown-item>
 						<b-dropdown-item aria-role="listitem" class="has-text-danger" @click="confirmRemove(row)">{{ $t('Remove') }}</b-dropdown-item>
 					</b-dropdown>
 				</b-table-column>

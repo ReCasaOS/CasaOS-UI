@@ -198,6 +198,19 @@ describe('the Fleet page', () => {
 		expect(rowOf('Garage').text()).not.toContain('1970')
 	})
 
+	it('marks boxes that need a new code', async () => {
+		boxes([{ ...A, needs_recode: true }, B])
+		await mountPage()
+		const home = rowOf('Home')
+		const shop = rowOf('Shop')
+		expect(home.find('.tag.is-warning').text()).toBe('New code needed')
+		expect(home.find('button.is-warning').exists()).toBe(true)
+		expect(shop.text()).not.toContain('New code needed')
+		expect(shop.find('.is-warning').exists()).toBe(false)
+		// the "New code" action itself is highlighted, for that box only
+		expect(document.querySelectorAll('.dropdown-item.has-text-warning')).toHaveLength(1)
+	})
+
 	it('asks before giving a box a new code, which cuts its tunnel', async () => {
 		fleetApi.rotateCode.mockResolvedValue({ data: { data: { code: 'FLEET1.new' } } })
 		await mountPage()
