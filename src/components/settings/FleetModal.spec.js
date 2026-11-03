@@ -119,6 +119,17 @@ describe('the Fleet settings', () => {
 		expect(wrapper.text()).toContain('Not connected: dial tcp: i/o timeout')
 	})
 
+	it('does not take a master that is down for a refusal', async () => {
+		fleetApi.status.mockReturnValue(answer(member({ connected: false, last_error: 'dial tcp 10.0.0.1:443: connect: connection refused' })))
+		await open()
+		expect(wrapper.text()).toContain('Not connected: dial tcp 10.0.0.1:443: connect: connection refused')
+		expect(wrapper.text()).not.toContain('Refused by the master')
+		wrapper.unmount()
+		fleetApi.status.mockReturnValue(answer(member({ connected: false, last_error: 'refused by the master' })))
+		await open()
+		expect(wrapper.text()).toContain('Refused by the master')
+	})
+
 	it('says so when the core cannot be read, and shows nothing to change', async () => {
 		fleetApi.status.mockImplementation(() => Promise.reject(new Error('Network Error')))
 		await open()

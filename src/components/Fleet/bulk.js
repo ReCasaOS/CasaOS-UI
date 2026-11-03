@@ -52,14 +52,21 @@ export const actions = {
 }
 
 const POLL_MS = 2000
+// a start that did not answer in time may run its checks for five minutes before the status leaves idle
+const IDLE_GRACE_MS = 6 * 60 * 1000
 // shortcut: a box that says "running" for ever is asked for an hour, then given up on; upgrade to a stop signal if a tab leaks polls
 const MAX_POLLS = 1800
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-// Asks `path` every two seconds and hands each answer's payload to `onEach`, until `done(payload)`. A box
-// that fails to answer ends the follow with { state: 'offline' | 'failed', error }, handed to `onEach` too.
-async function follow(boxId, path, onEach, done) {
+// Asks `path` every two seconds and hands each answer's payload to `onEach`, until `done(payload)`, or until
+// `alive()` says nobody is looking any more (the last payload). A box that fails to answer ends the follow with
+// { state: 'offline' | 'failed', error }, handed to `onEach` too.
+async function follow(boxId, path, onEach, done, alive) {
+	let last = {}
 	for (let i = 0; i < MAX_POLLS; i++) {
+		if (i > 0 && !alive()) {
+			return last
+		}
 		let payload
 		try {
 			payload = (await relay(boxId, 'get', path))?.data?.data ?? {}
@@ -69,6 +76,7 @@ async function follow(boxId, path, onEach, done) {
 			onEach(result)
 			return result
 		}
+		last = payload
 		onEach(payload)
 		if (done(payload)) {
 			return payload
@@ -78,12 +86,15 @@ async function follow(boxId, path, onEach, done) {
 	return { state: 'failed', error: 'timeout' }
 }
 
-// GET /v1/sys/packages/update/status until it is over: resolves to the last status.
-export function followPackages(boxId, onStatus) {
-	return follow(boxId, '/v1/sys/packages/update/status', onStatus, s => ['succeeded', 'failed'].includes(s.state))
+// GET /v1/sys/packages/update/status until it is over, or still idle once a slow start had time to begin:
+// resolves to the last status.
+export function followPackages(boxId, onStatus, alive = () => true) {
+	const since = Date.now()
+	const over = s => ['succeeded', 'failed'].includes(s.state) || (s.state === 'idle' && Date.now() - since >= IDLE_GRACE_MS)
+	return follow(boxId, '/v1/sys/packages/update/status', onStatus, over, alive)
 }
 
 // GET /v2/app_management/compose/updates/run until the run has a finished_at: resolves to the finished run.
-export function followAppUpdates(boxId, onRun) {
-	return follow(boxId, '/v2/app_management/compose/updates/run', onRun, run => Boolean(run.finished_at))
+export function followAppUpdates(boxId, onRun, alive = () => true) {
+	return follow(boxId, '/v2/app_management/compose/updates/run', onRun, run => Boolean(run.finished_at), alive)
 }

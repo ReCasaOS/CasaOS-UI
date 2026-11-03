@@ -118,6 +118,31 @@ describe('following a box action', () => {
 		expect(onStatus).toHaveBeenCalledTimes(2)
 	})
 
+	it('followPackages stops when it is no longer wanted', async () => {
+		fleetApi.relay.mockReturnValue(answer({ state: 'running' }))
+		let wanted = true
+		const done = followPackages('a', vi.fn(), () => wanted)
+		await vi.advanceTimersByTimeAsync(0)
+		wanted = false
+		await vi.advanceTimersByTimeAsync(10000)
+		expect(fleetApi.relay).toHaveBeenCalledTimes(1)
+		expect(await done).toEqual({ state: 'running' })
+	})
+
+	it('followPackages gives up on a box that stays idle, once a slow start had time to begin', async () => {
+		fleetApi.relay.mockReturnValue(answer({ state: 'idle' }))
+		const done = followPackages('a', vi.fn())
+		await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+		let settled = false
+		done.then(() => {
+			settled = true
+		})
+		await vi.advanceTimersByTimeAsync(0)
+		expect(settled).toBe(false)
+		await vi.advanceTimersByTimeAsync(2 * 60 * 1000)
+		expect(await done).toEqual({ state: 'idle' })
+	})
+
 	it('followAppUpdates stops once the run has finished', async () => {
 		const running = { started_at: 't0', finished_at: '', apps: [{ id: 'jellyfin', state: 'updating' }] }
 		const finished = { ...running, finished_at: 't1', apps: [{ id: 'jellyfin', state: 'updated' }] }

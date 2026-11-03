@@ -2806,5 +2806,11 @@
   "The address must start with http": "The address must start with http",
   "Give the box a name": "Give the box a name",
   "Copy this code into the box's settings. It is shown once.": "Copy this code into the box's settings. It is shown once.",
-  "Copy failed: select the code and copy it by hand": "Copy failed: select the code and copy it by hand"
+  "Copy failed: select the code and copy it by hand": "Copy failed: select the code and copy it by hand",
+  "Loading…": "Loading…",
+  "Never connected": "Never connected",
+  "New code for {name}?": "New code for {name}?",
+  "Its current code stops working: the box must be enrolled again with the new one.": "Its current code stops working: the box must be enrolled again with the new one.",
+  "Not supported: {reason}": "Not supported: {reason}",
+  "Not supported here": "Not supported here"
 }

@@ -64,8 +64,9 @@ import { forgetFleet, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
 import { fleetApi } from '@/service/fleet'
 
-// What the member's last error says when the master turned it away (its code was revoked or replaced).
-const REFUSED = /\b(?:401|403|unauthori[sz]ed|forbidden|refused|revoked)\b/i
+// What the member's last error says when the master turned it away (its code was revoked or replaced): the core's
+// own sentence, or an HTTP refusal. A bare "refused" is not one: "connection refused" is a master that is down.
+const REFUSED = /^refused by the master$|\b(?:401|403|unauthori[sz]ed|forbidden|revoked)\b/i
 
 export default {
 	name: 'FleetModal',

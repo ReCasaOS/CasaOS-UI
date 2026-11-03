@@ -71,7 +71,7 @@
 import tabMixin from './tabMixin'
 import ResultCell from './ResultCell.vue'
 import { actions, followAppUpdates, followPackages } from './bulk'
-import { failureCode, updatesRow } from './fleetData'
+import { packagesView, updatesRow } from './fleetData'
 import { ask } from './fleetLoader'
 import { AUTO_WORDS } from './fleetWords'
 
@@ -114,6 +114,10 @@ export default {
 			}
 		},
 	},
+	// the followers stop with the tab: a tab switch unmounts it
+	beforeUnmount() {
+		this.gone = true
+	},
 	methods: {
 		build(box, answers) {
 			return { ...updatesRow(box, answers), actionable: box.online === true }
@@ -145,12 +149,14 @@ export default {
 			if (p.error) {
 				return p.error === 'offline' ? this.$t('Box offline') : this.$t('Could not be read')
 			}
+			if (p.supported === false) {
+				return p.reason ? this.$t('Not supported: {reason}', { reason: p.reason }) : this.$t('Not supported here')
+			}
 			return p.count === 0 ? this.$t('Up to date') : this.$t('{count} packages pending', { count: p.count })
 		},
 		async checkPackages(row) {
 			this.packages[row.id] = { checking: true }
-			const answer = await ask({ id: row.id, online: row.online }, 'packages')
-			this.packages[row.id] = answer.ok ? { count: Number(answer.data?.count) || 0 } : { error: failureCode(answer) }
+			this.packages[row.id] = packagesView(await ask({ id: row.id, online: row.online }, 'packages'))
 		},
 		// updated/total, the names that failed, an ellipsis while the run goes on
 		runText(run) {
@@ -189,11 +195,32 @@ export default {
 				this.$t('Update packages'),
 				async () => {
 					const rows = this.selected
-					const done = await this.act(this.actions.box.packages, rows)
-					rows.filter(r => done.get(r.key)?.state === 'done').forEach((r) => {
+					// the core runs its checks before it answers: a start the relay gave up on (504) may be running,
+					// and the status route says whether it is
+					const late = new Set()
+					const call = row => this.actions.box.packages(row).catch((e) => {
+						if (e?.response?.status === 504) {
+							late.add(row.key)
+						}
+						throw e
+					})
+					const done = await this.act(call, rows)
+					rows.filter(r => done.get(r.key)?.state === 'done' || late.has(r.key)).forEach((r) => {
 						this.packages[r.id] = { state: 'running' }
+						if (late.has(r.key)) {
+							this.results[r.key] = { state: 'running', message: '' }
+						}
 						followPackages(r.id, (status) => {
 							this.packages[r.id] = status
+						}, () => !this.gone).then((last) => {
+							if (last.state === 'idle') {
+								delete this.packages[r.id]
+							}
+							if (late.has(r.key)) {
+								this.results[r.key] = last.state === 'succeeded'
+									? { state: 'done', message: '' }
+									: { state: last.state === 'offline' ? 'offline' : 'failed', message: last.error || '504' }
+							}
 						})
 					})
 				},
@@ -210,7 +237,7 @@ export default {
 					rows.filter(r => done.get(r.key)?.state === 'done').forEach((r) => {
 						followAppUpdates(r.id, (run) => {
 							this.appRuns[r.id] = run
-						})
+						}, () => !this.gone)
 					})
 				},
 			)

@@ -87,6 +87,7 @@ describe('the updates row of one box', () => {
 		const base = { version: ok(VERSION), autoupdate: ok({ state: 'up_to_date' }), grid: ok(GRID) }
 		expect(updatesRow(box, { ...base, packages: ok({ count: 7 }) }).packages).toEqual({ count: 7 })
 		expect(updatesRow(box, { ...base, packages: failed(503) }).packages).toEqual({ error: 'offline' })
+		expect(updatesRow(box, { ...base, packages: ok({ supported: false, reason: 'not root', count: 0 }) }).packages).toEqual({ supported: false, reason: 'not root' })
 		expect(updatesRow(box, { ...base, version: failed(500) })).toMatchObject({ current: null, latest: null, available: false, errors: ['version'] })
 	})
 })

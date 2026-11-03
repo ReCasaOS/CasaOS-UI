@@ -1,7 +1,8 @@
 // What every tab of the Fleet page does: read the boxes through loadRows, row by row, again every `intervalMs`
 // while the tab is shown; keep the selection by key across reads; run a grouped action on the rows as they are
 // when the button is clicked, and keep its results, by row key, until the next action.
-// The tab defines `sources`, `build(box, answers)` and `intervalMs`.
+// The tab defines `sources`, `build(box, answers)` and `intervalMs`, and may define `pendingRow(box)`: the row a box
+// shows while its answers are out, so that one slow box holds up neither the table nor its own line.
 import { runBulk } from './bulk'
 import { loadRows } from './fleetLoader'
 import { createPoller } from '@/components/Stats/poller'
@@ -48,6 +49,15 @@ export default {
 					if (ticket === this.ticket) {
 						this.rows = [...this.rows.filter(r => r.key !== row.key), row]
 					}
+				}, (boxes) => {
+					if (ticket !== this.ticket) {
+						return
+					}
+					if (this.pendingRow) {
+						const pending = boxes.map(box => this.pendingRow(box)).filter(p => !this.rows.some(r => r.key === p.key))
+						this.rows = [...this.rows, ...pending]
+					}
+					this.loading = false
 				})
 				if (ticket === this.ticket) {
 					this.rows = all

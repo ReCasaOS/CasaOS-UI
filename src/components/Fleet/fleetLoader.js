@@ -34,8 +34,10 @@ export function listBoxes() {
 	})
 }
 
-export async function loadRows(sources, build, onRow) {
+// `onBoxes(boxes)`, when given, hears the list of boxes before any of them has answered.
+export async function loadRows(sources, build, onRow, onBoxes) {
 	const boxes = await listBoxes()
+	onBoxes?.(boxes)
 	const perBox = await Promise.all(boxes.map(async (box) => {
 		const answers = Object.fromEntries(await Promise.all(sources.map(async source => [source, await ask(box, source)])))
 		const rows = [].concat(build(box, answers))

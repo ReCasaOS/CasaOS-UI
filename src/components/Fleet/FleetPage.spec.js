@@ -8,7 +8,7 @@ import i18n from '@/plugins/i18n'
 
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn(), rotateCode: vi.fn() } }))
 
 const A = { id: 'a', name: 'Home', url: 'https://home', online: true, last_seen: '2026-11-02T10:00:00Z' }
 const B = { id: 'b', name: 'Shop', url: '', online: true, last_seen: '2026-11-02T10:00:00Z' }
@@ -171,6 +171,57 @@ describe('the Fleet page', () => {
 		dialogButton('Force off').click()
 		await flushPromises()
 		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v2/virt_management/vms/vm-1/force-off']])
+	})
+
+	it('does not hold the overview behind a spinner for a slow box', async () => {
+		let answerB
+		const slow = new Promise((resolve) => {
+			answerB = resolve
+		})
+		// box B answers every source late, box A at once
+		const inner = fleetApi.relay.getMockImplementation()
+		fleetApi.relay.mockImplementation((boxId, method, path) => boxId === 'b' ? slow.then(data => ({ status: 200, data: { success: 200, data } })) : inner(boxId, method, path))
+		await mountPage()
+		expect(document.querySelector('.fleet-page .loading-overlay')).toBeNull()
+		expect(rowOf('Home').text()).toContain('Debian GNU/Linux 12 (bookworm)')
+		expect(rowOf('Shop').text()).toContain('Loading…')
+		answerB({ pretty_name: 'Ubuntu 24.04 LTS', support: { state: 'supported' } })
+		await flushPromises()
+		expect(rowOf('Shop').text()).not.toContain('Loading…')
+		expect(rowOf('Shop').text()).toContain('Ubuntu 24.04 LTS')
+	})
+
+	it('says "Never connected" for a box that has never reached the master', async () => {
+		boxes([A, { id: 'c', name: 'Garage', url: '', online: false }])
+		await mountPage()
+		expect(rowOf('Garage').text()).toContain('Never connected')
+		expect(rowOf('Garage').text()).not.toContain('1970')
+	})
+
+	it('asks before giving a box a new code, which cuts its tunnel', async () => {
+		fleetApi.rotateCode.mockResolvedValue({ data: { data: { code: 'FLEET1.new' } } })
+		await mountPage()
+		const overview = wrapper.findComponent({ name: 'OverviewTab' }).vm
+		overview.newCode({ id: 'b', name: 'Shop' })
+		await flushPromises()
+		expect(fleetApi.rotateCode).not.toHaveBeenCalled()
+		expect(document.body.textContent).toContain('New code for Shop?')
+		dialogButton('New code').click()
+		await flushPromises()
+		expect(fleetApi.rotateCode).toHaveBeenCalledWith('b')
+		expect(document.querySelector('.add-box-dialog input[readonly]').value).toBe('FLEET1.new')
+	})
+
+	it('shows what the core answers to a refused change as text, never as HTML', async () => {
+		fleetApi.removeBox.mockRejectedValue(failure(409, { message: '<b>busy</b>' }))
+		await mountPage()
+		wrapper.findComponent({ name: 'OverviewTab' }).vm.confirmRemove({ id: 'b', name: 'Shop' })
+		await flushPromises()
+		dialogButton('Remove').click()
+		await flushPromises()
+		const toast = document.querySelector('.toast')
+		expect(toast.textContent).toContain('<b>busy</b>')
+		expect(toast.querySelector('b')).toBeNull()
 	})
 
 	it('removes a box after confirming, and renames one', async () => {

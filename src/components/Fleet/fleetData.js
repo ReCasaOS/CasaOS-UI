@@ -91,7 +91,6 @@ export function vmRows(box, vms) {
 export function updatesRow(box, answers) {
 	const version = versionOf(answers.version)
 	const grid = list(payload(answers.grid))
-	const packages = payload(answers.packages)
 	return {
 		key: box.id,
 		id: box.id,
@@ -104,9 +103,22 @@ export function updatesRow(box, answers) {
 		autoState: text(payload(answers.autoupdate)?.state),
 		appUpdates: grid.filter(i => i?.update_available === true).length,
 		appIds: grid.filter(i => i?.update_available === true && i.app_type === 'v2app').map(i => i.name),
-		packages: packages ? { count: number(packages.count) ?? 0 } : answers.packages ? { error: failureCode(answers.packages) } : null,
+		packages: packagesView(answers.packages),
 		errors: errorsOf(answers),
 	}
+}
+
+// GET /v1/sys/packages for the packages cell: the count, or why it cannot be had. A box that cannot check (not
+// Debian, a core not running as root) answers supported: false with a count of 0, which is not "up to date".
+export function packagesView(answer) {
+	if (!answer) {
+		return null
+	}
+	if (!answer.ok) {
+		return { error: failureCode(answer) }
+	}
+	const p = answer.data || {}
+	return p.supported === false ? { supported: false, reason: text(p.reason) } : { count: number(p.count) ?? 0 }
 }
 
 // What a failed call means for a row: an axios error, or an answer of ask(). The four words of the spec, plus

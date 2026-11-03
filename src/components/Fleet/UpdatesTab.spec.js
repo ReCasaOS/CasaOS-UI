@@ -126,6 +126,47 @@ describe('the Updates tab', () => {
 		expect(rowOf('Home').text()).toContain('1/1')
 	})
 
+	it('says when a box cannot check its packages, instead of "Up to date"', async () => {
+		serve({ b: { '/v1/sys/packages': { supported: false, reason: 'the core does not run as root', count: 0 } } })
+		await mountTab()
+		await rowOf('Shop').findAll('button').find(b => b.text() === 'Check').trigger('click')
+		await flushPromises()
+		expect(rowOf('Shop').text()).toContain('Not supported: the core does not run as root')
+		expect(rowOf('Shop').text()).not.toContain('Up to date')
+	})
+
+	it('stops following a package update when the tab goes away', async () => {
+		serve({ b: { '/v1/sys/packages/update/status': { state: 'running' } } })
+		await mountTab()
+		await check(rowOf('Shop'))
+		await toolbarButton('Update packages').trigger('click')
+		await flushPromises()
+		vi.useFakeTimers()
+		dialogButton('Update packages').click()
+		await vi.advanceTimersByTimeAsync(0)
+		const asked = () => relayCalls('b').filter(c => c[2] === '/v1/sys/packages/update/status').length
+		expect(asked()).toBe(1)
+		wrapper.unmount()
+		wrapper = null
+		await vi.advanceTimersByTimeAsync(10000)
+		expect(asked()).toBe(1)
+	})
+
+	it('follows a package update whose start did not answer in time', async () => {
+		serve({ b: { 'post /v1/sys/packages/update': failure(504, { message: '' }), '/v1/sys/packages/update/status': inTurn({ state: 'running' }, { state: 'succeeded' }) } })
+		await mountTab()
+		await check(rowOf('Shop'))
+		await toolbarButton('Update packages').trigger('click')
+		await flushPromises()
+		vi.useFakeTimers()
+		dialogButton('Update packages').click()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(rowOf('Shop').text()).toContain('Updating…')
+		await vi.advanceTimersByTimeAsync(2000)
+		expect(rowOf('Shop').text()).toContain('Up to date')
+		expect(rowOf('Shop').find('.fleet-result').text()).toBe('Done')
+	})
+
 	it('shows a refused update on its row only', async () => {
 		serve({ b: { 'post /v1/sys/update': failure(409, { message: 'a backup is running' }) } })
 		fleetApi.status.mockResolvedValue({ data: { data: { role: 'master', master: { address: 'https://m', boxes: [{ ...A, self: false }, B] } } } })

@@ -18,7 +18,8 @@
 					<span :class="row.online ? 'is-online' : 'is-offline'" aria-hidden="true" class="fleet-dot"></span>
 					<span class="is-sr-only">{{ row.online ? $t('Online') : $t('Offline') }}</span>
 					<span class="has-text-weight-medium">{{ row.name }}</span>
-					<div v-if="!row.online" class="has-text-full-03">{{ $t('Offline since {time}', { time: when(row.lastSeen) }) }}</div>
+					<div v-if="!row.online" class="has-text-full-03">{{ offlineText(row) }}</div>
+					<div v-else-if="row.pending" class="has-text-full-03">{{ $t('Loading…') }}</div>
 				</b-table-column>
 
 				<b-table-column v-slot="{ row }" :label="$t('Version')" field="version">
@@ -87,6 +88,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import tabMixin from './tabMixin'
 import AddBoxDialog from './AddBoxDialog.vue'
 import { overviewRow } from './fleetData'
@@ -111,18 +113,23 @@ export default {
 		build(box, answers) {
 			return overviewRow(box, answers)
 		},
+		pendingRow(box) {
+			return { ...overviewRow(box, {}), pending: true }
+		},
 		supportOf(os) {
 			return SUPPORT_WORDS[os.support] || null
 		},
 		pct(value) {
 			return `${Math.round(value)} %`
 		},
-		when(iso) {
-			const date = new Date(iso)
-			return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
+		// a box enrolled and never connected has no last_seen: new Date(null) would be 1970
+		offlineText(row) {
+			const date = row.lastSeen ? new Date(row.lastSeen) : null
+			return date && date.getFullYear() >= 2000 ? this.$t('Offline since {time}', { time: date.toLocaleString() }) : this.$t('Never connected')
 		},
+		// the toast writes its message as HTML: what the core says is escaped
 		failed(e) {
-			this.$buefy.toast.open({ message: e?.response?.data?.message || e?.message || this.$t('Failed: {error}', { error: '' }), type: 'is-danger', queue: false })
+			this.$buefy.toast.open({ message: escape(e?.response?.data?.message || e?.message || String(e)), type: 'is-danger', queue: false })
 		},
 		// The code is shown once: the dialog closes from its own button only, not from Escape or a click outside.
 		addBox(self) {
@@ -135,13 +142,23 @@ export default {
 				events: { added: () => this.poller.now() },
 			})
 		},
+		// A new code replaces the box's key at once and cuts its tunnel: asked first, as Remove is.
 		newCode(row) {
-			this.$buefy.modal.open({
-				component: AddBoxDialog,
-				hasModalCard: true,
-				trapFocus: true,
-				canCancel: [],
-				props: { rotate: { id: row.id, name: row.name } },
+			this.$buefy.dialog.confirm({
+				title: this.$t('New code for {name}?', { name: row.name }),
+				message: this.$t('Its current code stops working: the box must be enrolled again with the new one.'),
+				type: 'is-warning',
+				hasIcon: true,
+				confirmText: this.$t('New code'),
+				cancelText: this.$t('Cancel'),
+				focusOn: 'cancel',
+				onConfirm: () => this.$buefy.modal.open({
+					component: AddBoxDialog,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: [],
+					props: { rotate: { id: row.id, name: row.name } },
+				}),
 			})
 		},
 		rename(row) {

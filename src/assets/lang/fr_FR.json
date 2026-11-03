@@ -2809,5 +2809,11 @@
   "The address must start with http": "L'adresse doit commencer par http",
   "Give the box a name": "Donnez un nom à la box",
   "Copy this code into the box's settings. It is shown once.": "Collez ce code dans les réglages de la box. Il n'est montré qu'une fois.",
-  "Copy failed: select the code and copy it by hand": "Copie impossible : sélectionnez le code et copiez-le à la main"
+  "Copy failed: select the code and copy it by hand": "Copie impossible : sélectionnez le code et copiez-le à la main",
+  "Loading…": "Chargement…",
+  "Never connected": "Jamais connectée",
+  "New code for {name}?": "Nouveau code pour {name} ?",
+  "Its current code stops working: the box must be enrolled again with the new one.": "Son code actuel cesse de fonctionner : la box doit être enrôlée de nouveau avec le nouveau.",
+  "Not supported: {reason}": "Non pris en charge : {reason}",
+  "Not supported here": "Non pris en charge ici"
 }
