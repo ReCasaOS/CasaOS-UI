@@ -27,13 +27,10 @@
 			<div class="video-container" :class="{ 'is-align-items-center': isAudio }">
 				<div key="video-player" ref="artRef" v-if="isVideo" class="player">
 				</div>
-				<aplayer :key="item.path" :autoplay="true" v-if="isAudio" preload="auto" class="player-audio"
-					theme="#41b883" :music="{
-						title: audioTitle,
-						artist: audioArtist,
-						src: getFileUrl(item),
-						pic: poster,
-					}" />
+				<div v-if="isAudio" :key="item.path" class="player-audio">
+					<p class="has-text-centered one-line mb-2">{{ audioTitle }}<template v-if="audioArtist"> - {{ audioArtist }}</template></p>
+					<audio :src="getFileUrl(item)" autoplay controls preload="auto" style="width: 100%"></audio>
+				</div>
 			</div>
 		</div>
 		<!-- Player Start -->
@@ -46,12 +43,10 @@
 </template>
 
 <script>
-import Aplayer from 'vue-aplayer'
 import Artplayer from 'artplayer'
 import { parseWebStream } from 'music-metadata'
 import { mixin } from '@/mixins/mixin'
 
-Aplayer.disableVersionBadge = true
 export default {
 	mixins: [mixin],
 	props: {
@@ -70,9 +65,6 @@ export default {
 				return []
 			},
 		},
-	},
-	components: {
-		Aplayer,
 	},
 	data() {
 		return {
@@ -126,7 +118,7 @@ export default {
 					}
 					// 将图片作为div.v-container的背景图，并且增加模糊效果
 
-					this.audioTitle = metadata.common.title
+					this.audioTitle = metadata.common.title || this.item.name
 					this.audioArtist = metadata.common.artist
 				})()
 			} else {
@@ -175,7 +167,6 @@ export default {
 .player-audio {
 	width: 100%;
 	max-width: 80rem;
-	max-height: 4.125rem;
 }
 
 .audio-blur-background {
