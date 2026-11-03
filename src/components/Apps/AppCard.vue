@@ -1,6 +1,7 @@
 <template>
-	<div :class="{ 'is-compact': compact }" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
-		@mouseleave="hover = true" @mouseover="hover = true">
+	<div :class="{ 'is-compact': compact }" :role="compact ? 'button' : undefined" :tabindex="compact ? 0 : undefined" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
+		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="hover = true">
+		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
@@ -137,7 +138,7 @@
 						<div class="is-relative">
 							<b-image :alt="statsBadge ? statsBadge.label : undefined" :class="dotClass(item.status, isLoading)" :src="item.icon"
 								:src-fallback="require('@/assets/img/app/default.svg')" class="is-64x64"
-								webp-fallback=".jpg" @click="openApp(item)" />
+								webp-fallback=".jpg" @click="!compact && openApp(item)" />
 							<!-- The number of active resource alerts, on the Statistics card only. Numbers only: the words are the icon's alt. -->
 							<span v-if="statsBadge" aria-hidden="true" class="stats-badge">{{ statsBadge.text }}</span>
 							<!-- Unstable -->
@@ -421,6 +422,13 @@ export default {
 		 * @param {string} index App access index
 		 * @return {*} void
 		 */
+		// the menu button has its own click; a card at work is not opened a second time
+		openFromCard(event) {
+			if (this.isLoading || (event.target.closest && event.target.closest('.action-btn'))) {
+				return
+			}
+			this.openApp(this.item)
+		},
 		openApp(item) {
 			if (this.isContainerApp) {
 				this.$emit('importApp', item, false)
@@ -1361,6 +1369,7 @@ export default {
 // beta dashboard: a row, not a square
 .app-card.is-compact {
   aspect-ratio: auto;
+  cursor: pointer;
   justify-content: flex-start;
   min-height: 4.5rem;
 

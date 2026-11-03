@@ -616,3 +616,60 @@ describe('the Fleet card', () => {
 		expect(openFleet).toHaveBeenCalledWith(vm.$buefy, vm.$store.state)
 	})
 })
+
+describe('the compact card (beta dashboard)', () => {
+	function compactCard(compact, item = { name: 'Files', app_type: 'system', status: 'running', title: { en_us: 'Files' } }) {
+		const homeShowFiles = vi.fn()
+		const wrapper = mount(AppCard, {
+			props: { item, compact },
+			global: {
+				plugins: [Buefy, i18n],
+				provide: { homeShowFiles, openAppStore: () => {} },
+				mocks: { $baseIp: 'localhost' },
+			},
+			attachTo: document.body,
+		})
+		return { wrapper, homeShowFiles }
+	}
+
+	it('opens the app from a click anywhere on the card', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true)
+
+		await wrapper.find('.cards-content p').trigger('click')
+
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+		expect(wrapper.attributes('role')).toBe('button')
+	})
+
+	it('opens the app once from a click on the icon, and from the keyboard', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true)
+
+		await wrapper.find('img').trigger('click')
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+
+		await wrapper.trigger('keydown.enter')
+		expect(homeShowFiles).toHaveBeenCalledTimes(2)
+	})
+
+	it('leaves the menu button to itself', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true, { name: 'syncthing', app_type: 'LinkApp', hostname: 'http://x', status: 'running', title: { en_us: 'X' } })
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		await wrapper.find('.action-btn p').trigger('click')
+
+		expect(open).not.toHaveBeenCalled()
+		expect(homeShowFiles).not.toHaveBeenCalled()
+		open.mockRestore()
+	})
+
+	it('changes nothing on the classic card: only the icon opens the app', async () => {
+		const { wrapper, homeShowFiles } = compactCard(false)
+
+		await wrapper.find('.cards-content p').trigger('click')
+		expect(homeShowFiles).not.toHaveBeenCalled()
+
+		await wrapper.find('img').trigger('click')
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+		expect(wrapper.attributes('role')).toBeUndefined()
+	})
+})
