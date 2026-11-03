@@ -121,6 +121,45 @@ describe('health strip', () => {
 		expect(wrapper.find('.beta-main .apps-here').exists()).toBe(true)
 	})
 
+	it('lists the disks the box reports with their role, SMART state and temperature', async () => {
+		const wrapper = mount(HealthStrip, {
+			global: {
+				mocks: {
+					$t: key => key,
+					$store: { state: { hardwareInfo } },
+					$EventBus: { $emit: vi.fn() },
+					$api: {
+						backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) },
+						disks: {
+							snapraid: () => Promise.resolve({ data: { data: { configured: true, last: {}, config: { data: [{ path: '/media/a' }], parity: ['/media/p'] } } } }),
+							getDiskList: () => Promise.resolve({ data: { data: { disks: [{ path: '/dev/sdb', temperature: 38, smart_status: 'passed' }, { path: '/dev/sdc', temperature: 0, smart_status: 'failed' }] } } }),
+						},
+						storage: {
+							list: () => Promise.resolve({ data: { data: [
+								{ path: '/dev/sda', disk_name: 'System', disk_model: 'Samsung SSD', children: [{ mount_point: '/', size: '100', used: '40' }] },
+								{ path: '/dev/sdb', disk_name: 'Disk1', disk_model: 'WD Red', children: [{ mount_point: '/media/a', size: '1000', used: '250' }] },
+								{ path: '/dev/sdc', disk_name: 'Disk2', disk_model: 'Parity one', children: [{ mount_point: '/media/p', size: '2000', used: '0' }] },
+							] } }),
+						},
+					},
+				},
+			},
+		})
+		await settle()
+
+		const drives = wrapper.findAll('.storage .drive')
+		expect(drives).toHaveLength(3)
+		expect(drives[0].text()).toContain('Samsung SSD')
+		expect(drives[0].text()).toContain('System')
+		// the system disk is no drive of the list: its SMART is the utilization's
+		expect(drives[0].text()).toContain('Healthy')
+		expect(drives[1].text()).toContain('Data disk · 25 %')
+		expect(drives[1].text()).toContain('38°C')
+		expect(drives[2].text()).toContain('Parity disk')
+		expect(drives[2].text()).toContain('Damage')
+		expect(drives[2].text()).not.toContain('°C')
+	})
+
 	it('opens the storage manager from the storage tile', async () => {
 		const emit = vi.fn()
 		const wrapper = strip({ emit })

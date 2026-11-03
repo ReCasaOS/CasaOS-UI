@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, backupTile, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
+import { attentionItems, backupTile, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
 
 const t = key => key
 
@@ -160,5 +160,30 @@ describe('attentionItems and the fleet', () => {
 	it('says nothing of a fleet when the box is not a master', () => {
 		expect(attentionItems({ ...healthy, fleet: { role: 'none' } }, tp, now)).toEqual([])
 		expect(attentionItems({ ...healthy, fleet: null }, tp, now)).toEqual([])
+	})
+})
+
+describe('diskRows', () => {
+	const storages = [
+		{ path: '/dev/sda', disk_name: 'System', disk_model: 'Samsung SSD', children: [{ mount_point: '/', size: '100', used: '40' }] },
+		{ path: '/dev/sdb', disk_name: 'Disk1', disk_model: 'WD Red', children: [{ mount_point: '/media/a', size: '1000', used: '250' }, { mount_point: '/media/b', size: '1000', used: '250' }] },
+		{ path: '/dev/sdc', disk_name: 'Disk2', disk_model: '', children: [{ mount_point: '/media/p', size: '2000', used: '0' }] },
+		{ path: '/dev/sdd', disk_name: 'Disk3', disk_model: 'Stick', children: [] },
+	]
+	const drives = [{ path: '/dev/sdb', temperature: 38, smart_status: 'passed' }]
+	const held = { '/media/a': 'data', '/media/p': 'parity' }
+
+	it('says the role of each disk, adds up its volumes and finds its drive by path', () => {
+		const rows = diskRows(storages, drives, held)
+
+		expect(rows.map(row => row.role)).toEqual(['system', 'data', 'parity', ''])
+		expect(rows[1]).toMatchObject({ name: 'WD Red', size: 2000, used: 500, drive: drives[0] })
+		expect(rows[0].drive).toBeNull()
+		expect(rows[2].name).toBe('Disk2')
+		expect(rows[3]).toMatchObject({ size: 0, used: 0 })
+	})
+
+	it('is empty when the box answers something else than a list', () => {
+		expect(diskRows(undefined, undefined, {})).toEqual([])
 	})
 })
