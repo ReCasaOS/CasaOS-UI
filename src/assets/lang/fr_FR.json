@@ -866,7 +866,7 @@
   "Update automatically": "Mettre à jour automatiquement",
   "Between": "Entre",
   "and": "et",
-  "New releases install at night, two days after they come out, never during a backup or an app operation.": "Une nouvelle version s'installe la nuit, deux jours après sa sortie, jamais pendant une sauvegarde ou une opération sur une app.",
+  "New releases install at night, one day after they come out, never during a backup or an app operation.": "Une nouvelle version s'installe la nuit, un jour après sa sortie, jamais pendant une sauvegarde ou une opération sur une app.",
   "Up to date": "À jour",
   "{version} will be installed after {date}": "{version} sera installée après le {date}",
   "Updating…": "Mise à jour en cours…",

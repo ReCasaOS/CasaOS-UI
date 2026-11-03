@@ -866,7 +866,7 @@
   "Update automatically": "Update automatically",
   "Between": "Between",
   "and": "and",
-  "New releases install at night, two days after they come out, never during a backup or an app operation.": "New releases install at night, two days after they come out, never during a backup or an app operation.",
+  "New releases install at night, one day after they come out, never during a backup or an app operation.": "New releases install at night, one day after they come out, never during a backup or an app operation.",
   "Up to date": "Up to date",
   "{version} will be installed after {date}": "{version} will be installed after {date}",
   "Updating…": "Updating…",

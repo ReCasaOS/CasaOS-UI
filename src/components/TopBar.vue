@@ -421,7 +421,7 @@
 								</b-select>
 							</div>
 							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
-								{{ $t("New releases install at night, two days after they come out, never during a backup or an app operation.") }}
+								{{ $t("New releases install at night, one day after they come out, never during a backup or an app operation.") }}
 							</div>
 							<div :class="{ '_has-text-gray': autoUpdate.state !== 'paused' }" class="pl-55 ml-1 mt-1 is-size-7 _is-wrap">
 								{{ autoUpdateStateText }}
