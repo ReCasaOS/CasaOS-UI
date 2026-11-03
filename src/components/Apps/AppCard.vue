@@ -429,13 +429,6 @@ export default {
 				this.dropdownPosition = `is-${verticalPos}-${horizontalPos}`
 			})
 		},
-		/**
-		 * @description: Open app in new windows
-		 * @param {string} status App status
-		 * @param {string} port App access port
-		 * @param {string} index App access index
-		 * @return {*} void
-		 */
 		toggleFavorite() {
 			this.$refs.dro.isActive = false
 			this.$emit('toggleFavorite', this.item)
@@ -447,6 +440,13 @@ export default {
 			}
 			this.openApp(this.item)
 		},
+		/**
+		 * @description: Open app in new windows
+		 * @param {string} status App status
+		 * @param {string} port App access port
+		 * @param {string} index App access index
+		 * @return {*} void
+		 */
 		openApp(item) {
 			if (this.isContainerApp) {
 				this.$emit('importApp', item, false)

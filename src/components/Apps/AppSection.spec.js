@@ -743,3 +743,75 @@ describe('app section fleet card', () => {
 		expect(source).toMatch(/\$EventBus\.\$off\(events\.FLEET_CHANGED, this\.syncFleetCard\)/)
 	})
 })
+
+// The beta dashboard's Favorites row: names pinned from a card's menu, kept in the user's custom storage
+describe('app section favorites (beta dashboard)', () => {
+	const apps = [
+		{ name: 'Files', app_type: 'system' },
+		{ name: 'jellyfin', app_type: 'v2app' },
+		{ name: 'immich', app_type: 'v2app' },
+	]
+
+	function section(favorites) {
+		const setCustomStorage = vi.fn()
+		const vm = { favorites, appList: apps, $api: { users: { setCustomStorage } } }
+		vm.isFavorite = AppSection.methods.isFavorite.bind(vm)
+		vm.toggleFavorite = AppSection.methods.toggleFavorite.bind(vm)
+		return { vm, setCustomStorage }
+	}
+
+	it('pins an app at the end, saves the names, and unpins it from the same menu item', () => {
+		const { vm, setCustomStorage } = section(['jellyfin'])
+
+		vm.toggleFavorite({ name: 'immich' })
+		expect(vm.favorites).toEqual(['jellyfin', 'immich'])
+		expect(setCustomStorage).toHaveBeenLastCalledWith('app_favorites', { data: ['jellyfin', 'immich'] })
+
+		vm.toggleFavorite({ name: 'jellyfin' })
+		expect(vm.favorites).toEqual(['immich'])
+		expect(setCustomStorage).toHaveBeenLastCalledWith('app_favorites', { data: ['immich'] })
+	})
+
+	it('forgets a pinned app that is no longer installed at the next change', () => {
+		const { vm } = section(['gone', 'jellyfin'])
+
+		vm.toggleFavorite({ name: 'immich' })
+
+		expect(vm.favorites).toEqual(['jellyfin', 'immich'])
+	})
+
+	it('shows the pinned apps in pinned order, without the missing ones and the system ones', () => {
+		const vm = { favorites: ['immich', 'gone', 'Files', 'jellyfin'], appList: apps }
+
+		expect(AppSection.computed.favoriteApps.call(vm).map(app => app.name)).toEqual(['immich', 'jellyfin'])
+	})
+
+	it('reads the saved names, and keeps none when the box cannot answer', async () => {
+		const vm = { favorites: [], $api: { users: { getCustomStorage: vi.fn(() => Promise.resolve({ data: { data: { data: ['immich'] } } })) } } }
+		await AppSection.methods.loadFavorites.call(vm)
+		expect(vm.favorites).toEqual(['immich'])
+		expect(vm.$api.users.getCustomStorage).toHaveBeenCalledWith('app_favorites')
+
+		const down = { favorites: [], $api: { users: { getCustomStorage: () => Promise.reject(new Error('down')) } } }
+		await AppSection.methods.loadFavorites.call(down)
+		expect(down.favorites).toEqual([])
+	})
+})
+
+describe('app section system subtitles (beta dashboard)', () => {
+	const tp = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, name) => params[name])
+	const subtitle = (name, vm) => AppSection.methods.systemSubtitle.call({ $t: tp, appList: [], vms: [], ...vm }, { name })
+
+	it('says what each system card is for', () => {
+		expect(subtitle('Files')).toBe('Your files')
+		expect(subtitle('Statistics')).toBe('CPU, memory, disks')
+		expect(subtitle('Fleet')).toBe('')
+	})
+
+	it('counts the updates on the App Store card, and the VMs on theirs, when there are some', () => {
+		expect(subtitle('App Store')).toBe('App catalogue')
+		expect(subtitle('App Store', { appList: [{ update_available: true }, {}, { update_available: true }] })).toBe('Updates: 2')
+		expect(subtitle('Virtual Machines')).toBe('Virtual Machines')
+		expect(subtitle('Virtual Machines', { vms: [{}, {}, {}] })).toBe('VMs: 3')
+	})
+})

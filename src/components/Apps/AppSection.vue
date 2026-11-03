@@ -108,7 +108,7 @@
 				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
 					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item"
-					@toggleFavorite="toggleFavorite"
+						@toggleFavorite="toggleFavorite"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
