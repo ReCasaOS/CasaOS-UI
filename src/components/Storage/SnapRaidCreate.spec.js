@@ -13,7 +13,7 @@ const storages = [
 	{ name: 'Series', size: 4000 * GB, uuid: 'u-series', mount_point: '/media/Series', persistedIn: 'casaos' },
 	{ name: 'System', size: 100 * GB, uuid: 'u-sys', mount_point: '/', persistedIn: 'casaos', isSystem: true },
 ]
-const drives = [{ name: 'sdc', model: 'Ironwolf', size: 8000 * GB, path: '/dev/sdc', need_format: true }]
+const drives = [{ name: 'sdc', model: 'Ironwolf', size: 8000 * GB, path: '/dev/sdc', children_number: 0, supported: false }]
 
 function dialog(props, apiOverrides = {}) {
 	const $api = {

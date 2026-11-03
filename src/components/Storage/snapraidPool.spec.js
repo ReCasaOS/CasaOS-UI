@@ -3,16 +3,16 @@ import { createSnapRaid, folderProblem, normalizeFolder, parityChoices, poolDisk
 
 const GB = 1e9
 const storage = (name, size, extra = {}) => ({ name, size, uuid: `uuid-${name}`, mount_point: `/media/${name}`, persistedIn: 'casaos', isSystem: false, isMergeSource: false, ...extra })
-const drive = (name, size, extra = {}) => ({ name, model: 'Disk', size, path: `/dev/${name}`, need_format: true, ...extra })
+const drive = (name, size, extra = {}) => ({ name, model: 'Disk', size, path: `/dev/${name}`, children_number: 0, supported: false, ...extra })
 
 describe('the drives a SnapRAID is offered', () => {
 	it('keeps the storages a merge can take and every drive that is no storage yet', () => {
 		const disks = poolDisks(
 			[storage('Movies', 4000 * GB), storage('System', 100 * GB, { isSystem: true }), storage('Merged', 2000 * GB, { isMergeSource: true }), storage('Odd', 1 * GB, { persistedIn: 'user' }), storage('Loose', 1 * GB, { mount_point: '' })],
-			[drive('sdc', 8000 * GB), drive('sdd', 500 * GB, { need_format: false })],
+			[drive('sdc', 8000 * GB), drive('sdd', 500 * GB, { children_number: 1, supported: true }), drive('sde', 500 * GB, { children_number: 1, supported: false }), drive('sdf', 500 * GB, { supported: true }), drive('sdg', 500 * GB, { supported: undefined })],
 		)
-		expect(disks.map(d => d.key)).toEqual(['/media/Movies', '/dev/sdc', '/dev/sdd'])
-		// only a drive that has to be formatted is erased: one that holds a filesystem is mounted as it is
+		expect(disks.map(d => d.key)).toEqual(['/media/Movies', '/dev/sdc', '/dev/sdd', '/dev/sde', '/dev/sdf', '/dev/sdg'])
+		// only a blank drive (no partition, no filesystem) is erased: one that holds partitions or a filesystem is mounted as it is, and so is one the box says nothing about
 		expect(disks.filter(d => d.erased).map(d => d.key)).toEqual(['/dev/sdc'])
 	})
 
