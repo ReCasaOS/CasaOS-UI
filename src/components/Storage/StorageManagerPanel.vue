@@ -199,7 +199,7 @@ import RaidStatus from './RaidStatus.vue'
 import RaidCreate from './RaidCreate.vue'
 import SnapRaidPanel from './SnapRaidPanel.vue'
 import SnapRaidCreate from './SnapRaidCreate.vue'
-import { POOL, poolDisks } from './snapraidPool'
+import { POOL, poolDisks, snapraidHeld } from './snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -359,6 +359,9 @@ export default {
 				console.log(error.response.message)
 			}
 
+			// the storages SnapRAID holds: not offered for format or removal (not set up, or not answering: none)
+			const held = snapraidHeld(await this.$api.disks.snapraid().then(res => res.data.data?.config, () => undefined))
+
 			// get storage list
 			// TODO: the part is repetition
 			//  with APPs Installation Location requirement document
@@ -462,6 +465,7 @@ export default {
 						persistedIn: storage.persisted_in,
 						raid: raidByPath[storage.disk],
 						isMergeSource: storage.diskName !== 'System' && mergeConbinations.some(item => item.uuid === storage.uuid),
+						snapraid: held[storage.mount_point],
 					}
 				}
 				this.storageData = storageArraySort.map(remapStorage)
