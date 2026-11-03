@@ -77,3 +77,32 @@ describe('removing a storage', () => {
 		expect(deleteRaid).not.toHaveBeenCalled()
 	})
 })
+
+describe('a storage SnapRAID holds', () => {
+	const buttons = wrapper => wrapper.findAll('button').map(b => b.text())
+
+	it('is tagged and offers neither Format, Rename nor Remove, and says what to do first', () => {
+		const { wrapper } = storageItem({ ...driveItem, snapraid: 'parity' })
+		expect(wrapper.text()).toContain('SnapRAID parity')
+		expect(buttons(wrapper)).toEqual([])
+		expect(wrapper.text()).toContain('Remove the SnapRAID protection first to format or remove it.')
+	})
+
+	it('is tagged SnapRAID when it is a data disk that is not merged', () => {
+		const { wrapper } = storageItem({ ...driveItem, snapraid: 'data' })
+		expect(wrapper.text()).toContain('SnapRAID')
+		expect(wrapper.text()).not.toContain('SnapRAID parity')
+		expect(buttons(wrapper)).toEqual([])
+	})
+
+	it('shows only Merged on a merged data disk, as before', () => {
+		const { wrapper } = storageItem({ ...driveItem, snapraid: 'data', isMergeSource: true })
+		expect(wrapper.text()).toContain('Merged')
+		expect(wrapper.text()).not.toContain('SnapRAID')
+		expect(wrapper.text()).not.toContain('Remove the SnapRAID protection first')
+	})
+
+	it('keeps its three buttons when SnapRAID does not hold it', () => {
+		expect(buttons(storageItem(driveItem).wrapper)).toEqual(['Format', 'Rename', 'Remove'])
+	})
+})

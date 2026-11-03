@@ -21,6 +21,19 @@ export function poolDisks(storages, drives) {
 	return [...stores, ...blank]
 }
 
+// The storages SnapRAID holds, by mount point: 'data' for a disk it protects, 'parity' for one that keeps the parity. Formatting or removing one takes away what the
+// protection stands on, so the Storage manager does not offer it.
+export function snapraidHeld(config) {
+	const held = {}
+	for (const disk of config?.data || []) {
+		held[disk.path] = 'data'
+	}
+	for (const path of config?.parity || []) {
+		held[path] = 'parity'
+	}
+	return held
+}
+
 // The parity is never an array: a RAID array as parity is not tried.
 export function parityChoices(disks, dataKeys) {
 	return disks.filter(disk => !dataKeys.includes(disk.key) && !disk.array)

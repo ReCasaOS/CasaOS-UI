@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createSnapRaid, folderProblem, normalizeFolder, parityChoices, poolDisks, suggestParity } from './snapraidPool'
+import { createSnapRaid, folderProblem, normalizeFolder, parityChoices, poolDisks, snapraidHeld, suggestParity } from './snapraidPool'
 
 const GB = 1e9
 const storage = (name, size, extra = {}) => ({ name, size, uuid: `uuid-${name}`, mount_point: `/media/${name}`, persistedIn: 'casaos', isSystem: false, isMergeSource: false, ...extra })
@@ -167,5 +167,16 @@ describe('the folder of the merged storage', () => {
 			expect(folderProblem(folder, stores)).toBe('taken')
 		}
 		expect(folderProblem('/srv/pool', stores)).toBe('')
+	})
+})
+
+describe('the storages SnapRAID holds', () => {
+	it('names each data disk and each parity disk by its mount point', () => {
+		expect(snapraidHeld({ data: [{ name: 'd1', path: '/media/A' }, { name: 'd2', path: '/media/B' }], parity: ['/media/P'] })).toEqual({ '/media/A': 'data', '/media/B': 'data', '/media/P': 'parity' })
+	})
+
+	it('holds nothing when SnapRAID is not set up or does not answer', () => {
+		expect(snapraidHeld(undefined)).toEqual({})
+		expect(snapraidHeld({})).toEqual({})
 	})
 })
