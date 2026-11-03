@@ -2726,5 +2726,9 @@
   "Removing the merged storage empties {folder}. The files stay on their drives.": "Supprimer le stockage fusionné vide {folder}. Les fichiers restent sur leurs disques.",
   "New dashboard (beta)": "Nouveau tableau de bord (bêta)",
   "Back to the classic dashboard": "Revenir au tableau de bord classique",
-  "Built into CasaOS.": "Intégré à CasaOS."
+  "Built into CasaOS.": "Intégré à CasaOS.",
+  "Needs attention": "À traiter",
+  "The system drive reports a failure": "Le disque système signale une défaillance",
+  "The last backup failed": "La dernière sauvegarde a échoué",
+  "No backup yet": "Aucune sauvegarde pour l’instant"
 }
