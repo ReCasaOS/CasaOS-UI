@@ -673,3 +673,49 @@ describe('the compact card (beta dashboard)', () => {
 		expect(wrapper.attributes('role')).toBeUndefined()
 	})
 })
+
+describe('the compact card favorites and subtitle (beta dashboard)', () => {
+	const mounted = []
+	// the menu is appended to the body: a card left mounted would leak its items into the next test
+	afterEach(() => {
+		mounted.splice(0).forEach(wrapper => wrapper.unmount())
+	})
+
+	function card(props) {
+		const wrapper = mount(AppCard, {
+			props: { item: { name: 'jellyfin', app_type: 'v2app', status: 'running', title: { en_us: 'Jellyfin' } }, ...props },
+			global: {
+				plugins: [Buefy, i18n],
+				provide: { homeShowFiles: () => {}, openAppStore: () => {} },
+				mocks: { $baseIp: 'localhost' },
+			},
+			attachTo: document.body,
+		})
+		mounted.push(wrapper)
+		return wrapper
+	}
+
+	it('offers to pin the app from its menu, and says so once it is pinned', async () => {
+		const wrapper = card({ compact: true })
+		// the menu is appended to the body
+		expect(document.body.textContent).toContain('Add to favorites')
+
+		await wrapper.setProps({ favorite: true })
+		expect(document.body.textContent).toContain('Remove from favorites')
+	})
+
+	it('asks the section to pin or unpin it', () => {
+		const wrapper = card({ compact: true })
+
+		wrapper.vm.toggleFavorite()
+
+		expect(wrapper.emitted('toggleFavorite')).toEqual([[wrapper.vm.item]])
+	})
+
+	it('has no pin item on the classic card, and shows a subtitle only on the compact one', () => {
+		expect(card({ compact: false }).text()).not.toContain('Your files')
+		expect(document.body.textContent).not.toContain('Add to favorites')
+
+		expect(card({ compact: true, subtitle: 'Your files' }).text()).toContain('Your files')
+	})
+})

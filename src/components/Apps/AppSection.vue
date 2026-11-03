@@ -11,9 +11,31 @@
 			</div>
 			<div :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas mb-5">
 				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" class="handle">
-					<app-card :compact="compact" :item="item"
+					<app-card :compact="compact" :item="item" :subtitle="systemSubtitle(item)"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
+						@updateState="getList"></app-card>
+				</div>
+			</div>
+		</template>
+
+		<!-- Favorites (beta dashboard): the apps pinned from a card's menu, above the whole list -->
+		<template v-if="compact && favoriteApps.length > 0">
+			<div class="is-flex is-align-items-center mb-4">
+				<app-section-title-tip id="appTitleFavorites"
+					class="is-flex-grow-1 has-text-sub-04"
+					label="Pinned apps."
+					title="Favorites">
+				</app-section-title-tip>
+			</div>
+			<div class="app-list is-compact contextmenu-canvas mb-5">
+				<div v-for="item in favoriteApps" :id="`favorite-${item.name}`" :key="item.name">
+					<app-card :favorite="true"
+						:item="item"
+						compact
+						@configApp="showConfigPanel"
+						@importApp="showContainerPanel"
+						@toggleFavorite="toggleFavorite"
 						@updateState="getList"></app-card>
 				</div>
 			</div>
@@ -85,7 +107,8 @@
 			<template #item="{ element: item }">
 				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
-					<app-card v-else :compact="compact" :item="item"
+					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item"
+						@toggleFavorite="toggleFavorite"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -202,6 +225,8 @@ const FILTERS = {
 }
 
 const orderConfig = 'app_order'
+// the names pinned in the compact grid, in the order they were pinned
+const favoritesConfig = 'app_favorites'
 
 // how often the VM tiles read the VMs again, while the tab is shown
 const VM_POLL_MS = 5000
@@ -276,6 +301,7 @@ export default {
 			vms: [],
 			// compact grid: 'all' | 'running' | 'stopped' | 'updates'
 			filter: 'all',
+			favorites: [],
 		}
 	},
 	computed: {
@@ -325,6 +351,10 @@ export default {
 		systemApps() {
 			return this.systemFirst ? this.appList.filter(isSystemApp) : []
 		},
+		// a pinned app that is gone (uninstalled) is skipped, and forgotten at the next pin
+		favoriteApps() {
+			return this.favorites.map(name => this.appList.find(app => app.name === name && !isSystemApp(app))).filter(Boolean)
+		},
 		filterOptions() {
 			const apps = this.appList.filter(app => !isSystemApp(app))
 			const labels = { all: 'All', running: 'Running', stopped: 'Stopped', updates: 'Updates' }
@@ -361,6 +391,9 @@ export default {
 		},
 	},
 	created() {
+		if (this.compact) {
+			this.loadFavorites()
+		}
 		this.getList()
 		this.draggable = this.isMobile() ? '' : '.handle'
 		this.$EventBus.$on(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING, () => {
@@ -403,6 +436,44 @@ export default {
 		this.getSkCount()
 	},
 	methods: {
+		// silent on failure: no favorites is a fine state, and the grid shows all the same
+		loadFavorites() {
+			this.$api.users.getCustomStorage(favoritesConfig)
+				.then((res) => {
+					this.favorites = res.data.data.data || []
+				})
+				.catch(() => {})
+		},
+
+		isFavorite(app) {
+			return this.favorites.includes(app.name)
+		},
+
+		toggleFavorite(app) {
+			const names = this.isFavorite(app) ? this.favorites.filter(name => name !== app.name) : [...this.favorites, app.name]
+			// the names of apps no longer there go with the change
+			const known = new Set(this.appList.map(item => item.name))
+			this.favorites = names.filter(name => known.has(name))
+			this.$api.users.setCustomStorage(favoritesConfig, { data: this.favorites })
+		},
+
+		// the second line of a system card (beta dashboard): what is worth knowing at a glance
+		systemSubtitle(app) {
+			const updates = this.appList.filter(item => item.update_available).length
+			switch (app.name) {
+				case 'App Store':
+					return updates > 0 ? this.$t('Updates: {count}', { count: updates }) : this.$t('App catalogue')
+				case 'Files':
+					return this.$t('Your files')
+				case STATS_APP_NAME:
+					return this.$t('CPU, memory, disks')
+				case VM_APP_NAME:
+					return this.vms.length > 0 ? this.$t('VMs: {count}', { count: this.vms.length }) : this.$t('Virtual Machines')
+				default:
+					return ''
+			}
+		},
+
 		/**
 		 * @description: Ask every app's registry whether its image has moved, then
 		 * reload the grid so the badges reflect the answer. One network round trip

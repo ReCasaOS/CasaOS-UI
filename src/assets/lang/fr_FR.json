@@ -2820,5 +2820,14 @@
   "{online} of {total} boxes online": "{online} box sur {total} en ligne",
   "Data disk": "Disque de données",
   "Parity disk": "Disque de parité",
-  "Support ReCasaOS on Ko-fi": "Soutenir ReCasaOS sur Ko-fi"
+  "Support ReCasaOS on Ko-fi": "Soutenir ReCasaOS sur Ko-fi",
+  "Favorites": "Favoris",
+  "Pinned apps.": "Apps épinglées.",
+  "Add to favorites": "Ajouter aux favoris",
+  "Remove from favorites": "Retirer des favoris",
+  "App catalogue": "Catalogue d’apps",
+  "Your files": "Vos fichiers",
+  "CPU, memory, disks": "CPU, mémoire, disques",
+  "Updates: {count}": "Mises à jour : {count}",
+  "VMs: {count}": "VM : {count}"
 }
