@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '@/components/VirtualMachines/entry'
+import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -17,6 +19,12 @@ vi.mock('@/components/VirtualMachines/entry', async importOriginal => ({
 	forgetVirtualMachines: vi.fn(),
 	listVirtualMachines: vi.fn(),
 	vmApplication: () => ({ name: 'Virtual Machines' }),
+}))
+vi.mock('@/components/Fleet/entry', async importOriginal => ({
+	...await importOriginal(),
+	hasFleet: vi.fn(() => Promise.resolve(false)),
+	forgetFleet: vi.fn(),
+	fleetApplication: () => ({ name: 'Fleet' }),
 }))
 
 // The grid, not the card, is what has to be read again after an update: the app that
@@ -226,6 +234,7 @@ describe('app section built-in cards', () => {
 			sortApps: AppSection.methods.sortApps,
 			saveSortIfChanged: vi.fn(),
 			addVmCardWhenThere: vi.fn(),
+			addFleetCardWhenThere: vi.fn(),
 		}
 		await AppSection.methods.getList.call(vm)
 		const names = vm.appList.map(app => app.name)
@@ -256,7 +265,7 @@ describe('app section built-in cards', () => {
 			sortApps: AppSection.methods.sortApps,
 			getList: vi.fn(),
 		}
-		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'onSortEnd']) {
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'onSortEnd']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, toast, setCustomStorage }
@@ -685,5 +694,52 @@ describe('app section with the system row (beta dashboard)', () => {
 
 		expect(vm.systemApps).toEqual([])
 		expect(get.call(vm)).toEqual([store, jellyfin, files, nextcloud])
+	})
+})
+
+// The Fleet card is there only where the core says this box is a master, and
+// joins the grid the way the Virtual Machines card does.
+describe('app section fleet card', () => {
+	function section(names) {
+		const vm = {
+			appList: names.map(name => ({ name })),
+			saveSortData: vi.fn(),
+		}
+		vm.sortApps = AppSection.methods.sortApps.bind(vm)
+		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		return vm
+	}
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('is there only where the core says master, at its saved place', async () => {
+		hasFleet.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files', 'Statistics', 'jellyfin'])
+		await AppSection.methods.addFleetCardWhenThere.call(vm, ['App Store', 'Files', 'Statistics', 'Fleet', 'jellyfin'])
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Statistics', 'Fleet', 'jellyfin'])
+		expect(vm.saveSortData).not.toHaveBeenCalled()
+
+		hasFleet.mockResolvedValue(false)
+		const other = section(['App Store', 'Files'])
+		await AppSection.methods.addFleetCardWhenThere.call(other, [])
+		expect(names(other)).toEqual(['App Store', 'Files'])
+	})
+
+	it('is asked again when the role changes, and comes or goes', async () => {
+		const grid = apps => ({ appList: apps.map(name => ({ name })), sortApps: AppSection.methods.sortApps })
+		hasFleet.mockResolvedValue(true)
+		const vm = grid(['App Store', 'Files'])
+		await AppSection.methods.syncFleetCard.call(vm)
+		expect(forgetFleet).toHaveBeenCalled()
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Fleet'])
+
+		hasFleet.mockResolvedValue(false)
+		await AppSection.methods.syncFleetCard.call(vm)
+		expect(names(vm)).toEqual(['App Store', 'Files'])
+	})
+
+	it('listens for the role change while mounted', () => {
+		const source = readFileSync('src/components/Apps/AppSection.vue', 'utf8')
+		expect(source).toMatch(/\$EventBus\.\$on\(events\.FLEET_CHANGED, this\.syncFleetCard\)/)
+		expect(source).toMatch(/\$EventBus\.\$off\(events\.FLEET_CHANGED, this\.syncFleetCard\)/)
 	})
 })

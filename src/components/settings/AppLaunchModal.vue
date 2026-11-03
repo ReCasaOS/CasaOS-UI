@@ -55,8 +55,9 @@
 </template>
 
 <script>
-import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, FLEET_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
+import { hasFleet } from '@/components/Fleet/entry'
 
 export default {
 	name: 'AppLaunchModal',
@@ -66,6 +67,7 @@ export default {
 			exceptions: [...(this.$store.state.appLaunchExceptions || [])],
 			apps: [],
 			hasVMs: false,
+			isMaster: false,
 			isLoading: true,
 			loadError: '',
 		}
@@ -80,12 +82,18 @@ export default {
 			if (this.hasVMs) {
 				builtins.push({ id: VMS_LAUNCH_ID, title: this.$t('Virtual Machines') })
 			}
+			if (this.isMaster) {
+				builtins.push({ id: FLEET_LAUNCH_ID, title: this.$t('Fleet') })
+			}
 			return builtins
 		},
 	},
 	async mounted() {
 		hasVirtualMachines().then((available) => {
 			this.hasVMs = available
+		})
+		hasFleet().then((master) => {
+			this.isMaster = master
 		})
 
 		try {

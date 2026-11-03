@@ -837,9 +837,9 @@ describe('the fleet row', () => {
 		expect(vm.getFleet).toHaveBeenCalledTimes(1)
 	})
 
-	it('opens the dialog from Configure', () => {
+	it('opens the dialog from Configure', async () => {
 		const vm = bar()
-		vm.showFleet()
+		await vm.showFleet()
 		expect(source).toMatch(/<!-- Fleet Start -->[\s\S]*?@click="showFleet"[\s\S]*?<!-- Fleet End -->/)
 		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
 		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: FleetModal }))

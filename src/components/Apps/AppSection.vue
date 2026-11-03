@@ -144,6 +144,7 @@ import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import { STATS_APP_NAME } from '@/components/Stats/entry'
+import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -371,6 +372,7 @@ export default {
 		})
 
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$on(events.FLEET_CHANGED, this.syncFleetCard)
 
 		this.ListRefreshTimer = setInterval(() => {
 			this.getList()
@@ -387,6 +389,7 @@ export default {
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$off(events.FLEET_CHANGED, this.syncFleetCard)
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
@@ -537,8 +540,11 @@ export default {
 				// list read again keeps the card it already shows.
 				const hasVmCard = this.appList.some(app => app.name === VM_APP_NAME)
 				const vmApps = hasVmCard ? [vmApplication()] : []
+				// the Fleet card the same way, where the core says this box is a master
+				const hasFleetCard = this.appList.some(app => app.name === FLEET_APP_NAME)
+				const fleetApps = hasFleetCard ? [fleetApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, vmApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(builtInApplications, vmApps, fleetApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -550,11 +556,14 @@ export default {
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
 					this.addVmCardWhenThere(lateSortList)
+				}
+				if (!hasFleetCard) {
+					this.addFleetCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -625,6 +634,32 @@ export default {
 					this.appList = this.sortApps(concat(this.appList, vmApplication()), [])
 				} else if (!available && has) {
 					this.appList = this.appList.filter(app => app.name !== VM_APP_NAME)
+				}
+			})
+		},
+
+		// This box became, or stopped being, a master: ask the core again, then add
+		// the Fleet card or take it away, without the page being reloaded.
+		syncFleetCard() {
+			forgetFleet()
+			return hasFleet().then((available) => {
+				const has = this.appList.some(app => app.name === FLEET_APP_NAME)
+				if (available && !has) {
+					this.appList = this.sortApps(concat(this.appList, fleetApplication()), [])
+				} else if (!available && has) {
+					this.appList = this.appList.filter(app => app.name !== FLEET_APP_NAME)
+				}
+			})
+		},
+
+		// Adds the Fleet card at its saved place once the core says master.
+		addFleetCardWhenThere(savedOrder) {
+			return hasFleet().then((available) => {
+				if (available && !this.appList.some(app => app.name === FLEET_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, fleetApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(FLEET_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
 				}
 			})
 		},

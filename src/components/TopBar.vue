@@ -575,7 +575,6 @@ import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
-import FleetModal from './settings/FleetModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
@@ -585,7 +584,6 @@ import { readThemePreference, setThemePreference } from '@/mixins/app/themePrefe
 import messages from '@/assets/lang'
 
 import events from '@/events/events'
-import { fleetApi } from '@/service/fleet'
 
 const systemConfigName = 'system'
 
@@ -897,22 +895,26 @@ export default {
 			})
 		},
 
-		// Asked once, from mounted(): the dialog reads the roles itself.
+		// Asked once, from mounted(): the dialog reads the roles itself. The client is
+		// loaded here, not at the top: the bar must not pull the store in through it.
 		getFleet() {
-			fleetApi.status().then(() => {
+			return import('@/service/fleet').then(({ fleetApi }) => fleetApi.status()).then(() => {
 				this.fleetAvailable = true
 			}).catch(() => {})
 		},
 
+		// The dialog is loaded when opened, for the same reason.
 		showFleet() {
 			this.$refs.settingsDrop.toggle()
-			this.$buefy.modal.open({
-				component: FleetModal,
-				hasModalCard: true,
-				trapFocus: true,
-				canCancel: ['escape'],
-				scroll: 'keep',
-				animation: 'zoom-in',
+			return import('./settings/FleetModal.vue').then(({ default: FleetModal }) => {
+				this.$buefy.modal.open({
+					component: FleetModal,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: ['escape'],
+					scroll: 'keep',
+					animation: 'zoom-in',
+				})
 			})
 		},
 

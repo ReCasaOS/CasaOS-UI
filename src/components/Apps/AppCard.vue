@@ -205,6 +205,7 @@ import ContainerDetailPanel from './ContainerDetailPanel.vue'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
+import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -487,6 +488,9 @@ export default {
 					break
 				case STATS_APP_NAME:
 					openStatistics(this.$buefy, this.$store.state)
+					break
+				case FLEET_APP_NAME:
+					openFleet(this.$buefy, this.$store.state)
 					break
 				default:
 					break
