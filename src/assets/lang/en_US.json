@@ -2733,5 +2733,11 @@
   "Needs attention": "Needs attention",
   "The system drive reports a failure": "The system drive reports a failure",
   "The last backup failed": "The last backup failed",
-  "No backup yet": "No backup yet"
+  "No backup yet": "No backup yet",
+  "Fleet": "Fleet",
+  "Online": "Online",
+  "Offline": "Offline",
+  "Never connected": "Never connected",
+  "The box {name} is offline": "The box {name} is offline",
+  "{online} of {total} boxes online": "{online} of {total} boxes online"
 }

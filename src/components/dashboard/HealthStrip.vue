@@ -73,6 +73,20 @@
 						<p v-if="backup.status === 'failed'" class="is-danger panel-error">{{ $t('The last backup failed') }}</p>
 					</div>
 				</div>
+
+				<div v-if="fleet && fleet.total" class="widget has-text-grey-100 panel fleet">
+					<div class="blur-background"></div>
+					<div class="widget-content">
+						<div class="tile-label">{{ $t('Fleet') }}</div>
+						<p class="fleet-count">{{ $t('{online} of {total} boxes online', { online: fleet.online, total: fleet.total }) }}</p>
+						<ul>
+							<li v-for="box in fleet.boxes" :key="box.key" :class="`is-${box.state}`">
+								<span class="fleet-name">{{ box.name }}</span>
+								<span class="fleet-state">{{ fleetStateLabel(box.state) }}</span>
+							</li>
+						</ul>
+					</div>
+				</div>
 			</aside>
 
 			<div class="beta-main">
@@ -84,7 +98,7 @@
 
 <script>
 import { mixin } from '@/mixins/mixin'
-import { attentionItems, backupTile, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
+import { attentionItems, backupTile, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -104,6 +118,7 @@ export default {
 			speed: null,
 			runs: [],
 			snapraidState: null,
+			fleetState: null,
 			timer: 0,
 		}
 	},
@@ -122,7 +137,11 @@ export default {
 			return snapraidTile(this.snapraidState, this.translate)
 		},
 		attention() {
-			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup }, this.translate)
+			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState }, this.translate)
+		},
+		// null unless this box is a master
+		fleet() {
+			return fleetPanel(this.fleetState)
 		},
 		// the system drive first, then the USB disks the box reports
 		drives() {
@@ -218,6 +237,10 @@ export default {
 			return value >= 80 ? 'warning' : 'ok'
 		},
 
+		fleetStateLabel(state) {
+			return { online: this.$t('Online'), offline: this.$t('Offline'), never: this.$t('Never connected') }[state]
+		},
+
 		driveHealthLabel(health) {
 			if (health === 'passed') {
 				return this.$t('Healthy')
@@ -260,6 +283,12 @@ export default {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
 			} catch {
 				this.snapraidState = null
+			}
+			// 404 on a core without a fleet, nothing to show on a box that is not a master
+			try {
+				this.fleetState = (await this.$api.fleet.status()).data.data
+			} catch {
+				this.fleetState = null
 			}
 		},
 	},
@@ -429,6 +458,37 @@ export default {
 
 	dd {
 		text-align: right;
+	}
+}
+
+.fleet {
+	ul {
+		margin-top: 0.25rem;
+	}
+
+	.fleet-name {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.fleet-state {
+		flex-shrink: 0;
+	}
+
+	li {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		line-height: 1.75rem;
+
+		&.is-online .fleet-state {
+			color: #8fd16a;
+		}
+
+		&.is-offline .fleet-state {
+			color: #ff9d9d;
+		}
 	}
 }
 

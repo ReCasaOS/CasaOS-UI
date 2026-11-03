@@ -2736,5 +2736,11 @@
   "No backup yet": "Aucune sauvegarde pour l’instant",
   "System drive": "Disque système",
   "All good": "Rien à signaler",
-  "All": "Toutes"
+  "All": "Toutes",
+  "Fleet": "Flotte",
+  "Online": "En ligne",
+  "Offline": "Hors ligne",
+  "Never connected": "Jamais connectée",
+  "The box {name} is offline": "La box {name} est hors ligne",
+  "{online} of {total} boxes online": "{online} box sur {total} en ligne"
 }
