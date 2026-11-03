@@ -48,7 +48,7 @@
 							<div class="tile-bar">
 								<div :class="drive.level" :style="{ width: `${drive.percent}%` }"></div>
 							</div>
-							<div class="tile-detail">{{ drive.percent }} % · {{ drive.detail }}</div>
+							<div class="tile-detail">{{ driveDetail(drive) }}</div>
 						</div>
 					</div>
 				</div>
@@ -103,7 +103,8 @@
 <script>
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
-import { attentionItems, backupTile, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
+import { snapraidHeld } from '@/components/Storage/snapraidPool'
+import { attentionItems, backupTile, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -120,6 +121,9 @@ export default {
 			disk: info.sys_disk || {},
 			net: info.net || [],
 			usb: info.sys_usb || [],
+			// the disks with their volumes (GET /v1/storage) and the drives (GET /v1/disks); empty on a box that does not answer
+			storageList: [],
+			driveList: [],
 			speed: null,
 			runs: [],
 			snapraidState: null,
@@ -148,23 +152,23 @@ export default {
 		fleet() {
 			return fleetPanel(this.fleetState)
 		},
-		// the system drive first, then the USB disks the box reports
+		// one row per disk where the box lists them, else the system drive and the USB disks of the utilization
 		drives() {
-			const system = {
-				key: 'system',
-				name: this.$t('System drive'),
-				health: this.health,
-				percent: percent(this.disk.used, this.disk.size),
-				detail: `${this.renderSize(this.disk.used || 0)} / ${this.renderSize(this.disk.size || 0)}`,
-			}
-			const usb = this.usb.map(disk => ({
-				key: `usb_${disk.name}`,
-				name: disk.model || disk.name,
-				health: '',
-				percent: usbPercent(disk),
-				detail: this.renderSize(disk.size || 0),
-			}))
-			return [system, ...usb].map(drive => ({
+			const rows = diskRows(this.storageList, this.driveList, snapraidHeld(this.snapraidState && this.snapraidState.config))
+			const list = rows.length > 0
+				? rows.map(row => ({
+					key: row.key,
+					name: row.name,
+					role: row.role,
+					// the system disk may not be among the drives: its SMART is the utilization's
+					health: row.drive ? this.smartHealth(row.drive) : (row.role === 'system' ? this.health : ''),
+					// 0 is no reading
+					temperature: row.drive && row.drive.temperature > 0 ? row.drive.temperature : 0,
+					percent: percent(row.used, row.size),
+					detail: `${this.renderSize(row.used)} / ${this.renderSize(row.size)}`,
+				}))
+				: this.utilizationDrives()
+			return list.map(drive => ({
 				...drive,
 				level: drive.health === 'failed' ? 'danger' : this.barLevel(drive.percent),
 			}))
@@ -250,6 +254,34 @@ export default {
 			return { online: this.$t('Online'), offline: this.$t('Offline'), never: this.$t('Never connected') }[state]
 		},
 
+		utilizationDrives() {
+			const system = {
+				key: 'system',
+				name: this.$t('System drive'),
+				role: 'system',
+				health: this.health,
+				temperature: 0,
+				percent: percent(this.disk.used, this.disk.size),
+				detail: `${this.renderSize(this.disk.used || 0)} / ${this.renderSize(this.disk.size || 0)}`,
+			}
+			const usb = this.usb.map(disk => ({
+				key: `usb_${disk.name}`,
+				name: disk.model || disk.name,
+				role: '',
+				health: '',
+				temperature: 0,
+				percent: usbPercent(disk),
+				detail: this.renderSize(disk.size || 0),
+			}))
+			return [system, ...usb]
+		},
+
+		// role, how full, and the temperature when the drive reads one
+		driveDetail(drive) {
+			const role = { system: this.$t('System'), data: this.$t('Data disk'), parity: this.$t('Parity disk') }[drive.role]
+			return [role, `${drive.percent} %`, drive.detail, drive.temperature ? `${drive.temperature}°C` : ''].filter(Boolean).join(' · ')
+		},
+
 		driveHealthLabel(health) {
 			if (health === 'passed') {
 				return this.$t('Healthy')
@@ -292,6 +324,14 @@ export default {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
 			} catch {
 				this.snapraidState = null
+			}
+			// an older box answers 404 to either: the panel then has the utilization's drives
+			try {
+				this.storageList = (await this.$api.storage.list({ system: 'show' })).data.data || []
+				this.driveList = (await this.$api.disks.getDiskList()).data.data.disks || []
+			} catch {
+				this.storageList = []
+				this.driveList = []
 			}
 			// 404 on a core without a fleet, nothing to show on a box that is not a master
 			try {

@@ -99,3 +99,24 @@ export function attentionItems({ health, snapraid, backup, fleet }, t, now = Dat
 	}
 	return items.sort((a, b) => (a.level === 'danger' ? 0 : 1) - (b.level === 'danger' ? 0 : 1))
 }
+
+// The Storage panel's rows, one per disk, from GET /v1/storage (the disks with their volumes, the
+// system one among them), GET /v1/disks (the drives: SMART and temperature) and the volumes
+// SnapRAID holds by mount point ('data' | 'parity', see snapraidHeld). The system disk may not
+// be among the drives: its SMART comes from the utilization payload, the caller's business.
+export function diskRows(storages, drives, held) {
+	const byPath = new Map((Array.isArray(drives) ? drives : []).map(drive => [drive.path, drive]))
+	return (Array.isArray(storages) ? storages : []).map((disk) => {
+		const volumes = disk.children || []
+		const sum = field => volumes.reduce((total, volume) => total + (Number(volume[field]) || 0), 0)
+		const system = disk.disk_name === 'System'
+		return {
+			key: disk.path,
+			name: disk.disk_model || disk.disk_name || disk.path,
+			role: system ? 'system' : (volumes.map(volume => held[volume.mount_point]).find(Boolean) || ''),
+			size: sum('size'),
+			used: sum('used'),
+			drive: byPath.get(disk.path) || null,
+		}
+	})
+}
