@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import FleetModal from './settings/FleetModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
@@ -13,10 +14,12 @@ import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import createEventBus from '@/events/eventBus'
 import events from '@/events/events'
+import { fleetApi } from '@/service/fleet'
 
 // The locale table is assembled with webpack's `require.context`, which Vite has
 // no equivalent for; TopBar only reads the language names from it.
 vi.mock('@/assets/lang', () => ({ default: { en_us: { lang_name: 'English' } } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(() => new Promise(() => {})) } }))
 
 // From the project root: import.meta.url is not a file URL under happy-dom.
 const source = readFileSync('src/components/TopBar.vue', 'utf8')
@@ -82,6 +85,7 @@ describe('the anonymous statistics switch', () => {
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
@@ -196,6 +200,7 @@ describe('the automatic update row', () => {
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
@@ -402,6 +407,7 @@ describe('the alerts row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -496,6 +502,7 @@ describe('the modules row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -779,5 +786,67 @@ describe('the restart and the shutdown while an upgrade works on the machine', (
 		expect(en['Failed to perform power operation.']).toBe('Failed to perform power operation.')
 		expect(fr['Failed to perform power operation.']).toBeTruthy()
 		expect(fr['Failed to perform power operation.']).not.toBe('Failed to perform power operation.')
+	})
+})
+
+// The Fleet row: visible only when the core answers GET /v1/fleet, like the alerts row.
+describe('the fleet row', () => {
+	function bar() {
+		const vm = {
+			fleetAvailable: false,
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getFleet', 'showFleet'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('shows the Fleet row only when the core answers /v1/fleet', async () => {
+		fleetApi.status.mockReturnValueOnce(Promise.resolve({ data: { success: 200, data: { role: 'none' } } }))
+		const vm = bar()
+		vm.getFleet()
+		await flushPromises()
+		expect(vm.fleetAvailable).toBe(true)
+
+		fleetApi.status.mockReturnValueOnce(Promise.reject(new Error('404')))
+		const older = bar()
+		older.getFleet()
+		await flushPromises()
+		expect(older.fleetAvailable).toBe(false)
+		expect(source).toMatch(/<!-- Fleet Start -->\s*<div v-if="fleetAvailable"/)
+	})
+
+	it('asks the core when the bar mounts', () => {
+		const vm = {
+			$EventBus: createEventBus(),
+			getAlerts: vi.fn(),
+			getModules: vi.fn(),
+			getOs: vi.fn(),
+			getFleet: vi.fn(),
+			checkVersion: vi.fn(),
+			getUserInfo: vi.fn(),
+			getUsbStatus: vi.fn(),
+			getTelemetry: vi.fn(),
+			getAutoUpdate: vi.fn(),
+			getHardwareInfo: vi.fn(),
+			onTelemetryChanged: vi.fn(),
+		}
+		TopBar.mounted.call(vm)
+		expect(vm.getFleet).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens the dialog from Configure', () => {
+		const vm = bar()
+		vm.showFleet()
+		expect(source).toMatch(/<!-- Fleet Start -->[\s\S]*?@click="showFleet"[\s\S]*?<!-- Fleet End -->/)
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: FleetModal }))
+	})
+
+	it('says "Fleet" in English and French', () => {
+		expect(en.Fleet).toBe('Fleet')
+		expect(fr.Fleet).toBe('Flotte')
 	})
 })

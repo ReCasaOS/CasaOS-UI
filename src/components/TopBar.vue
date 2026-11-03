@@ -293,6 +293,21 @@
 					</div>
 					<!-- Alerts End -->
 
+					<!-- Fleet Start -->
+					<div v-if="fleetAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="server-network-outline" size="is-20" />
+							{{ $t("Fleet") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showFleet">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Fleet End -->
+
 					<!-- Automount USB Drive Start  -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -560,6 +575,7 @@ import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import FleetModal from './settings/FleetModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
@@ -569,6 +585,7 @@ import { readThemePreference, setThemePreference } from '@/mixins/app/themePrefe
 import messages from '@/assets/lang'
 
 import events from '@/events/events'
+import { fleetApi } from '@/service/fleet'
 
 const systemConfigName = 'system'
 
@@ -625,6 +642,9 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			// true once the core answers GET /v1/fleet: a core older than the
+			// feature shows no row.
+			fleetAvailable: false,
 			// true once the core answers GET /v1/sys/modules: a core older than the
 			// feature shows no row.
 			modulesAvailable: false,
@@ -752,6 +772,7 @@ export default {
 		this.getTelemetry()
 		this.getAutoUpdate()
 		this.getAlerts()
+		this.getFleet()
 		this.getModules()
 		this.getOs()
 		this.getHardwareInfo()
@@ -868,6 +889,25 @@ export default {
 			this.$refs.settingsDrop.toggle()
 			this.$buefy.modal.open({
 				component: AlertsModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(): the dialog reads the roles itself.
+		getFleet() {
+			fleetApi.status().then(() => {
+				this.fleetAvailable = true
+			}).catch(() => {})
+		},
+
+		showFleet() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: FleetModal,
 				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
