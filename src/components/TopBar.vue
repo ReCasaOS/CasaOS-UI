@@ -297,7 +297,7 @@
 					<div v-if="fleetAvailable"
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
 						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="server-network-outline" size="is-20" />
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="server-network" size="is-20" />
 							{{ $t("Fleet") }}
 						</div>
 						<div class="ml-2">

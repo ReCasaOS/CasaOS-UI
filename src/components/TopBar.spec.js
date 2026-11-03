@@ -845,6 +845,13 @@ describe('the fleet row', () => {
 		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: FleetModal }))
 	})
 
+	// an icon name the installed font lacks draws nothing
+	it('has an icon the installed Material Design font draws', () => {
+		const icon = source.match(/<!-- Fleet Start -->[\s\S]*?icon="([^"]+)"/)[1]
+		const mdi = readFileSync('node_modules/@mdi/font/css/materialdesignicons.css', 'utf8')
+		expect(mdi).toContain(`.mdi-${icon}::before`)
+	})
+
 	it('says "Fleet" in English and French', () => {
 		expect(en.Fleet).toBe('Fleet')
 		expect(fr.Fleet).toBe('Flotte')
