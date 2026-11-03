@@ -1,5 +1,5 @@
 <template>
-	<div class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
+	<div :class="{ 'is-compact': compact }" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
 		@mouseleave="hover = true" @mouseover="hover = true">
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
@@ -160,25 +160,33 @@
 						<!-- Loading Bar End -->
 					</div>
 
-					<p class="mt-3 one-line">
-						<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
-						<a class="one-line" style="cursor:default">
-							{{ i18n(item.title) || item.name }}
-						</a>
-					</p>
+					<div class="app-text">
+						<p class="mt-3 one-line">
+							<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
+							<a class="one-line" style="cursor:default">
+								{{ i18n(item.title) || item.name }}
+							</a>
+						</p>
 
-					<!-- Docker hands out names like `adoring_antonelli`, and a container
-						whose name it never set falls back to its id. For those cards the
-						name identifies nothing, and the image does. -->
-					<p v-if="facts.length" class="one-line has-text-full-03 _facts">
-						{{ facts.join(' · ') }}
-					</p>
-					<!-- The compose list could not load this container's stack. Saying so, with
-						the loader's words on hover and in the detail panel, turns "why can I not
-						edit it" into something to fix. -->
-					<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
-						{{ $t('CasaOS cannot read its compose file.') }}
-					</p>
+						<!-- beta dashboard: whether the app is up, under its name -->
+						<p v-if="compact && item.app_type !== 'system'" class="one-line app-state">
+							<span :class="item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
+							{{ item.status === 'running' ? $t('Running') : $t('Stopped') }}
+						</p>
+
+						<!-- Docker hands out names like `adoring_antonelli`, and a container
+							whose name it never set falls back to its id. For those cards the
+							name identifies nothing, and the image does. -->
+						<p v-if="facts.length" class="one-line has-text-full-03 _facts">
+							{{ facts.join(' · ') }}
+						</p>
+						<!-- The compose list could not load this container's stack. Saying so, with
+							the loader's words on hover and in the detail panel, turns "why can I not
+							edit it" into something to fix. -->
+						<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
+							{{ $t('CasaOS cannot read its compose file.') }}
+						</p>
+					</div>
 				</div>
 			</b-tooltip>
 			<!-- Card Content End -->
@@ -230,6 +238,11 @@ export default {
 	props: {
 		item: {
 			type: Object,
+		},
+		// beta dashboard: the icon beside the name and the state, not above it
+		compact: {
+			type: Boolean,
+			default: false,
 		},
 	},
 	data() {
@@ -1339,6 +1352,78 @@ export default {
 .dropdown.is-left .dropdown-menu {
   top: 0;
   left: calc(-100% - 14px);
+}
+
+// beta dashboard: a row, not a square
+.app-card.is-compact {
+  aspect-ratio: auto;
+  justify-content: flex-start;
+  min-height: 4.5rem;
+
+  .cards-content,
+  .in-card.b-tooltip,
+  .in-card .tooltip-trigger {
+    display: block;
+    width: 100%;
+  }
+
+  .img-c {
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-start !important;
+    padding: 0.75rem 2rem 0.75rem 0.875rem !important;
+    text-align: left;
+    gap: 0.75rem;
+
+    > .is-flex {
+      flex-shrink: 0;
+    }
+  }
+
+  .image.is-64x64,
+  .is-64x64 {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .app-text {
+    min-width: 0;
+
+    p {
+      margin: 0 !important;
+    }
+  }
+
+  .action-btn {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .system-marker {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .app-state {
+    font-size: 0.75rem;
+    opacity: 0.85;
+  }
+
+  .state-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.25rem;
+    border-radius: 50%;
+
+    &.is-running {
+      background: #8fd16a;
+    }
+
+    &.is-stopped {
+      background: #9aa4ad;
+    }
+  }
 }
 </style>
 

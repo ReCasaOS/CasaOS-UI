@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, backupTile, netSpeed, percent, snapraidTile } from './healthTiles'
+import { attentionItems, backupTile, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
 
 const t = key => key
 
@@ -44,9 +44,9 @@ describe('backupTile', () => {
 	})
 
 	it('is ok on a last backup that worked', () => {
-		const runs = [{ started_at: '2026-11-02T03:00:00Z' }, { started_at: '2026-11-01T03:00:00Z', error: 'x' }]
+		const runs = [{ started_at: '2026-11-02T03:00:00Z', destination: 'nas' }, { started_at: '2026-11-01T03:00:00Z', error: 'x' }]
 
-		expect(backupTile(runs)).toEqual({ status: 'ok', at: '2026-11-02T03:00:00Z', error: '' })
+		expect(backupTile(runs)).toEqual({ status: 'ok', at: '2026-11-02T03:00:00Z', destination: 'nas', error: '' })
 	})
 
 	it('fails on a failed last backup and still dates the last good copy', () => {
@@ -55,7 +55,15 @@ describe('backupTile', () => {
 			{ started_at: '2026-11-02T03:00:00Z' },
 		]
 
-		expect(backupTile(runs)).toEqual({ status: 'failed', at: '2026-11-02T03:00:00Z', error: 'no route to host' })
+		expect(backupTile(runs)).toEqual({ status: 'failed', at: '2026-11-02T03:00:00Z', destination: '', error: 'no route to host' })
+	})
+})
+
+describe('usbPercent', () => {
+	it('reads used where the box gives it, size - avail where it does not', () => {
+		expect(usbPercent({ size: 100, used: 25, avail: 75 })).toBe(25)
+		expect(usbPercent({ size: 100, avail: 40 })).toBe(60)
+		expect(usbPercent({ size: 0, used: 5 })).toBe(0)
 	})
 })
 

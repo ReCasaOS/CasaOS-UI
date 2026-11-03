@@ -23,13 +23,60 @@
 			</component>
 		</div>
 
-		<div v-if="attention.length > 0" class="widget has-text-grey-100 attention">
-			<div class="blur-background"></div>
-			<div class="widget-content">
-				<div class="tile-label">{{ $t('Needs attention') }}</div>
-				<ul>
-					<li v-for="item in attention" :key="item.key" :class="`is-${item.level}`">{{ item.text }}</li>
-				</ul>
+		<div class="beta-body">
+			<aside class="beta-aside">
+				<div class="widget has-text-grey-100 panel attention">
+					<div class="blur-background"></div>
+					<div class="widget-content">
+						<div class="tile-label">{{ $t('Needs attention') }}</div>
+						<ul v-if="attention.length > 0">
+							<li v-for="item in attention" :key="item.key" :class="`is-${item.level}`">{{ item.text }}</li>
+						</ul>
+						<p v-else class="panel-empty">{{ $t('All good') }}</p>
+					</div>
+				</div>
+
+				<div class="widget has-text-grey-100 panel storage">
+					<div class="blur-background"></div>
+					<div class="widget-content">
+						<div class="tile-label">{{ $t('Storage') }}</div>
+						<div v-for="drive in drives" :key="drive.key" class="drive">
+							<div class="drive-head">
+								<span class="drive-name">{{ drive.name }}</span>
+								<span v-if="drive.health" :class="`is-${drive.health}`" class="drive-health">{{ driveHealthLabel(drive.health) }}</span>
+							</div>
+							<div class="tile-bar">
+								<div :class="drive.level" :style="{ width: `${drive.percent}%` }"></div>
+							</div>
+							<div class="tile-detail">{{ drive.percent }} % · {{ drive.detail }}</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="widget has-text-grey-100 panel backups">
+					<div class="blur-background"></div>
+					<div class="widget-content">
+						<div class="tile-label">{{ $t('Backups') }}</div>
+						<template v-if="backup.status === 'none'">
+							<p class="panel-empty">{{ $t('No backup yet') }}</p>
+						</template>
+						<dl v-else>
+							<div>
+								<dt>{{ $t('Last backup') }}</dt>
+								<dd>{{ new Date(backup.at).toLocaleString() }}</dd>
+							</div>
+							<div v-if="backup.destination">
+								<dt>{{ $t('Destination') }}</dt>
+								<dd>{{ backup.destination }}</dd>
+							</div>
+						</dl>
+						<p v-if="backup.status === 'failed'" class="is-danger panel-error">{{ $t('The last backup failed') }}</p>
+					</div>
+				</div>
+			</aside>
+
+			<div class="beta-main">
+				<slot></slot>
 			</div>
 		</div>
 	</div>
@@ -37,7 +84,7 @@
 
 <script>
 import { mixin } from '@/mixins/mixin'
-import { attentionItems, backupTile, netSpeed, percent, snapraidTile } from '@/components/dashboard/healthTiles'
+import { attentionItems, backupTile, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -53,6 +100,7 @@ export default {
 			mem: info.mem || {},
 			disk: info.sys_disk || {},
 			net: info.net || [],
+			usb: info.sys_usb || [],
 			speed: null,
 			runs: [],
 			snapraidState: null,
@@ -75,6 +123,27 @@ export default {
 		},
 		attention() {
 			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup }, this.translate)
+		},
+		// the system drive first, then the USB disks the box reports
+		drives() {
+			const system = {
+				key: 'system',
+				name: this.$t('System drive'),
+				health: this.health,
+				percent: percent(this.disk.used, this.disk.size),
+				detail: `${this.renderSize(this.disk.used || 0)} / ${this.renderSize(this.disk.size || 0)}`,
+			}
+			const usb = this.usb.map(disk => ({
+				key: `usb_${disk.name}`,
+				name: disk.model || disk.name,
+				health: '',
+				percent: usbPercent(disk),
+				detail: this.renderSize(disk.size || 0),
+			}))
+			return [system, ...usb].map(drive => ({
+				...drive,
+				level: drive.health === 'failed' ? 'danger' : this.barLevel(drive.percent),
+			}))
 		},
 		tiles() {
 			const cpuPercent = Math.round(Number(this.cpu.percent) || 0)
@@ -149,15 +218,24 @@ export default {
 			return value >= 80 ? 'warning' : 'ok'
 		},
 
+		driveHealthLabel(health) {
+			if (health === 'passed') {
+				return this.$t('Healthy')
+			}
+			return health === 'failed' ? this.$t('Damage') : this.$t('No SMART data')
+		},
+
 		backupTileData() {
 			const { status, at, error } = this.backup
+			// the strip is narrow: the day here, the full date and time in the Backups panel
+			const when = new Date(at)
 			return {
 				key: 'backup',
 				label: this.$t('Backups'),
-				value: status === 'none' ? this.$t('No backup yet') : new Date(at).toLocaleString(),
+				value: status === 'none' ? this.$t('No backup yet') : when.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
 				bar: null,
 				level: status === 'failed' ? 'danger' : 'ok',
-				detail: '',
+				detail: status === 'none' ? '' : when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
 				status: status === 'failed' ? this.$t('The last backup failed') : '',
 				title: error,
 			}
@@ -191,6 +269,7 @@ export default {
 			this.cpu = JSON.parse(data.sys_cpu)
 			this.mem = JSON.parse(data.sys_mem)
 			this.disk = JSON.parse(data.sys_disk)
+			this.usb = JSON.parse(data.sys_usb || '[]')
 			this.follow(JSON.parse(data.sys_net))
 		},
 	},
@@ -270,9 +349,90 @@ export default {
 	}
 }
 
-.attention {
-	margin-bottom: 1rem;
+// side panels on the left, the apps on the right; one column on a narrow screen
+.beta-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 1rem;
+	align-items: start;
 
+	@include desktop {
+		grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+	}
+}
+
+.beta-aside {
+	display: grid;
+	gap: 0.75rem;
+
+	.widget {
+		margin-bottom: 0;
+	}
+}
+
+.beta-main {
+	min-width: 0;
+	// one column: the apps before the panels
+	order: -1;
+
+	@include desktop {
+		order: 0;
+	}
+}
+
+.panel-empty {
+	margin-top: 0.25rem;
+	opacity: 0.85;
+}
+
+.panel-error,
+.drive-health.is-failed {
+	color: #ff9d9d;
+}
+
+.drive {
+	margin-top: 0.75rem;
+}
+
+.drive-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.drive-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.drive-health {
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	opacity: 0.85;
+
+	&.is-passed {
+		color: #8fd16a;
+	}
+}
+
+.backups dl > div {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+	line-height: 1.75rem;
+
+	dt {
+		opacity: 0.8;
+		white-space: nowrap;
+	}
+
+	dd {
+		text-align: right;
+	}
+}
+
+.attention {
 	ul {
 		margin-top: 0.25rem;
 	}

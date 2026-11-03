@@ -71,7 +71,8 @@ describe('health strip', () => {
 		const without = strip()
 		await settle()
 		expect(without.findAll('.tile')).toHaveLength(5)
-		expect(without.find('.attention').exists()).toBe(false)
+		expect(without.findAll('.attention li')).toHaveLength(0)
+		expect(without.find('.attention').text()).toContain('All good')
 
 		const late = strip({ snapraid: () => Promise.resolve({ data: { data: { configured: true, last: {} } } }) })
 		await settle()
@@ -90,6 +91,28 @@ describe('health strip', () => {
 
 		expect(wrapper.find('.attention').text()).toContain('The last backup failed')
 		expect(wrapper.text()).toContain(new Date('2026-11-02T03:00:00Z').toLocaleString())
+	})
+
+	it('lists the system drive and the USB disks in the storage panel, and the apps go in the main column', () => {
+		const wrapper = mount(HealthStrip, {
+			slots: { default: '<p class="apps-here">apps</p>' },
+			global: {
+				mocks: {
+					$t: key => key,
+					$store: { state: { hardwareInfo: { ...hardwareInfo, sys_usb: [{ name: 'sdb', model: 'Backup stick', size: 1000, avail: 250 }] } } },
+					$EventBus: { $emit: vi.fn() },
+					$api: { backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) }, disks: { snapraid: () => Promise.reject(new Error('404')) } },
+				},
+			},
+		})
+
+		const drives = wrapper.findAll('.storage .drive')
+		expect(drives).toHaveLength(2)
+		expect(drives[0].text()).toContain('System drive')
+		expect(drives[0].text()).toContain('Healthy')
+		expect(drives[1].text()).toContain('Backup stick')
+		expect(drives[1].text()).toContain('75 %')
+		expect(wrapper.find('.beta-main .apps-here').exists()).toBe(true)
 	})
 
 	it('opens the storage manager from the storage tile', async () => {
