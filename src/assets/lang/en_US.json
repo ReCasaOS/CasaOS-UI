@@ -2726,5 +2726,9 @@
   "Removing the merged storage empties {folder}. The files stay on their drives.": "Removing the merged storage empties {folder}. The files stay on their drives.",
   "New dashboard (beta)": "New dashboard (beta)",
   "Back to the classic dashboard": "Back to the classic dashboard",
-  "Built into CasaOS.": "Built into CasaOS."
+  "Built into CasaOS.": "Built into CasaOS.",
+  "Needs attention": "Needs attention",
+  "The system drive reports a failure": "The system drive reports a failure",
+  "The last backup failed": "The last backup failed",
+  "No backup yet": "No backup yet"
 }
