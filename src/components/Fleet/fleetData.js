@@ -35,6 +35,7 @@ export function overviewRow(box, answers) {
 	const vms = payload(answers.vms)
 	const disk = util?.sys_disk
 	return {
+		key: box.id,
 		id: box.id,
 		name: text(box.name),
 		url: text(box.url),
