@@ -37,7 +37,7 @@
 
 		<!-- Editor Start -->
 		<div class="is-flex is-justify-content-center is-align-items-center is-flex-grow-1 v-container pb-5">
-			<codemirror ref="cmEditor" v-model="code" :options="cmOptions" @input="onCmCodeChange" @ready="onCmReady" />
+			<codemirror ref="cmEditor" :value="code" :options="cmOptions" @input="onCmCodeChange" @ready="onCmReady" />
 		</div>
 		<!-- Editor End -->
 	</div>
@@ -197,7 +197,10 @@ export default {
 	},
 
 	methods: {
-		onCmCodeChange() {
+		// The editor wrapper takes `value` and emits `input`: a v-model here would pass `modelValue`,
+		// which it ignores, and every file would open empty.
+		onCmCodeChange(text) {
+			this.code = text
 			this.isChange = true
 		},
 		onCmReady() {
