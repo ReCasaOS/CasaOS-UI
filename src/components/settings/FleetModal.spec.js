@@ -11,7 +11,7 @@ import { fleetApi } from '@/service/fleet'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), setMaster: vi.fn(), join: vi.fn(), leave: vi.fn(), addBox: vi.fn(), rotateCode: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setMaster: vi.fn(), setRelay: vi.fn(), join: vi.fn(), leave: vi.fn(), addBox: vi.fn(), rotateCode: vi.fn() } }))
 vi.mock('@/components/Fleet/entry', () => ({ forgetFleet: vi.fn(), openFleet: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
@@ -31,6 +31,8 @@ async function open(component = FleetModal, props = {}) {
 const button = label => wrapper.findAll('button').find(b => b.text() === label)
 const dialogButton = label => [...document.querySelectorAll('.dialog button')].find(b => b.textContent.includes(label))
 const pick = role => wrapper.find(`input[type=radio][value=${role}]`).setValue(true)
+const field = name => wrapper.find(`input[name=${name}]`)
+const advanced = () => wrapper.find('input[type=checkbox]').setValue(true)
 
 describe('the Fleet settings', () => {
 	beforeEach(() => {
@@ -74,17 +76,79 @@ describe('the Fleet settings', () => {
 		expect(bus.$emit).toHaveBeenCalledWith(events.FLEET_CHANGED)
 	})
 
+	it('enables the master with the relay and no address', async () => {
+		await open()
+		await pick('master')
+		expect(field('relay').element.value).toBe('https://relay.official.test')
+		expect(wrapper.text()).toContain('The official ReCasaOS relay unless you run your own')
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.official.test' })
+		fleetApi.setMaster.mockClear()
+		await pick('master')
+		await field('relay').setValue('  https://relay.mine.example  ')
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.mine.example' })
+	})
+
+	it('shows the address field only under advanced settings', async () => {
+		await open()
+		await pick('master')
+		expect(field('address').exists()).toBe(false)
+		expect(wrapper.text()).toContain('Advanced settings')
+		await advanced()
+		expect(field('address').exists()).toBe(true)
+		// an empty address under advanced settings still goes through the relay
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.official.test' })
+	})
+
+	it('shows the address field when the core reports no relay', async () => {
+		// a master on an older core, or in advanced mode: its address as before, nothing about a relay
+		fleetApi.status.mockReturnValue(answer(MASTER))
+		await open()
+		expect(wrapper.text()).toContain('Address the boxes join it at: https://m.example')
+		expect(wrapper.text()).not.toContain('Relay server')
+		expect(button('Change the relay')).toBeUndefined()
+		// and an older core is still enabled with an address, sent as before without a relay
+		wrapper.unmount()
+		fleetApi.status.mockReturnValue(answer(NONE))
+		await open()
+		await pick('master')
+		await advanced()
+		await field('address').setValue('https://m.example')
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, address: 'https://m.example' })
+	})
+
+	it('rejects a relay that does not start with https://', async () => {
+		await open()
+		await pick('master')
+		await field('relay').setValue('http://relay.example')
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).not.toHaveBeenCalled()
+		expect(wrapper.text()).toContain('The relay must start with https://')
+	})
+
 	it('enables the master with its address and refuses an address without https', async () => {
 		await open()
 		await pick('master')
-		await wrapper.find('input[type=url]').setValue('http://m.example')
+		await advanced()
+		await field('address').setValue('http://m.example')
 		await button('Enable').trigger('click')
 		await flushPromises()
 		expect(fleetApi.setMaster).not.toHaveBeenCalled()
 		expect(wrapper.text()).toContain('The address must start with https://')
 		fleetApi.setMaster.mockReturnValue(answer({}))
 		fleetApi.status.mockReturnValue(answer(MASTER))
-		await wrapper.find('input[type=url]').setValue('https://m.example')
+		await field('address').setValue('https://m.example')
 		await button('Enable').trigger('click')
 		await flushPromises()
 		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, address: 'https://m.example' })

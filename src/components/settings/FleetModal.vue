@@ -29,10 +29,16 @@
 						</div>
 					</template>
 					<template v-else>
-						<b-field :label="$t('Address the boxes join it at')">
-							<b-input v-model="address" placeholder="https://" type="url" />
+						<b-field :label="$t('Relay server')" :message="$t('The official ReCasaOS relay unless you run your own')">
+							<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
 						</b-field>
-						<b-button :loading="busy" rounded size="is-small" type="is-primary" @click="enable">{{ $t('Enable') }}</b-button>
+						<b-field>
+							<b-switch v-model="advanced" size="is-small">{{ $t('Advanced settings') }}</b-switch>
+						</b-field>
+						<b-field v-if="advanced" :label="$t('Address the boxes join it at')">
+							<b-input v-model="address" name="address" placeholder="https://" type="url" />
+						</b-field>
+						<b-button :disabled="busy" :loading="busy" rounded size="is-small" type="is-primary" @click="enable">{{ $t('Enable') }}</b-button>
 					</template>
 				</template>
 
@@ -62,7 +68,9 @@
 <script>
 import { forgetFleet, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
-import { fleetApi } from '@/service/fleet'
+import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
+
+const HTTPS = /^https:\/\/.+/i
 
 // What the member's last error says when the master turned it away (its code was revoked or replaced): the core's
 // own sentence, or an HTTP refusal. A bare "refused" is not one: "connection refused" is a master that is down.
@@ -73,11 +81,15 @@ export default {
 	emits: ['close'],
 	data() {
 		return {
-			// GET /v1/fleet: { role, master: { address, boxes }, member: { master_url, connected, since, last_error } }
+			// GET /v1/fleet: { role, master: { address, boxes }, member: { master_url, connected, since, last_error } },
+			// and over a relay (absent otherwise, and on an older core): relay, net: { connected, addr, error }
 			view: null,
 			error: '',
 			role: 'none',
 			address: '',
+			relay: OFFICIAL_RELAY,
+			// the address field: a master already reachable at its own address, without a relay
+			advanced: false,
 			code: '',
 			busy: false,
 		}
@@ -108,6 +120,7 @@ export default {
 				this.view = view && typeof view === 'object' ? view : { role: 'none' }
 				this.role = ['master', 'member'].includes(this.view.role) ? this.view.role : 'none'
 				this.address = typeof this.view.master?.address === 'string' ? this.view.master.address : ''
+				this.relay = typeof this.view.relay === 'string' && this.view.relay ? this.view.relay : OFFICIAL_RELAY
 			}).catch(() => {
 				this.view = null
 				this.error = this.$t('The fleet could not be read.')
@@ -133,12 +146,22 @@ export default {
 			}
 		},
 		enable() {
-			const address = this.address.trim()
-			if (!/^https:\/\/.+/i.test(address)) {
-				this.error = this.$t('The address must start with https://')
+			// an address typed under advanced settings is the old flow, without a relay (what an older core takes)
+			const address = this.advanced ? this.address.trim() : ''
+			if (address) {
+				if (!HTTPS.test(address)) {
+					this.error = this.$t('The address must start with https://')
+					return
+				}
+				this.run(() => fleetApi.setMaster({ enabled: true, address }))
 				return
 			}
-			this.run(() => fleetApi.setMaster({ enabled: true, address }))
+			const relay = this.relay.trim()
+			if (!HTTPS.test(relay)) {
+				this.error = this.$t('The relay must start with https://')
+				return
+			}
+			this.run(() => fleetApi.setMaster({ enabled: true, relay }))
 		},
 		confirmDisable() {
 			this.$buefy.dialog.confirm({
