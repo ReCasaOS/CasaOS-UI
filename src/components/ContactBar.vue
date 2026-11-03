@@ -13,6 +13,17 @@
 			</a>
 		</b-tooltip>
 
+		<!-- not in the icon font: a cup (the Material Design "coffee" glyph), coloured like the others -->
+		<b-tooltip :label="$t('Support ReCasaOS on Ko-fi')" content-class="contact-tip" position="is-top" type="is-primary">
+			<a :aria-label="$t('Support ReCasaOS on Ko-fi')" rel="noopener noreferrer" href="https://ko-fi.com/recasaos" target="_blank">
+				<span class="icon">
+					<svg aria-hidden="true" height="24" viewBox="0 0 24 24" width="24">
+						<path d="M2,21H20V19H2M20,8H18V5H20M20,3H4V13A4,4 0 0,0 8,17H14A4,4 0 0,0 18,13V10H20A2,2 0 0,0 22,8V5C22,3.89 21.1,3 20,3Z" fill="currentColor" />
+					</svg>
+				</span>
+			</a>
+		</b-tooltip>
+
 	</div>
 </template>
 

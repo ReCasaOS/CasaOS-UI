@@ -2819,5 +2819,6 @@
   "The box {name} is offline": "La box {name} est hors ligne",
   "{online} of {total} boxes online": "{online} box sur {total} en ligne",
   "Data disk": "Disque de données",
-  "Parity disk": "Disque de parité"
+  "Parity disk": "Disque de parité",
+  "Support ReCasaOS on Ko-fi": "Soutenir ReCasaOS sur Ko-fi"
 }
