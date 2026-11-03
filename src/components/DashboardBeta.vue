@@ -1,10 +1,10 @@
 <template>
 	<div class="dashboard-beta contextmenu-canvas">
 		<!-- Beta bar: says which dashboard this is and how to leave it -->
-		<div class="is-flex is-align-items-center mb-4 ml-2">
+		<div class="beta-bar is-flex is-align-items-center mb-4 ml-2">
 			<b-tag rounded type="is-dark">{{ $t('Beta') }}</b-tag>
-			<span class="ml-2 is-flex-grow-1 has-text-grey-100">{{ $t('New dashboard (beta)') }}</span>
-			<b-button rounded size="is-small" type="is-dark" @click="$emit('leave')">
+			<span class="beta-title has-text-grey-100">{{ $t('New dashboard (beta)') }}</span>
+			<b-button class="beta-leave" rounded size="is-small" type="is-dark" @click="$emit('leave')">
 				{{ $t('Back to the classic dashboard') }}
 			</b-button>
 		</div>
@@ -48,3 +48,19 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+// a narrow screen puts the button under the title instead of squeezing the title into four lines
+.beta-bar {
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.beta-title {
+	flex: 1 1 8rem;
+}
+
+.beta-leave {
+	flex-shrink: 0;
+}
+</style>
