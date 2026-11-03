@@ -40,13 +40,16 @@
 						</template>
 					</template>
 					<template v-else>
-						<b-field :label="$t('Relay server')" :message="$t('The official ReCasaOS relay unless you run your own')">
-							<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
-						</b-field>
-						<b-field>
-							<b-switch v-model="advanced" size="is-small">{{ $t('Advanced settings') }}</b-switch>
-						</b-field>
-						<b-field v-if="advanced" :label="$t('Address the boxes join it at')">
+						<template v-if="relayCapable">
+							<b-field :label="$t('Relay server')" :message="$t('The official ReCasaOS relay unless you run your own')">
+								<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
+							</b-field>
+							<b-field>
+								<b-switch v-model="advanced" size="is-small">{{ $t('Advanced settings') }}</b-switch>
+							</b-field>
+						</template>
+						<!-- an older core knows no relay: the address is the only way -->
+						<b-field v-if="advanced || !relayCapable" :label="$t('Address the boxes join it at')">
 							<b-input v-model="address" name="address" placeholder="https://" type="url" />
 						</b-field>
 						<b-button :disabled="busy" :loading="busy" rounded size="is-small" type="is-primary" @click="enable">{{ $t('Enable') }}</b-button>
@@ -94,7 +97,7 @@ export default {
 	data() {
 		return {
 			// GET /v1/fleet: { role, master: { address, boxes }, member: { master_url, connected, since, last_error } },
-			// and over a relay (absent otherwise, and on an older core): relay, net: { connected, addr, error }
+			// default_relay (always, on a core with the relay flow), and over a relay (absent otherwise): relay, net: { connected, addr, error }
 			view: null,
 			error: '',
 			role: 'none',
@@ -107,6 +110,11 @@ export default {
 		}
 	},
 	computed: {
+		// default_relay is always announced by a core that has the relay flow; an older core knows none of the three
+		relayCapable() {
+			const v = this.view
+			return !!(v?.default_relay || v?.relay || v?.master?.relay)
+		},
 		boxes() {
 			return Array.isArray(this.view?.master?.boxes) ? this.view.master.boxes : []
 		},
@@ -143,7 +151,7 @@ export default {
 				this.view = view && typeof view === 'object' ? view : { role: 'none' }
 				this.role = ['master', 'member'].includes(this.view.role) ? this.view.role : 'none'
 				this.address = typeof this.view.master?.address === 'string' ? this.view.master.address : ''
-				this.relay = typeof this.view.relay === 'string' && this.view.relay ? this.view.relay : OFFICIAL_RELAY
+				this.relay = this.view.relay || this.view.default_relay || OFFICIAL_RELAY
 			}).catch(() => {
 				this.view = null
 				this.error = this.$t('The fleet could not be read.')
@@ -188,8 +196,8 @@ export default {
 		},
 		enable() {
 			// an address typed under advanced settings is the old flow, without a relay (what an older core takes)
-			const address = this.advanced ? this.address.trim() : ''
-			if (address) {
+			const address = this.advanced || !this.relayCapable ? this.address.trim() : ''
+			if (address || !this.relayCapable) {
 				if (!HTTPS.test(address)) {
 					this.error = this.$t('The address must start with https://')
 					return

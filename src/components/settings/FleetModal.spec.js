@@ -16,7 +16,9 @@ vi.mock('@/components/Fleet/entry', () => ({ forgetFleet: vi.fn(), openFleet: vi
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })
-const NONE = { role: 'none', master: null, member: null }
+const NONE = { role: 'none', master: null, member: null, default_relay: 'https://relay.official.test' }
+// an older core: no default_relay, no relay
+const OLD_NONE = { role: 'none', master: null, member: null }
 const MASTER = { role: 'master', master: { address: 'https://m.example', boxes: [{ id: 'a', name: 'Home' }, { id: 'b', name: 'Shop' }] }, member: null }
 const RELAY_MASTER = { ...MASTER, relay: 'https://relay.mine.example', net: { connected: true, addr: '100.64.0.1' } }
 const refusal = (status, message) => Promise.reject(Object.assign(new Error(String(status)), { response: { status, data: { success: false, message } } }))
@@ -95,6 +97,31 @@ describe('the Fleet settings', () => {
 		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.mine.example' })
 	})
 
+	it('shows the old address flow when the core reports neither default_relay nor relay', async () => {
+		fleetApi.status.mockReturnValue(answer(OLD_NONE))
+		await open()
+		await pick('master')
+		expect(field('relay').exists()).toBe(false)
+		expect(wrapper.find('input[type=checkbox]').exists()).toBe(false)
+		expect(wrapper.text()).not.toContain('Advanced settings')
+		await field('address').setValue('https://m.example')
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, address: 'https://m.example' })
+	})
+
+	it('uses the default relay announced by the core', async () => {
+		fleetApi.status.mockReturnValue(answer({ ...NONE, default_relay: 'https://relay.core.example' }))
+		await open()
+		await pick('master')
+		expect(field('relay').element.value).toBe('https://relay.core.example')
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.core.example' })
+	})
+
 	it('shows the address field only under advanced settings', async () => {
 		await open()
 		await pick('master')
@@ -118,10 +145,9 @@ describe('the Fleet settings', () => {
 		expect(button('Change the relay')).toBeUndefined()
 		// and an older core is still enabled with an address, sent as before without a relay
 		wrapper.unmount()
-		fleetApi.status.mockReturnValue(answer(NONE))
+		fleetApi.status.mockReturnValue(answer(OLD_NONE))
 		await open()
 		await pick('master')
-		await advanced()
 		await field('address').setValue('https://m.example')
 		fleetApi.setMaster.mockReturnValue(answer({}))
 		await button('Enable').trigger('click')
