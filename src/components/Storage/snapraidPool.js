@@ -10,11 +10,14 @@ export const POOL_STEPS = ['storages', 'protection', 'merge', 'sync']
 
 // A storage of its own that a merge can take (mounted, CasaOS's, neither the system nor already merged) keeps its files. A drive that is no storage yet is mounted as
 // it is when it holds a filesystem, and erased only when it has to be formatted.
+// A drive is blank when it has no partition and no filesystem the box can mount. The box's own need_format is always false, so it cannot tell.
+const isBlank = drive => Number(drive.children_number) === 0 && drive.supported === false
+
 export function poolDisks(storages, drives) {
 	const stores = storages
 		.filter(storage => !storage.isSystem && !storage.isMergeSource && storage.mount_point && storage.persistedIn === 'casaos')
 		.map(storage => ({ key: storage.mount_point, kind: 'storage', name: storage.name, size: Number(storage.size), uuid: storage.uuid, mountPoint: storage.mount_point, array: Boolean(storage.raid) }))
-	const blank = drives.map(drive => ({ key: drive.path, kind: 'drive', name: `${drive.name} (${drive.model})`, size: Number(drive.size), path: drive.path, erased: Boolean(drive.need_format) }))
+	const blank = drives.map(drive => ({ key: drive.path, kind: 'drive', name: `${drive.name} (${drive.model})`, size: Number(drive.size), path: drive.path, erased: isBlank(drive) }))
 	return [...stores, ...blank]
 }
 
