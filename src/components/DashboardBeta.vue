@@ -9,12 +9,8 @@
 			</b-button>
 		</div>
 
-		<!-- Health strip: the widgets of the side bar, side by side -->
-		<div class="columns is-variable is-2 health-strip">
-			<div class="column"><Cpu /></div>
-			<div class="column"><Disks /></div>
-			<div class="column"><Network /></div>
-		</div>
+		<!-- Health strip: what the side bar widgets say, in one row, and what needs a person -->
+		<HealthStrip />
 
 		<section>
 			<transition name="fade">
@@ -34,9 +30,7 @@
 import SearchBar from '@/components/SearchBar.vue'
 import CoreService from '@/components/CoreService.vue'
 import AppSection from '@/components/Apps/AppSection.vue'
-import Cpu from '@/widgets/Cpu.vue'
-import Disks from '@/widgets/Disks.vue'
-import Network from '@/widgets/Network.vue'
+import HealthStrip from '@/components/dashboard/HealthStrip.vue'
 
 export default {
 	name: 'DashboardBeta',
@@ -44,9 +38,7 @@ export default {
 		SearchBar,
 		CoreService,
 		AppSection,
-		Cpu,
-		Disks,
-		Network,
+		HealthStrip,
 	},
 	emits: ['leave'],
 	computed: {
@@ -56,9 +48,3 @@ export default {
 	},
 }
 </script>
-
-<style lang="scss" scoped>
-.health-strip .column > :deep(.widget) {
-	height: 100%;
-}
-</style>
