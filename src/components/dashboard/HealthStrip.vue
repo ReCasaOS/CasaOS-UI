@@ -85,6 +85,10 @@
 								<span class="fleet-state">{{ fleetStateLabel(box.state) }}</span>
 							</li>
 						</ul>
+						<button class="fleet-open" type="button" @click="openFleetPage">
+							<span class="tag is-dark is-rounded">{{ $t('Beta') }}</span>
+							<span>{{ $t('Open the Fleet page') }}</span>
+						</button>
 					</div>
 				</div>
 			</aside>
@@ -98,6 +102,7 @@
 
 <script>
 import { mixin } from '@/mixins/mixin'
+import { openFleet } from '@/components/Fleet/entry'
 import { attentionItems, backupTile, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
@@ -235,6 +240,10 @@ export default {
 				return 'danger'
 			}
 			return value >= 80 ? 'warning' : 'ok'
+		},
+
+		openFleetPage() {
+			openFleet(this.$buefy, this.$store.state)
 		},
 
 		fleetStateLabel(state) {
@@ -489,6 +498,31 @@ export default {
 		&.is-offline .fleet-state {
 			color: #ff9d9d;
 		}
+	}
+}
+
+.fleet-open {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	width: 100%;
+	margin-top: 0.5rem;
+	padding: 0.375rem 0.5rem;
+	border: 0;
+	border-radius: 0.5rem;
+	background: rgba(255, 255, 255, 0.1);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.2);
+	}
+
+	&:focus-visible {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
 	}
 }
 

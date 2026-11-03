@@ -2,6 +2,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HealthStrip from './HealthStrip.vue'
+import { openFleet } from '@/components/Fleet/entry'
+
+vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
 
 const hardwareInfo = {
 	cpu: { percent: 12.4, temperature: 46, num: 4 },
@@ -10,12 +13,13 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], snapraid, fleet, emit = vi.fn() } = {}) {
+function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {} } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
 				$store: { state: { hardwareInfo } },
+				$buefy: buefy,
 				$EventBus: { $emit: emit },
 				$api: {
 					backup: { getRuns: () => Promise.resolve({ data: { data: runs } }) },
@@ -182,5 +186,24 @@ describe('health strip fleet panel', () => {
 
 		const lines = wrapper.findAll('.attention li').map(li => li.text())
 		expect(lines).toEqual(['The box Cabin is offline'])
+	})
+})
+
+describe('health strip fleet link', () => {
+	const master = () => Promise.resolve({ data: { data: { role: 'master', master: { boxes: [{ id: 'a', name: 'Home', online: true }] } } } })
+
+	it('opens the Fleet page from a Beta strip at the foot of the panel', async () => {
+		const buefy = { modal: {} }
+		const wrapper = strip({ fleet: master, buefy })
+		await settle()
+
+		const link = wrapper.find('.fleet button.fleet-open')
+		expect(link.text()).toContain('Beta')
+		expect(link.text()).toContain('Open the Fleet page')
+
+		await link.trigger('click')
+
+		// the page opens as the app card and the settings open it: with this box's modal service and store state
+		expect(openFleet).toHaveBeenCalledWith(buefy, wrapper.vm.$store.state)
 	})
 })
