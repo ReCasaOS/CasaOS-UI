@@ -18,6 +18,8 @@ vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 const answer = data => Promise.resolve({ data: { success: 200, data } })
 const NONE = { role: 'none', master: null, member: null }
 const MASTER = { role: 'master', master: { address: 'https://m.example', boxes: [{ id: 'a', name: 'Home' }, { id: 'b', name: 'Shop' }] }, member: null }
+const RELAY_MASTER = { ...MASTER, relay: 'https://relay.mine.example', net: { connected: true, addr: '100.64.0.1' } }
+const refusal = (status, message) => Promise.reject(Object.assign(new Error(String(status)), { response: { status, data: { success: false, message } } }))
 const member = fields => ({ role: 'member', master: null, member: { master_url: 'https://m.example', connected: true, since: '2026-11-02T10:00:00Z', last_error: '', ...fields } })
 
 let wrapper
@@ -192,6 +194,120 @@ describe('the Fleet settings', () => {
 		fleetApi.status.mockReturnValue(answer(member({ connected: false, last_error: 'refused by the master' })))
 		await open()
 		expect(wrapper.text()).toContain('Refused by the master')
+	})
+
+	it('shows the relay and the private-network address when master', async () => {
+		fleetApi.status.mockReturnValue(answer(RELAY_MASTER))
+		await open()
+		expect(wrapper.text()).toContain('Relay server: https://relay.mine.example')
+		expect(wrapper.text()).toContain('Address on the private network: 100.64.0.1')
+	})
+
+	it('shows connected/not connected for a member from net.connected', async () => {
+		fleetApi.status.mockReturnValue(answer({ ...member(), relay: 'https://relay.mine.example', net: { connected: true } }))
+		await open()
+		expect(wrapper.text()).toContain('Connected to the private network')
+		expect(wrapper.text()).not.toContain('Not connected to the private network')
+		wrapper.unmount()
+		fleetApi.status.mockReturnValue(answer({ ...member(), relay: 'https://relay.mine.example', net: { connected: false, error: '<b>tailscale down</b>' } }))
+		await open()
+		expect(wrapper.text()).toContain('Not connected to the private network: <b>tailscale down</b>')
+		expect(wrapper.find('.fleet-settings-modal b').exists()).toBe(false)
+		// no relay, no line about a private network
+		wrapper.unmount()
+		fleetApi.status.mockReturnValue(answer(member()))
+		await open()
+		expect(wrapper.text()).not.toContain('private network')
+	})
+
+	it('renders relay errors as text', async () => {
+		fleetApi.setMaster.mockImplementation(() => refusal(400, '<script>window.hacked = 1</script><img src=x onerror="window.hacked = 2">'))
+		await open()
+		await pick('master')
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(wrapper.text()).toContain('<script>window.hacked = 1</script>')
+		expect(wrapper.html()).toContain('&lt;script&gt;')
+		expect(wrapper.find('script').exists()).toBe(false)
+		expect(wrapper.find('img').exists()).toBe(false)
+		expect(window.hacked).toBeUndefined()
+	})
+
+	it('confirm text mentions the relay when one is set', async () => {
+		fleetApi.status.mockReturnValue(answer(RELAY_MASTER))
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		await open()
+		await button('Disable the master role').trigger('click')
+		await flushPromises()
+		expect(document.body.textContent).toContain('Disabling the master also deletes the fleet at the relay')
+		fleetApi.status.mockReturnValue(answer(NONE))
+		dialogButton('Disable').click()
+		await flushPromises()
+		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: false, address: 'https://m.example' })
+		// without a relay, the old warning only
+		wrapper.unmount()
+		document.body.innerHTML = ''
+		fleetApi.status.mockReturnValue(answer(MASTER))
+		await open()
+		await button('Disable the master role').trigger('click')
+		await flushPromises()
+		expect(document.body.textContent).toContain('The list of boxes is erased.')
+		expect(document.body.textContent).not.toContain('at the relay')
+	})
+
+	it('maps 409 other network to a readable message', async () => {
+		const tries = [
+			[409, 'this box is already in another private network', 'This box is already in another private network'],
+			[409, 'the relay refused: this fleet has reached its limit of boxes or unused join keys', 'The relay refused: the fleet is full'],
+			[429, 'the relay is busy, try again later', 'The relay is busy, try again later'],
+			[502, 'dial tcp: connection refused', 'Relay unreachable'],
+			[409, 'the relay rejected the credentials of this box', 'the relay rejected the credentials of this box'],
+		]
+		for (const [status, message, shown] of tries) {
+			fleetApi.setMaster.mockImplementation(() => refusal(status, message))
+			await open()
+			await pick('master')
+			await button('Enable').trigger('click')
+			await flushPromises()
+			expect(wrapper.text()).toContain(shown)
+			wrapper.unmount()
+		}
+		wrapper = null
+	})
+
+	it('changes the relay after a warning that the codes stop working', async () => {
+		fleetApi.status.mockReturnValue(answer(RELAY_MASTER))
+		fleetApi.setRelay.mockReturnValue(answer({}))
+		await open()
+		expect(field('relay').element.value).toBe('https://relay.mine.example')
+		await field('relay').setValue('http://other.example')
+		await button('Change the relay').trigger('click')
+		await flushPromises()
+		expect(wrapper.text()).toContain('The relay must start with https://')
+		await field('relay').setValue('https://other.example')
+		await button('Change the relay').trigger('click')
+		await flushPromises()
+		expect(fleetApi.setRelay).not.toHaveBeenCalled()
+		expect(document.body.textContent).toContain('The codes already given stop working: every box needs a new code.')
+		dialogButton('Change the relay').click()
+		await flushPromises()
+		expect(fleetApi.setRelay).toHaveBeenCalledWith('https://other.example')
+	})
+
+	it('keeps the buttons disabled while the relay works', async () => {
+		let done
+		fleetApi.setMaster.mockImplementation(() => new Promise((resolve) => {
+			done = resolve
+		}))
+		await open()
+		await pick('master')
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(button('Enable').attributes('disabled')).toBeDefined()
+		await button('Enable').trigger('click')
+		expect(fleetApi.setMaster).toHaveBeenCalledTimes(1)
+		done(answer({}))
+		await flushPromises()
 	})
 
 	it('says so when the core cannot be read, and shows nothing to change', async () => {

@@ -22,11 +22,22 @@
 				<template v-if="role === 'master'">
 					<template v-if="view.role === 'master'">
 						<p class="mb-1">{{ $t('Address the boxes join it at') }}: <span class="has-text-weight-medium">{{ view.master.address }}</span></p>
+						<template v-if="view.relay">
+							<p class="mb-1">{{ $t('Relay server') }}: <span class="has-text-weight-medium">{{ view.relay }}</span></p>
+							<p v-if="view.net?.addr" class="mb-1">{{ $t('Address on the private network') }}: <span class="has-text-weight-medium">{{ view.net.addr }}</span></p>
+						</template>
 						<p class="mb-3">{{ $t('{count} boxes in the fleet', { count: boxes.length }) }}</p>
 						<div class="buttons">
 							<b-button rounded size="is-small" type="is-primary" @click="openPage">{{ $t('Open the Fleet page') }}</b-button>
-							<b-button outlined rounded size="is-small" type="is-danger" @click="confirmDisable">{{ $t('Disable the master role') }}</b-button>
+							<b-button :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmDisable">{{ $t('Disable the master role') }}</b-button>
 						</div>
+						<!-- the same relay again renews a fleet the relay lost -->
+						<template v-if="view.relay">
+							<b-field :label="$t('Relay server')">
+								<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
+							</b-field>
+							<b-button :disabled="busy" :loading="busy" outlined rounded size="is-small" @click="confirmRelay">{{ $t('Change the relay') }}</b-button>
+						</template>
 					</template>
 					<template v-else>
 						<b-field :label="$t('Relay server')" :message="$t('The official ReCasaOS relay unless you run your own')">
@@ -45,8 +56,9 @@
 				<template v-else-if="role === 'member'">
 					<template v-if="view.role === 'member'">
 						<p class="mb-1">{{ $t('Master: {url}', { url: view.member.master_url }) }}</p>
-						<p class="mb-3">{{ memberStatus }}</p>
-						<b-button outlined rounded size="is-small" type="is-danger" @click="confirmLeave">{{ $t('Leave the fleet') }}</b-button>
+						<p :class="netStatus ? 'mb-1' : 'mb-3'">{{ memberStatus }}</p>
+						<p v-if="netStatus" class="mb-3">{{ netStatus }}</p>
+						<b-button :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmLeave">{{ $t('Leave the fleet') }}</b-button>
 					</template>
 					<template v-else>
 						<b-field :label="$t('Paste the enrolment code')">
@@ -109,6 +121,17 @@ export default {
 			}
 			return REFUSED.test(m.last_error) ? this.$t('Refused by the master') : this.$t('Not connected: {error}', { error: m.last_error })
 		},
+		// a member over a relay: its place on the private network, apart from its tunnel to the master
+		netStatus() {
+			const net = this.view?.relay && this.view.net
+			if (!net) {
+				return ''
+			}
+			if (net.connected) {
+				return this.$t('Connected to the private network')
+			}
+			return net.error ? this.$t('Not connected to the private network: {error}', { error: net.error }) : this.$t('Not connected to the private network')
+		},
 	},
 	mounted() {
 		this.load()
@@ -140,10 +163,28 @@ export default {
 				this.code = ''
 				await this.changed()
 			} catch (e) {
-				this.error = e?.response?.data?.message || e?.message || this.$t('Could not be read')
+				this.error = this.readable(e)
 			} finally {
 				this.busy = false
 			}
+		},
+		// the core's refusal, in the owner's language where the relay is the cause; shown as text, never as HTML
+		readable(e) {
+			const status = e?.response?.status
+			const message = e?.response?.data?.message
+			if (status === 429) {
+				return this.$t('The relay is busy, try again later')
+			}
+			if (status === 502) {
+				return this.$t('Relay unreachable')
+			}
+			if (status === 409 && /another private network/i.test(message)) {
+				return this.$t('This box is already in another private network')
+			}
+			if (status === 409 && /limit of boxes/i.test(message)) {
+				return this.$t('The relay refused: the fleet is full')
+			}
+			return (typeof message === 'string' && message) || e?.message || this.$t('Could not be read')
 		},
 		enable() {
 			// an address typed under advanced settings is the old flow, without a relay (what an older core takes)
@@ -166,13 +207,31 @@ export default {
 		confirmDisable() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Disable the master role?'),
-				message: this.$t('The list of boxes is erased.'),
+				message: this.view?.relay ? this.$t('Disabling the master also deletes the fleet at the relay') : this.$t('The list of boxes is erased.'),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Disable'),
 				cancelText: this.$t('Cancel'),
 				focusOn: 'cancel',
 				onConfirm: () => this.run(() => fleetApi.setMaster({ enabled: false, address: this.address })),
+			})
+		},
+		confirmRelay() {
+			const relay = this.relay.trim()
+			if (!HTTPS.test(relay)) {
+				this.error = this.$t('The relay must start with https://')
+				return
+			}
+			this.error = ''
+			this.$buefy.dialog.confirm({
+				title: this.$t('Change the relay?'),
+				message: this.$t('The codes already given stop working: every box needs a new code.'),
+				type: 'is-warning',
+				hasIcon: true,
+				confirmText: this.$t('Change the relay'),
+				cancelText: this.$t('Cancel'),
+				focusOn: 'cancel',
+				onConfirm: () => this.run(() => fleetApi.setRelay(relay)),
 			})
 		},
 		join() {
