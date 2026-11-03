@@ -346,6 +346,7 @@ describe('app section VM tiles', () => {
 	function section(names, vms = []) {
 		const vm = {
 			appList: names.map(name => ({ name })),
+			filter: 'all',
 			vms,
 			$api: { users: { setCustomStorage: vi.fn() } },
 			$buefy: { toast: { open: vi.fn() } },
@@ -640,7 +641,7 @@ describe('app section with the system row (beta dashboard)', () => {
 	const systemApps = AppSection.computed.systemApps
 
 	it('draws the built-ins in their own row and keeps them out of the grid', () => {
-		const vm = { systemFirst: true, vms: [], appList: [store, jellyfin, files, nextcloud] }
+		const vm = { systemFirst: true, filter: 'all', vms: [], appList: [store, jellyfin, files, nextcloud] }
 		vm.systemApps = systemApps.call(vm)
 
 		expect(vm.systemApps).toEqual([store, files])
@@ -648,15 +649,38 @@ describe('app section with the system row (beta dashboard)', () => {
 	})
 
 	it('puts the built-ins back first after a drag, so the saved order keeps them', () => {
-		const vm = { systemFirst: true, vms: [], appList: [store, jellyfin, files, nextcloud] }
+		const vm = { systemFirst: true, filter: 'all', vms: [], appList: [store, jellyfin, files, nextcloud] }
 
 		set.call(vm, [nextcloud, jellyfin])
 
 		expect(vm.appList).toEqual([store, files, nextcloud, jellyfin])
 	})
 
+	it('filters the grid by state, counts each filter, and never saves an order from a filtered grid', () => {
+		const running = { name: 'jellyfin', app_type: 'v2app', status: 'running', update_available: true }
+		const stopped = { name: 'nextcloud', app_type: 'v2app', status: 'exited' }
+		const link = { name: 'blog', app_type: 'LinkApp' }
+		const vm = { systemFirst: true, filter: 'stopped', vms: [], appList: [store, running, stopped, link] }
+		vm.$t = key => key
+		const names = () => get.call(vm).map(app => app.name)
+
+		expect(names()).toEqual(['nextcloud'])
+		vm.filter = 'running'
+		expect(names()).toEqual(['jellyfin'])
+		vm.filter = 'updates'
+		expect(names()).toEqual(['jellyfin'])
+
+		expect(AppSection.computed.filterOptions.call(vm).map(option => [option.id, option.count]))
+			.toEqual([['all', 3], ['running', 1], ['stopped', 1], ['updates', 1]])
+
+		// the drag of a filtered grid hands back some of the apps: the list stays whole
+		set.call(vm, [running])
+		expect(vm.appList).toEqual([store, running, stopped, link])
+		expect(AppSection.computed.dragOptions.call(vm).disabled).toBe(true)
+	})
+
 	it('changes nothing on the classic dashboard', () => {
-		const vm = { systemFirst: false, vms: [], appList: [store, jellyfin, files, nextcloud] }
+		const vm = { systemFirst: false, filter: 'all', vms: [], appList: [store, jellyfin, files, nextcloud] }
 		vm.systemApps = systemApps.call(vm)
 
 		expect(vm.systemApps).toEqual([])

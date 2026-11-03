@@ -9,9 +9,9 @@
 					title="System">
 				</app-section-title-tip>
 			</div>
-			<div class="app-list contextmenu-canvas mb-5">
+			<div :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas mb-5">
 				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" class="handle">
-					<app-card :item="item"
+					<app-card :compact="compact" :item="item"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -26,6 +26,18 @@
 				label="Drag icons to sort."
 				title="Apps">
 			</app-section-title-tip>
+
+			<!-- beta dashboard: which apps to show; the order can only be changed on the whole list -->
+			<div v-if="compact" class="filters mr-3" role="group">
+				<button v-for="option in filterOptions"
+					:key="option.id"
+					:class="{ 'is-active': filter === option.id }"
+					class="filter-chip"
+					type="button"
+					@click="filter = option.id">
+					{{ option.label }} <span class="filter-count">{{ option.count }}</span>
+				</button>
+			</div>
 
 			<b-dropdown animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
 				<template #trigger>
@@ -62,6 +74,7 @@
 			v-model="gridList"
 			:draggable="draggable"
 			:move="checkMove"
+			:class="{ 'is-compact': compact }"
 			class="app-list contextmenu-canvas"
 			item-key="name"
 			tag="div"
@@ -72,7 +85,7 @@
 			<template #item="{ element: item }">
 				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
-					<app-card v-else :item="item"
+					<app-card v-else :compact="compact" :item="item"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -80,7 +93,7 @@
 			</template>
 			<!-- App Icon Card End -->
 		</draggable>
-		<div v-else class="app-list contextmenu-canvas">
+		<div v-else :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas">
 			<div v-for="index in skCount" :id="`app-${index}`" :key="`app-${index}`" class="handle">
 				<app-card-skeleton :index="index"></app-card-skeleton>
 			</div>
@@ -100,9 +113,9 @@
 					</app-section-title-tip>
 				</div>
 
-				<div class="app-list contextmenu-canvas">
+				<div :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas">
 					<div v-for="item in group.items" :id="`app-${item.name}`" :key="`app-${item.name}`" class="handle">
-						<app-card :is-casa="false"
+						<app-card :compact="compact" :is-casa="false"
 							:item="item"
 							@configApp="showConfigPanel"
 							@importApp="showContainerPanel"
@@ -179,6 +192,14 @@ const builtInApplications = [
 
 const isSystemApp = app => app.app_type === 'system'
 
+// the compact grid's filters; a link app has no state to be running or stopped in
+const FILTERS = {
+	all: () => true,
+	running: app => app.status === 'running',
+	stopped: app => app.status !== 'running' && app.app_type !== 'LinkApp',
+	updates: app => Boolean(app.update_available),
+}
+
 const orderConfig = 'app_order'
 
 // how often the VM tiles read the VMs again, while the tab is shown
@@ -223,6 +244,11 @@ export default {
 			type: Boolean,
 			default: false,
 		},
+		// beta dashboard: one row per app (icon, name, state) and a filter by state
+		compact: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	data() {
 		return {
@@ -247,6 +273,8 @@ export default {
 			isCheckingImages: false,
 			// the VMs of the tiles, by title
 			vms: [],
+			// compact grid: 'all' | 'running' | 'stopped' | 'updates'
+			filter: 'all',
 		}
 	},
 	computed: {
@@ -254,7 +282,8 @@ export default {
 			return {
 				animation: 300,
 				group: 'description',
-				disabled: false,
+				// a filtered grid lacks apps: dragging in it would save an order without them
+				disabled: this.filter !== 'all',
 				ghostClass: 'ghost',
 				// on a touch screen a swipe scrolls the grid: only a long press starts a drag; a mouse drags at once
 				delay: 300,
@@ -274,6 +303,9 @@ export default {
 		gridList: {
 			get() {
 				const apps = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
+				if (this.filter !== 'all') {
+					return apps.filter(FILTERS[this.filter])
+				}
 				const at = apps.findIndex(app => app.name === VM_APP_NAME)
 				if (at < 0 || !this.vms.length) {
 					return apps
@@ -282,12 +314,24 @@ export default {
 				return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
 			},
 			set(list) {
+				if (this.filter !== 'all') {
+					return
+				}
 				const system = this.systemFirst ? this.appList.filter(isSystemApp) : []
 				this.appList = concat(system, list.filter(item => !item.vmTile))
 			},
 		},
 		systemApps() {
 			return this.systemFirst ? this.appList.filter(isSystemApp) : []
+		},
+		filterOptions() {
+			const apps = this.appList.filter(app => !isSystemApp(app))
+			const labels = { all: 'All', running: 'Running', stopped: 'Stopped', updates: 'Updates' }
+			return Object.keys(FILTERS).map(id => ({
+				id,
+				label: this.$t(labels[id]),
+				count: apps.filter(FILTERS[id]).length,
+			}))
 		},
 		hasVmCard() {
 			return this.appList.some(app => app.name === VM_APP_NAME)
@@ -954,6 +998,40 @@ export default {
 
 	@include fullhd {
 		grid-template-columns: repeat(5, minmax(0, 1fr));
+	}
+
+	// beta dashboard: as many rows' worth of columns as fit
+	&.is-compact {
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: 0.75rem;
+	}
+}
+
+.filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+}
+
+.filter-chip {
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.75rem;
+	line-height: 1.25rem;
+	padding: 0.125rem 0.625rem;
+
+	&.is-active {
+		background: rgba(255, 255, 255, 0.9);
+		border-color: transparent;
+		color: #1a1f24;
+	}
+
+	.filter-count {
+		opacity: 0.7;
 	}
 }
 </style>

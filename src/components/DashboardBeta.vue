@@ -9,20 +9,20 @@
 			</b-button>
 		</div>
 
-		<!-- Health strip: what the side bar widgets say, in one row, and what needs a person -->
-		<HealthStrip />
-
-		<section>
-			<transition name="fade">
-				<SearchBar v-if="searchbarShow" />
-			</transition>
-		</section>
-		<section>
-			<CoreService />
-		</section>
-		<section>
-			<AppSection system-first />
-		</section>
+		<!-- The health strip and the side panels (what needs a person, storage, backups); the apps go in its main column -->
+		<HealthStrip>
+			<section>
+				<transition name="fade">
+					<SearchBar v-if="searchbarShow" />
+				</transition>
+			</section>
+			<section>
+				<CoreService />
+			</section>
+			<section>
+				<AppSection compact system-first />
+			</section>
+		</HealthStrip>
 	</div>
 </template>
 

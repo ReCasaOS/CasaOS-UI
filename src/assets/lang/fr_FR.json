@@ -2733,5 +2733,8 @@
   "Needs attention": "À traiter",
   "The system drive reports a failure": "Le disque système signale une défaillance",
   "The last backup failed": "La dernière sauvegarde a échoué",
-  "No backup yet": "Aucune sauvegarde pour l’instant"
+  "No backup yet": "Aucune sauvegarde pour l’instant",
+  "System drive": "Disque système",
+  "All good": "Rien à signaler",
+  "All": "Toutes"
 }

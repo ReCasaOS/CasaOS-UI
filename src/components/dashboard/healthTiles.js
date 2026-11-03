@@ -36,10 +36,17 @@ export function backupTile(runs) {
 	const own = (Array.isArray(runs) ? runs : []).filter(run => !run.restore)
 	const last = own[0]
 	if (!last) {
-		return { status: 'none', at: '', error: '' }
+		return { status: 'none', at: '', destination: '', error: '' }
 	}
-	const lastOk = own.find(run => !run.error)
-	return { status: last.error ? 'failed' : 'ok', at: (lastOk || last).started_at, error: last.error || '' }
+	const lastOk = own.find(run => !run.error) || last
+	return { status: last.error ? 'failed' : 'ok', at: lastOk.started_at, destination: lastOk.destination || '', error: last.error || '' }
+}
+
+// A USB disk of the utilization payload: `used` where the box gives it, size - avail
+// where it does not (the Storage widget reads it the same way)
+export function usbPercent(disk) {
+	const used = Number(disk.used)
+	return percent(Number.isFinite(used) && used >= 0 ? used : Number(disk.size) - Number(disk.avail), disk.size)
 }
 
 const LEVELS = { 'is-success': 'ok', 'is-info': 'info', 'is-warning': 'warning', 'is-danger': 'danger' }
