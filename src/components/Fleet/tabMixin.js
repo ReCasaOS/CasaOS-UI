@@ -71,12 +71,17 @@ export default {
 		sameRow(a, b) {
 			return a.key === b.key
 		},
-		// One call per row, a result per row; then the list is read again.
+		// what an empty cell says: the source failed on a box that is there, or nothing to say
+		blank(row, source) {
+			return row.online && row.errors.includes(source) ? this.$t('Could not be read') : '—'
+		},
+		// One call per row, a result per row; then the list is read again. Resolves to the results, by key.
 		async act(call, rows = this.selected) {
 			this.results = Object.fromEntries(rows.map(r => [r.key, { state: 'running', message: '' }]))
 			const done = await runBulk(rows, call)
 			this.results = { ...this.results, ...Object.fromEntries(done) }
 			this.poller.now()
+			return done
 		},
 	},
 }

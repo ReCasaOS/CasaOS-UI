@@ -2758,5 +2758,22 @@
   "New name": "New name",
   "The fleet could not be read.": "The fleet could not be read.",
   "Applications": "Applications",
-  "Update ready": "Update ready"
+  "Update ready": "Update ready",
+  "ReCasaOS": "ReCasaOS",
+  "Automatic updates": "Automatic updates",
+  "Update the master from its own settings": "Update the master from its own settings",
+  "Update ReCasaOS": "Update ReCasaOS",
+  "Update apps": "Update apps",
+  "Update ReCasaOS on {count} boxes?": "Update ReCasaOS on {count} boxes?",
+  "Each box goes offline for a few minutes and comes back with its new version.": "Each box goes offline for a few minutes and comes back with its new version.",
+  "Update the system packages on {count} boxes?": "Update the system packages on {count} boxes?",
+  "Docker is left out, as on a box.": "Docker is left out, as on a box.",
+  "Update the apps on {count} boxes?": "Update the apps on {count} boxes?",
+  "{count} packages pending": "{count} packages pending",
+  "{n} app to update": "{n} app to update",
+  "{n} apps to update": "{n} apps to update",
+  "Force off {count} virtual machines?": "Force off {count} virtual machines?",
+  "vCPUs": "vCPUs",
+  "{n} MiB": "{n} MiB",
+  "OS": "OS"
 }

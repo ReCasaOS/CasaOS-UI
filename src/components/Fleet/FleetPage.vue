@@ -19,10 +19,10 @@
 					<containers-tab v-if="tab === 'containers'" />
 				</b-tab-item>
 				<b-tab-item :label="$t('Virtual Machines')" value="vms">
-					<vms-tab v-if="tab === 'vms' && tabs.vms" />
+					<vms-tab v-if="tab === 'vms'" />
 				</b-tab-item>
 				<b-tab-item :label="$t('Updates')" value="updates">
-					<updates-tab v-if="tab === 'updates' && tabs.updates" />
+					<updates-tab v-if="tab === 'updates'" />
 				</b-tab-item>
 			</b-tabs>
 		</section>
@@ -32,18 +32,16 @@
 <script>
 import OverviewTab from './OverviewTab.vue'
 import ContainersTab from './ContainersTab.vue'
-
-// the two tabs of the next step register here
-const TABS = {}
+import VmsTab from './VmsTab.vue'
+import UpdatesTab from './UpdatesTab.vue'
 
 export default {
 	name: 'FleetPage',
-	components: { OverviewTab, ContainersTab, ...TABS },
+	components: { OverviewTab, ContainersTab, VmsTab, UpdatesTab },
 	emits: ['close'],
 	data() {
 		return {
 			tab: 'overview',
-			tabs: { vms: 'VmsTab' in TABS, updates: 'UpdatesTab' in TABS },
 		}
 	},
 	mounted() {
@@ -63,6 +61,25 @@ export default {
 
 	:deep(.b-table .table) {
 		background: transparent;
+	}
+
+	// what every tab shares: its button bar, and the line it shows when the fleet cannot be read
+	:deep(.fleet-toolbar) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: center;
+		margin-bottom: 0.75rem;
+
+		.fleet-toolbar-gap {
+			flex-grow: 1;
+		}
+	}
+
+	:deep(.fleet-error) {
+		display: flex;
+		align-items: center;
+		padding: 1rem;
 	}
 }
 </style>

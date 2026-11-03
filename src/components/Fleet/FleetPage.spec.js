@@ -141,6 +141,38 @@ describe('the Fleet page', () => {
 		expect(wrapper.text()).toContain('The fleet could not be read.')
 	})
 
+	it('lists the VMs of the boxes that have the module and acts on them', async () => {
+		const vm = { id: 'vm-1', title: 'Debian', state: 'running', vcpus: 2, memory_mib: 2048, os: 'debian12' }
+		serve({ a: { '/v2/virt_management/vms': [vm] }, b: { '/v2/virt_management/vms': failure(404) } })
+		await mountPage()
+		await openTab('Virtual Machines')
+		expect(rows()).toHaveLength(1)
+		expect(rowOf('Debian').text()).toContain('2048 MiB')
+		expect(rowOf('Debian').text()).toContain('Running')
+		await rowOf('Debian').find('label.b-checkbox').trigger('click')
+		await toolbarButton('Restart').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v2/virt_management/vms/vm-1/reboot']])
+		expect(rowOf('Debian').find('.fleet-result').text()).toBe('Done')
+		await toolbarButton('Stop').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post').at(-1)).toEqual(['a', 'post', '/v2/virt_management/vms/vm-1/shutdown'])
+	})
+
+	it('asks before forcing a VM off', async () => {
+		serve({ a: { '/v2/virt_management/vms': [{ id: 'vm-1', title: 'Debian', state: 'running', vcpus: 2, memory_mib: 2048, os: '' }] } })
+		await mountPage()
+		await openTab('Virtual Machines')
+		await rowOf('Debian').find('label.b-checkbox').trigger('click')
+		await toolbarButton('Force off').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([])
+		expect(document.body.textContent).toContain('Force off 1 virtual machines?')
+		dialogButton('Force off').click()
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v2/virt_management/vms/vm-1/force-off']])
+	})
+
 	it('removes a box after confirming, and renames one', async () => {
 		fleetApi.removeBox.mockResolvedValue({})
 		fleetApi.renameBox.mockResolvedValue({})

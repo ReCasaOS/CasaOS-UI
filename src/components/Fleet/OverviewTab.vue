@@ -100,10 +100,6 @@ export default {
 		build(box, answers) {
 			return overviewRow(box, answers)
 		},
-		// what an empty cell says: the source failed on a box that is there, or nothing to say
-		blank(row, source) {
-			return row.online && row.errors.includes(source) ? this.$t('Could not be read') : '—'
-		},
 		supportOf(os) {
 			return SUPPORT_WORDS[os.support] || null
 		},
@@ -155,11 +151,5 @@ export default {
 	&.is-online {
 		background: #3dd26b;
 	}
-}
-
-.fleet-error {
-	display: flex;
-	align-items: center;
-	padding: 1rem;
 }
 </style>

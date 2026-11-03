@@ -113,23 +113,3 @@ export default {
 	},
 }
 </script>
-
-<style lang="scss" scoped>
-.fleet-toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
-	align-items: center;
-	margin-bottom: 0.75rem;
-
-	.fleet-toolbar-gap {
-		flex-grow: 1;
-	}
-}
-
-.fleet-error {
-	display: flex;
-	align-items: center;
-	padding: 1rem;
-}
-</style>
