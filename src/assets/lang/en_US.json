@@ -2816,5 +2816,6 @@
   "The box {name} is offline": "The box {name} is offline",
   "{online} of {total} boxes online": "{online} of {total} boxes online",
   "Data disk": "Data disk",
-  "Parity disk": "Parity disk"
+  "Parity disk": "Parity disk",
+  "Support ReCasaOS on Ko-fi": "Support ReCasaOS on Ko-fi"
 }

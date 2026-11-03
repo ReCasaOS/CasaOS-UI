@@ -9,6 +9,7 @@
 		<div class="brand-text ml-4">
 			<span class="intro-text">Made with ❤️ by ReCasaOS and YOU!</span>
 			<span class="upstream-text">Built on CasaOS by IceWhale</span>
+			<a class="kofi-link" href="https://ko-fi.com/recasaos" rel="noopener noreferrer" target="_blank">{{ $t('Support ReCasaOS on Ko-fi') }}</a>
 		</div>
 	</div>
 </template>
@@ -44,6 +45,19 @@ export default {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.kofi-link {
+		font-size: 0.75rem;
+		line-height: 1rem;
+		color: var(--casa-on-glass-dim);
+		white-space: nowrap;
+		width: fit-content;
+
+		&:hover {
+			color: inherit;
+			text-decoration: underline;
+		}
 	}
 
 	.upstream-text {
