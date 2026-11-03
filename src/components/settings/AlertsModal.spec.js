@@ -13,7 +13,7 @@ function view(fields = {}) {
 			{ id: 'a', name: 'Phone', service: 'ntfy', host: 'ntfy.sh' },
 			{ id: 'b', name: 'Mail', service: 'smtp', host: 'smtp.example.com' },
 		],
-		categories: { backups: true, disks: true, updates: true, apps: true },
+		categories: { backups: true, disks: true, updates: true, apps: true, fleet: true },
 		disk_threshold: 90,
 		last_failure: null,
 		...fields,
@@ -178,23 +178,31 @@ describe('the alerts dialog', () => {
 	it('shows the resources category only when the core sends that key, and sends it', async () => {
 		const setAlerts = answer({})
 		const wrapper = await open({
-			getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true, resources: true } })),
+			getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true, resources: true, fleet: true } })),
 			setAlerts,
 		})
 
-		expect(rows(wrapper)).toHaveLength(5)
+		expect(rows(wrapper)).toHaveLength(6)
 		expect(wrapper.vm.shownCategories.map(c => c.key)).toContain('resources')
 		expect(wrapper.vm.shownCategories.find(c => c.key === 'resources').label).toBe(RESOURCES)
 
 		await wrapper.vm.save({ categories: { ...wrapper.vm.view.categories, resources: false } })
-		expect(setAlerts).toHaveBeenLastCalledWith({ categories: { backups: true, disks: true, updates: true, apps: true, resources: false } })
+		expect(setAlerts).toHaveBeenLastCalledWith({ categories: { backups: true, disks: true, updates: true, apps: true, resources: false, fleet: true } })
 	})
 
 	it('shows no resources row for a core that does not know the category', async () => {
 		const wrapper = await open({})
 
-		expect(rows(wrapper)).toHaveLength(4)
+		expect(rows(wrapper)).toHaveLength(5)
 		expect(wrapper.vm.shownCategories.map(c => c.key)).not.toContain('resources')
+	})
+
+	it('lists the fleet category, labelled Fleet, only when the core knows it', async () => {
+		const wrapper = await open({})
+		expect(wrapper.vm.shownCategories.find(c => c.key === 'fleet').label).toBe('Fleet')
+		const older = await open({ getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true } })) })
+		expect(rows(older)).toHaveLength(4)
+		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('fleet')
 	})
 
 	it('sends a category or the threshold alone, and goes back when refused', async () => {
@@ -202,7 +210,7 @@ describe('the alerts dialog', () => {
 		const wrapper = await open({ setAlerts })
 
 		await wrapper.vm.save({ categories: { ...wrapper.vm.view.categories, apps: false } })
-		expect(setAlerts).toHaveBeenLastCalledWith({ categories: { backups: true, disks: true, updates: true, apps: false } })
+		expect(setAlerts).toHaveBeenLastCalledWith({ categories: { backups: true, disks: true, updates: true, apps: false, fleet: true } })
 
 		await wrapper.vm.save({ disk_threshold: 80 })
 		expect(setAlerts).toHaveBeenLastCalledWith({ disk_threshold: 80 })

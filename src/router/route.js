@@ -81,6 +81,16 @@ export default [
 		},
 	},
 	{
+		path: '/fleet',
+		name: 'Fleet',
+		hidden: true,
+		component: () => import('@/components/Fleet/FleetTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
 		path: '/launch',
 		name: 'AppLauncherCheck',
 		hidden: true,

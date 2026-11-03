@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AppLaunchModal from './AppLaunchModal.vue'
 
 const hasVMs = vi.hoisted(() => ({ value: false }))
+const isMaster = vi.hoisted(() => ({ value: false }))
+vi.mock('@/components/Fleet/entry', async importOriginal => ({
+	...await importOriginal(),
+	hasFleet: () => Promise.resolve(isMaster.value),
+}))
 vi.mock('@/components/VirtualMachines/entry', async importOriginal => ({
 	...await importOriginal(),
 	hasVirtualMachines: () => Promise.resolve(hasVMs.value),
@@ -27,6 +32,18 @@ async function open() {
 describe('the built-in apps of the App launching setting', () => {
 	beforeEach(() => {
 		hasVMs.value = false
+		isMaster.value = false
+	})
+
+	it('lists Fleet only where the core says master', async () => {
+		let wrapper = await open()
+		expect(wrapper.vm.builtins.map(b => b.title)).not.toContain('Fleet')
+		wrapper.unmount()
+		isMaster.value = true
+		wrapper = await open()
+		expect(wrapper.vm.builtins.map(b => b.id)).toContain('casaos:fleet')
+		expect(wrapper.vm.builtins.map(b => b.title)).toContain('Fleet')
+		wrapper.unmount()
 	})
 
 	it('lists Statistics, and no Virtual Machines without the module', async () => {

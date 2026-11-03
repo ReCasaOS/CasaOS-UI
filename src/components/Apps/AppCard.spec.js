@@ -7,6 +7,9 @@ import i18n from '@/plugins/i18n'
 import AppCard from '@/components/Apps/AppCard.vue'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import { alertBadge } from '@/components/Stats/alertBadge'
+import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
+
+vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
@@ -603,5 +606,13 @@ describe('the system app marker', () => {
 
 		expect(marker(wrapper).exists()).toBe(false)
 		wrapper.unmount()
+	})
+})
+
+describe('the Fleet card', () => {
+	it('opens the Fleet page from its card', () => {
+		const vm = { $buefy: { modal: { open: vi.fn() } }, $store: { state: { appLaunchInIframe: true, appLaunchExceptions: [] } } }
+		AppCard.methods.openSystemApps.call(vm, { name: FLEET_APP_NAME, app_type: 'system' })
+		expect(openFleet).toHaveBeenCalledWith(vm.$buefy, vm.$store.state)
 	})
 })
