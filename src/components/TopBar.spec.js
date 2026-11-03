@@ -258,7 +258,7 @@ describe('the automatic update row', () => {
 
 		expect(block).toMatch(/setAutoUpdate\(\{ window_start: \$event \}\)/)
 		expect(block).toMatch(/setAutoUpdate\(\{ window_end: \$event \}\)/)
-		expect(block).toContain('New releases install at night, two days after they come out, never during a backup or an app operation.')
+		expect(block).toContain('New releases install at night, one day after they come out, never during a backup or an app operation.')
 		expect(block).toContain('{{ autoUpdateStateText }}')
 	})
 
@@ -342,7 +342,7 @@ describe('the automatic update row', () => {
 		'Update automatically',
 		'Between',
 		'and',
-		'New releases install at night, two days after they come out, never during a backup or an app operation.',
+		'New releases install at night, one day after they come out, never during a backup or an app operation.',
 		'Up to date',
 		'{version} will be installed after {date}',
 		'Updating…',
