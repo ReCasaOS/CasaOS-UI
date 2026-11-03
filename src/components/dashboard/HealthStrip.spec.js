@@ -10,16 +10,18 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], snapraid, emit = vi.fn() } = {}) {
+function strip({ runs = [], snapraid, fleet, emit = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
-				$t: (key, params) => (params ? key.replace('{name}', params.name) : key),
+				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
 				$store: { state: { hardwareInfo } },
 				$EventBus: { $emit: emit },
 				$api: {
 					backup: { getRuns: () => Promise.resolve({ data: { data: runs } }) },
 					disks: { snapraid: snapraid || (() => Promise.reject(new Error('404'))) },
+					// absent on a core that predates the fleet: the panel then has nothing to ask
+					...(fleet ? { fleet: { status: fleet } } : {}),
 				},
 			},
 		},
@@ -145,5 +147,40 @@ describe('health strip', () => {
 		wrapper.unmount()
 		vi.advanceTimersByTime(5 * 60 * 1000)
 		expect(getRuns).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('health strip fleet panel', () => {
+	const answer = data => () => Promise.resolve({ data: { data } })
+	const master = boxes => answer({ role: 'master', master: { address: 'https://home.example', boxes } })
+	const home = { id: 'a', name: 'Home', online: true, last_seen: '2026-11-03T10:00:00Z' }
+	const cabin = { id: 'b', name: 'Cabin', online: false, last_seen: '2020-01-01T00:00:00Z' }
+	const fresh = { id: 'c', name: 'Shed', online: false, last_seen: new Date().toISOString() }
+	const nobody = { id: 'd', name: 'New', online: false }
+
+	it('counts the boxes of a master that are online and says where each one stands', async () => {
+		const wrapper = strip({ fleet: master([home, cabin, nobody]) })
+		await settle()
+
+		const panel = wrapper.find('.fleet')
+		expect(panel.text()).toContain('1 of 3 boxes online')
+		const rows = panel.findAll('li').map(li => li.text())
+		expect(rows).toEqual(['HomeOnline', 'CabinOffline', 'NewNever connected'])
+	})
+
+	it('shows no panel on a box that is not a master, on an old core, or when the call fails', async () => {
+		for (const fleet of [answer({ role: 'none' }), answer({ role: 'member', member: { connected: true } }), master([]), () => Promise.reject(new Error('404')), undefined]) {
+			const wrapper = strip({ fleet })
+			await settle()
+			expect(wrapper.find('.fleet').exists()).toBe(false)
+		}
+	})
+
+	it('puts a box that has been gone for a while in the attention list, not one that just dropped or never came', async () => {
+		const wrapper = strip({ fleet: master([home, cabin, fresh, nobody]) })
+		await settle()
+
+		const lines = wrapper.findAll('.attention li').map(li => li.text())
+		expect(lines).toEqual(['The box Cabin is offline'])
 	})
 })

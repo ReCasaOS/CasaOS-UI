@@ -2812,5 +2812,7 @@
   "New code for {name}?": "New code for {name}?",
   "Its current code stops working: the box must be enrolled again with the new one.": "Its current code stops working: the box must be enrolled again with the new one.",
   "Not supported: {reason}": "Not supported: {reason}",
-  "Not supported here": "Not supported here"
+  "Not supported here": "Not supported here",
+  "The box {name} is offline": "The box {name} is offline",
+  "{online} of {total} boxes online": "{online} of {total} boxes online"
 }

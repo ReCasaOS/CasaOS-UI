@@ -2815,5 +2815,7 @@
   "New code for {name}?": "Nouveau code pour {name} ?",
   "Its current code stops working: the box must be enrolled again with the new one.": "Son code actuel cesse de fonctionner : la box doit être enrôlée de nouveau avec le nouveau.",
   "Not supported: {reason}": "Non pris en charge : {reason}",
-  "Not supported here": "Non pris en charge ici"
+  "Not supported here": "Non pris en charge ici",
+  "The box {name} is offline": "La box {name} est hors ligne",
+  "{online} of {total} boxes online": "{online} box sur {total} en ligne"
 }

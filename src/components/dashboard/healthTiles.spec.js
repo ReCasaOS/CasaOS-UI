@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, backupTile, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
+import { attentionItems, backupTile, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
 
 const t = key => key
 
@@ -107,5 +107,58 @@ describe('attentionItems', () => {
 		const working = { configured: true, job: { action: 'sync', percent: 40 }, last: {} }
 
 		expect(attentionItems({ ...healthy, snapraid: working }, t)).toEqual([])
+	})
+})
+
+describe('fleetPanel', () => {
+	const boxes = [
+		{ id: 'a', name: 'Home', online: true, last_seen: '2026-11-03T10:00:00Z' },
+		{ id: 'b', name: 'Cabin', online: false, last_seen: '2026-11-03T08:00:00Z' },
+		{ id: 'c', name: 'New', online: false },
+	]
+
+	it('is the master’s: a plain box, a member and a core with no fleet have none', () => {
+		expect(fleetPanel(undefined)).toBeNull()
+		expect(fleetPanel({ role: 'none' })).toBeNull()
+		expect(fleetPanel({ role: 'member', member: { connected: true } })).toBeNull()
+	})
+
+	it('counts the boxes online, and tells a box that went from one that never came', () => {
+		const panel = fleetPanel({ role: 'master', master: { boxes } })
+
+		expect(panel).toMatchObject({ total: 3, online: 1 })
+		expect(panel.boxes.map(box => [box.name, box.state])).toEqual([['Home', 'online'], ['Cabin', 'offline'], ['New', 'never']])
+	})
+
+	it('is an empty fleet for a master with no box yet', () => {
+		expect(fleetPanel({ role: 'master', master: { boxes: [] } })).toMatchObject({ total: 0, online: 0, boxes: [] })
+	})
+})
+
+describe('attentionItems and the fleet', () => {
+	const tp = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, name) => params[name])
+	const healthy = { health: 'passed', snapraid: null, backup: { status: 'ok' } }
+	const fleet = {
+		role: 'master',
+		master: {
+			boxes: [
+				{ id: 'a', name: 'Home', online: true, last_seen: '2026-11-03T10:00:00Z' },
+				{ id: 'b', name: 'Cabin', online: false, last_seen: '2026-11-03T08:00:00Z' },
+				{ id: 'c', name: 'Shed', online: false, last_seen: '2026-11-03T09:55:00Z' },
+				{ id: 'd', name: 'New', online: false },
+			],
+		},
+	}
+	const now = Date.parse('2026-11-03T10:00:00Z')
+
+	it('names a box gone for ten minutes, and not one that is online, back for a moment or yet to come', () => {
+		const items = attentionItems({ ...healthy, fleet }, tp, now)
+
+		expect(items).toEqual([{ key: 'fleet_b', level: 'warning', text: 'The box Cabin is offline' }])
+	})
+
+	it('says nothing of a fleet when the box is not a master', () => {
+		expect(attentionItems({ ...healthy, fleet: { role: 'none' } }, tp, now)).toEqual([])
+		expect(attentionItems({ ...healthy, fleet: null }, tp, now)).toEqual([])
 	})
 })

@@ -62,7 +62,25 @@ export function snapraidTile(state, t) {
 
 // What needs a person, worst first. `health` is the system drive's SMART answer
 // ('passed' | 'failed' | 'unavailable'): no SMART data is not a failure.
-export function attentionItems({ health, snapraid, backup }, t) {
+// The fleet panel of a master: the boxes, each one online, gone (seen before) or never come (its code may be
+// on its way). Null on a box that is not a master, or on a core that has no fleet.
+export function fleetPanel(status) {
+	if (status?.role !== 'master') {
+		return null
+	}
+	const boxes = (status.master?.boxes || []).map(box => ({
+		key: box.id,
+		name: box.name,
+		state: box.online ? 'online' : (box.last_seen ? 'offline' : 'never'),
+		lastSeen: box.last_seen,
+	}))
+	return { total: boxes.length, online: boxes.filter(box => box.state === 'online').length, boxes }
+}
+
+// the core raises its own alert for a box after as long
+const FLEET_GONE_MS = 10 * 60 * 1000
+
+export function attentionItems({ health, snapraid, backup, fleet }, t, now = Date.now()) {
 	const items = []
 	if (health === 'failed') {
 		items.push({ key: 'disk', level: 'danger', text: t('The system drive reports a failure') })
@@ -73,6 +91,11 @@ export function attentionItems({ health, snapraid, backup }, t) {
 	}
 	if (backup && backup.status === 'failed') {
 		items.push({ key: 'backup', level: 'danger', text: t('The last backup failed') })
+	}
+	for (const box of fleetPanel(fleet)?.boxes || []) {
+		if (box.state === 'offline' && now - Date.parse(box.lastSeen) >= FLEET_GONE_MS) {
+			items.push({ key: `fleet_${box.key}`, level: 'warning', text: t('The box {name} is offline', { name: box.name }) })
+		}
 	}
 	return items.sort((a, b) => (a.level === 'danger' ? 0 : 1) - (b.level === 'danger' ? 0 : 1))
 }
