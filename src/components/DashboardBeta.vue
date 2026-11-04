@@ -4,13 +4,17 @@
 		<div class="beta-bar is-flex is-align-items-center mb-4 ml-2">
 			<b-tag rounded type="is-dark">{{ $t('Beta') }}</b-tag>
 			<span class="beta-title has-text-grey-100">{{ $t('New dashboard (beta)') }}</span>
+			<button :aria-label="bellLabel" class="beta-bell" type="button" @click="$refs.strip.showAttention()">
+				<b-icon icon="bell-outline" size="is-20" />
+				<span v-if="attentionCount > 0" class="beta-bell-count">{{ attentionCount }}</span>
+			</button>
 			<b-button class="beta-leave" rounded size="is-small" type="is-dark" @click="$emit('leave')">
 				{{ $t('Back to the classic dashboard') }}
 			</b-button>
 		</div>
 
 		<!-- The health strip and the side panels (what needs a person, storage, backups); the apps go in its main column -->
-		<HealthStrip>
+		<HealthStrip ref="strip" @attention="attentionCount = $event">
 			<section>
 				<transition name="fade">
 					<SearchBar v-if="searchbarShow" />
@@ -45,7 +49,13 @@ export default {
 		BetaTabBar,
 	},
 	emits: ['leave'],
+	data() {
+		return { attentionCount: 0 }
+	},
 	computed: {
+		bellLabel() {
+			return this.attentionCount > 0 ? this.$t('Needs attention ({count})', { count: this.attentionCount }) : this.$t('Needs attention')
+		},
 		searchbarShow() {
 			return this.$store.state.searchEngineSwitch
 		},
@@ -75,5 +85,41 @@ export default {
 
 .beta-leave {
 	flex-shrink: 0;
+}
+
+// the bell of the proposal: the number of things that need a person, on the accent
+.beta-bell {
+	position: relative;
+	flex-shrink: 0;
+	width: 2.25rem;
+	height: 2.25rem;
+	border: 0;
+	border-radius: 0.75rem;
+	background: transparent;
+	color: #f1f5f9;
+	cursor: pointer;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	&:focus-visible {
+		outline: 2px solid #fff;
+	}
+}
+
+.beta-bell-count {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 1.125rem;
+	height: 1.125rem;
+	padding: 0 0.25rem;
+	border-radius: 0.5625rem;
+	background: #3b82f6;
+	color: #fff;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	line-height: 1.125rem;
 }
 </style>

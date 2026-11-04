@@ -2835,5 +2835,6 @@
   "Available update": "Mise à jour",
   "Home": "Accueil",
   "My apps": "Apps",
-  "Main navigation": "Navigation principale"
+  "Main navigation": "Navigation principale",
+  "Needs attention ({count})": "À traiter ({count})"
 }

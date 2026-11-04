@@ -284,3 +284,23 @@ describe('health strip opens the dialogs behind its panels', () => {
 		expect(open).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('health strip and the bell of the beta bar', () => {
+	it('says how many things need a person, again when that changes', async () => {
+		const wrapper = strip({ runs: [{ started_at: '2026-11-03T03:00:00Z', error: 'no route to host' }] })
+		await settle()
+
+		expect(wrapper.emitted('attention').map(args => args[0])).toEqual([0, 1])
+	})
+
+	it('brings the attention panel into view and focuses it', () => {
+		const wrapper = strip()
+		const panel = wrapper.find('.attention').element
+		panel.scrollIntoView = vi.fn()
+
+		wrapper.vm.showAttention()
+
+		expect(panel.scrollIntoView).toHaveBeenCalledTimes(1)
+		expect(document.activeElement === panel || panel.tabIndex === -1).toBe(true)
+	})
+})

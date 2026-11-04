@@ -25,7 +25,7 @@
 
 		<div class="beta-body">
 			<aside class="beta-aside">
-				<div class="widget has-text-grey-100 panel attention">
+				<div ref="attentionPanel" class="widget has-text-grey-100 panel attention" tabindex="-1">
 					<div class="blur-background"></div>
 					<div class="widget-content">
 						<div class="tile-label">{{ $t('Needs attention') }}</div>
@@ -118,6 +118,7 @@ const SLOW_REFRESH = 60 * 1000
 export default {
 	name: 'HealthStrip',
 	mixins: [mixin],
+	emits: ['attention'],
 	data() {
 		const info = this.$store.state.hardwareInfo || {}
 		return {
@@ -235,6 +236,15 @@ export default {
 			return tiles
 		},
 	},
+	watch: {
+		// the bell of the beta bar counts them
+		attention: {
+			immediate: true,
+			handler(items) {
+				this.$emit('attention', items.length)
+			},
+		},
+	},
 	mounted() {
 		this.refreshSlow()
 		this.timer = setInterval(this.refreshSlow, SLOW_REFRESH)
@@ -278,6 +288,13 @@ export default {
 			} else {
 				this.openStorage()
 			}
+		},
+
+		// the bell of the beta bar: brings the list into view, whatever the width (on a phone it is under the apps)
+		showAttention() {
+			const panel = this.$refs.attentionPanel
+			panel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+			panel.focus({ preventScroll: true })
 		},
 
 		openFleetPage() {
@@ -600,6 +617,10 @@ export default {
 		outline: 2px solid #fff;
 		outline-offset: 2px;
 	}
+}
+
+.attention:focus {
+	outline: none;
 }
 
 .attention-item {
