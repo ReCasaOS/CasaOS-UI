@@ -2853,5 +2853,6 @@
   "My apps": "Apps",
   "Main navigation": "Main navigation",
   "Needs attention ({count})": "Needs attention ({count})",
-  "Back up now": "Back up now"
+  "Back up now": "Back up now",
+  "{count} cores": "{count} cores"
 }

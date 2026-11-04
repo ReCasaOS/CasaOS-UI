@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, backupTile, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
+import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
 
 const t = key => key
 
@@ -185,5 +185,32 @@ describe('diskRows', () => {
 
 	it('is empty when the box answers something else than a list', () => {
 		expect(diskRows(undefined, undefined, {})).toEqual([])
+	})
+})
+
+describe('cpuWatts', () => {
+	it('is the energy between two samples over the time between them', () => {
+		const prev = { timestamp: '100', value: '1000000' }
+		const cur = { timestamp: '102', value: '31000000' }
+
+		expect(cpuWatts(prev, cur)).toBe(15)
+	})
+
+	it('gives no figure without a counter, before a second sample, or after a wrap', () => {
+		const sample = { timestamp: '100', value: '5000000' }
+
+		expect(cpuWatts({ timestamp: '100', value: '0' }, { timestamp: '102', value: '0' })).toBeNull()
+		expect(cpuWatts(undefined, sample)).toBeNull()
+		expect(cpuWatts(sample, sample)).toBeNull()
+		expect(cpuWatts(sample, { timestamp: '102', value: '1000' })).toBeNull()
+	})
+})
+
+describe('cpuFrequency', () => {
+	it('reads MHz as GHz from 1000 up, and says nothing without a reading', () => {
+		expect(cpuFrequency(3400)).toBe('3.4 GHz')
+		expect(cpuFrequency(800)).toBe('800 MHz')
+		expect(cpuFrequency(0)).toBeNull()
+		expect(cpuFrequency(undefined)).toBeNull()
 	})
 })
