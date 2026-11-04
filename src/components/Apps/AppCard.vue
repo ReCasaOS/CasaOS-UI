@@ -176,6 +176,7 @@
 						<p v-if="compact && item.app_type !== 'system'" class="one-line app-state">
 							<span :class="item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
 							{{ item.status === 'running' ? $t('Running') : $t('Stopped') }}
+							<template v-if="memory > 0 && item.status === 'running'"> · {{ renderSize(memory) }}</template>
 						</p>
 
 						<!-- Docker hands out names like `adoring_antonelli`, and a container
@@ -217,6 +218,7 @@ import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
+import { renderSize } from '@/mixins/file_utils'
 import tipEditorModal from '@/components/Apps/TipEditorModal.vue'
 import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
 
@@ -259,6 +261,11 @@ export default {
 		subtitle: {
 			type: String,
 			default: '',
+		},
+		// bytes the app's containers use (compact card)
+		memory: {
+			type: Number,
+			default: 0,
 		},
 	},
 	data() {
@@ -420,6 +427,7 @@ export default {
 	},
 
 	methods: {
+		renderSize,
 		handleDorpdownPosition(event) {
 			this.$nextTick(() => {
 				const rightOffset = window.innerWidth - event.clientX - 160
