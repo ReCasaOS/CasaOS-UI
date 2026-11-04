@@ -28,18 +28,27 @@
 					title="Favorites">
 				</app-section-title-tip>
 			</div>
-			<div class="app-list is-compact contextmenu-canvas mb-5">
-				<div v-for="item in favoriteApps" :id="`favorite-${item.name}`" :key="item.name">
-					<app-card :favorite="true"
-						:item="item"
-						:memory="memory[item.name] || 0"
-						compact
-						@configApp="showConfigPanel"
-						@importApp="showContainerPanel"
-						@toggleFavorite="toggleFavorite"
-						@updateState="getList"></app-card>
-				</div>
-			</div>
+			<!-- dragged among themselves only: the group keeps a favorite out of the main grid -->
+			<draggable :draggable="draggable"
+				:model-value="favoriteApps"
+				v-bind="favoriteDragOptions"
+				class="app-list is-compact contextmenu-canvas mb-5"
+				item-key="name"
+				tag="div"
+				@update:model-value="reorderFavorites">
+				<template #item="{ element: item }">
+					<div :id="`favorite-${item.name}`" class="handle">
+						<app-card :favorite="true"
+							:item="item"
+							:memory="memory[item.name] || 0"
+							compact
+							@configApp="showConfigPanel"
+							@importApp="showContainerPanel"
+							@toggleFavorite="toggleFavorite"
+							@updateState="getList"></app-card>
+					</div>
+				</template>
+			</draggable>
 		</template>
 
 		<!-- Title Bar Start -->
@@ -363,6 +372,9 @@ export default {
 		favoriteApps() {
 			return this.favorites.map(name => this.appList.find(app => app.name === name && !isSystemApp(app))).filter(Boolean)
 		},
+		favoriteDragOptions() {
+			return { ...this.dragOptions, group: 'favorites', disabled: false }
+		},
 		filterOptions() {
 			const apps = this.appList.filter(app => !isSystemApp(app))
 			const labels = { all: 'All', running: 'Running', stopped: 'Stopped', updates: 'Updates' }
@@ -464,6 +476,12 @@ export default {
 					this.favorites = res.data.data.data || []
 				})
 				.catch(() => {})
+		},
+
+		// the new order of the pinned apps, as the drag leaves it
+		reorderFavorites(apps) {
+			this.favorites = apps.map(app => app.name)
+			this.$api.users.setCustomStorage(favoritesConfig, { data: this.favorites })
 		},
 
 		isFavorite(app) {
