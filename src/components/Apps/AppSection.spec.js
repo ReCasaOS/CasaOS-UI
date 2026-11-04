@@ -786,6 +786,22 @@ describe('app section favorites (beta dashboard)', () => {
 		expect(AppSection.computed.favoriteApps.call(vm).map(app => app.name)).toEqual(['immich', 'jellyfin'])
 	})
 
+	it('keeps the order a drag leaves the pinned apps in, and saves it', () => {
+		const { vm, setCustomStorage } = section(['jellyfin', 'immich'])
+		vm.reorderFavorites = AppSection.methods.reorderFavorites.bind(vm)
+
+		vm.reorderFavorites([{ name: 'immich' }, { name: 'jellyfin' }])
+
+		expect(vm.favorites).toEqual(['immich', 'jellyfin'])
+		expect(setCustomStorage).toHaveBeenLastCalledWith('app_favorites', { data: ['immich', 'jellyfin'] })
+	})
+
+	it('drags the pinned apps among themselves, even while the grid is filtered', () => {
+		const options = AppSection.computed.favoriteDragOptions.call({ dragOptions: AppSection.computed.dragOptions.call({ filter: 'running' }) })
+
+		expect(options).toMatchObject({ group: 'favorites', disabled: false })
+	})
+
 	it('reads the saved names, and keeps none when the box cannot answer', async () => {
 		const vm = { favorites: [], $api: { users: { getCustomStorage: vi.fn(() => Promise.resolve({ data: { data: { data: ['immich'] } } })) } } }
 		await AppSection.methods.loadFavorites.call(vm)
