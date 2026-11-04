@@ -1,14 +1,17 @@
 <template>
 	<div class="health-strip-beta">
 		<div class="tiles">
-			<component :is="tile.onClick ? 'button' : 'div'"
-				v-for="tile in tiles"
+			<!-- a div that acts as a button: a real <button> is not stretched to the row by every browser, and the clickable tiles sat lower -->
+			<div v-for="tile in tiles"
 				:key="tile.key"
 				:class="{ 'is-clickable': tile.onClick }"
+				:role="tile.onClick ? 'button' : undefined"
+				:tabindex="tile.onClick ? 0 : undefined"
 				:title="tile.title"
-				:type="tile.onClick ? 'button' : undefined"
 				class="widget has-text-grey-100 tile"
-				@click="tile.onClick && tile.onClick()">
+				@click="tile.onClick && tile.onClick()"
+				@keydown.enter.self.prevent="tile.onClick && tile.onClick()"
+				@keydown.space.self.prevent="tile.onClick && tile.onClick()">
 				<div class="blur-background"></div>
 				<div class="widget-content">
 					<div class="tile-label">{{ tile.label }}</div>
@@ -20,7 +23,7 @@
 						{{ tile.status || tile.detail }}
 					</div>
 				</div>
-			</component>
+			</div>
 		</div>
 
 		<div class="beta-body">
@@ -453,7 +456,6 @@ export default {
 	grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
 	gap: 0.75rem;
 	margin-bottom: 1rem;
-	// a button does not stretch to the row by itself: the clickable tiles sat lower
 	align-items: stretch;
 
 	.widget {
@@ -462,17 +464,19 @@ export default {
 }
 
 .tile {
-	border: 0;
-	padding: 0;
-	text-align: left;
-	background: transparent;
-	font: inherit;
 	min-width: 0;
-	align-self: stretch;
-	box-sizing: border-box;
 
 	.widget-content {
 		padding: 0.75rem 1rem;
+	}
+
+	&.is-clickable {
+		cursor: pointer;
+
+		&:focus-visible {
+			outline: 2px solid #fff;
+			outline-offset: 2px;
+		}
 	}
 }
 
