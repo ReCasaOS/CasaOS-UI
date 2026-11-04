@@ -110,7 +110,7 @@ import { defineAsyncComponent } from 'vue'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
-import { attentionItems, backupTile, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
+import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -132,6 +132,7 @@ export default {
 			storageList: [],
 			driveList: [],
 			speed: null,
+			watts: null,
 			runs: [],
 			// the names of the backup destinations; none on a box that has not set one up
 			destinations: [],
@@ -198,8 +199,14 @@ export default {
 					value: `${cpuPercent} %`,
 					bar: cpuPercent,
 					level: this.barLevel(cpuPercent),
-					// a VM has no thermal zone: 0 is not a reading
-					detail: temperature ? `${temperature}°C` : '',
+					// a VM has no thermal zone, and only some boxes have a power counter or a
+					// frequency: what is missing is left out, not shown as 0
+					detail: [
+						Number(this.cpu.num) > 0 ? this.$t('{count} cores', { count: this.cpu.num }) : '',
+						cpuFrequency(this.cpu.freq),
+						this.watts === null ? '' : `${this.watts.toFixed(1)} W`,
+						temperature ? `${temperature}°C` : '',
+					].filter(Boolean).join(' · '),
 				},
 				{
 					key: 'mem',
@@ -207,7 +214,7 @@ export default {
 					value: `${memPercent} %`,
 					bar: memPercent,
 					level: this.barLevel(memPercent),
-					detail: this.mem.total ? this.renderSize(this.mem.total) : '',
+					detail: this.mem.total ? `${this.renderSize(this.mem.used || 0)} / ${this.renderSize(this.mem.total)}` : '',
 				},
 				{
 					key: 'storage',
@@ -428,7 +435,9 @@ export default {
 	sockets: {
 		'casaos:system:utilization': function (res) {
 			const data = res.Properties
-			this.cpu = JSON.parse(data.sys_cpu)
+			const cpu = JSON.parse(data.sys_cpu)
+			this.watts = cpuWatts(this.cpu.power, cpu.power)
+			this.cpu = cpu
 			this.mem = JSON.parse(data.sys_mem)
 			this.disk = JSON.parse(data.sys_disk)
 			this.usb = JSON.parse(data.sys_usb || '[]')

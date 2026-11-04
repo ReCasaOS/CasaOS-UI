@@ -8,7 +8,7 @@ vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
 
 const hardwareInfo = {
 	cpu: { percent: 12.4, temperature: 46, num: 4 },
-	mem: { usedPercent: 49, total: 4 * 1024 ** 3 },
+	mem: { usedPercent: 49, used: 2 * 1024 ** 3, total: 4 * 1024 ** 3 },
 	sys_disk: { size: 100, used: 40, smart_status: 'passed' },
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
@@ -52,6 +52,8 @@ describe('health strip', () => {
 		expect(text).toContain('49 %')
 		expect(text).toContain('40 %')
 		expect(text).toContain('46°C')
+		expect(text).toContain('4 cores')
+		expect(text).toContain('2 GB / 4 GB')
 		// no second sample yet: no speed claimed
 		expect(wrapper.findAll('.tile')).toHaveLength(5)
 		expect(text).toContain('—')
@@ -62,7 +64,7 @@ describe('health strip', () => {
 		const onUtilization = wrapper.vm.$options.sockets['casaos:system:utilization']
 		const payload = (sent, recv, time, cpu) => ({
 			Properties: {
-				sys_cpu: JSON.stringify({ percent: cpu }),
+				sys_cpu: JSON.stringify({ percent: cpu, num: 8, freq: 3400, power: { timestamp: String(time), value: String(time * 1e6 * 7.5) } }),
 				sys_mem: JSON.stringify({ usedPercent: 50, total: 1024 }),
 				sys_disk: JSON.stringify({ size: 100, used: 41, smart_status: 'passed' }),
 				sys_net: JSON.stringify([{ name: 'eth0', bytesSent: sent, bytesRecv: recv, time }]),
@@ -76,6 +78,8 @@ describe('health strip', () => {
 		expect(wrapper.text()).toContain('30 %')
 		expect(wrapper.text()).toContain('↓ 2 KB/s')
 		expect(wrapper.text()).toContain('↑ 1 KB/s')
+		// 15 J over the 2 s between the samples
+		expect(wrapper.text()).toContain('8 cores · 3.4 GHz · 7.5 W')
 	})
 
 	it('leaves SnapRAID out on a box that has none, and says so when it is late', async () => {

@@ -29,6 +29,27 @@ export function netSpeed(prev, cur) {
 	}
 }
 
+// Watts between two samples of the CPU energy counter (microjoules, Intel RAPL). A box
+// without the counter sends 0, and a counter that wrapped goes back: both read as no figure.
+export function cpuWatts(prev, cur) {
+	const before = Number(prev?.value)
+	const after = Number(cur?.value)
+	const gap = Number(cur?.timestamp) - Number(prev?.timestamp)
+	if (!(before > 0) || !(after >= before) || !(gap > 0)) {
+		return null
+	}
+	return (after - before) / gap / 1e6
+}
+
+// "3.4 GHz" from MHz; null when the core sends no frequency
+export function cpuFrequency(mhz) {
+	const value = Number(mhz)
+	if (!(value > 0)) {
+		return null
+	}
+	return value >= 1000 ? `${(value / 1000).toFixed(1)} GHz` : `${Math.round(value)} MHz`
+}
+
 // From GET /backup/runs, newest first, failures included: a restore is not a backup.
 // `at` is the last backup that worked, so a failed one still says how old the last
 // good copy is.
