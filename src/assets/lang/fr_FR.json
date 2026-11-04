@@ -2832,5 +2832,8 @@
   "VMs: {count}": "VM : {count}",
   "Manage storage": "Gérer le stockage",
   "Backups and restore": "Sauvegardes et restauration",
-  "Available update": "Mise à jour"
+  "Available update": "Mise à jour",
+  "Home": "Accueil",
+  "My apps": "Apps",
+  "Main navigation": "Navigation principale"
 }

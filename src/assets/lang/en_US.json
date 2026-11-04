@@ -2829,5 +2829,8 @@
   "VMs: {count}": "VMs: {count}",
   "Manage storage": "Manage storage",
   "Backups and restore": "Backups and restore",
-  "Available update": "Update"
+  "Available update": "Update",
+  "Home": "Home",
+  "My apps": "Apps",
+  "Main navigation": "Main navigation"
 }

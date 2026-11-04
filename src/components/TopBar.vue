@@ -776,9 +776,12 @@ export default {
 		this.getHardwareInfo()
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
+		// the tab bar of the beta dashboard on a phone
+		this.$EventBus.$on('casaUI:openSettings', this.toggleSettings)
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
+		this.$EventBus.$off('casaUI:openSettings', this.toggleSettings)
 	},
 
 	methods: {
@@ -861,6 +864,10 @@ export default {
 					this.port = res.data.data
 				}
 			})
+		},
+
+		toggleSettings() {
+			this.$refs.settingsDrop.toggle()
 		},
 
 		showBackupDestinations() {
