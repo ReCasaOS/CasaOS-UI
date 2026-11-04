@@ -12,7 +12,7 @@
 
 		<!-- Starred Start -->
 		<template v-if="starredList.length">
-			<h3 class="title is-3 mb-0 pb-3 pt-3 has-text-left">
+			<h3 class="title is-3 mb-0 pb-3 pt-3 has-text-left starred-title">
 				{{ $t('Starred') }}
 			</h3>
 			<tree-list-item v-for="item in starredList" :key="`starred:${item.path}`" :icon-label="$t('Remove from Starred')"
@@ -147,3 +147,10 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+// inside .list-container (padding 0.75rem): line up with the Files and Location headings outside it
+.starred-title {
+	margin-left: -0.75rem;
+}
+</style>
