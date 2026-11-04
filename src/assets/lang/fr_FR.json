@@ -2829,5 +2829,7 @@
   "Your files": "Vos fichiers",
   "CPU, memory, disks": "CPU, mémoire, disques",
   "Updates: {count}": "Mises à jour : {count}",
-  "VMs: {count}": "VM : {count}"
+  "VMs: {count}": "VM : {count}",
+  "Manage storage": "Gérer le stockage",
+  "Backups and restore": "Sauvegardes et restauration"
 }

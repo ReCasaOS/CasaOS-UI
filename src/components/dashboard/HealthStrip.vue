@@ -30,7 +30,9 @@
 					<div class="widget-content">
 						<div class="tile-label">{{ $t('Needs attention') }}</div>
 						<ul v-if="attention.length > 0">
-							<li v-for="item in attention" :key="item.key" :class="`is-${item.level}`">{{ item.text }}</li>
+							<li v-for="item in attention" :key="item.key" :class="`is-${item.level}`">
+								<button class="attention-item" type="button" @click="openAttention(item)">{{ item.text }}</button>
+							</li>
 						</ul>
 						<p v-else class="panel-empty">{{ $t('All good') }}</p>
 					</div>
@@ -50,6 +52,7 @@
 							</div>
 							<div class="tile-detail">{{ driveDetail(drive) }}</div>
 						</div>
+						<button class="panel-action" type="button" @click="openStorage">{{ $t('Manage storage') }}</button>
 					</div>
 				</div>
 
@@ -71,6 +74,7 @@
 							</div>
 						</dl>
 						<p v-if="backup.status === 'failed'" class="is-danger panel-error">{{ $t('The last backup failed') }}</p>
+						<button class="panel-action" type="button" @click="openBackups">{{ $t('Backups and restore') }}</button>
 					</div>
 				</div>
 
@@ -101,6 +105,7 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
@@ -204,9 +209,7 @@ export default {
 					level: this.health === 'failed' ? 'danger' : this.barLevel(diskPercent),
 					detail: `${this.renderSize(this.disk.used || 0)} / ${this.renderSize(this.disk.size || 0)}`,
 					status: this.health === 'failed' ? this.$t('Damage') : '',
-					// the event Home.vue already listens for to open the Storage manager
-					// eslint-disable-next-line vue/custom-event-name-casing
-					onClick: () => this.$EventBus.$emit('casaUI:openStorageManager'),
+					onClick: this.openStorage,
 				},
 				{
 					key: 'net',
@@ -226,6 +229,7 @@ export default {
 					bar: null,
 					level: this.raid.level,
 					detail: this.raid.at,
+					onClick: this.openStorage,
 				})
 			}
 			return tiles
@@ -244,6 +248,36 @@ export default {
 				return 'danger'
 			}
 			return value >= 80 ? 'warning' : 'ok'
+		},
+
+		// the event Home.vue already listens for to open the Storage manager
+		openStorage() {
+			// eslint-disable-next-line vue/custom-event-name-casing
+			this.$EventBus.$emit('casaUI:openStorageManager')
+		},
+
+		// the same dialog as the settings menu's Backups entry
+		openBackups() {
+			this.$buefy.modal.open({
+				component: defineAsyncComponent(() => import('@/components/settings/BackupDestinations.vue')),
+				hasModalCard: true,
+				customClass: 'backup-modal',
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// a failure opens what it is about: the disks, the backups, the fleet
+		openAttention(item) {
+			if (item.key === 'backup') {
+				this.openBackups()
+			} else if (item.key.startsWith('fleet_')) {
+				this.openFleetPage()
+			} else {
+				this.openStorage()
+			}
 		},
 
 		openFleetPage() {
@@ -302,6 +336,7 @@ export default {
 				detail: status === 'none' ? '' : when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
 				status: status === 'failed' ? this.$t('The last backup failed') : '',
 				title: error,
+				onClick: this.openBackups,
 			}
 		},
 
@@ -541,7 +576,8 @@ export default {
 	}
 }
 
-.fleet-open {
+.fleet-open,
+.panel-action {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
@@ -563,6 +599,20 @@ export default {
 	&:focus-visible {
 		outline: 2px solid #fff;
 		outline-offset: 2px;
+	}
+}
+
+.attention-item {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+
+	&:hover {
+		text-decoration: underline;
 	}
 }
 
