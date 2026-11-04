@@ -2,6 +2,7 @@
 	<div :class="{ 'is-compact': compact }" :role="compact ? 'button' : undefined" :tabindex="compact ? 0 : undefined" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
 		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="hover = true">
 		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
+		<span v-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
@@ -145,14 +146,15 @@
 							<!-- The number of active resource alerts, on the Statistics card only. Numbers only: the words are the icon's alt. -->
 							<span v-if="statsBadge" aria-hidden="true" class="stats-badge">{{ statsBadge.text }}</span>
 							<!-- Unstable -->
-							<CTooltip v-if="newAppIds.includes(item.name)" class="__position" content="NEW" />
+							<!-- the compact card has no NEW marker, and says an update in its own chip -->
+							<CTooltip v-if="!compact && newAppIds.includes(item.name)" class="__position" content="NEW" />
 							<!-- Shown from what the last image check found, so an app nobody has
 								checked yet carries no badge rather than a claim of being current.
 								v-else so it never stacks on top of the NEW marker. -->
 							<!-- A git app's state, or its new commits: gitApps.js says which wins. Before
 								the image badge, since a failed build matters more than a newer image. -->
 							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
-							<CTooltip v-else-if="item.update_available" class="__position __position-wide" content="Update available" />
+							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
 						</div>
 
 						<!-- Loading Bar Start -->
@@ -1394,6 +1396,22 @@ export default {
 
 // beta dashboard: a row, not a square
 .app-card.is-compact {
+  // the proposal's chip: the accent of the beta dashboard, over the card's top right corner
+  .update-chip {
+    position: absolute;
+    top: -0.5rem;
+    right: 0.75rem;
+    z-index: 30;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.5rem;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1rem;
+    pointer-events: none;
+  }
+
   aspect-ratio: auto;
   cursor: pointer;
   justify-content: flex-start;
