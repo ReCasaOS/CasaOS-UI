@@ -9,7 +9,7 @@
 					title="System">
 				</app-section-title-tip>
 			</div>
-			<div :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas mb-5">
+			<div :class="{ 'is-compact': compact, 'is-tiles': compact }" class="app-list contextmenu-canvas mb-5">
 				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" class="handle">
 					<app-card :compact="compact" :item="item" :subtitle="systemSubtitle(item)"
 						@configApp="showConfigPanel"
@@ -32,7 +32,7 @@
 			<draggable :draggable="draggable"
 				:model-value="favoriteApps"
 				v-bind="favoriteDragOptions"
-				class="app-list is-compact contextmenu-canvas mb-5"
+				class="app-list is-compact is-tiles contextmenu-canvas mb-5"
 				item-key="name"
 				tag="div"
 				@update:model-value="reorderFavorites">
@@ -1150,6 +1150,39 @@ export default {
 	&.is-compact {
 		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 		gap: 0.75rem;
+	}
+
+	// the system and favorite apps of the beta dashboard on a phone: tiles of three, icon over name, as the proposal draws them
+	&.is-tiles {
+		@include touch {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.625rem;
+
+			:deep(.app-card.is-compact) {
+				.img-c {
+					flex-direction: column !important;
+					justify-content: center !important;
+					padding: 0.75rem 0.375rem !important;
+					text-align: center;
+					gap: 0.5rem;
+				}
+
+				.app-text {
+					width: 100%;
+					text-align: center;
+				}
+
+				.app-state {
+					font-size: 0.625rem;
+				}
+
+				.action-btn {
+					top: 0.25rem;
+					right: 0.125rem;
+					transform: none;
+				}
+			}
+		}
 	}
 }
 
