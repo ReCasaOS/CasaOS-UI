@@ -444,6 +444,8 @@ export default {
 	grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
 	gap: 0.75rem;
 	margin-bottom: 1rem;
+	// a button does not stretch to the row by itself: the clickable tiles sat lower
+	align-items: stretch;
 
 	.widget {
 		margin-bottom: 0;
@@ -457,6 +459,8 @@ export default {
 	background: transparent;
 	font: inherit;
 	min-width: 0;
+	align-self: stretch;
+	box-sizing: border-box;
 
 	.widget-content {
 		padding: 0.75rem 1rem;
@@ -474,9 +478,8 @@ export default {
 	font-size: 1.375rem;
 	font-weight: 600;
 	line-height: 1.75rem;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	// a word such as "No backup yet" wraps rather than ending in an ellipsis
+	overflow-wrap: anywhere;
 }
 
 .tile-bar {
