@@ -173,9 +173,22 @@ describe('health strip', () => {
 		const emit = vi.fn()
 		const wrapper = strip({ emit })
 
-		await wrapper.find('button.tile').trigger('click')
+		await wrapper.find('.tile.is-clickable').trigger('click')
 
 		expect(emit).toHaveBeenCalledWith('casaUI:openStorageManager')
+	})
+
+	it('opens it from the keyboard too, since the tile is a div acting as a button', async () => {
+		const emit = vi.fn()
+		const wrapper = strip({ emit })
+		const tile = wrapper.find('.tile.is-clickable')
+
+		expect(tile.attributes('role')).toBe('button')
+		expect(tile.attributes('tabindex')).toBe('0')
+		await tile.trigger('keydown', { key: 'Enter' })
+		await tile.trigger('keydown', { key: ' ' })
+
+		expect(emit).toHaveBeenCalledTimes(2)
 	})
 
 	it('reads the backup runs and SnapRAID again now and then, and stops with the page', async () => {
