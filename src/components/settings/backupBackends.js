@@ -47,15 +47,28 @@ export const BACKUP_BACKENDS = [
 		id: 'drive',
 		label: 'Google Drive',
 		fields: ['token'],
-		help: 'A box has no browser to sign in with. On a computer that has one, run rclone authorize "drive", sign in, and paste the token it prints.',
+		// the box runs rclone authorize itself: see the sign-in under the backend
+		signIn: true,
+		help: 'Or, on a computer that has a browser, run rclone authorize "drive", sign in, and paste the token it prints.',
 	},
 	{
 		id: 'dropbox',
 		label: 'Dropbox',
 		fields: ['token'],
-		help: 'A box has no browser to sign in with. On a computer that has one, run rclone authorize "dropbox", sign in, and paste the token it prints.',
+		signIn: true,
+		help: 'Or, on a computer that has a browser, run rclone authorize "dropbox", sign in, and paste the token it prints.',
 	},
 ]
+
+/**
+ * @param {string} id an rclone backend name
+ * @returns {boolean} whether the box can sign in to it for the person: it runs rclone
+ *   authorize itself, so only a browser is needed, not a computer with rclone
+ */
+export function canSignIn(id) {
+	const backend = BACKUP_BACKENDS.find(candidate => candidate.id === id)
+	return Boolean(backend && backend.signIn)
+}
 
 /**
  * @param {string} id an rclone backend name

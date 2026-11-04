@@ -27,6 +27,18 @@ const backup = {
 		})
 	},
 
+	// A box has no browser: it runs `rclone authorize` and gives back the provider's
+	// sign-in address. The provider then redirects to 127.0.0.1:53682, which does
+	// not load on the person's computer; the address of that page goes to
+	// signInFinish, which gives back the token for the destination.
+	signIn(backend) {
+		return api.post(`${PREFIX}/backup/signin`, { backend })
+	},
+
+	signInFinish(redirected) {
+		return api.post(`${PREFIX}/backup/signin/finish`, { redirected })
+	},
+
 	// Removes the way in, not the backups already sent there.
 	deleteDestination(name) {
 		return api.delete(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}`)
