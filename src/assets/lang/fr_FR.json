@@ -2831,5 +2831,6 @@
   "Updates: {count}": "Mises à jour : {count}",
   "VMs: {count}": "VM : {count}",
   "Manage storage": "Gérer le stockage",
-  "Backups and restore": "Sauvegardes et restauration"
+  "Backups and restore": "Sauvegardes et restauration",
+  "Available update": "Mise à jour"
 }

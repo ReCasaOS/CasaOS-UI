@@ -728,4 +728,20 @@ describe('the compact card favorites and subtitle (beta dashboard)', () => {
 
 		expect(card({ compact: true }).find('.app-state').text()).not.toContain('·')
 	})
+
+	it('says an update in a chip, and has no NEW marker, on the compact card only', async () => {
+		const item = { name: 'jellyfin', app_type: 'v2app', status: 'running', update_available: true, title: { en_us: 'Jellyfin' } }
+		const compact = card({ compact: true, item })
+		await compact.setData({ newAppIds: ['jellyfin'] })
+
+		expect(compact.find('.update-chip').text()).toBe('Available update')
+		expect(compact.text()).not.toContain('NEW')
+		// the corner tooltip of the classic card is not drawn a second time
+		expect(compact.text()).not.toContain('Update available')
+
+		const classic = card({ compact: false, item })
+		await classic.setData({ newAppIds: ['jellyfin'] })
+		expect(classic.find('.update-chip').exists()).toBe(false)
+		expect(classic.text()).toContain('NEW')
+	})
 })
