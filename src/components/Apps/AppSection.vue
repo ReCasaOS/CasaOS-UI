@@ -32,6 +32,7 @@
 				<div v-for="item in favoriteApps" :id="`favorite-${item.name}`" :key="item.name">
 					<app-card :favorite="true"
 						:item="item"
+						:memory="memory[item.name] || 0"
 						compact
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
@@ -107,7 +108,7 @@
 			<template #item="{ element: item }">
 				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
-					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item"
+					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item" :memory="memory[item.name] || 0"
 						@toggleFavorite="toggleFavorite"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
@@ -167,6 +168,8 @@ import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import { STATS_APP_NAME } from '@/components/Stats/entry'
+import { createPoller } from '@/components/Stats/poller'
+import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
@@ -230,6 +233,9 @@ const favoritesConfig = 'app_favorites'
 
 // how often the VM tiles read the VMs again, while the tab is shown
 const VM_POLL_MS = 5000
+
+// how often the compact cards read the memory of the apps; the daemon is read twice for it
+const MEMORY_POLL_MS = 30000
 // how long a read of the VMs may take before it counts as failed
 const VM_LIST_MS = 15000
 // failed reads in a row after which the tiles go
@@ -302,6 +308,8 @@ export default {
 			// compact grid: 'all' | 'running' | 'stopped' | 'updates'
 			filter: 'all',
 			favorites: [],
+			// compact grid: the bytes each app's containers use, by app name
+			memory: {},
 		}
 	},
 	computed: {
@@ -418,6 +426,18 @@ export default {
 		this.vmFailures = 0
 		document.addEventListener('visibilitychange', this.onVisibility)
 		this.pollVms()
+
+		if (this.compact) {
+			// silent on failure: a card without its memory is a card all the same
+			this.memoryPoller = createPoller({
+				intervalMs: MEMORY_POLL_MS,
+				// the service client brings the router and the store with it: loaded when the poll runs
+				run: () => import('@/service/stats').then(({ statsApi }) => statsApi.list('app_management')).then((raw) => {
+					this.memory = memoryByApp(raw)
+				}),
+			})
+			this.memoryPoller.start()
+		}
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
@@ -429,6 +449,7 @@ export default {
 
 		this.vmPollStopped = true
 		clearTimeout(this.vmPollTimer)
+		this.memoryPoller?.stop()
 		document.removeEventListener('visibilitychange', this.onVisibility)
 	},
 	mounted() {
@@ -797,6 +818,7 @@ export default {
 		},
 
 		onVisibility() {
+			this.memoryPoller?.visibilityChanged()
 			if (document.hidden) {
 				clearTimeout(this.vmPollTimer)
 				return

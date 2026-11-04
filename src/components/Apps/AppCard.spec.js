@@ -718,4 +718,14 @@ describe('the compact card favorites and subtitle (beta dashboard)', () => {
 
 		expect(card({ compact: true, subtitle: 'Your files' }).text()).toContain('Your files')
 	})
+
+	it('says the memory the app uses beside its state, on a running card only', async () => {
+		const wrapper = card({ compact: true, memory: 1024 * 1024 * 640 })
+		expect(wrapper.find('.app-state').text()).toContain('640 MB')
+
+		await wrapper.setProps({ item: { name: 'jellyfin', app_type: 'v2app', status: 'exited', title: { en_us: 'Jellyfin' } } })
+		expect(wrapper.find('.app-state').text()).not.toContain('MB')
+
+		expect(card({ compact: true }).find('.app-state').text()).not.toContain('·')
+	})
 })
