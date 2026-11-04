@@ -280,7 +280,6 @@ export const mixin = {
 			const deleteShortcut = async (item) => {
 				try {
 					await deleteShare(item.extensions.share.id)
-					this.$store.commit('REMOVE_SHORTCUT', item.path)
 				} catch (e) {
 					console.log(`${e} in delete shortcut`)
 				}

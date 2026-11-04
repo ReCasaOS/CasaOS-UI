@@ -24,7 +24,7 @@
 				<div class="notification pl-4 pri-height">
 					<b-field>
 						<b-checkbox v-show="isRootorDATA" v-model="shortcut" type="is-info">
-							{{ $t('Add a shortcut') }}
+							{{ $t('Add to Starred') }}
 						</b-checkbox>
 					</b-field>
 					<b-field>
@@ -157,7 +157,6 @@ export default {
 							})
 							// save shortcut
 							// await this.$api.users.saveShutcutDetail(shortcut);
-							// LURK BUG: shortcut data not update
 							await this.$store.dispatch('SET_SHORTCUT_DATA', shortcut)
 						}
 
