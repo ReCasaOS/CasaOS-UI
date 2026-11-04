@@ -59,6 +59,9 @@
 					<b-dropdown-item v-if="showSingleEdit" key="file-context2" aria-role="menuitem" @click="copyPath">
 						{{ $t('Copy Path') }}
 					</b-dropdown-item>
+					<b-dropdown-item v-if="showSingleEdit" key="file-context-star" aria-role="menuitem" @click="toggleStar">
+						{{ isStarred ? $t('Remove from Starred') : $t('Add to Starred') }}
+					</b-dropdown-item>
 					<hr class="dropdown-divider">
 					<b-dropdown-item v-if="showSingleEdit && !isShared && !isMounted" key="file-context3"
 						aria-role="menuitem" @click="rename">
@@ -150,6 +153,9 @@ export default {
 		},
 		isMounted() {
 			return this.item.extensions ? this.item.extensions.mounted : false
+		},
+		isStarred() {
+			return (this.$store.state.shortcutData || []).some(s => s.path === this.item.path)
 		},
 	},
 	watch: {
@@ -262,6 +268,16 @@ export default {
 		uploadFile() {
 			this.$refs.dropDown.toggle()
 			this.filePanel.uploaderInstance.opts.query.path = this.filePanel.currentPath
+		},
+
+		// the sidebar's TreeList watches the store and redraws the Starred section
+		toggleStar() {
+			this.$refs.dropDown.toggle()
+			const starred = this.$store.state.shortcutData || []
+			const next = this.isStarred
+				? starred.filter(s => s.path !== this.item.path)
+				: [...starred, { name: this.item.name, path: this.item.path, type: this.item.is_dir ? 'folder' : 'file' }]
+			this.$store.dispatch('SET_SHORTCUT_DATA', next)
 		},
 
 	},

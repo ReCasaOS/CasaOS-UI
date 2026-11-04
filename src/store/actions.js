@@ -15,18 +15,15 @@ const actions = {
 	// GET_HARDWARE_INFO(context, val) {
 	//     context.commit("GET_HARDWARE_INFO",val)
 	// },
-	// set shortcut data
+	// set shortcut data: the sidebar's Starred list, folders and files
 	async SET_SHORTCUT_DATA(context, val) {
 		try {
-			// Changing the shortcut data structure
-			val.forEach((item) => {
-				item.icon = 'folder'
-				item.pack = 'casa'
-				item.visible = true
-				item.selected = true
-				item.extensions = null
+			// new objects, so the list in the store is not changed before the save answers
+			const shortcuts = val.map((item) => {
+				const type = item.type === 'file' ? 'file' : 'folder'
+				return { ...item, type, icon: type === 'file' ? 'files-outline' : 'folder', pack: 'casa', visible: true, selected: true, extensions: null }
 			})
-			const data = await $api.users.saveShutcutDetail(val).then(v => v.data.data)
+			const data = await $api.users.saveShutcutDetail(shortcuts).then(v => v.data.data)
 			context.commit('SET_SHORTCUT_DATA', data)
 		} catch (e) {
 			console.log(e)
