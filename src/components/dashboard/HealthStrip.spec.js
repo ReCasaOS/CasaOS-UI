@@ -13,7 +13,7 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {} } = {}) {
+function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
@@ -22,7 +22,12 @@ function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {} } = {}) 
 				$buefy: buefy,
 				$EventBus: { $emit: emit },
 				$api: {
-					backup: { getRuns: () => Promise.resolve({ data: { data: runs } }) },
+					backup: {
+						getRuns: () => Promise.resolve({ data: { data: runs } }),
+						// absent on a core that predates the call: the button is then left out
+						...(destinations ? { getDestinations: () => Promise.resolve({ data: { data: destinations } }) } : {}),
+						backupSystem,
+					},
 					disks: { snapraid: snapraid || (() => Promise.reject(new Error('404'))) },
 					// absent on a core that predates the fleet: the panel then has nothing to ask
 					...(fleet ? { fleet: { status: fleet } } : {}),
@@ -302,5 +307,44 @@ describe('health strip and the bell of the beta bar', () => {
 
 		expect(panel.scrollIntoView).toHaveBeenCalledTimes(1)
 		expect(document.activeElement === panel || panel.tabIndex === -1).toBe(true)
+	})
+})
+
+describe('health strip back up now', () => {
+	const toast = vi.fn()
+	const confirmed = () => ({ dialog: { confirm: vi.fn(options => options.onConfirm()) }, toast: { open: toast } })
+
+	it('has no button on a box with no destination, or one that cannot list them', async () => {
+		expect((await settled(strip({ destinations: [] }))).find('.backups .panel-action').text()).toBe('Backups and restore')
+		expect((await settled(strip())).findAll('.backups .panel-action')).toHaveLength(1)
+	})
+
+	async function settled(wrapper) {
+		await settle()
+		return wrapper
+	}
+
+	it('backs the box up to where the last backup went, once the dialog that warns of the stop is confirmed', async () => {
+		const backupSystem = vi.fn(() => Promise.resolve())
+		const buefy = confirmed()
+		const wrapper = await settled(strip({ destinations: ['usb', 'nas'], runs: [{ started_at: '2026-11-03T03:00:00Z', destination: 'nas' }], buefy, backupSystem }))
+
+		await wrapper.findAll('.backups .panel-action')[0].trigger('click')
+		await settle()
+
+		expect(buefy.dialog.confirm.mock.calls[0][0].message).toContain('unreachable for a few seconds')
+		expect(backupSystem).toHaveBeenCalledWith('nas', true)
+		expect(toast.mock.calls.at(-1)[0].type).toBe('is-success')
+	})
+
+	it('falls back to the first destination, and says what the box answered when it refuses', async () => {
+		const backupSystem = vi.fn(() => Promise.reject(Object.assign(new Error('refused'), { response: { data: { message: 'a backup is already running' } } })))
+		const wrapper = await settled(strip({ destinations: ['usb', 'nas'], buefy: confirmed(), backupSystem }))
+
+		await wrapper.findAll('.backups .panel-action')[0].trigger('click')
+		await settle()
+
+		expect(backupSystem).toHaveBeenCalledWith('usb', true)
+		expect(toast.mock.calls.at(-1)[0]).toMatchObject({ message: 'a backup is already running', type: 'is-danger' })
 	})
 })
