@@ -25,7 +25,7 @@
 
 		<div class="beta-body">
 			<aside class="beta-aside">
-				<div class="widget has-text-grey-100 panel attention">
+				<div ref="attentionPanel" class="widget has-text-grey-100 panel attention" tabindex="-1">
 					<div class="blur-background"></div>
 					<div class="widget-content">
 						<div class="tile-label">{{ $t('Needs attention') }}</div>
@@ -74,6 +74,7 @@
 							</div>
 						</dl>
 						<p v-if="backup.status === 'failed'" class="is-danger panel-error">{{ $t('The last backup failed') }}</p>
+						<button v-if="backupDestination" class="panel-action" type="button" @click="backupNow">{{ $t('Back up now') }}</button>
 						<button class="panel-action" type="button" @click="openBackups">{{ $t('Backups and restore') }}</button>
 					</div>
 				</div>
@@ -118,6 +119,7 @@ const SLOW_REFRESH = 60 * 1000
 export default {
 	name: 'HealthStrip',
 	mixins: [mixin],
+	emits: ['attention'],
 	data() {
 		const info = this.$store.state.hardwareInfo || {}
 		return {
@@ -131,6 +133,8 @@ export default {
 			driveList: [],
 			speed: null,
 			runs: [],
+			// the names of the backup destinations; none on a box that has not set one up
+			destinations: [],
 			snapraidState: null,
 			fleetState: null,
 			timer: 0,
@@ -149,6 +153,10 @@ export default {
 		},
 		raid() {
 			return snapraidTile(this.snapraidState, this.translate)
+		},
+		// where Back up now sends it: where the last backup went, else the first destination
+		backupDestination() {
+			return this.destinations.includes(this.backup.destination) ? this.backup.destination : (this.destinations[0] || '')
 		},
 		attention() {
 			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState }, this.translate)
@@ -235,6 +243,15 @@ export default {
 			return tiles
 		},
 	},
+	watch: {
+		// the bell of the beta bar counts them
+		attention: {
+			immediate: true,
+			handler(items) {
+				this.$emit('attention', items.length)
+			},
+		},
+	},
 	mounted() {
 		this.refreshSlow()
 		this.timer = setInterval(this.refreshSlow, SLOW_REFRESH)
@@ -254,6 +271,26 @@ export default {
 		openStorage() {
 			// eslint-disable-next-line vue/custom-event-name-casing
 			this.$EventBus.$emit('casaUI:openStorageManager')
+		},
+
+		// the box itself, as the Backups dialog does it: said first, since the services holding its files are stopped for the copy
+		backupNow() {
+			const name = this.backupDestination
+			this.$buefy.dialog.confirm({
+				title: this.$t('Back up this box to {name}?', { name }),
+				message: this.$t('The services holding its files are stopped for the length of the copy, so the dashboard is unreachable for a few seconds. The backup shows in History as "This box".'),
+				confirmText: this.$t('Back up'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: async () => {
+					try {
+						await this.$api.backup.backupSystem(name, true)
+						this.$buefy.toast.open({ message: this.$t('Backup of this box started.'), type: 'is-success', duration: 5000 })
+					} catch (error) {
+						const data = error.response && error.response.data
+						this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+					}
+				},
+			})
 		},
 
 		// the same dialog as the settings menu's Backups entry
@@ -278,6 +315,13 @@ export default {
 			} else {
 				this.openStorage()
 			}
+		},
+
+		// the bell of the beta bar: brings the list into view, whatever the width (on a phone it is under the apps)
+		showAttention() {
+			const panel = this.$refs.attentionPanel
+			panel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+			panel.focus({ preventScroll: true })
 		},
 
 		openFleetPage() {
@@ -354,6 +398,11 @@ export default {
 				this.runs = (await this.$api.backup.getRuns()).data.data || []
 			} catch {
 				this.runs = []
+			}
+			try {
+				this.destinations = (await this.$api.backup.getDestinations()).data.data || []
+			} catch {
+				this.destinations = []
 			}
 			try {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
@@ -600,6 +649,10 @@ export default {
 		outline: 2px solid #fff;
 		outline-offset: 2px;
 	}
+}
+
+.attention:focus {
+	outline: none;
 }
 
 .attention-item {
