@@ -7,6 +7,13 @@ import { instance } from '@/service/service.js'
 // The routes the box takes minutes over (apt-get update, image checks): five minutes instead of the instance's one.
 export const SLOW_MS = 300000
 
+// The official ReCasaOS relay, the default of the relay setting. Provisional: the owner picks the final hostname.
+export const OFFICIAL_RELAY = 'https://relay.recasaos.org'
+
+// The routes that wait on the relay (joining its private network, an address there): the core gives them up
+// to two minutes, so two and a half here instead of the instance's one.
+export const RELAY_MS = 150000
+
 const box = id => `/v1/fleet/boxes/${encodeURIComponent(id)}`
 
 export function isSlow(method, path, params) {
@@ -18,12 +25,15 @@ export function isSlow(method, path, params) {
 
 export const fleetApi = {
 	status: () => instance.get('/v1/fleet'),
-	setMaster: fields => instance.put('/v1/fleet/master', fields),
+	// { enabled, relay } or { enabled, address } (advanced mode, no relay); { enabled } alone takes the official relay
+	setMaster: fields => instance.put('/v1/fleet/master', fields, { timeout: RELAY_MS }),
+	// another relay, or the same one again when it lost the fleet: every box then needs a new code
+	setRelay: relay => instance.put('/v1/fleet/relay', { relay }, { timeout: RELAY_MS }),
 	addBox: fields => instance.post('/v1/fleet/boxes', fields),
 	renameBox: (id, fields) => instance.patch(box(id), fields),
 	removeBox: id => instance.delete(box(id)),
 	rotateCode: id => instance.post(`${box(id)}/code`),
-	join: code => instance.put('/v1/fleet/member', { code }),
+	join: code => instance.put('/v1/fleet/member', { code }, { timeout: RELAY_MS }),
 	leave: () => instance.delete('/v1/fleet/member'),
 	relay: (boxId, method, path, { params, data, timeout } = {}) => instance.request({
 		method,

@@ -42,6 +42,8 @@ export function overviewRow(box, answers) {
 		self: box.self === true,
 		online: box.online === true,
 		lastSeen: box.last_seen ?? null,
+		// set by the core when the owner changed relay: the box's code no longer reaches the new one
+		needsRecode: box.needs_recode === true,
 		version: versionOf(answers.version),
 		os: os ? { label: text(os.pretty_name), support: text(os.support?.state) || 'unknown' } : null,
 		apps: grid

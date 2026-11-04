@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { SLOW_MS, fleetApi, isSlow } from './fleet'
+import { OFFICIAL_RELAY, RELAY_MS, SLOW_MS, fleetApi, isSlow } from './fleet'
 import { instance } from '@/service/service.js'
 
 vi.mock('@/service/service.js', () => {
@@ -41,7 +41,7 @@ describe('the fleet service', () => {
 		await fleetApi.status()
 		expect(instance.get).toHaveBeenCalledWith('/v1/fleet')
 		await fleetApi.setMaster({ enabled: true, address: 'https://m' })
-		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/master', { enabled: true, address: 'https://m' })
+		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/master', { enabled: true, address: 'https://m' }, { timeout: RELAY_MS })
 		await fleetApi.addBox({ name: 'Home', url: 'https://h', self: false })
 		expect(instance.post).toHaveBeenCalledWith('/v1/fleet/boxes', { name: 'Home', url: 'https://h', self: false })
 		await fleetApi.renameBox('a/b', { name: 'Shop' })
@@ -51,8 +51,18 @@ describe('the fleet service', () => {
 		await fleetApi.rotateCode('x')
 		expect(instance.post).toHaveBeenCalledWith('/v1/fleet/boxes/x/code')
 		await fleetApi.join('abc')
-		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/member', { code: 'abc' })
+		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/member', { code: 'abc' }, { timeout: RELAY_MS })
 		await fleetApi.leave()
 		expect(instance.delete).toHaveBeenCalledWith('/v1/fleet/member')
+	})
+
+	it('gives the routes that wait on the relay two and a half minutes', async () => {
+		// the core takes up to two minutes to join a private network
+		expect(RELAY_MS).toBe(150000)
+		expect(OFFICIAL_RELAY).toMatch(/^https:\/\//)
+		await fleetApi.setMaster({ enabled: true, relay: 'https://r' })
+		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/master', { enabled: true, relay: 'https://r' }, { timeout: RELAY_MS })
+		await fleetApi.setRelay('https://r2')
+		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/relay', { relay: 'https://r2' }, { timeout: RELAY_MS })
 	})
 })
