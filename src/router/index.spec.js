@@ -92,3 +92,29 @@ describe('a first account made on the machine', () => {
 		expect(store.state.firstAdmin).toBe('web')
 	})
 })
+
+// A link to a page of the dashboard, opened signed out, ends on that page once
+// signed in: the login is told where it was going.
+describe('a link opened signed out', () => {
+	beforeEach(() => {
+		store.commit('SET_NEED_INITIALIZATION', false)
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true } } })
+		localStorage.removeItem('access_token')
+		store.commit('SET_ACCESS_TOKEN', '')
+	})
+
+	it('keeps where it was going for after the login', async () => {
+		vi.doMock('@/views/TerminalTab.vue', () => ({ default: { render: () => null } }))
+		await router.push('/terminal')
+
+		expect(router.currentRoute.value.path).toBe('/login')
+		expect(router.currentRoute.value.query.redirect).toBe('/terminal')
+	})
+
+	it('adds nothing for the dashboard itself', async () => {
+		await router.push('/logout')
+		await router.push('/')
+
+		expect(router.currentRoute.value.fullPath).toBe('/login')
+	})
+})
