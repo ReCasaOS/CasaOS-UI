@@ -97,6 +97,27 @@ describe('the Fleet settings', () => {
 		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.mine.example' })
 	})
 
+	it('says what the relay sees, and offers the official relay again once the field was changed', async () => {
+		await open()
+		await pick('master')
+		expect(wrapper.text()).toContain('never what they exchange')
+		expect(button('Use the official relay')).toBeUndefined()
+		await field('relay').setValue('https://relay.mine.example')
+		await button('Use the official relay').trigger('click')
+		expect(field('relay').element.value).toBe('https://relay.official.test')
+		expect(button('Use the official relay')).toBeUndefined()
+		// a trailing slash is still the official relay
+		await field('relay').setValue('https://relay.official.test/')
+		expect(button('Use the official relay')).toBeUndefined()
+	})
+
+	it('offers the official relay again next to the field of a master over another relay', async () => {
+		fleetApi.status.mockReturnValue(answer({ ...RELAY_MASTER, default_relay: 'https://relay.official.test' }))
+		await open()
+		await button('Use the official relay').trigger('click')
+		expect(field('relay').element.value).toBe('https://relay.official.test')
+	})
+
 	it('shows the old address flow when the core reports neither default_relay nor relay', async () => {
 		fleetApi.status.mockReturnValue(answer(OLD_NONE))
 		await open()

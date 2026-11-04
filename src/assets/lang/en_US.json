@@ -2782,6 +2782,8 @@
   "Address the boxes join it at": "Address the boxes join it at",
   "Relay server": "Relay server",
   "The official ReCasaOS relay unless you run your own": "The official ReCasaOS relay unless you run your own",
+  "Use the official relay": "Use the official relay",
+  "The relay sees which boxes connect and when, never what they exchange.": "The relay sees which boxes connect and when, never what they exchange.",
   "Advanced settings": "Advanced settings",
   "The relay must start with https://": "The relay must start with https://",
   "Address on the private network": "Address on the private network",

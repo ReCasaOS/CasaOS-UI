@@ -36,6 +36,7 @@
 							<b-field :label="$t('Relay server')">
 								<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
 							</b-field>
+							<b-button v-if="notOfficial" class="mb-2 px-0" size="is-small" type="is-text" @click="relay = officialRelay">{{ $t('Use the official relay') }}</b-button>
 							<b-button :disabled="busy" :loading="busy" outlined rounded size="is-small" @click="confirmRelay">{{ $t('Change the relay') }}</b-button>
 						</template>
 					</template>
@@ -44,6 +45,8 @@
 							<b-field :label="$t('Relay server')" :message="$t('The official ReCasaOS relay unless you run your own')">
 								<b-input v-model="relay" name="relay" placeholder="https://" type="url" />
 							</b-field>
+							<b-button v-if="notOfficial" class="mb-2 px-0" size="is-small" type="is-text" @click="relay = officialRelay">{{ $t('Use the official relay') }}</b-button>
+							<p class="is-size-7 mb-3">{{ $t('The relay sees which boxes connect and when, never what they exchange.') }}</p>
 							<b-field>
 								<b-switch v-model="advanced" size="is-small">{{ $t('Advanced settings') }}</b-switch>
 							</b-field>
@@ -114,6 +117,13 @@ export default {
 		relayCapable() {
 			const v = this.view
 			return !!(v?.default_relay || v?.relay || v?.master?.relay)
+		},
+		officialRelay() {
+			return this.view?.default_relay || OFFICIAL_RELAY
+		},
+		// the field holds another relay than the official one (a trailing slash is the same relay)
+		notOfficial() {
+			return this.relay.trim().replace(/\/+$/, '') !== this.officialRelay.replace(/\/+$/, '')
 		},
 		boxes() {
 			return Array.isArray(this.view?.master?.boxes) ? this.view.master.boxes : []
