@@ -246,3 +246,41 @@ describe('health strip fleet link', () => {
 		expect(openFleet).toHaveBeenCalledWith(buefy, wrapper.vm.$store.state)
 	})
 })
+
+describe('health strip opens the dialogs behind its panels', () => {
+	const failed = [{ started_at: '2026-11-03T03:00:00Z', error: 'no route to host' }]
+
+	it('opens the Storage manager from the storage panel and the SnapRAID tile', async () => {
+		const emit = vi.fn()
+		const wrapper = strip({ emit, snapraid: () => Promise.resolve({ data: { data: { configured: true, last: {} } } }) })
+		await settle()
+
+		await wrapper.find('.storage .panel-action').trigger('click')
+		await wrapper.findAll('.tile').find(tile => tile.text().includes('SnapRAID')).trigger('click')
+
+		expect(emit).toHaveBeenCalledTimes(2)
+		expect(emit).toHaveBeenCalledWith('casaUI:openStorageManager')
+	})
+
+	it('opens the backups dialog, with the restore, from the backups panel and tile', async () => {
+		const open = vi.fn()
+		const wrapper = strip({ buefy: { modal: { open } } })
+		await settle()
+
+		await wrapper.find('.backups .panel-action').trigger('click')
+		await wrapper.findAll('.tile').find(tile => tile.text().includes('Backups')).trigger('click')
+
+		expect(open).toHaveBeenCalledTimes(2)
+		expect(open.mock.calls[0][0]).toMatchObject({ customClass: 'backup-modal', hasModalCard: true })
+	})
+
+	it('opens what a failure is about: a failed backup opens the backups dialog', async () => {
+		const open = vi.fn()
+		const wrapper = strip({ runs: failed, buefy: { modal: { open } } })
+		await settle()
+
+		await wrapper.find('.attention .attention-item').trigger('click')
+
+		expect(open).toHaveBeenCalledTimes(1)
+	})
+})

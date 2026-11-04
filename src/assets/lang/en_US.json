@@ -2826,5 +2826,7 @@
   "Your files": "Your files",
   "CPU, memory, disks": "CPU, memory, disks",
   "Updates: {count}": "Updates: {count}",
-  "VMs: {count}": "VMs: {count}"
+  "VMs: {count}": "VMs: {count}",
+  "Manage storage": "Manage storage",
+  "Backups and restore": "Backups and restore"
 }
