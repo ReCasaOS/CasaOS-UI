@@ -23,6 +23,8 @@
 				<AppSection compact system-first />
 			</section>
 		</HealthStrip>
+
+		<BetaTabBar />
 	</div>
 </template>
 
@@ -31,6 +33,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import CoreService from '@/components/CoreService.vue'
 import AppSection from '@/components/Apps/AppSection.vue'
 import HealthStrip from '@/components/dashboard/HealthStrip.vue'
+import BetaTabBar from '@/components/dashboard/BetaTabBar.vue'
 
 export default {
 	name: 'DashboardBeta',
@@ -39,6 +42,7 @@ export default {
 		CoreService,
 		AppSection,
 		HealthStrip,
+		BetaTabBar,
 	},
 	emits: ['leave'],
 	computed: {
@@ -50,6 +54,15 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+// the fixed tab bar of a phone must not cover the last cards
+.dashboard-beta {
+	padding-bottom: 4.5rem;
+
+	@include desktop {
+		padding-bottom: 0;
+	}
+}
+
 // a narrow screen puts the button under the title instead of squeezing the title into four lines
 .beta-bar {
 	flex-wrap: wrap;
