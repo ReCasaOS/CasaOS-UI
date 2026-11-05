@@ -1011,6 +1011,11 @@ export default {
 		 * @return {*}
 		 */
 		handleRemove() {
+			this.confirmDelete(this.selectedArray, () => this.handleClose())
+		},
+
+		// shared by the toolbar and the right-click menu: a reliable modal, not an inline confirm the menu can dismiss before the second click
+		confirmDelete(items, afterConfirm) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Deleting files'),
 				// 30: trash.Retention in the core
@@ -1021,8 +1026,10 @@ export default {
 				hasIcon: true,
 				onConfirm: () => {
 					const permanent = document.getElementById('deletePermanently')?.checked === true
-					this.deleteItem(this.selectedArray, permanent)
-					this.handleClose()
+					this.deleteItem(items, permanent)
+					if (afterConfirm) {
+						afterConfirm()
+					}
 				},
 			})
 		},
