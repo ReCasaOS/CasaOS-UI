@@ -109,6 +109,26 @@
 						{{ $t('The bucket you made at your provider. Without one, each app is put in a bucket named after it, which most providers refuse because bucket names are shared by everyone.') }}
 					</p>
 
+					<div v-if="canSignIn(draft.backend)" class="mb-3">
+						<b-button :loading="busy === 'signin'" rounded size="is-small" type="is-info" @click="startSignIn">
+							{{ $t('Sign in with {provider}', { provider: backendLabel(draft.backend) }) }}
+						</b-button>
+						<template v-if="signIn.url">
+							<a :href="signIn.url" class="is-size-7 ml-2" rel="noopener noreferrer" target="_blank">{{ $t('Open the sign-in page again') }}</a>
+							<p class="_has-text-gray is-size-7 mt-2 mb-1">
+								{{ $t('When you are done, your browser shows a page that does not load (127.0.0.1:53682). That is expected: copy the whole address of that page from the address bar and paste it below.') }}
+							</p>
+							<div class="is-flex">
+								<b-input v-model="signIn.redirected" :placeholder="$t('Address of the page that did not load')" autocomplete="off"
+									class="mr-1" expanded size="is-small" />
+								<b-button :disabled="!signIn.redirected" :loading="busy === 'signin-finish'" rounded size="is-small"
+									type="is-primary" @click="finishSignIn">
+									{{ $t('Finish sign-in') }}
+								</b-button>
+							</div>
+						</template>
+					</div>
+
 					<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
 						{{ $t(backendHelp(draft.backend)) }}
 					</p>
@@ -174,7 +194,7 @@
 import BackupHistory from './BackupHistory.vue'
 import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import BackupSchedules from './BackupSchedules.vue'
-import { BACKUP_BACKENDS, backendHelp, parametersFrom, suggestedFields } from './backupBackends'
+import { BACKUP_BACKENDS, backendHelp, canSignIn, parametersFrom, suggestedFields } from './backupBackends'
 import { renderSize } from '@/mixins/file_utils'
 
 const CHECK_POLL_MS = 3000
@@ -199,6 +219,8 @@ export default {
 			backends: BACKUP_BACKENDS,
 			draft: { name: '', backend: 's3', root: '', rows: suggestedFields('s3'), encrypt: false, password: '' },
 			systemDestination: '',
+			// the sign-in waiting: the provider's address, and what was pasted back
+			signIn: { url: '', redirected: '' },
 		}
 	},
 	mounted() {
@@ -246,6 +268,54 @@ export default {
 		// A value that looks like a credential is not shown while it is typed. The
 		// field names are rclone's, and its secrets are consistently named.
 		backendHelp,
+		canSignIn,
+
+		backendLabel(id) {
+			const backend = BACKUP_BACKENDS.find(candidate => candidate.id === id)
+			return backend ? backend.label : id
+		},
+
+		// The box runs rclone authorize and gives back the provider's address.
+		async startSignIn() {
+			this.busy = 'signin'
+			try {
+				const url = (await this.$api.backup.signIn(this.draft.backend)).data.data.url
+				// it ends up in an href: nothing but a web address belongs there
+				if (!/^https:\/\//.test(url))
+					throw new Error('unexpected sign-in address')
+
+				this.signIn = { url, redirected: '' }
+				window.open(url, '_blank', 'noopener,noreferrer')
+			} catch (error) {
+				this.toastError(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		async finishSignIn() {
+			this.busy = 'signin-finish'
+			try {
+				const token = (await this.$api.backup.signInFinish(this.signIn.redirected)).data.data.token
+				const row = this.draft.rows.find(candidate => candidate.key === 'token')
+				if (row)
+					row.value = token
+				else
+					this.draft.rows.push({ key: 'token', value: token })
+
+				this.signIn = { url: '', redirected: '' }
+				this.$buefy.toast.open({ message: this.$t('Signed in: the token is filled in below. Save the destination to keep it.'), type: 'is-success', duration: 6000 })
+			} catch (error) {
+				this.toastError(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		toastError(error) {
+			const data = error.response && error.response.data
+			this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+		},
 
 		isSecret(key) {
 			return /pass|secret|key|token/i.test(key || '') && !/key_file|public/i.test(key || '')
@@ -253,6 +323,7 @@ export default {
 
 		fillSuggestions(backend) {
 			this.draft.rows = suggestedFields(backend)
+			this.signIn = { url: '', redirected: '' }
 		},
 
 		async load() {
