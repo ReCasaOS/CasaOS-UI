@@ -58,6 +58,7 @@
 <script>
 import TreeListItem from './TreeListItem.vue'
 import { apiErrorMessage, emptyCloudOnError } from './apiError.js'
+import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
 
@@ -128,6 +129,9 @@ export default {
 				console.log(error)
 			}
 
+			// the SnapRAID parity disk holds only parity files: browsing it risks the protection, so it stays out of the file manager
+			const held = snapraidHeld(await this.$api.disks.snapraid().then(res => res.data.data?.config, () => undefined))
+
 			// Local Storage
 			try {
 				const storageRes = await this.$api.storage.list()
@@ -135,6 +139,9 @@ export default {
 				const usbStorageArray = []
 				storageRes.data.data.forEach((item) => {
 					item.children.forEach((part) => {
+						if (held[part.mount_point] === 'parity') {
+							return
+						}
 						if (!mergeRes.find(mp => mp === part.uuid)) {
 							if (item.type === 'usb') {
 								usbStorageArray.push(part)
@@ -398,30 +405,7 @@ export default {
 		},
 		storage_status() {
 			setTimeout(() => {
-				this.$api.storage
-					.list()
-					.then((res) => {
-						const storageArray = []
-						res.data.data.forEach((item) => {
-							item.children.forEach((part) => {
-								storageArray.push(part)
-							})
-						})
-						this.localStorageList = storageArray.map((storage) => {
-							return {
-								name: storage.label,
-								icon: 'storage-other',
-								pack: 'casa',
-								path: storage.mount_point,
-								visible: true,
-								selected: true,
-								extensions: null,
-							}
-						})
-					})
-					.catch((error) => {
-						console.log(apiErrorMessage(error))
-					})
+				this.getLocalStorage()
 			}, 500)
 		},
 		'casaos:file:recover': function (data) {
