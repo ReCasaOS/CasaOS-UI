@@ -8,6 +8,19 @@ export function createLocalStream({ url, WebSocket = globalThis.WebSocket, onRow
 	let delay = 1000
 	let openedAt = null
 	let active = false
+	let pending = []
+	let flushTimer = null
+
+	// rows of one macrotask reach the page as one batch
+	function queue(row) {
+		pending.push(row)
+		flushTimer ??= setTimeout(() => {
+			const rows = pending
+			pending = []
+			flushTimer = null
+			onRows(rows)
+		}, 0)
+	}
 
 	function lost(ws) {
 		if (ws !== socket || !active) {
@@ -37,16 +50,15 @@ export function createLocalStream({ url, WebSocket = globalThis.WebSocket, onRow
 			onState?.('open')
 		}
 		ws.onmessage = (ev) => {
-			let m
 			try {
-				m = JSON.parse(ev.data)
+				const m = JSON.parse(ev.data)
+				if (m.t === 'line' || m.t === 'event') {
+					queue(toRow(m[m.t]))
+				} else if (m.t === 'lag') {
+					onLag?.(m.dropped)
+				}
 			} catch {
-				return
-			}
-			if (m.t === 'line' || m.t === 'event') {
-				onRows([toRow(m[m.t])])
-			} else if (m.t === 'lag') {
-				onLag?.(m.dropped)
+				// a malformed message is dropped
 			}
 		}
 		ws.onclose = () => lost(ws)
@@ -68,6 +80,9 @@ export function createLocalStream({ url, WebSocket = globalThis.WebSocket, onRow
 			active = false
 			clearTimeout(timer)
 			timer = null
+			clearTimeout(flushTimer)
+			flushTimer = null
+			pending = []
 			socket?.close?.()
 			socket = null
 			onState?.('closed')
@@ -105,6 +120,8 @@ export function createRelayPoller({ ask, intervalMs = 3000, maxPages = 5, onRows
 					onState?.('open')
 				}
 				const { lines = [], events = [], next = '' } = res.data ?? {}
+				// the cursor moves before the rows are handed over, so a throwing handler cannot replay the page forever
+				cursor = next || cursor
 				const rows = [...lines, ...events].map(toRow)
 				if (rows.length) {
 					onRows(rows)
@@ -112,14 +129,15 @@ export function createRelayPoller({ ask, intervalMs = 3000, maxPages = 5, onRows
 				if (!next) {
 					break
 				}
-				cursor = next
 				if (pages >= maxPages) {
 					onSkipped?.()
 					break
 				}
 			}
 		} catch {
-			// a thrown ask or handler: the chain goes on
+			// a thrown ask or handler: shown as a failure, and the chain goes on
+			failing = true
+			onState?.('retrying')
 		}
 		if (mine === generation && active) {
 			timer = setTimeout(tick, intervalMs)

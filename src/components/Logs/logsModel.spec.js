@@ -23,6 +23,14 @@ describe('logsModel', () => {
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'updated', from_image: 'x:1', to_image: 'x:2' })).toMatchObject({ level: 'info', text: 'a/s updated from x:1 to x:2' })
 	})
 
+	it('never throws on a malformed row', () => {
+		expect(toRow({ at: 'garbage', text: 'x' }).at).toEqual(new Date(0))
+		expect(toRow(null).kind).toBe('line')
+		expect(toRow({ at: 'x', app: 'a', service: 's', kind: 'died' }).text).toBe('a/s died')
+		expect(skippedMarker(2).key).toBe('marker/0/2')
+		expect(colorOf(null)).toBe(0)
+	})
+
 	it('guesses levels like the server', () => {
 		expect(levelOf('e', 'ok')).toBe('warn')
 		expect(levelOf('o', 'ERROR x')).toBe('error')
@@ -45,10 +53,26 @@ describe('logsModel', () => {
 		const second = insertRows(first.buffer, late, first.keys)
 		expect(second.buffer.map(r => r.at.toISOString().slice(11, 16))).toEqual(['10:00', '10:01', '10:02'])
 		expect(first.buffer).toEqual(before)
-		expect(first.keys.size).toBe(2)
 		expect(late).toHaveLength(1)
-		expect(second.keys.size).toBe(3)
 		expect(second.dropped).toBe(0)
+	})
+
+	it('updates the key set of the caller in place and returns it', () => {
+		const keys = new Set()
+		const { buffer, keys: same } = insertRows([], [row('10:00')], keys)
+		expect(same).toBe(keys)
+		expect([...keys]).toEqual([buffer[0].key])
+		insertRows(buffer, [row('10:01')], keys)
+		expect(keys.size).toBe(2)
+	})
+
+	it('appends a newer batch the same way the sort path would place it', () => {
+		const base = insertRows([], [row('10:00'), row('10:01')]).buffer
+		const batch = [row('10:01', 'tie'), row('10:02'), row('10:03')]
+		const appended = insertRows(base, batch).buffer
+		expect(appended.slice(0, 2)).toEqual(base)
+		const sorted = insertRows(base, [...batch].reverse()).buffer
+		expect(appended.map(r => r.key)).toEqual(sorted.map(r => r.key))
 	})
 
 	it('drops a row whose key is already there', () => {

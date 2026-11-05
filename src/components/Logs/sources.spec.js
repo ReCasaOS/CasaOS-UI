@@ -43,21 +43,33 @@ describe('createLocalStream', () => {
 	}
 
 	it('hands rows and lag over', () => {
-		const { h } = open()
+		const { t, h } = open()
 		const ws = FakeSocket.all[0]
 		expect(ws.url).toBe('ws://x')
 		ws.onopen()
 		expect(h.onState).toHaveBeenCalledWith('open')
 		ws.onmessage({ data: JSON.stringify({ t: 'line', line }) })
+		expect(h.onRows).not.toHaveBeenCalled()
+		t.run()
 		expect(h.onRows).toHaveBeenCalledTimes(1)
 		expect(h.onRows.mock.calls[0][0]).toHaveLength(1)
 		expect(h.onRows.mock.calls[0][0][0].kind).toBe('line')
-		ws.onmessage({ data: JSON.stringify({ t: 'event', event: { ...line, kind: 'started' } }) })
-		expect(h.onRows.mock.calls[1][0][0].kind).toBe('event')
 		ws.onmessage({ data: '{"t":"lag","dropped":5}' })
 		expect(h.onLag).toHaveBeenCalledWith(5)
-		ws.onmessage({ data: 'not json' })
-		expect(h.onRows).toHaveBeenCalledTimes(2)
+		for (const data of ['not json', 'null', '{"t":"line"}', '{}']) {
+			expect(() => ws.onmessage({ data })).not.toThrow()
+		}
+	})
+
+	it('delivers the messages of one macrotask as one batch', () => {
+		const { t, h } = open()
+		const ws = FakeSocket.all[0]
+		ws.onmessage({ data: JSON.stringify({ t: 'line', line }) })
+		ws.onmessage({ data: JSON.stringify({ t: 'event', event: { ...line, kind: 'started' } }) })
+		expect(t.delays).toEqual([0])
+		t.run()
+		expect(h.onRows).toHaveBeenCalledTimes(1)
+		expect(h.onRows.mock.calls[0][0].map(r => r.kind)).toEqual(['line', 'event'])
 	})
 
 	it('reconnects after 1000, 2000, 4000 … capped at 30000 ms', () => {
@@ -150,6 +162,17 @@ describe('createRelayPoller', () => {
 		expect(h.onState).toHaveBeenCalledWith('retrying')
 		t.run()
 		await vi.waitFor(() => expect(h.onState).toHaveBeenCalledWith('open'))
+	})
+
+	it('says retrying when ask rejects, and recovers', async () => {
+		const { p, t, ask, h } = poll([])
+		ask.mockImplementationOnce(() => Promise.reject(new Error('down')))
+		p.start()
+		await vi.waitFor(() => expect(t.delays).toHaveLength(1))
+		expect(h.onState.mock.calls).toEqual([['retrying']])
+		t.run()
+		await vi.waitFor(() => expect(h.onState).toHaveBeenLastCalledWith('open'))
+		expect(ask).toHaveBeenCalledTimes(2)
 	})
 
 	it('asks nothing more after stop, and ignores the answer in flight', async () => {
