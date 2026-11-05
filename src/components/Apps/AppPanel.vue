@@ -1410,13 +1410,14 @@ export default {
 				})
 				.catch((e) => {
 					this.installStarted = false
-					if (e.response.status === 400) {
+					if (e?.response?.status === 400) {
 						this.dockerComposeConfig = dockerComposeCommands
 						this.currentSlide = 1
 						this.errInfo = e.response.data.data
 					}
+					// The body is an object: as the message it read "[object Object]".
 					this.$buefy.toast.open({
-						message: e.response.data || e.response.status,
+						message: escape(e?.response?.data?.message || String(e?.response?.status || e)),
 						type: 'is-danger',
 					})
 				})

@@ -185,6 +185,8 @@ export default {
 			this.$openAPI.appManagement.image.pruneDanglingImages().then((res) => {
 				this.$buefy.toast.open({
 					message: this.$t('Freed {size}', { size: this.renderSize(res.data.data?.size ?? 0) }),
+					// Without a type Buefy paints it is-dark, under the theme's dark toast text.
+					type: 'is-success',
 					position: 'is-top',
 					duration: 5000,
 				})
