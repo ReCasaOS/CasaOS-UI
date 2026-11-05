@@ -2891,5 +2891,7 @@
   "Used (MB)": "Used (MB)",
   "Oldest line": "Oldest line",
   "{app} is restarting": "{app} is restarting",
-  "{app} is stopping": "{app} is stopping"
+  "{app} is stopping": "{app} is stopping",
+  "Jump to now": "Now",
+  "The logs could not be read": "The logs could not be read"
 }

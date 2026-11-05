@@ -2,6 +2,7 @@
 	<div :class="{ 'is-embedded': embedded }" class="log-stream">
 		<p v-if="state === 'outdated'" class="log-note" role="status">{{ $t('Update this box to read its logs') }}</p>
 		<div v-else-if="state === 'error'" class="log-note" role="status">
+			<span class="mr-2">{{ $t('The logs could not be read') }}</span>
 			<b-button rounded size="is-small" @click="start">{{ $t('Retry') }}</b-button>
 		</div>
 
@@ -48,7 +49,7 @@
 <script>
 import { shallowRef } from 'vue'
 import FileSaver from 'file-saver'
-import { MAX_LINES, colorOf, insertRows, skippedMarker, toRow } from './logsModel'
+import { MAX_LINES, colorOf, cursorAt, insertRows, skippedMarker, toRow } from './logsModel'
 import { createLocalStream, createRelayPoller } from './sources'
 import { visibleRange } from './virtualList'
 import { logsApi } from '@/service/logs'
@@ -79,9 +80,18 @@ const ICONS = {
 	'created': 'plus-circle-outline',
 }
 
-// A cursor just before a moment, for a forwards walk from it: the server orders by time first.
-// Written as text: nanoseconds since 1970 pass Number's precision.
-export const cursorAt = date => `${new Date(date).getTime() - 1}999999:0:_`
+// a blob request's error body is a Blob too: the server's JSON message is inside it
+async function messageOf(e) {
+	let body = e?.response?.data
+	if (typeof body?.text === 'function') {
+		try {
+			body = JSON.parse(await body.text())
+		} catch {
+			body = null
+		}
+	}
+	return (typeof body?.message === 'string' && body.message) || e?.message || ''
+}
 
 const rowsOf = res => [...(res.data?.lines ?? []), ...(res.data?.events ?? [])].map(toRow)
 const pad = (n, w = 2) => String(n).padStart(w, '0')
@@ -143,6 +153,7 @@ export default {
 		this.keys = new Set()
 		this.pending = []
 		this.held = []
+		this.heldKeys = new Set()
 		this.flushTimer = null
 		this.lastSkip = 0
 		this.manual = false
@@ -168,8 +179,9 @@ export default {
 			if (this.apps?.length) {
 				p.app = [...this.apps]
 			}
-			if (this.services?.length) {
-				p.service = [...this.services]
+			const names = this.serviceScope().names
+			if (names.length) {
+				p.service = names
 			}
 			if (f.stream) {
 				p.stream = f.stream
@@ -184,6 +196,20 @@ export default {
 				}
 			}
 			return p
+		},
+		// `services` holds names, or "app/service" pairs. The server's filter is apps × services: when the pairs
+		// span several apps, only the apps are asked for and the pairs are kept here (keep).
+		serviceScope() {
+			const list = this.services ?? []
+			const apps = new Set(list.map(x => (x.includes('/') ? x.split('/')[0] : '')))
+			if (apps.size <= 1) {
+				return { names: list.map(x => x.split('/').pop()), keep: null }
+			}
+			return { names: [], keep: new Set(list) }
+		},
+		wanted(rows) {
+			const keep = this.serviceScope().keep
+			return keep ? rows.filter(r => r.kind === 'marker' || keep.has(`${r.app}/${r.service}`)) : rows
 		},
 		until() {
 			if (this.focused && this.focusAt) {
@@ -205,8 +231,10 @@ export default {
 			this.keys = new Set()
 			this.pending = []
 			this.held = []
+			this.heldKeys = new Set()
 			this.newCount = 0
 			this.expanded = null
+			this.lastLiveAt = null
 			this.oldestCursor = ''
 			this.newestCursor = ''
 			this.exhausted = false
@@ -233,6 +261,7 @@ export default {
 			this.merge(second.ok ? [...rowsOf(first), ...rowsOf(second)] : rowsOf(first))
 			this.newestCursor = (second.ok && second.data?.next) || since
 			this.state = 'open'
+			this.toasted = false
 			await this.$nextTick()
 			if (this.focused) {
 				this.scrollToFocus()
@@ -272,7 +301,14 @@ export default {
 				this.source = createLocalStream({
 					url: () => logsApi.streamUrl(base, this.$store?.state?.access_token, { wsProtocol: this.$wsProtocol, baseURL: this.$baseURL }),
 					WebSocket: this.wsFactory || window.WebSocket,
-					onRows: rows => this.receive(rows),
+					onRows: (rows) => {
+						for (const r of rows) {
+							if (!this.lastLiveAt || r.at > this.lastLiveAt) {
+								this.lastLiveAt = r.at
+							}
+						}
+						this.receive(rows)
+					},
 					onLag: (n) => {
 						this.$emit('lag', n)
 						this.receive([skippedMarker(n, new Date())])
@@ -298,18 +334,25 @@ export default {
 			this.connected = s === 'open'
 			this.emitStatus()
 		},
+		// From the last live row the socket gave (the rows of that millisecond come again, merged by key), or from
+		// the load's cursor when none came.
 		async fillGap() {
 			const gen = this.generation
+			let cursor = this.lastLiveAt ? cursorAt(this.lastLiveAt) : this.newestCursor
 			for (let i = 0; i < GAP_PAGES; i++) {
-				const res = await logsApi.query(this.box, { ...this.params(), since: this.newestCursor, limit: FORWARD_PAGE })
+				const res = await logsApi.query(this.box, { ...this.params(), since: cursor, limit: FORWARD_PAGE })
 				if (gen !== this.generation || !res.ok) {
 					return
 				}
-				this.newestCursor = res.data?.next || this.newestCursor
-				this.receive(rowsOf(res))
-				if ((res.data?.lines?.length ?? 0) < FORWARD_PAGE) {
+				const rows = rowsOf(res)
+				this.receive(rows)
+				const next = res.data?.next
+				// a page cut by size is short but not the last: only an empty page or a cursor that stays put ends
+				if (!rows.length || !next || next === cursor) {
 					return
 				}
+				cursor = next
+				this.newestCursor = next
 			}
 		},
 		skipped() {
@@ -333,10 +376,14 @@ export default {
 			const rows = this.pending
 			this.pending = []
 			if (this.paused) {
-				// held aside, not merged: the list under the reader's eyes does not move
-				this.held = this.held.concat(rows)
+				// held aside, not merged: the list under the reader's eyes does not move; rows read again after a
+				// reconnect are not counted twice
+				const fresh = this.wanted(rows).filter(r => !this.keys.has(r.key) && !this.heldKeys.has(r.key))
+				fresh.forEach(r => this.heldKeys.add(r.key))
+				this.held = this.held.concat(fresh)
 				if (this.held.length > MAX_LINES) {
 					this.held = this.held.slice(-MAX_LINES)
+					this.heldKeys = new Set(this.held.map(r => r.key))
 				}
 				this.newCount = this.held.length
 				return
@@ -346,11 +393,11 @@ export default {
 		},
 		merge(rows) {
 			const since = this.range?.since ? new Date(this.range.since) : null
-			const kept = since ? rows.filter(r => r.at >= since) : rows
-			if (kept.length < rows.length) {
+			const inRange = since ? rows.filter(r => r.at >= since) : rows
+			if (inRange.length < rows.length) {
 				this.exhausted = true
 			}
-			this.buffer = insertRows(this.buffer, kept, this.keys).buffer
+			this.buffer = insertRows(this.buffer, this.wanted(inRange), this.keys).buffer
 			this.emitStatus()
 		},
 		emitStatus() {
@@ -432,6 +479,7 @@ export default {
 			this.manual = false
 			const held = this.held
 			this.held = []
+			this.heldKeys = new Set()
 			this.newCount = 0
 			this.merge(held)
 			this.$nextTick(() => this.scrollToBottom())
@@ -439,7 +487,9 @@ export default {
 		clear() {
 			this.buffer = []
 			this.keys = new Set()
+			this.pending = []
 			this.held = []
+			this.heldKeys = new Set()
 			this.newCount = 0
 			this.expanded = null
 			// what was cleared does not come back from the top
@@ -470,17 +520,20 @@ export default {
 					}
 					const lines = res.data?.lines ?? []
 					for (const l of lines) {
-						out.push(`${l.at} ${l.stream} ${l.text}\n`)
+						out.push(`${l.at} ${l.stream} ${l.text}
+`)
 					}
-					if (lines.length < FORWARD_PAGE || !res.data.next) {
+					// a page cut by size is short but not the last: only an empty page or a cursor that stays put ends
+					const next = res.data?.next
+					if (!lines.length || !next || next === cursor) {
 						break
 					}
-					cursor = res.data.next
+					cursor = next
 				}
 				const name = `recasaos-logs-${this.apps?.length === 1 ? this.apps[0] : 'all'}-${this.range?.since ? stamp(this.range.since) : 'start'}-${p.until ? stamp(p.until) : 'now'}.log`
 				FileSaver.saveAs(new Blob(out, { type: 'text/plain' }), name)
 			} catch (e) {
-				this.$buefy?.toast.open({ message: e?.response?.data?.message || e?.message || this.$t('Error'), type: 'is-danger' })
+				this.$buefy?.toast.open({ message: (await messageOf(e)) || this.$t('Error'), type: 'is-danger' })
 			}
 		},
 

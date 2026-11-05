@@ -2,6 +2,7 @@
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import FileSaver from 'file-saver'
 import LogStream from './LogStream.vue'
 import { logsApi } from '@/service/logs'
 import i18n from '@/plugins/i18n'
@@ -9,6 +10,7 @@ import i18n from '@/plugins/i18n'
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/service.js', () => ({ instance: { request: vi.fn() } }))
+vi.mock('file-saver', () => ({ default: { saveAs: vi.fn() } }))
 vi.mock('@/service/logs', () => ({ logsApi: { query: vi.fn(), apps: vi.fn(), exportUrl: vi.fn(), streamUrl: vi.fn(() => 'ws://box/logs/stream') } }))
 
 class FakeSocket {
@@ -27,7 +29,9 @@ class FakeSocket {
 	}
 }
 
-const line = (n, app = 'plex') => ({ at: `2026-11-06T10:00:0${n}Z`, app, service: app, container: app, stream: 'o', text: `line ${n}` })
+const line = (n, app = 'plex', service = app) => ({ at: `2026-11-06T10:00:${String(n).padStart(2, '0')}Z`, app, service, container: `${app}-${service}`, stream: 'o', text: `line ${n}` })
+// cursorAt(line(4).at)
+const AFTER_4 = '1793959203999999999:0:_'
 const page = (lines, next = '') => Promise.resolve({ ok: true, status: 200, data: { lines, events: [], next } })
 const LINES = [line(1), line(2), line(3)]
 
@@ -114,14 +118,58 @@ describe('the log stream', () => {
 		expect(rows()).toHaveLength(5)
 	})
 
-	it('fills the gap from the newest cursor after a reconnect', async () => {
+	it('fills the gap from the last live row after a reconnect, not from the page load', async () => {
 		await mountStream()
 		socket().onopen()
+		socket().send({ t: 'line', line: line(4) })
+		await tick()
 		socket().onclose()
 		await tick(1000)
 		socket().onopen()
 		await flushPromises()
-		expect(logsApi.query).toHaveBeenLastCalledWith(null, { app: ['plex'], since: 'c3', limit: 1000 })
+		expect(logsApi.query).toHaveBeenNthCalledWith(3, null, { app: ['plex'], since: AFTER_4, limit: 1000 })
+	})
+
+	it('does not count again, while scrolled up, the rows a reconnect reads again', async () => {
+		await mountStream()
+		const el = wrapper.find('.log-scroller').element
+		Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true })
+		Object.defineProperty(el, 'clientHeight', { value: 200, configurable: true })
+		Object.defineProperty(el, 'scrollTop', { value: 100, writable: true, configurable: true })
+		el.dispatchEvent(new Event('scroll'))
+		socket().onopen()
+		socket().send({ t: 'line', line: line(4) })
+		await tick()
+		logsApi.query.mockImplementation((box, p) => (p.since === AFTER_4 ? page([...LINES, line(4), line(5)], 'c5') : page([], '')))
+		socket().onclose()
+		await tick(1000)
+		socket().onopen()
+		await flushPromises()
+		await tick()
+		expect(wrapper.find('.log-banner').text()).toBe('2 new lines')
+	})
+
+	it('pages a fleet box download past pages cut short, to the empty one', async () => {
+		await mountStream({ box: 'b1', range: { since: null, until: '2026-11-06T11:00:00Z' } })
+		const forty = from => Array.from({ length: 40 }, (_, i) => line(from + i))
+		logsApi.query.mockImplementation((box, p) => page(...({ '0:0:_': [forty(0), 'p1'], 'p1': [forty(40), 'p2'] }[p.since] ?? [[], ''])))
+		await wrapper.vm.download()
+		const blob = FileSaver.saveAs.mock.calls[0][0]
+		expect((await blob.text()).trim().split(/\n/)).toHaveLength(80)
+		expect(logsApi.query.mock.calls.slice(-3).map(c => c[1].since)).toEqual(['0:0:_', 'p1', 'p2'])
+	})
+
+	it('asks by app and keeps the pairs here when services of several apps are ticked', async () => {
+		const mixed = [line(1, 'a', 'web'), line(2, 'a', 'db'), line(3, 'b', 'web')]
+		logsApi.query.mockImplementation((box, p) => (p.since ? page(mixed, 'c3') : page([...mixed].reverse(), 'c1')))
+		await mountStream({ apps: ['a', 'b'], services: ['a/web', 'b/web'] })
+		expect(logsApi.query).toHaveBeenNthCalledWith(1, null, { app: ['a', 'b'], limit: 500 })
+		expect(rows().map(r => r.find('.log-text').text())).toEqual(['line 1', 'line 3'])
+	})
+
+	it('sends the service names when the ticked services are of one app', async () => {
+		await mountStream({ services: ['plex/web', 'plex/db'] })
+		expect(logsApi.query).toHaveBeenNthCalledWith(1, null, { app: ['plex'], service: ['web', 'db'], limit: 500 })
 	})
 
 	it('says to update a box without the logs routes', async () => {

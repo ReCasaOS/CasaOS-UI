@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_LINES, colorOf, insertRows, levelOf, parseQuery, rangeBounds, skippedMarker, toRow } from './logsModel'
+import { MAX_LINES, colorOf, cursorAt, insertRows, levelOf, parseQuery, rangeBounds, skippedMarker, toRow } from './logsModel'
 
 const line = (at, text = 'hi', extra = {}) => ({ at, app: 'jf', service: 'web', container: 'jf-web', stream: 'o', text, ...extra })
 const row = (at, text) => toRow(line(`2026-11-05T${at}:00Z`, text))
@@ -110,5 +110,11 @@ describe('logsModel', () => {
 		expect(rangeBounds('7d', now).since).toEqual(new Date(now.getTime() - 7 * 86400000))
 		const since = new Date(0)
 		expect(rangeBounds('custom', now, { since, until: null })).toEqual({ since, until: null })
+	})
+})
+
+describe('cursorAt', () => {
+	it('is the nanosecond just before the moment', () => {
+		expect(cursorAt('2026-11-06T10:00:04Z')).toBe('1793959203999999999:0:_')
 	})
 })

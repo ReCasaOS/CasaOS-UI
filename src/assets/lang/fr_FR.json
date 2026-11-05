@@ -2894,5 +2894,7 @@
   "Used (MB)": "Utilisé (Mo)",
   "Oldest line": "Ligne la plus ancienne",
   "{app} is restarting": "{app} redémarre",
-  "{app} is stopping": "{app} s'arrête"
+  "{app} is stopping": "{app} s'arrête",
+  "Jump to now": "Maintenant",
+  "The logs could not be read": "Les journaux n'ont pas pu être lus"
 }

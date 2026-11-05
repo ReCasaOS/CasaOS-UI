@@ -38,7 +38,7 @@
 							</div>
 							<ul v-if="open[app.app]" class="logs-services">
 								<li v-for="s in app.services" :key="s.container">
-									<b-checkbox :model-value="selectedServices.includes(s.service)" size="is-small" @update:model-value="toggleService(app.app, s.service, $event)">
+									<b-checkbox :model-value="selectedServices.includes(`${app.app}/${s.service}`)" size="is-small" @update:model-value="toggleService(app.app, s.service, $event)">
 										{{ s.service }}
 									</b-checkbox>
 								</li>
@@ -75,7 +75,7 @@
 						</b-select>
 						<div class="logs-actions">
 							<b-button rounded size="is-small" @click="togglePause">{{ status.paused ? $t('Resume') : $t('Pause') }}</b-button>
-							<b-button rounded size="is-small" @click="$refs.stream.jumpToNow()">{{ $t('Now') }}</b-button>
+							<b-button rounded size="is-small" @click="$refs.stream.jumpToNow()">{{ $t('Jump to now') }}</b-button>
 							<b-button rounded size="is-small" @click="$refs.stream.download()">{{ $t('Download') }}</b-button>
 							<b-button rounded size="is-small" @click="$refs.stream.clear()">{{ $t('Clear') }}</b-button>
 							<template v-if="controlled">
@@ -241,12 +241,13 @@ export default {
 		toggleApp(name, on) {
 			this.selectedApps = on ? [...this.selectedApps, name] : this.selectedApps.filter(a => a !== name)
 			if (!on) {
-				const services = this.apps.find(a => a.app === name)?.services?.map(s => s.service) ?? []
-				this.selectedServices = this.selectedServices.filter(s => !services.includes(s))
+				this.selectedServices = this.selectedServices.filter(s => !s.startsWith(`${name}/`))
 			}
 		},
+		// a service is "app/service": two apps may both have a "web"
 		toggleService(app, service, on) {
-			this.selectedServices = on ? [...this.selectedServices, service] : this.selectedServices.filter(s => s !== service)
+			const key = `${app}/${service}`
+			this.selectedServices = on ? [...this.selectedServices, key] : this.selectedServices.filter(s => s !== key)
 			if (on && !this.selectedApps.includes(app)) {
 				this.selectedApps = [...this.selectedApps, app]
 			}

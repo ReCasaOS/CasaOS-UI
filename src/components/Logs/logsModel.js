@@ -110,3 +110,7 @@ export function rangeBounds(range, now, custom) {
 	}
 	return { since: RANGES[range] ? new Date(now.getTime() - RANGES[range]) : null, until: null }
 }
+
+// A cursor just before a moment, for a forwards walk from it: the server orders by time first.
+// Written as text: nanoseconds since 1970 pass Number's precision.
+export const cursorAt = date => `${new Date(date).getTime() - 1}999999:0:_`
