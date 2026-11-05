@@ -296,6 +296,21 @@
 					</div>
 					<!-- Backup destinations End -->
 
+					<!-- Share accounts Start -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="account-multiple-outline" size="is-20" />
+							{{ $t("Share accounts") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showShareAccounts">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Share accounts End -->
+
 					<!-- Alerts Start -->
 					<div v-if="alertsAvailable"
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -599,6 +614,7 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import AccountPanel from './account/AccountPanel.vue'
 import TerminalPanel from './logsAndTerminal/TerminalPanel.vue'
 import BackupDestinations from './settings/BackupDestinations.vue'
@@ -909,6 +925,19 @@ export default {
 
 		toggleSettings() {
 			this.$refs.settingsDrop.toggle()
+		},
+
+		// The accounts network shares open with, and the folders each opens.
+		showShareAccounts() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: defineAsyncComponent(() => import('./filebrowser/shared/SambaUsersModal.vue')),
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 
 		showBackupDestinations() {

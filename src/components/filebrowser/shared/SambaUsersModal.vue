@@ -24,7 +24,13 @@
 			<div v-for="user in users" :key="user" class="samba-users-modal__row is-flex is-align-items-center">
 				<div class="is-flex-grow-1">
 					{{ user }}
+					<span class="has-text-full-03 is-size-7 ml-2">
+						{{ folderCount(user) === 1 ? $t('1 folder') : $t('{count} folders', { count: folderCount(user) }) }}
+					</span>
 				</div>
+				<b-button class="mr-2" rounded size="is-small" @click="editFolders(user)">
+					{{ $t('Folders') }}
+				</b-button>
 				<b-button class="mr-2" rounded size="is-small" @click="changePassword(user)">
 					{{ $t('Change password') }}
 				</b-button>
@@ -62,6 +68,9 @@
 <script>
 // Mirrors the pattern the backend validates against, so a bad name is refused
 // here with an explanation rather than by the API with a generic error.
+import MemberFoldersModal from './MemberFoldersModal.vue'
+import { shareMembers } from './shareMembers'
+
 const USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,30}$/
 
 export default {
@@ -69,6 +78,7 @@ export default {
 	data() {
 		return {
 			users: [],
+			shares: [],
 			isLoading: true,
 			isSaving: false,
 			newUsername: '',
@@ -103,13 +113,32 @@ export default {
 		async load() {
 			this.isLoading = true
 			try {
-				const response = await this.$api.samba.getUsers()
-				this.users = response.data.data || []
+				const [users, shares] = await Promise.all([this.$api.samba.getUsers(), this.$api.samba.getShares()])
+				this.users = users.data.data || []
+				this.shares = shares.data.data || []
 			} catch (e) {
 				this.error = this.messageOf(e)
 			} finally {
 				this.isLoading = false
 			}
+		},
+
+		folderCount(username) {
+			return this.shares.filter(s => shareMembers(s).some(m => m.username === username)).length
+		},
+
+		// which folders an account opens, and how
+		editFolders(username) {
+			this.$buefy.modal.open({
+				component: MemberFoldersModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				props: { username },
+				events: { saved: () => this.load() },
+			})
 		},
 
 		messageOf(e) {
@@ -156,8 +185,8 @@ export default {
 
 		remove(username) {
 			this.$buefy.dialog.confirm({
-				// The API refuses while a share still names the account, so this only
-				// warns about the account itself.
+				// The API takes the account out of its shares, and refuses while it is
+				// the only one a share lets in, so this only warns about the account.
 				message: this.$t('Delete the account {name}? Anyone using it will lose access.', { name: username }),
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),

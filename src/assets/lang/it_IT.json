@@ -1121,5 +1121,14 @@
   "Updated with the system": "Aggiornato con il sistema",
   "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.": "Il primo account si crea sul dispositivo su cui gira ReCasaOS. Una volta creato, ricarica questa pagina per accedere.",
   "Open the Terminal full screen": "Apri il terminale a tutto schermo",
-  "Login incorrect": "Accesso non riuscito"
+  "Login incorrect": "Accesso non riuscito",
+  "1 folder": "1 cartella",
+  "{count} folders": "{count} cartelle",
+  "Add folder": "Aggiungi cartella",
+  "Folders of {name}": "Cartelle di {name}",
+  "Opens only with the accounts {names}.": "Si apre solo con gli account {names}.",
+  "Read and write": "Lettura e scrittura",
+  "Read only": "Sola lettura",
+  "The folders this account can open:": "Le cartelle che questo account può aprire:",
+  "Folders": "Cartelle"
 }

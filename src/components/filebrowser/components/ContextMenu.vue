@@ -244,7 +244,7 @@ export default {
 				events: {
 					reload: (access) => {
 						this.filePanel.reloadShare()
-						this.filePanel.getShareLink({ ...this.item, username: (access && access.username) || '' })
+						this.filePanel.getShareLink({ ...this.item, members: (access && access.members) || [] })
 					},
 				},
 			})
