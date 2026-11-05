@@ -9,7 +9,7 @@ import api from '@/service/api'
 vi.mock('@/store', async () => {
 	const { createStore } = await import('vuex')
 	const { default: mutations } = await import('@/store/mutations')
-	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false }, mutations }) }
+	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false, loginStyle: 'classic' }, mutations }) }
 })
 vi.mock('@/service/api', () => ({
 	default: { users: { getUserStatus: vi.fn() } },
@@ -116,5 +116,32 @@ describe('a link opened signed out', () => {
 		await router.push('/')
 
 		expect(router.currentRoute.value.fullPath).toBe('/login')
+	})
+})
+
+// The login page asks the box nothing of its own: the guard's status call says
+// which page to show, and the store (and this browser) keep it.
+describe('the login style', () => {
+	beforeEach(() => {
+		localStorage.clear()
+		store.commit('SET_NEED_INITIALIZATION', false)
+	})
+
+	it('comes from the status the guard asks anyway', async () => {
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true, login_style: 'beta' } } })
+		await router.push('/login?x=1')
+		expect(store.state.loginStyle).toBe('beta')
+		expect(localStorage.getItem('login-style')).toBe('beta')
+
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true } } })
+		await router.push('/login?x=2')
+		expect(store.state.loginStyle).toBe('classic')
+	})
+
+	it('stays what it was when the box does not answer', async () => {
+		store.commit('SET_LOGIN_STYLE', 'beta')
+		api.users.getUserStatus.mockRejectedValue(new Error('502'))
+		await router.push('/login?x=3')
+		expect(store.state.loginStyle).toBe('beta')
 	})
 })

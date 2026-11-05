@@ -1121,5 +1121,10 @@
   "Updated with the system": "Aggiornato con il sistema",
   "The first account is created on the device running ReCasaOS. Once it exists, reload this page to sign in.": "Il primo account si crea sul dispositivo su cui gira ReCasaOS. Una volta creato, ricarica questa pagina per accedere.",
   "Open the Terminal full screen": "Apri il terminale a tutto schermo",
-  "Login incorrect": "Accesso non riuscito"
+  "Login incorrect": "Accesso non riuscito",
+  "Welcome back to ReCasaOS": "Bentornato su ReCasaOS",
+  "Enter the username": "Inserisci il nome utente",
+  "Enter the password": "Inserisci la password",
+  "New login page (beta)": "Nuova pagina di accesso (beta)",
+  "The login page could not be changed": "Non è stato possibile cambiare la pagina di accesso"
 }
