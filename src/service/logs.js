@@ -27,7 +27,7 @@ function request(box, method, path, { params, data } = {}) {
 	const call = box ? fleetApi.relay(box, method, url, { data }) : instance.request({ method, url, data })
 	return call
 		.then(res => ({ ok: true, status: res.status, data: res?.data?.data }))
-		.catch(e => ({ ok: false, status: e?.response?.status ?? 0, error: e?.message || 'failed' }))
+		.catch(e => ({ ok: false, status: e?.response?.status ?? 0, error: (typeof e?.response?.data?.message === 'string' && e.response.data.message) || e?.message || 'failed' }))
 }
 
 export const logsApi = {

@@ -124,7 +124,7 @@ export function createRelayPoller({ ask, intervalMs = 3000, maxPages = 5, onRows
 				cursor = next || cursor
 				const rows = [...lines, ...events].map(toRow)
 				if (rows.length) {
-					onRows(rows)
+					onRows(rows, cursor)
 				}
 				if (!next) {
 					break
