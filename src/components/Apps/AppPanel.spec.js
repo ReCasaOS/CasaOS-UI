@@ -155,4 +155,21 @@ describe('appPanel and the installs on the message bus', () => {
 		expect(wrapper.vm.currentSlide).toBe(2)
 		wrapper.unmount()
 	})
+
+	// ReCasaOS/CasaOS#91: the refusal's whole body went in as the message, "[object Object]".
+	it('says why the install was refused, and opens the form on the ports', async () => {
+		const { wrapper } = await panel(Object.assign(new Error('404'), { response: { status: 404 } }))
+		const ports = { ports_in_use: { tcp: ['3001'], udp: [] } }
+		wrapper.vm.$openAPI.appManagement.compose = {
+			installComposeApp: vi.fn().mockRejectedValue({ response: { status: 400, data: { message: 'there are ports in use', data: ports } } }),
+		}
+		const toast = vi.spyOn(wrapper.vm.$buefy.toast, 'open').mockImplementation(() => {})
+
+		await wrapper.vm.installComposeApp(COMPOSE)
+
+		expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'there are ports in use' }))
+		expect(wrapper.vm.errInfo).toEqual(ports)
+		expect(wrapper.vm.currentSlide).toBe(1)
+		wrapper.unmount()
+	})
 })

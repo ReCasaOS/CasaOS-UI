@@ -18,8 +18,8 @@
 								<b-input :key="service.image" :readonly="state === 'update' || serviceStableVersion !== ''" :model-value="getFirstField(service.image)" :placeholder="$t('e.g.,hello-world:latest')" @update:model-value="(V) => changeIcon(V)" @blur="
 									(E) => {
 										return (service.image = service.image.split(':')[1]
-											? `${E.target._value}:${service.image.split(':')[1]}`
-											: E.target._value);
+											? `${E.target.value}:${service.image.split(':')[1]}`
+											: E.target.value);
 									}
 								" />
 							</b-field>
@@ -65,7 +65,7 @@
 
 					<VeeField v-slot="{ errors, meta }" :model-value="ice_i18n(configData['x-casaos'].title)" name="composeAppName" rules="required">
 						<b-field :label="`${$t('App Name')} *`" :message="errors" :type="{ 'is-danger': errors[0], 'is-success': meta.valid }">
-							<b-input :placeholder="$t('e.g.,Your App Name')" :model-value="ice_i18n(configData['x-casaos'].title)" @blur="(E) => (configData['x-casaos'].title.custom = E.target._value)" />
+							<b-input :placeholder="$t('e.g.,Your App Name')" :model-value="ice_i18n(configData['x-casaos'].title)" @blur="(E) => (configData['x-casaos'].title.custom = E.target.value)" />
 						</b-field>
 					</VeeField>
 
