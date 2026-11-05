@@ -3,8 +3,7 @@
 
 		<div :style="{ top: `${y}px`, left: `${x}px` }" class="action-btn context-menu">
 			<b-dropdown id="dr1" ref="dropDown" :animation="ani" :close-on-click="false" :mobile-modal="false"
-				:position="`is-${verticalPos}-${horizontalPos}`" aria-role="list" class="file-dropdown"
-				@active-change="dorpActiveChange($event, 'dr1')">
+				:position="`is-${verticalPos}-${horizontalPos}`" aria-role="list" class="file-dropdown">
 				<!-- Blank Start -->
 				<template v-if="!showDetail">
 					<b-dropdown-item key="system-context11" aria-role="menuitem" class="is-flex is-align-items-center"
@@ -91,12 +90,8 @@
 
 					<template v-if="!isShared && !isMounted">
 						<hr class="dropdown-divider">
-						<b-dropdown-item v-if="!isConfirmed" aria-role="menuitem" class="has-text-danger"
-							@click="isConfirmed = true">
+						<b-dropdown-item aria-role="menuitem" class="has-text-danger" @click="remove">
 							{{ $t('Delete') }}
-						</b-dropdown-item>
-						<b-dropdown-item v-else aria-role="menuitem" class="has-text-danger" @click="deleteItem(items)">
-							{{ $t('Are you sure?') }}
 						</b-dropdown-item>
 					</template>
 
@@ -120,7 +115,6 @@ export default {
 		return {
 			verticalPos: 'bottom',
 			horizontalPos: 'right',
-			isConfirmed: false,
 			x: Number,
 			y: Number,
 			showDetail: false,
@@ -213,10 +207,9 @@ export default {
 				this.filePanel.uploaderInstance.assignBrowse(document.getElementById('upfolderBtn'), true)
 			})
 		},
-		dorpActiveChange($event) {
-			if ($event) {
-				this.isConfirmed = false
-			}
+		remove() {
+			this.$refs.dropDown.toggle()
+			this.filePanel.confirmDelete(this.items)
 		},
 		rename() {
 			this.$refs.dropDown.toggle()
