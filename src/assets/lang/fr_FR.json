@@ -2914,5 +2914,17 @@
   "New login page (beta)": "Nouvelle page de connexion (bêta)",
   "The login page could not be changed": "La page de connexion n'a pas pu être modifiée",
   "Update ReCasaOS on {name}?": "Mettre à jour ReCasaOS sur {name} ?",
-  "The box goes offline for a few minutes and comes back with its new version.": "La box passe hors ligne quelques minutes puis revient avec sa nouvelle version."
+  "The box goes offline for a few minutes and comes back with its new version.": "La box passe hors ligne quelques minutes puis revient avec sa nouvelle version.",
+  "Search": "Rechercher",
+  "{count} selected": "{count} sélectionné(s)",
+  "Select all of {name}": "Tout sélectionner pour {name}",
+  "{running} of {total} running": "{running} sur {total} en marche",
+  "View only": "Lecture seule",
+  "Restart {name}": "Redémarrer {name}",
+  "Stop {name}": "Arrêter {name}",
+  "Start {name}": "Démarrer {name}",
+  "Update {name}": "Mettre à jour {name}",
+  "No container matches this filter": "Aucun conteneur ne correspond à ce filtre",
+  "on {box}": "sur {box}",
+  "No virtual machine matches this filter": "Aucune machine virtuelle ne correspond à ce filtre"
 }
