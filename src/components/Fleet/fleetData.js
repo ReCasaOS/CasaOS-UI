@@ -51,6 +51,7 @@ export function overviewRow(box, answers) {
 					running: list(grid).filter(i => i?.status === 'running').length,
 					total: list(grid).length,
 					down: list(grid).filter(i => DOWN.has(i?.status)).length,
+					updates: list(grid).filter(i => i?.update_available === true).length,
 				}
 			: null,
 		vms: vms ? { running: list(vms).filter(v => v?.state === 'running').length, total: list(vms).length } : null,
@@ -143,4 +144,41 @@ const compare = (a, b) => text(a).localeCompare(text(b), undefined, { sensitivit
 
 export function sortRows(rows) {
 	return [...rows].sort((a, b) => compare(a.boxName, b.boxName) || compare(a.title, b.title))
+}
+
+// The four tiles on top of the overview, from the rows as they are now. A box that did not answer has no apps or VMs to count.
+export function fleetSummary(rows) {
+	const sum = (pick, field) => rows.reduce((n, row) => n + (pick(row)?.[field] ?? 0), 0)
+	const apps = row => row.apps
+	const vms = row => row.vms
+	return {
+		boxes: rows.length,
+		online: rows.filter(row => row.online).length,
+		offline: rows.filter(row => !row.online).length,
+		appsRunning: sum(apps, 'running'),
+		appsTotal: sum(apps, 'total'),
+		appsDown: sum(apps, 'down'),
+		appUpdates: sum(apps, 'updates'),
+		vmsRunning: sum(vms, 'running'),
+		vmsTotal: sum(vms, 'total'),
+		toUpdate: rows.filter(row => row.version?.available === true).length,
+	}
+}
+
+// The chips above the cards: all, the boxes that answer, the ones that do not, the ones with a newer ReCasaOS.
+export const BOX_FILTERS = {
+	all: () => true,
+	online: row => row.online,
+	offline: row => !row.online,
+	update: row => row.version?.available === true,
+}
+
+export function filterBoxes(rows, filter) {
+	return rows.filter(BOX_FILTERS[filter] || BOX_FILTERS.all)
+}
+
+// By name, or by what needs a person first: a box that is offline, then one that needs a new code, then one with an update, then the rest.
+export function sortBoxes(rows, mode) {
+	const rank = row => (!row.online ? 0 : row.needsRecode ? 1 : row.version?.available ? 2 : 3)
+	return [...rows].sort((a, b) => (mode === 'state' ? rank(a) - rank(b) : 0) || compare(a.name, b.name))
 }
