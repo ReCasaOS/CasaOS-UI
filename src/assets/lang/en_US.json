@@ -2894,5 +2894,13 @@
   "{app} is restarting": "{app} is restarting",
   "{app} is stopping": "{app} is stopping",
   "Jump to now": "Now",
-  "The logs could not be read": "The logs could not be read"
+  "The logs could not be read": "The logs could not be read",
+  "Boxes": "Boxes",
+  "{n} offline": "{n} offline",
+  "Boxes to update": "Boxes to update",
+  "The box is not answering the master: its figures come back as soon as it does.": "The box is not answering the master: its figures come back as soon as it does.",
+  "{n} stopped": "{n} stopped",
+  "No box matches this filter": "No box matches this filter",
+  "To update": "To update",
+  "All": "All"
 }

@@ -2897,5 +2897,12 @@
   "{app} is restarting": "{app} redémarre",
   "{app} is stopping": "{app} s'arrête",
   "Jump to now": "Maintenant",
-  "The logs could not be read": "Les journaux n'ont pas pu être lus"
+  "The logs could not be read": "Les journaux n'ont pas pu être lus",
+  "Boxes": "Boxes",
+  "{n} offline": "{n} hors ligne",
+  "Boxes to update": "Boxes à mettre à jour",
+  "The box is not answering the master: its figures come back as soon as it does.": "La box ne répond plus au maître : ses chiffres reviennent dès qu'elle répond.",
+  "{n} stopped": "{n} arrêtée(s)",
+  "No box matches this filter": "Aucune box ne correspond à ce filtre",
+  "To update": "À mettre à jour"
 }
