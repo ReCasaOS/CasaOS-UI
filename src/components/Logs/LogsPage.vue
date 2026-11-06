@@ -208,8 +208,8 @@ export default {
 	mounted() {
 		listBoxes().catch(() => []).then((boxes) => {
 			this.boxes = boxes
-			// a box of the URL this master does not know: this box, with the app and the moment kept
-			if (this.box && !boxes.some(b => b.id === this.box)) {
+			// a box of the URL this master does not know (an unknown list proves nothing): this box, with the app and the moment kept
+			if (this.box && boxes.length && !boxes.some(b => b.id === this.box)) {
 				this.keepSelection = true
 				this.box = null
 			}

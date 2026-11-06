@@ -83,6 +83,17 @@ describe('the Logs page', () => {
 		expect(wrapper.text()).not.toContain('Update this box')
 	})
 
+	it('keeps a deep-linked box when the fleet list is unknown, and shows its error', async () => {
+		fleetApi.status.mockRejectedValue(new Error('down'))
+		logsApi.apps.mockImplementation(async box => (box ? { ok: false, status: 503, error: 'box offline' } : { ok: true, status: 200, data: APPS }))
+		await mountPage({ initialBox: 'b1', initialApp: 'plex' })
+		const stream = wrapper.findComponent({ name: 'LogStream' })
+		expect(stream.props('box')).toBe('b1')
+		expect(stream.props('apps')).toEqual(['plex'])
+		expect(logsApi.apps).toHaveBeenLastCalledWith('b1')
+		expect(document.body.textContent).toContain('box offline')
+	})
+
 	it('offers Restart and Stop for a compose app, not for a v1 app', async () => {
 		fleetApi.status.mockRejectedValue(new Error('down'))
 		const v1 = { app: 'nginx', title: null, icon: null, uninstalled: false, services: [{ service: 'main', container: 'nginx', running: true }] }
