@@ -46,7 +46,7 @@
 
 			<p class="section-title">{{ $t('Storage & CD') }}</p>
 			<b-field :label="$t('Disk size (GB)')" :message="diskMessage" :type="errors.disk_gib ? 'is-danger' : ''">
-				<b-numberinput v-model="form.disk_gib" :min="1" controls-position="compact" expanded size="is-small"></b-numberinput>
+				<b-numberinput v-model="form.disk_gib" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :min="1" controls-position="compact" expanded size="is-small"></b-numberinput>
 			</b-field>
 			<b-field :label="$t('Save in')" :message="folderMessage" :type="folderError ? 'is-danger' : ''" class="mt-3">
 				<b-input :model-value="form.storage_path" expanded readonly size="is-small"></b-input>

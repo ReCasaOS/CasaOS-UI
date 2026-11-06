@@ -1,10 +1,10 @@
 <template>
 	<div>
 		<div class="home-context-menu" :style="{ top: `${y}px`, left: `${x}px` }">
-			<b-dropdown aria-role="list" close-on-click ref="dropDown" id="dr2" class="file-dropdown"
+			<b-dropdown id="dr2" ref="dropDown" aria-role="list" close-on-click class="file-dropdown"
 				:position="`is-${verticalPos}-${horizontalPos}`" :animation="ani" :mobile-modal="false">
 				<!-- Blank Start -->
-				<b-dropdown-item aria-role="menuitem" class="is-flex is-align-items-center" key="system-context11"
+				<b-dropdown-item key="system-context11" aria-role="menuitem" class="is-flex is-align-items-center"
 					@click="showChangeWallpaperModal">
 					<b-icon pack="casa" icon="wallpaper-outline" class="mr-1"></b-icon>
 					{{ $t('Change wallpaper') }}

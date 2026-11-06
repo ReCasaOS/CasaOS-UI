@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card vm-page">
+	<div class="modal-card vm-page touch-targets">
 		<!-- the terminal panel's header: title, add, close -->
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">

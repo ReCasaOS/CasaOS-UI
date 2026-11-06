@@ -16,10 +16,10 @@
 					{{ capText }}
 				</b-message>
 				<b-field :label="$t('Retention (days)')">
-					<b-numberinput v-model="draft.retention_days" :max="3650" :min="1" controls-position="compact" size="is-small" />
+					<b-numberinput v-model="draft.retention_days" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :max="3650" :min="1" controls-position="compact" size="is-small" />
 				</b-field>
 				<b-field :label="$t('Size cap (MB)')">
-					<b-numberinput v-model="draft.max_size_mb" :max="1048576" :min="64" :step="64" controls-position="compact" size="is-small" />
+					<b-numberinput v-model="draft.max_size_mb" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :max="1048576" :min="64" :step="64" controls-position="compact" size="is-small" />
 				</b-field>
 				<b-field class="mb-1">
 					<b-checkbox v-model="draft.include_others" size="is-small">

@@ -215,6 +215,20 @@
     }
 }
 
+// On a phone or a touch screen the controls of a page reach 44 px; a mouse keeps the compact size.
+// Put the class on the page's root. shortcut: opt-in per page, move to the base rules once every page has been checked.
+@media (max-width: 768px), (pointer: coarse) {
+    .touch-targets {
+        button,
+        .button,
+        select,
+        .close-button {
+            min-width: 2.75rem;
+            min-height: 2.75rem;
+        }
+    }
+}
+
 .hover-effect {
     &:hover {
         background-color: var(--casa-hover-tint);

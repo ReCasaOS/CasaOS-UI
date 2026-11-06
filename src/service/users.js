@@ -17,6 +17,10 @@ const users = {
 	getUserStatus() {
 		return api.get(`${PREFIX}/status`)
 	},
+	// the login page the whole box shows: 'classic' or 'beta'; status says it
+	setLoginStyle(style) {
+		return api.put(`${PREFIX}/login-style`, { style })
+	},
 
 	// get user current info [OK]
 	getUserInfo() {
@@ -54,6 +58,22 @@ const users = {
 	// create or update user image from upload
 	setUserImage(key, data) {
 		return api.put(`${PREFIX}/current/image/${key}`, data)
+	},
+
+	// upload a user image from the browser, as <key>.<ext> in the user's
+	// folder [login wallpaper]
+	uploadUserImage(key, blob, fileName) {
+		const form = new FormData()
+		form.append('file', blob, fileName)
+		return api.post(`${PREFIX}/current/image/${key}`, form, {
+			headers: { 'Content-Type': 'multipart/form-data' },
+		})
+	},
+
+	// delete one of the user's images, by its path [login wallpaper]
+	removeUserImage(path) {
+		// the path goes in the query: api.delete sends its second argument as a body
+		return api.delete(`${PREFIX}/current/image?path=${encodeURIComponent(path)}`)
 	},
 
 	// delete user image [NOT USE]

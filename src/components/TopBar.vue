@@ -222,6 +222,25 @@
 					</div>
 					<!-- Beta dashboard Switch End -->
 
+					<!-- Beta login page Switch Start: for the whole box, not this user -->
+					<div
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="login-variant" size="is-20" />
+							{{ $t("New login page (beta)") }}
+						</div>
+						<div>
+							<b-field>
+								<b-switch v-model="loginBeta"
+									:disabled="loginBetaSaving"
+									class="is-flex-direction-row-reverse mr-0 _small"
+									type="is-dark"
+									@update:model-value="setLoginBeta" />
+							</b-field>
+						</div>
+					</div>
+					<!-- Beta login page Switch End -->
+
 					<!-- Terminal full screen Switch Start -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -708,6 +727,10 @@ export default {
 				lang: key,
 				name: value.lang_name,
 			})),
+			// The new login page: the box keeps it (the login page has no session
+			// to read barData with); the router read it from the status already
+			loginBeta: this.$store.state.loginStyle === 'beta',
+			loginBetaSaving: false,
 			// Appearance: kept in localStorage, never in barData - the login page
 			// needs it before any user exists, and the server copy would overwrite it.
 			theme: readThemePreference(),
@@ -846,6 +869,23 @@ export default {
 		 * @param {*}
 		 * @return {*}
 		 */
+		// The box's login page; a box that refuses keeps the switch where it was.
+		async setLoginBeta(value) {
+			const style = value ? 'beta' : 'classic'
+			this.loginBetaSaving = true
+			try {
+				await this.$api.users.setLoginStyle(style)
+				this.$store.commit('SET_LOGIN_STYLE', style)
+			} catch {
+				this.loginBeta = !value
+				this.$buefy.toast.open({
+					message: this.$t('The login page could not be changed'),
+					type: 'is-danger',
+				})
+			} finally {
+				this.loginBetaSaving = false
+			}
+		},
 		async saveData() {
 			const saveRes = await this.$api.users.setCustomStorage(systemConfigName, this.barData)
 			if (saveRes.data.success === 200) {

@@ -6,6 +6,7 @@ const DOWN = new Set(['exited', 'dead', 'restarting', 'unknown'])
 
 const text = v => (typeof v === 'string' ? v : '')
 const number = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+const positive = v => (number(v) > 0 ? v : null)
 const list = a => (Array.isArray(a) ? a : [])
 const payload = answer => (answer?.ok ? answer.data : null)
 
@@ -51,12 +52,17 @@ export function overviewRow(box, answers) {
 					running: list(grid).filter(i => i?.status === 'running').length,
 					total: list(grid).length,
 					down: list(grid).filter(i => DOWN.has(i?.status)).length,
+					updates: list(grid).filter(i => i?.update_available === true).length,
 				}
 			: null,
 		vms: vms ? { running: list(vms).filter(v => v?.state === 'running').length, total: list(vms).length } : null,
 		cpu: number(util?.cpu?.percent),
 		mem: number(util?.mem?.usedPercent),
 		disk: number(disk?.size) > 0 ? Math.min(100, Math.floor(number(disk.used) * 100 / disk.size)) : null,
+		// what sits under each meter; a figure the box does not send is null, never 0
+		cpuInfo: util?.cpu ? { cores: positive(util.cpu.num), freq: positive(util.cpu.freq), temperature: positive(util.cpu.temperature) } : null,
+		memInfo: positive(util?.mem?.total) ? { used: number(util.mem.used) ?? 0, total: util.mem.total } : null,
+		diskInfo: number(disk?.size) > 0 ? { used: number(disk.used) ?? 0, total: disk.size } : null,
 		errors: errorsOf(answers),
 	}
 }
@@ -143,4 +149,81 @@ const compare = (a, b) => text(a).localeCompare(text(b), undefined, { sensitivit
 
 export function sortRows(rows) {
 	return [...rows].sort((a, b) => compare(a.boxName, b.boxName) || compare(a.title, b.title))
+}
+
+// The four tiles on top of the overview, from the rows as they are now. A box that did not answer has no apps or VMs to count.
+export function fleetSummary(rows) {
+	const sum = (pick, field) => rows.reduce((n, row) => n + (pick(row)?.[field] ?? 0), 0)
+	const apps = row => row.apps
+	const vms = row => row.vms
+	return {
+		boxes: rows.length,
+		online: rows.filter(row => row.online).length,
+		offline: rows.filter(row => !row.online).length,
+		appsRunning: sum(apps, 'running'),
+		appsTotal: sum(apps, 'total'),
+		appsDown: sum(apps, 'down'),
+		appUpdates: sum(apps, 'updates'),
+		vmsRunning: sum(vms, 'running'),
+		vmsTotal: sum(vms, 'total'),
+		toUpdate: rows.filter(row => row.version?.available === true).length,
+	}
+}
+
+// The chips above the cards: all, the boxes that answer, the ones that do not, the ones with a newer ReCasaOS.
+export const BOX_FILTERS = {
+	all: () => true,
+	online: row => row.online,
+	offline: row => !row.online,
+	update: row => row.version?.available === true,
+}
+
+export function filterBoxes(rows, filter) {
+	return rows.filter(BOX_FILTERS[filter] || BOX_FILTERS.all)
+}
+
+// By name, or by what needs a person first: a box that is offline, then one that needs a new code, then one with an update, then the rest.
+export function sortBoxes(rows, mode) {
+	const rank = row => (!row.online ? 0 : row.needsRecode ? 1 : row.version?.available ? 2 : 3)
+	return [...rows].sort((a, b) => (mode === 'state' ? rank(a) - rank(b) : 0) || compare(a.name, b.name))
+}
+
+// The chips of the Containers and Virtual Machines tabs. A row that stands for a box that could not be read has
+// no status or state, so it belongs to "all" only.
+export const CONTAINER_FILTERS = {
+	all: () => true,
+	running: row => row.status === 'running',
+	stopped: row => ['exited', 'dead'].includes(row.status),
+	update: row => row.updateAvailable === true,
+}
+
+export const VM_FILTERS = {
+	all: () => true,
+	running: row => row.state === 'running',
+	stopped: row => row.state === 'shut-off',
+	attention: row => ['paused', 'crashed'].includes(row.state),
+}
+
+// How many rows each filter keeps, the unreadable boxes' rows not counted.
+export function countRows(rows, filters) {
+	const own = rows.filter(row => !row.error)
+	return Object.fromEntries(Object.keys(filters).map(key => [key, own.filter(filters[key]).length]))
+}
+
+// The sorted rows as one group per box, in the order the boxes first appear: `error` is why the box could not be
+// read ('' when it could), `rows` what it lists.
+export function groupByBox(rows) {
+	const groups = new Map()
+	for (const row of rows) {
+		if (!groups.has(row.boxId)) {
+			groups.set(row.boxId, { id: row.boxId, name: row.boxName, error: '', rows: [] })
+		}
+		const group = groups.get(row.boxId)
+		if (row.error) {
+			group.error = row.error
+		} else {
+			group.rows.push(row)
+		}
+	}
+	return [...groups.values()]
 }

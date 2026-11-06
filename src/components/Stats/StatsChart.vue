@@ -243,7 +243,7 @@ export default {
 		}
 
 		@media (max-width: 600px) {
-			min-height: 2.25rem;
+			min-height: 2.75rem;
 		}
 
 		&.is-hidden {
@@ -297,7 +297,7 @@ export default {
 	cursor: pointer;
 
 	@media (max-width: 600px) {
-		min-height: 2.25rem;
+		min-height: 2.75rem;
 	}
 }
 

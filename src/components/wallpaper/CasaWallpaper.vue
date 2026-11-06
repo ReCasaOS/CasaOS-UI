@@ -18,6 +18,7 @@
 <script>
 import { defineAsyncComponent } from 'vue'
 import ContextMenu from './ContextMenu.vue'
+import { findLoginWallpaper } from './loginWallpaper'
 import events from '@/events/events'
 
 export default {
@@ -42,9 +43,28 @@ export default {
 	watch: {
 		'$store.state.wallpaperObject': {
 			handler(val) {
-				this.backgroundStyleObj.backgroundImage = `url(${this.parseUrl(val.path)})`
+				if (this.$route?.path !== '/login') {
+					this.backgroundStyleObj.backgroundImage = `url(${this.parseUrl(val.path)})`
+				}
 			},
 			deep: true,
+		},
+		// the login screen has a wallpaper of its own when one was set; the
+		// dashboard's comes back once signed in
+		'$route.path': {
+			handler(path) {
+				if (path === '/login') {
+					findLoginWallpaper().then((url) => {
+						if (url && this.$route.path === '/login') {
+							this.backgroundStyleObj.backgroundImage = `url(${url})`
+						}
+					})
+				} else {
+					const saved = localStorage.getItem('wallpaper')
+					this.backgroundStyleObj.backgroundImage = `url(${this.parseUrl(saved || this.$store.state.wallpaperObject.path)})`
+				}
+			},
+			immediate: true,
 		},
 
 	},

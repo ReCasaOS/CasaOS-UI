@@ -1131,5 +1131,15 @@
   "Read only": "Sola lettura",
   "The folders this account can open:": "Le cartelle che questo account può aprire:",
   "Folders": "Cartelle",
-  "not a share account": "non è un account di condivisione"
+  "not a share account": "non è un account di condivisione",
+  "Welcome back to ReCasaOS": "Bentornato su ReCasaOS",
+  "Enter the username": "Inserisci il nome utente",
+  "Enter the password": "Inserisci la password",
+  "New login page (beta)": "Nuova pagina di accesso (beta)",
+  "The login page could not be changed": "Non è stato possibile cambiare la pagina di accesso",
+  "Dashboard": "Dashboard",
+  "Login screen": "Schermata di accesso",
+  "Shown behind the login box. The first wallpaper is the default one.": "Mostrato dietro la finestra di accesso. Il primo sfondo è quello predefinito.",
+  "Login screen wallpaper saved.": "Sfondo della schermata di accesso salvato.",
+  "Only the first account can choose the login screen's wallpaper.": "Solo il primo account può scegliere lo sfondo della schermata di accesso."
 }

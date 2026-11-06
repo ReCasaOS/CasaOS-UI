@@ -40,8 +40,11 @@ async function mountPage() {
 	await flushPromises()
 	return wrapper
 }
-const rows = () => wrapper.findAll('.fleet-page tbody tr')
+const rows = () => wrapper.findAll('.fleet-page .fleet-row, .fleet-page .fleet-vm')
+const chipOf = label => wrapper.findAll('.fleet-chip').find(c => c.text().startsWith(label))
 const rowOf = text => rows().find(r => r.text().includes(text))
+const cards = () => wrapper.findAll('.fleet-page .fleet-card')
+const cardOf = text => cards().find(c => c.find('h4').text().includes(text))
 async function openTab(label) {
 	await wrapper.findAll('.tabs li a').find(a => a.text().includes(label)).trigger('click')
 	await flushPromises()
@@ -66,11 +69,11 @@ describe('the Fleet page', () => {
 		boxes([A, { ...B, online: false }])
 		await mountPage()
 		expect(wrapper.find('h3').text()).toBe('Fleet')
-		expect(rows()).toHaveLength(2)
-		expect(rowOf('Home').text()).toContain('Debian GNU/Linux 12 (bookworm)')
-		expect(rowOf('Home').text()).toContain('Update available: 0.4.81')
-		expect(rowOf('Home').text()).toContain('1/2')
-		expect(rowOf('Shop').text()).toContain('Offline since')
+		expect(cards()).toHaveLength(2)
+		expect(cardOf('Home').text()).toContain('Debian GNU/Linux 12 (bookworm)')
+		expect(cardOf('Home').text()).toContain('Update available: 0.4.81')
+		expect(cardOf('Home').text()).toContain('1/2')
+		expect(cardOf('Shop').text()).toContain('Offline since')
 		expect(relayCalls('b')).toHaveLength(0)
 		expect(relayCalls('a', 'get').map(c => c[2]).sort()).toEqual(['/v1/sys/os', '/v1/sys/utilization', '/v1/sys/version/check', '/v2/app_management/web/appgrid', '/v2/virt_management/vms'])
 	})
@@ -78,10 +81,10 @@ describe('the Fleet page', () => {
 	it('keeps a failed source on its own row', async () => {
 		serve({ a: { '/v1/sys/os': failure(500) } })
 		await mountPage()
-		expect(rowOf('Home').text()).toContain('Could not be read')
-		expect(rowOf('Home').text()).toContain('1/2')
-		expect(rowOf('Shop').text()).toContain('Debian GNU/Linux 12 (bookworm)')
-		expect(rowOf('Shop').text()).not.toContain('Could not be read')
+		expect(cardOf('Home').text()).toContain('Could not be read')
+		expect(cardOf('Home').text()).toContain('1/2')
+		expect(cardOf('Shop').text()).toContain('Debian GNU/Linux 12 (bookworm)')
+		expect(cardOf('Shop').text()).not.toContain('Could not be read')
 	})
 
 	it('lists the containers of every box and acts on the selection', async () => {
@@ -130,9 +133,58 @@ describe('the Fleet page', () => {
 		await wrapper.find('select.fleet-filter-box').setValue('b')
 		expect(rows().map(r => r.text().includes('Plex'))).toEqual([true])
 		await wrapper.find('select.fleet-filter-box').setValue('')
-		await wrapper.find('select.fleet-filter-state').setValue('exited')
+		await chipOf('Stopped').trigger('click')
 		expect(rows()).toHaveLength(2)
 		expect(rows().some(r => r.text().includes('Jellyfin'))).toBe(false)
+	})
+
+	it('groups the containers by box, counts them, and counts each chip', async () => {
+		await mountPage()
+		await openTab('Containers')
+		const groups = wrapper.findAll('.fleet-group')
+		expect(groups.map(g => g.find('h4').text())).toEqual(['Home', 'Shop'])
+		expect(groups[0].text()).toContain('1 of 2 running')
+		expect(groups[1].text()).toContain('0 of 1 running')
+		expect(chipOf('All').text()).toContain('3')
+		expect(chipOf('Running').text()).toContain('1')
+		expect(chipOf('Stopped').text()).toContain('2')
+	})
+
+	it('searches the containers by name', async () => {
+		await mountPage()
+		await openTab('Containers')
+		await wrapper.find('input.fleet-search').setValue('jelly')
+		expect(rows().map(r => r.find('.fleet-row-title').text())).toEqual(['Jellyfin'])
+		await wrapper.find('input.fleet-search').setValue('nothing here')
+		expect(rows()).toHaveLength(0)
+		expect(wrapper.text()).toContain('No container matches this filter')
+	})
+
+	it('acts on one container from its own buttons, and on a whole box from its header', async () => {
+		await mountPage()
+		await openTab('Containers')
+		await rowOf('Jellyfin').find('button[aria-label="Stop Jellyfin"]').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'put')).toEqual([['a', 'put', '/v2/app_management/compose/jellyfin/status', { data: '"stop"' }]])
+		expect(rowOf('Jellyfin').find('.fleet-result').text()).toBe('Done')
+		// a stopped one offers Start, a running one Restart and Stop
+		expect(rowOf('Plex').find('button[aria-label="Start Plex"]').exists()).toBe(true)
+		expect(rowOf('Plex').find('button[aria-label="Stop Plex"]').exists()).toBe(false)
+		// the box header checks what can be checked in it: Postgres is only listed
+		await wrapper.find('.fleet-group-head label.b-checkbox').trigger('click')
+		await toolbarButton('Restart').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'put').slice(1)).toEqual([['a', 'put', '/v2/app_management/compose/jellyfin/status', { data: '"restart"' }]])
+	})
+
+	it('names a box whose containers cannot be read once, in its group', async () => {
+		serve({ b: { '/v2/app_management/web/appgrid': failure(503) } })
+		await mountPage()
+		await openTab('Containers')
+		const shop = wrapper.findAll('.fleet-group').find(g => g.find('h4').text() === 'Shop')
+		expect(shop.text()).toContain('Box offline')
+		expect(shop.findAll('.fleet-row')).toHaveLength(0)
+		expect(chipOf('All').text()).toContain('2')
 	})
 
 	it('says so when the fleet cannot be read', async () => {
@@ -159,6 +211,32 @@ describe('the Fleet page', () => {
 		expect(relayCalls('a', 'post').at(-1)).toEqual(['a', 'post', '/v2/virt_management/vms/vm-1/shutdown'])
 	})
 
+	it('shows each VM as a card with its facts, filters them, and acts from the card', async () => {
+		const vms = [
+			{ id: 'vm-1', title: 'Debian', state: 'running', vcpus: 2, memory_mib: 2048, os: 'debian12' },
+			{ id: 'vm-2', title: 'Kali', state: 'paused', vcpus: 4, memory_mib: 4096, os: 'kali' },
+			{ id: 'vm-3', title: 'Old', state: 'shut-off', vcpus: 1, memory_mib: 512, os: '' },
+		]
+		serve({ a: { '/v2/virt_management/vms': vms }, b: { '/v2/virt_management/vms': failure(503) } })
+		await mountPage()
+		await openTab('Virtual Machines')
+		expect(rows()).toHaveLength(3)
+		expect(rowOf('Kali').text()).toContain('on Home')
+		expect(rowOf('Kali').text()).toContain('4096 MiB')
+		expect(chipOf('Running').text()).toContain('1')
+		expect(chipOf('Needs attention').text()).toContain('1')
+		await chipOf('Needs attention').trigger('click')
+		expect(rows().map(r => r.find('h4').text())).toEqual(['Kali'])
+		await chipOf('All').trigger('click')
+		await rowOf('Old').find('button[aria-label="Start Old"]').trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v2/virt_management/vms/vm-3/start']])
+		expect(rowOf('Old').find('.fleet-result').text()).toBe('Done')
+		// the box whose VMs could not be read is named below the cards
+		expect(wrapper.find('.fleet-vm-notes').text()).toContain('Shop')
+		expect(wrapper.find('.fleet-vm-notes').text()).toContain('Box offline')
+	})
+
 	it('asks before forcing a VM off', async () => {
 		serve({ a: { '/v2/virt_management/vms': [{ id: 'vm-1', title: 'Debian', state: 'running', vcpus: 2, memory_mib: 2048, os: '' }] } })
 		await mountPage()
@@ -183,26 +261,113 @@ describe('the Fleet page', () => {
 		fleetApi.relay.mockImplementation((boxId, method, path) => boxId === 'b' ? slow.then(data => ({ status: 200, data: { success: 200, data } })) : inner(boxId, method, path))
 		await mountPage()
 		expect(document.querySelector('.fleet-page .loading-overlay')).toBeNull()
-		expect(rowOf('Home').text()).toContain('Debian GNU/Linux 12 (bookworm)')
-		expect(rowOf('Shop').text()).toContain('Loading…')
+		expect(cardOf('Home').text()).toContain('Debian GNU/Linux 12 (bookworm)')
+		expect(cardOf('Shop').text()).toContain('Loading…')
 		answerB({ pretty_name: 'Ubuntu 24.04 LTS', support: { state: 'supported' } })
 		await flushPromises()
-		expect(rowOf('Shop').text()).not.toContain('Loading…')
-		expect(rowOf('Shop').text()).toContain('Ubuntu 24.04 LTS')
+		expect(cardOf('Shop').text()).not.toContain('Loading…')
+		expect(cardOf('Shop').text()).toContain('Ubuntu 24.04 LTS')
 	})
 
 	it('says "Never connected" for a box that has never reached the master', async () => {
 		boxes([A, { id: 'c', name: 'Garage', url: '', online: false }])
 		await mountPage()
-		expect(rowOf('Garage').text()).toContain('Never connected')
-		expect(rowOf('Garage').text()).not.toContain('1970')
+		expect(cardOf('Garage').text()).toContain('Never connected')
+		expect(cardOf('Garage').text()).not.toContain('1970')
+	})
+
+	it('sums the fleet in tiles above the cards, without a tile for virtual machines when there are none', async () => {
+		boxes([A, { ...B, online: false }])
+		await mountPage()
+		const tiles = wrapper.findAll('.fleet-stat').map(t => t.text())
+		expect(tiles).toHaveLength(3)
+		expect(tiles[0]).toContain('1 / 2')
+		expect(tiles[0]).toContain('1 offline')
+		expect(tiles[1]).toContain('1 / 2')
+		expect(tiles[1]).toContain('1 down')
+		expect(tiles[2]).toContain('1')
+		expect(wrapper.find('.fleet-overview').text()).not.toContain('Virtual Machines')
+	})
+
+	it('shows the virtual machines of a box that has some', async () => {
+		serve({ a: { '/v2/virt_management/vms': [{ state: 'running' }, { state: 'shut off' }] } })
+		await mountPage()
+		expect(cardOf('Home').text()).toContain('Virtual Machines')
+		expect(cardOf('Home').text()).toContain('1/2')
+		expect(cardOf('Shop').text()).not.toContain('Virtual Machines')
+		expect(wrapper.findAll('.fleet-stat')).toHaveLength(4)
+	})
+
+	it('says under each meter what the box has: cores, frequency, sizes', async () => {
+		serve({ a: { '/v1/sys/utilization': { cpu: { percent: 10, num: 8, freq: 3400, temperature: 52 }, mem: { usedPercent: 50, used: 4 * 1024 ** 3, total: 8 * 1024 ** 3 }, sys_disk: { size: 100 * 1024 ** 3, used: 25 * 1024 ** 3 } } } })
+		await mountPage()
+		const details = cardOf('Home').findAll('.fleet-meter-detail').map(d => d.text())
+		expect(details).toEqual(['8 cores · 3.4 GHz · 52°C', '4 GB / 8 GB', '25 GB / 100 GB'])
+		// a box that sends no cores, no frequency and no totals gets no detail line
+		expect(cardOf('Shop').findAll('.fleet-meter-detail')).toHaveLength(1)
+	})
+
+	it('updates ReCasaOS on a box from its tag, after asking', async () => {
+		await mountPage()
+		const tag = () => cardOf('Home').find('button.fleet-update')
+		expect(tag().text()).toBe('Update available: 0.4.81')
+		await tag().trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toHaveLength(0)
+		expect(document.body.textContent).toContain('Update ReCasaOS on Home?')
+		dialogButton('Update').click()
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v1/sys/update']])
+		expect(tag().exists()).toBe(false)
+		expect(cardOf('Home').text()).toContain('Updating…')
+	})
+
+	it('says why an update did not start, and leaves the tag', async () => {
+		serve({ a: { 'post /v1/sys/update': failure(409, { message: 'busy' }) } })
+		await mountPage()
+		await cardOf('Home').find('button.fleet-update').trigger('click')
+		await flushPromises()
+		dialogButton('Update').click()
+		await flushPromises()
+		expect(document.body.textContent).toContain('busy')
+		expect(cardOf('Home').find('button.fleet-update').exists()).toBe(true)
+	})
+
+	it('does not offer to update the master from the page', async () => {
+		boxes([{ ...A, self: true }, B])
+		await mountPage()
+		expect(cardOf('Home').find('button.fleet-update').exists()).toBe(false)
+		expect(cardOf('Home').text()).toContain('Update available: 0.4.81')
+		expect(cardOf('Shop').find('button.fleet-update').exists()).toBe(true)
+	})
+
+	it('filters the cards with the chips and counts each filter', async () => {
+		boxes([A, { ...B, online: false }])
+		await mountPage()
+		const chip = label => wrapper.findAll('.fleet-chip').find(c => c.text().startsWith(label))
+		expect(chip('All').text()).toContain('2')
+		expect(chip('Offline').text()).toContain('1')
+		await chip('Offline').trigger('click')
+		expect(cards().map(c => c.find('h4').text())).toEqual(['Shop'])
+		await chip('To update').trigger('click')
+		expect(cards().map(c => c.find('h4').text())).toEqual(['Home'])
+		await chip('All').trigger('click')
+		expect(cards()).toHaveLength(2)
+	})
+
+	it('puts the boxes that need a person first when sorted by state', async () => {
+		boxes([A, { ...B, online: false }])
+		await mountPage()
+		expect(cards().map(c => c.find('h4').text())).toEqual(['Home', 'Shop'])
+		await wrapper.find('#fleet-sort').setValue('state')
+		expect(cards().map(c => c.find('h4').text())).toEqual(['Shop', 'Home'])
 	})
 
 	it('marks boxes that need a new code', async () => {
 		boxes([{ ...A, needs_recode: true }, B])
 		await mountPage()
-		const home = rowOf('Home')
-		const shop = rowOf('Shop')
+		const home = cardOf('Home')
+		const shop = cardOf('Shop')
 		expect(home.find('.tag.is-warning').text()).toBe('New code needed')
 		expect(home.find('button.is-warning').exists()).toBe(true)
 		expect(shop.text()).not.toContain('New code needed')
