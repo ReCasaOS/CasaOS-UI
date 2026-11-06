@@ -14,6 +14,7 @@ function modal(share) {
 	const vm = {
 		share,
 		...ShareAccessModal.data.call({ share }),
+		users: ['plex', 'anna'],
 		$api: { samba: { createShare: create, updateShare: update } },
 		$emit: vi.fn(),
 		$t: key => key,
@@ -29,7 +30,8 @@ describe('sharing a folder that is not shared yet', () => {
 		const { vm, create, update, save } = modal({ path: '/DATA/flare' })
 
 		vm.requireAccount = true
-		vm.username = 'plex'
+		vm.selected.plex = true
+		vm.access.plex = 'rw'
 		await save()
 
 		expect(update).not.toHaveBeenCalled()
@@ -37,9 +39,10 @@ describe('sharing a folder that is not shared yet', () => {
 			path: '/DATA/flare',
 			anonymous: false,
 			username: 'plex',
+			members: [{ username: 'plex', read_only: false }],
 			time_machine: false,
 		}])
-		expect(vm.$emit).toHaveBeenCalledWith('reload', { username: 'plex' })
+		expect(vm.$emit).toHaveBeenCalledWith('reload', { members: [{ username: 'plex', read_only: false }] })
 	})
 
 	// Leaving the switch off has to keep working: it is what every share created
@@ -50,7 +53,7 @@ describe('sharing a folder that is not shared yet', () => {
 		await save()
 
 		expect(create).toHaveBeenCalledWith([
-			{ path: '/DATA/flare', anonymous: true, username: '', time_machine: false },
+			{ path: '/DATA/flare', anonymous: true, username: '', members: [], time_machine: false },
 		])
 	})
 
@@ -72,11 +75,34 @@ describe('changing an existing share', () => {
 		const { vm, create, update, save } = modal({ id: 7, path: '/DATA/flare', username: '' })
 
 		vm.requireAccount = true
-		vm.username = 'plex'
+		vm.selected.plex = true
+		vm.selected.anna = true
+		vm.access.plex = 'rw'
+		vm.access.anna = 'ro'
 		await save()
 
 		expect(create).not.toHaveBeenCalled()
-		expect(update).toHaveBeenCalledWith(7, { username: 'plex', time_machine: false })
+		expect(update).toHaveBeenCalledWith(7, {
+			anonymous: false,
+			username: 'plex',
+			members: [{ username: 'plex', read_only: false }, { username: 'anna', read_only: true }],
+			time_machine: false,
+		})
+	})
+
+	// A box running an older CasaOS sends only the one account a share had.
+	it('reads a share from before members as its one account, with write access', () => {
+		const { vm } = modal({ id: 7, path: '/DATA/flare', username: 'plex' })
+
+		expect(vm.members).toEqual([{ username: 'plex', read_only: false }])
+	})
+
+	it('counts a change of access as a change', () => {
+		const { vm } = modal({ id: 7, path: '/DATA/flare', members: [{ username: 'plex', read_only: false }] })
+
+		expect(vm.canSave).toBe(false)
+		vm.access.plex = 'ro'
+		expect(vm.canSave).toBe(true)
 	})
 
 	// An unchanged share has nothing to save, which is what tells the two modes
@@ -87,5 +113,40 @@ describe('changing an existing share', () => {
 		expect(vm.canSave).toBe(false)
 		vm.timeMachine = true
 		expect(vm.canSave).toBe(true)
+	})
+})
+
+// A CasaOS without members reads username alone: without it a protected share
+// would be created, or edited back, as a guest share open to anybody.
+describe('a box whose CasaOS knows no members', () => {
+	it('gets the account that can write as username, else the first', async () => {
+		const { vm, update, save } = modal({ id: 4, path: '/DATA/flare', members: [{ username: 'anna', read_only: true }] })
+
+		vm.selected.plex = true
+		vm.access.plex = 'rw'
+		await save()
+
+		expect(update).toHaveBeenCalledWith(4, expect.objectContaining({ anonymous: false, username: 'plex' }))
+
+		const ro = modal({ id: 5, path: '/DATA/b', members: [{ username: 'anna', read_only: true }] })
+		ro.vm.timeMachine = true
+		await ro.save()
+		expect(ro.update).toHaveBeenCalledWith(5, expect.objectContaining({ username: 'anna' }))
+	})
+})
+
+// A member that is not a share account (a share made before, on another
+// account) is listed and kept: a save, even of Time Machine alone, must not drop it.
+describe('a member the dialog does not know', () => {
+	it('is kept on save', async () => {
+		const { vm, update, save } = modal({ id: 6, path: '/DATA/old', members: [{ username: 'vince', read_only: false }, { username: 'anna', read_only: true }] })
+
+		expect(vm.accounts).toEqual(['plex', 'anna', 'vince'])
+		vm.timeMachine = true
+		await save()
+
+		expect(update).toHaveBeenCalledWith(6, expect.objectContaining({
+			members: [{ username: 'anna', read_only: true }, { username: 'vince', read_only: false }],
+		}))
 	})
 })

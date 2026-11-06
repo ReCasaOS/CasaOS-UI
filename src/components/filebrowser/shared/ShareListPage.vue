@@ -45,6 +45,7 @@
 import { defineAsyncComponent } from 'vue'
 import ShareListView from './ShareListView.vue'
 import ShareAccessModal from './ShareAccessModal.vue'
+import { shareMembers } from './shareMembers'
 import SambaUsersModal from './SambaUsersModal.vue'
 import events from '@/events/events'
 
@@ -100,6 +101,7 @@ export default {
 						name,
 						path: item.path,
 						username: item.username || '',
+						members: shareMembers(item),
 						time_machine: !!item.time_machine,
 						size: 0,
 						write: false,

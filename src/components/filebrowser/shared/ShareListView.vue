@@ -29,8 +29,8 @@
 									</div>
 									<p class="text ">
 										{{ item.name }}
-										<b-tag :type="item.username ? 'is-light' : 'is-warning'" class="ml-2" rounded>
-											{{ item.username || $t('Everyone') }}
+										<b-tag :type="item.members.length ? 'is-light' : 'is-warning'" class="ml-2" rounded>
+											{{ item.members.map(m => m.username).join(', ') || $t('Everyone') }}
 										</b-tag>
 									</p>
 									<div class="action-wrapper mr-3">
@@ -69,16 +69,16 @@ import ContextMenu from './ContextMenu.vue'
 import { mixin } from '@/mixins/mixin'
 
 export default {
-	props: {
-		listData: Array,
-		isLoading: Boolean,
-	},
 	components: {
 		ActionButton,
 		ContextMenu,
 		ListIconContainer,
 	},
 	mixins: [mixin],
+	props: {
+		listData: Array,
+		isLoading: Boolean,
+	},
 
 	data() {
 		return {
