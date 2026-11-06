@@ -180,6 +180,7 @@ import { STATS_APP_NAME } from '@/components/Stats/entry'
 import { createPoller } from '@/components/Stats/poller'
 import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -653,8 +654,11 @@ export default {
 				// the Fleet card the same way, where the core says this box is a master
 				const hasFleetCard = this.appList.some(app => app.name === FLEET_APP_NAME)
 				const fleetApps = hasFleetCard ? [fleetApplication()] : []
+				// the Logs card the same way, where AppManagement keeps logs
+				const hasLogsCard = this.appList.some(app => app.name === LOGS_APP_NAME)
+				const logsApps = hasLogsCard ? [logsApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, vmApps, fleetApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(builtInApplications, vmApps, fleetApps, logsApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -666,7 +670,7 @@ export default {
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
@@ -674,6 +678,9 @@ export default {
 				}
 				if (!hasFleetCard) {
 					this.addFleetCardWhenThere(lateSortList)
+				}
+				if (!hasLogsCard) {
+					this.addLogsCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -769,6 +776,18 @@ export default {
 					this.appList = this.sortApps(concat(this.appList, fleetApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
 				} else if (!available && savedOrder.includes(FLEET_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
+		},
+
+		// Adds the Logs card at its saved place once AppManagement says it keeps logs.
+		addLogsCardWhenThere(savedOrder) {
+			return hasLogs().then((available) => {
+				if (available && !this.appList.some(app => app.name === LOGS_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, logsApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(LOGS_APP_NAME)) {
 					this.saveSortIfChanged(savedOrder)
 				}
 			})

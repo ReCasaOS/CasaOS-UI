@@ -61,6 +61,10 @@
 						</b-loading>
 					</b-button>
 
+					<b-button v-if="logsAvailable && (isV2App || isV1App)" expanded type="is-text" @click="showLogs()">
+						{{ $t('Logs') }}
+					</b-button>
+
 					<b-button v-if="isContainerApp" expanded type="is-text" @click="showContainerDetail()">
 						{{
 							$t('Details')
@@ -215,6 +219,7 @@ import { alertBadge } from '@/components/Stats/alertBadge'
 import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
 import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -287,6 +292,8 @@ export default {
 			isSaving: false,
 			isActiveTooltip: false,
 			dropdownPosition: 'is-bottom-right',
+			// whether AppManagement keeps logs: an older one gets no Logs entry
+			logsAvailable: false,
 		}
 	},
 
@@ -428,6 +435,12 @@ export default {
 		},
 	},
 
+	created() {
+		hasLogs().then((available) => {
+			this.logsAvailable = available
+		})
+	},
+
 	methods: {
 		renderSize,
 		handleDorpdownPosition(event) {
@@ -511,6 +524,18 @@ export default {
 			})
 		},
 
+		// The logs keep an app under the name AppManagement gives it: the compose project for a compose app, the
+		// container's name for a v1 app, whose card knows only the container's id.
+		async showLogs() {
+			let app = this.item.name
+			if (this.isV1App) {
+				try {
+					app = (await this.$api.container.getDetail(this.item.name)).data.data?.name || app
+				} catch {}
+			}
+			openLogs(this.$buefy, this.$store.state, { app })
+		},
+
 		openSystemApps(item) {
 			switch (item.name) {
 				case 'App Store':
@@ -527,6 +552,9 @@ export default {
 					break
 				case FLEET_APP_NAME:
 					openFleet(this.$buefy, this.$store.state)
+					break
+				case LOGS_APP_NAME:
+					openLogs(this.$buefy, this.$store.state)
 					break
 				default:
 					break
