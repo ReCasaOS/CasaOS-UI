@@ -6,6 +6,7 @@ const DOWN = new Set(['exited', 'dead', 'restarting', 'unknown'])
 
 const text = v => (typeof v === 'string' ? v : '')
 const number = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+const positive = v => (number(v) > 0 ? v : null)
 const list = a => (Array.isArray(a) ? a : [])
 const payload = answer => (answer?.ok ? answer.data : null)
 
@@ -58,6 +59,10 @@ export function overviewRow(box, answers) {
 		cpu: number(util?.cpu?.percent),
 		mem: number(util?.mem?.usedPercent),
 		disk: number(disk?.size) > 0 ? Math.min(100, Math.floor(number(disk.used) * 100 / disk.size)) : null,
+		// what sits under each meter; a figure the box does not send is null, never 0
+		cpuInfo: util?.cpu ? { cores: positive(util.cpu.num), freq: positive(util.cpu.freq), temperature: positive(util.cpu.temperature) } : null,
+		memInfo: positive(util?.mem?.total) ? { used: number(util.mem.used) ?? 0, total: util.mem.total } : null,
+		diskInfo: number(disk?.size) > 0 ? { used: number(disk.used) ?? 0, total: disk.size } : null,
 		errors: errorsOf(answers),
 	}
 }

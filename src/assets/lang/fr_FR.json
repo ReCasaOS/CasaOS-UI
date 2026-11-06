@@ -2912,5 +2912,7 @@
   "Enter the username": "Saisissez le nom d'utilisateur",
   "Enter the password": "Saisissez le mot de passe",
   "New login page (beta)": "Nouvelle page de connexion (bêta)",
-  "The login page could not be changed": "La page de connexion n'a pas pu être modifiée"
+  "The login page could not be changed": "La page de connexion n'a pas pu être modifiée",
+  "Update ReCasaOS on {name}?": "Mettre à jour ReCasaOS sur {name} ?",
+  "The box goes offline for a few minutes and comes back with its new version.": "La box passe hors ligne quelques minutes puis revient avec sa nouvelle version."
 }

@@ -23,7 +23,7 @@
 						<b-tag v-if="summary.appsDown" size="is-small" type="is-danger">{{ $t('{n} down', { n: summary.appsDown }) }}</b-tag>
 					</div>
 				</div>
-				<div class="fleet-stat">
+				<div v-if="summary.vmsTotal" class="fleet-stat">
 					<div class="fleet-stat-label">{{ $t('Virtual Machines') }}</div>
 					<div class="fleet-stat-value">{{ summary.vmsRunning }} / {{ summary.vmsTotal }}</div>
 					<div class="fleet-stat-note">
@@ -98,7 +98,10 @@
 							<dd>
 								<template v-if="row.version">
 									<span class="has-text-weight-semibold">{{ row.version.current }}</span>
-									<b-tag v-if="row.version.available && row.version.latest" size="is-small" type="is-info">{{ $t('Update available: {version}', { version: row.version.latest }) }}</b-tag>
+									<b-tag v-if="isUpdating(row)" size="is-small" type="is-info">{{ $t('Updating…') }}</b-tag>
+									<!-- the master updates from its own settings: for it the tag only says so -->
+									<button v-else-if="row.version.available && row.version.latest && !row.self" :title="$t('Update ReCasaOS on {name}?', { name: row.name })" class="tag is-small is-info fleet-update" type="button" @click="confirmUpdate(row)">{{ $t('Update available: {version}', { version: row.version.latest }) }}</button>
+									<b-tag v-else-if="row.version.available && row.version.latest" :title="$t('Update the master from its own settings')" size="is-small" type="is-info">{{ $t('Update available: {version}', { version: row.version.latest }) }}</b-tag>
 									<b-tag v-else size="is-small" type="is-success">{{ $t('Up to date') }}</b-tag>
 								</template>
 								<span v-else class="has-text-full-03">{{ blank(row, 'version') }}</span>
@@ -124,7 +127,7 @@
 									<span v-else class="has-text-full-03">{{ blank(row, 'grid') }}</span>
 								</span>
 							</div>
-							<div class="fleet-count">
+							<div v-if="hasVms(row)" class="fleet-count">
 								<span class="fleet-count-label has-text-full-03">{{ $t('Virtual Machines') }}</span>
 								<span class="fleet-count-value">
 									<template v-if="row.vms">
@@ -144,6 +147,7 @@
 								</div>
 								<span v-else class="fleet-meter-track" aria-hidden="true"></span>
 								<span :class="{ 'has-text-full-03': row[meter.field] === null }" class="fleet-meter-value">{{ row[meter.field] === null ? blank(row, 'utilization') : pct(row[meter.field]) }}</span>
+								<span v-if="detailOf(row, meter.field)" class="fleet-meter-detail has-text-full-03">{{ detailOf(row, meter.field) }}</span>
 							</div>
 						</div>
 					</template>
@@ -165,9 +169,12 @@
 import escape from 'lodash/escape'
 import tabMixin from './tabMixin'
 import AddBoxDialog from './AddBoxDialog.vue'
+import { actions } from './bulk'
 import { BOX_FILTERS, filterBoxes, fleetSummary, overviewRow, sortBoxes } from './fleetData'
 import { SUPPORT_WORDS } from './fleetWords'
 import { fleetApi } from '@/service/fleet'
+import { cpuFrequency } from '@/components/dashboard/healthTiles'
+import { renderSize } from '@/mixins/file_utils'
 
 export default {
 	name: 'OverviewTab',
@@ -176,6 +183,8 @@ export default {
 		return {
 			sources: ['version', 'os', 'utilization', 'grid', 'vms'],
 			intervalMs: 30000,
+			// box id → the version it had when its update started, until it comes back with another
+			updating: {},
 			filter: 'all',
 			sort: 'name',
 			meters: [
@@ -204,6 +213,16 @@ export default {
 			return sortBoxes(filterBoxes(this.rows, this.filter), this.sort)
 		},
 	},
+	watch: {
+		// a box back with another version is no longer updating
+		rows(rows) {
+			for (const row of rows) {
+				if (this.updating[row.id] !== undefined && row.online && row.version?.current && row.version.current !== this.updating[row.id]) {
+					delete this.updating[row.id]
+				}
+			}
+		},
+	},
 	methods: {
 		build(box, answers) {
 			return overviewRow(box, answers)
@@ -213,6 +232,40 @@ export default {
 		},
 		supportOf(os) {
 			return SUPPORT_WORDS[os.support] || null
+		},
+		hasVms(row) {
+			return row.vms ? row.vms.total > 0 : row.online && row.errors.includes('vms')
+		},
+		isUpdating(row) {
+			return this.updating[row.id] !== undefined
+		},
+		// "8 cores · 3.4 GHz · 52°C", "4.6 GB / 15.6 GB": what the box does not send is left out
+		detailOf(row, field) {
+			if (field === 'cpu') {
+				const c = row.cpuInfo
+				return c ? [c.cores ? this.$t('{count} cores', { count: c.cores }) : '', cpuFrequency(c.freq), c.temperature ? `${c.temperature}°C` : ''].filter(Boolean).join(' · ') : ''
+			}
+			const d = field === 'mem' ? row.memInfo : row.diskInfo
+			return d ? `${renderSize(d.used)} / ${renderSize(d.total)}` : ''
+		},
+		// asked first, as on the Updates tab: the box goes offline while it updates
+		confirmUpdate(row) {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Update ReCasaOS on {name}?', { name: row.name }),
+				message: this.$t('The box goes offline for a few minutes and comes back with its new version.'),
+				type: 'is-warning',
+				hasIcon: true,
+				confirmText: this.$t('Update'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: async () => {
+					const done = (await this.act(actions.box.update, [row])).get(row.key)
+					if (done?.state === 'done') {
+						this.updating[row.id] = row.version?.current ?? ''
+					} else {
+						this.failed(new Error(done?.message || done?.state || ''))
+					}
+				},
+			})
 		},
 		pct(value) {
 			return `${Math.round(value)} %`
@@ -495,6 +548,27 @@ $panel: rgba(255, 255, 255, 0.06);
 	display: flex;
 	flex-direction: column;
 	gap: 0.625rem;
+}
+
+.fleet-update {
+	min-height: 1.5rem;
+	border: 0;
+	cursor: pointer;
+
+	&:hover {
+		filter: brightness(1.15);
+	}
+
+	&:focus-visible {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+}
+
+.fleet-meter-detail {
+	grid-column: 2 / -1;
+	margin-top: -0.375rem;
+	font-size: 0.75rem;
 }
 
 .fleet-meter {
