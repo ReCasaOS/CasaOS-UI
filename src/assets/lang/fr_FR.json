@@ -2926,5 +2926,10 @@
   "Update {name}": "Mettre à jour {name}",
   "No container matches this filter": "Aucun conteneur ne correspond à ce filtre",
   "on {box}": "sur {box}",
-  "No virtual machine matches this filter": "Aucune machine virtuelle ne correspond à ce filtre"
+  "No virtual machine matches this filter": "Aucune machine virtuelle ne correspond à ce filtre",
+  "Dashboard": "Tableau de bord",
+  "Login screen": "Écran de connexion",
+  "Shown behind the login box. The first wallpaper is the default one.": "Affiché derrière la boîte de connexion. Le premier fond d'écran est celui par défaut.",
+  "Login screen wallpaper saved.": "Fond d'écran de connexion enregistré.",
+  "Only the first account can choose the login screen's wallpaper.": "Seul le premier compte peut choisir le fond de l'écran de connexion."
 }
