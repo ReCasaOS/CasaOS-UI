@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card fleet-page">
+	<div class="modal-card fleet-page touch-targets">
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 ref="title" class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Fleet') }}</h3>
@@ -90,6 +90,11 @@ export default {
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
+
+		// a finger, not a pointer
+		@media (max-width: 768px), (pointer: coarse) {
+			min-height: 2.75rem;
+		}
 
 		&.is-selected {
 			border-color: #3b82f6;

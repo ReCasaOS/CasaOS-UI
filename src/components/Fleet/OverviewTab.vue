@@ -524,6 +524,10 @@ $panel: rgba(255, 255, 255, 0.06);
 	border: 0;
 	cursor: pointer;
 
+	@media (max-width: 768px), (pointer: coarse) {
+		min-height: 2.75rem;
+	}
+
 	&:hover {
 		filter: brightness(1.15);
 	}
