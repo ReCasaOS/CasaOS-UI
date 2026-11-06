@@ -27,13 +27,13 @@
 					{{ $t('Enter the following link to access the shared folder ( Samba ) .') }}
 				</div>
 				<!-- Only when the caller knows: the shared-folders list carries the
-					account, and a share just created is told which one it got. A file
+					accounts, and a share just created is told which ones it got. A file
 					item from the browser carries nothing, and guessing "everyone" from
 					nothing is the lie this line exists to prevent. -->
-				<b-message v-if="typeof item.username === 'string'" :type="item.username ? 'is-light' : 'is-warning'"
+				<b-message v-if="Array.isArray(item.members)" :type="item.members.length ? 'is-light' : 'is-warning'"
 					class="mb-5" size="is-small">
-					{{ item.username
-						? $t('Opens only with the account {name}.', { name: item.username })
+					{{ item.members.length
+						? $t('Opens only with the accounts {names}.', { names: item.members.map(m => m.username).join(', ') })
 						: $t('Anyone on the network can read and write this folder.') }}
 				</b-message>
 				<b-field :label="$t('PC ( Windows explorer )')" class="mb-5" horizontal>

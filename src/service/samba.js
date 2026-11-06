@@ -39,7 +39,8 @@ const samba = {
 		return api.post(`${PREFIX}/shares`, data)
 	},
 
-	// change who can open a share; an empty username hands it back to guests
+	// change who can open a share: members is [{ username, read_only }], and an
+	// empty list hands it back to guests
 	updateShare(id, data) {
 		return api.put(`${PREFIX}/shares/${id}`, data)
 	},
@@ -66,6 +67,12 @@ const samba = {
 	// change the password of a share account
 	setUserPassword(username, password) {
 		return api.put(`${PREFIX}/users/${encodeURIComponent(username)}/password`, { password })
+	},
+
+	// set the protected shares an account may open: [{ id, read_only }]; shares
+	// left out lose the account
+	setUserShares(username, shares) {
+		return api.put(`${PREFIX}/users/${encodeURIComponent(username)}/shares`, shares)
 	},
 
 	// delete a share account
