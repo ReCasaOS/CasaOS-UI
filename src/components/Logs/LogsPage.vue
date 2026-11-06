@@ -467,3 +467,19 @@ export default {
 	}
 }
 </style>
+
+<style lang="scss">
+// The modal the page opens in: as wide as the window allows, since a log line needs the room (Buefy's default is 640px).
+.logs-modal {
+	.animation-content {
+		width: 100rem;
+		max-width: calc(100vw - 2rem) !important;
+	}
+
+	.modal-card.logs-page {
+		width: 100%;
+		height: calc(100vh - 3rem);
+		max-height: calc(100vh - 3rem);
+	}
+}
+</style>
