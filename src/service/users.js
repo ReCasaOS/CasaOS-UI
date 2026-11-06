@@ -17,6 +17,10 @@ const users = {
 	getUserStatus() {
 		return api.get(`${PREFIX}/status`)
 	},
+	// the login page the whole box shows: 'classic' or 'beta'; status says it
+	setLoginStyle(style) {
+		return api.put(`${PREFIX}/login-style`, { style })
+	},
 
 	// get user current info [OK]
 	getUserInfo() {

@@ -21,7 +21,7 @@
 							<div class="logs-app">
 								<b-checkbox :model-value="selectedApps.includes(app.app)" size="is-small" @update:model-value="toggleApp(app.app, $event)">
 									<span class="logs-app-label">
-										<img v-if="app.icon" :src="app.icon" alt="" class="logs-app-icon">
+										<img :src="app.icon || defaultIcon" alt="" class="logs-app-icon" @error="$event.target.src = defaultIcon">
 										<span :class="{ 'is-running': isRunning(app) }" class="logs-dot" aria-hidden="true"></span>
 										<span class="logs-app-name">{{ titleOf(app) }}</span>
 									</span>
@@ -138,6 +138,8 @@ export default {
 	emits: ['close'],
 	data() {
 		return {
+			// the grid's stand-in when an app has no icon or its icon does not load
+			defaultIcon: require('@/assets/img/app/default.svg'),
 			ranges: RANGES,
 			boxes: [],
 			box: this.initialBox || null,
@@ -464,6 +466,22 @@ export default {
 	dd {
 		margin: 0;
 		word-break: break-word;
+	}
+}
+</style>
+
+<style lang="scss">
+// The modal the page opens in: as wide as the window allows, since a log line needs the room (Buefy's default is 640px).
+.logs-modal {
+	.animation-content {
+		width: 100rem;
+		max-width: calc(100vw - 2rem) !important;
+	}
+
+	.modal-card.logs-page {
+		width: 100%;
+		height: calc(100vh - 3rem);
+		max-height: calc(100vh - 3rem);
 	}
 }
 </style>

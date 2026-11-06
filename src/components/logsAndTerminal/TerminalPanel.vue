@@ -61,6 +61,9 @@ export default {
 			this.getLogs()
 		}, 1000 * 5)
 	},
+	unmounted() {
+		clearInterval(this.timer)
+	},
 	methods: {
 		getLogs() {
 			this.$api.sys.getLogs().then((res) => {
@@ -88,9 +91,6 @@ export default {
 			}
 			window.open(`/v2/casaos/health/logs?${qs.stringify(parameters)}`, '_self')
 		},
-	},
-	unmounted() {
-		clearInterval(this.timer)
 	},
 }
 </script>

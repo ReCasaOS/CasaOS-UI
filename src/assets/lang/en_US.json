@@ -2903,5 +2903,12 @@
   "{n} stopped": "{n} stopped",
   "No box matches this filter": "No box matches this filter",
   "To update": "To update",
-  "All": "All"
+  "All": "All",
+  "Open the Terminal full screen": "Open the Terminal full screen",
+  "Login incorrect": "Login incorrect",
+  "Welcome back to ReCasaOS": "Welcome back to ReCasaOS",
+  "Enter the username": "Enter the username",
+  "Enter the password": "Enter the password",
+  "New login page (beta)": "New login page (beta)",
+  "The login page could not be changed": "The login page could not be changed"
 }

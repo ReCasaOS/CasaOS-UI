@@ -11,6 +11,8 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import route from './route.js'
 import api from '@/service/api'
 import store from '@/store'
+import { LOGIN_PORT_KEY, LOGIN_USER_KEY } from '@/components/logsAndTerminal/terminalLogin'
+import { loginStyleOf } from '@/views/loginStyle'
 
 const routes = route
 
@@ -42,6 +44,8 @@ async function needInit() {
 	}
 	try {
 		const userStatusRes = await api.users.getUserStatus()
+		// the status says which login page to show, so the login page needs no call of its own
+		store.commit('SET_LOGIN_STYLE', loginStyleOf(userStatusRes))
 		if (userStatusRes.data.success === 200 && !userStatusRes.data.data.initialized) {
 			store.commit('SET_NEED_INITIALIZATION', true)
 			store.commit('SET_INIT_KEY', userStatusRes.data.data.key)
@@ -87,6 +91,9 @@ router.beforeEach(async (to, from, next) => {
 						forgetTokens()
 						localStorage.removeItem('wallpaper')
 						localStorage.removeItem('user')
+						// the Terminal's last login is the signed-in person's, not the next one's
+						localStorage.removeItem(LOGIN_USER_KEY)
+						localStorage.removeItem(LOGIN_PORT_KEY)
 						return next('/login')
 
 					// No `default` that throws the session away when `version` is not in

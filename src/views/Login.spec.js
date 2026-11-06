@@ -170,3 +170,98 @@ describe('a login from a link', () => {
 		wrapper.unmount()
 	})
 })
+
+// The new login page (beta): the router asked the box which page to be before
+// this page opened, and put it in the store. The sign-in and the second factor
+// are the classic page's own.
+describe('the new login page', () => {
+	const preAuth = () => Promise.resolve({ data: { success: 10014, data: { pre_auth_token: 't', expires_at: Date.now() / 1000 + 300 } } })
+
+	function mountStyled(loginStyle, login, verify2FA) {
+		// no getUserStatus: the page asks nothing of its own
+		const $api = { users: { login, verify2FA } }
+		const $router = { push: vi.fn() }
+		const $store = { state: { loginStyle }, commit: vi.fn() }
+		const wrapper = mount(Login, { global: { plugins: [Buefy, i18n], mocks: { $api, $router, $store, $route: { query: {} } } } })
+		return { wrapper, $router }
+	}
+
+	async function signIn(wrapper) {
+		const [username, password] = wrapper.findAll('input')
+		await username.setValue('root')
+		await password.setValue('secret')
+		await wrapper.find('button.login-go').trigger('click')
+		await flushPromises()
+	}
+
+	beforeEach(() => localStorage.clear())
+
+	it('is the classic page on a box that never chose', () => {
+		for (const style of ['classic', undefined]) {
+			const { wrapper } = mountStyled(style)
+			expect(wrapper.find('.login-beta').exists()).toBe(false)
+			expect(wrapper.find('.login-panel').exists()).toBe(true)
+			wrapper.unmount()
+		}
+	})
+
+	it('is the card when the box says beta', () => {
+		const { wrapper } = mountStyled('beta')
+		expect(wrapper.find('.login-beta .login-card').exists()).toBe(true)
+		expect(wrapper.find('.login-greeting').text()).toBe('Welcome back to ReCasaOS')
+		expect(wrapper.find('.login-logo img').attributes('alt')).toBe('ReCasaOS')
+		expect(wrapper.findAll('input')).toHaveLength(2)
+		wrapper.unmount()
+	})
+
+	it('signs in with the arrow, which waits for both fields', async () => {
+		const login = vi.fn(() => Promise.resolve({ data: { success: 200, data: { ...session, user: { ...session.user, totp_enabled: false } } } }))
+		const { wrapper, $router } = mountStyled('beta', login)
+		await flushPromises()
+		expect(wrapper.find('button.login-go').attributes('disabled')).toBeDefined()
+		await signIn(wrapper)
+		expect(login).toHaveBeenCalledWith('root', 'secret')
+		expect($router.push).toHaveBeenCalledWith('/')
+		expect(localStorage.getItem('access_token')).toBe('a')
+		wrapper.unmount()
+	})
+
+	it('says so under a field left empty', async () => {
+		const { wrapper } = mountStyled('beta')
+		await flushPromises()
+		await wrapper.findAll('input')[0].trigger('blur')
+		expect(wrapper.find('.help').text()).toBe('Enter the username')
+		wrapper.unmount()
+	})
+
+	it('asks for the second factor, and a recovery code after the toggle', async () => {
+		const verify2FA = vi.fn(() => Promise.resolve({ data: { success: 200, data: session } }))
+		const { wrapper, $router } = mountStyled('beta', preAuth, verify2FA)
+		await flushPromises()
+		await signIn(wrapper)
+
+		const code = wrapper.find('input')
+		expect(wrapper.findAll('input')).toHaveLength(1)
+		expect(code.attributes('autocomplete')).toBe('one-time-code')
+		expect(localStorage.getItem('access_token')).toBeNull()
+
+		await wrapper.find('a.login-link').trigger('click')
+		await wrapper.find('input').setValue('abcde-fghij')
+		await wrapper.find('button.login-go').trigger('click')
+		await flushPromises()
+		expect(verify2FA).toHaveBeenCalledWith({ pre_auth_token: 't', recovery_code: 'abcde-fghij' })
+		expect($router.push).toHaveBeenCalledWith('/')
+		wrapper.unmount()
+	})
+
+	it('shows a refused password and stays', async () => {
+		const login = () => Promise.reject(Object.assign(new Error('x'), { response: { status: 400, data: { success: 10013, message: 'Invalid password' } } }))
+		const { wrapper, $router } = mountStyled('beta', login)
+		await flushPromises()
+		await signIn(wrapper)
+		expect(wrapper.find('.notification').text()).toContain('Invalid password')
+		expect(wrapper.find('button.login-go').classes()).not.toContain('is-loading')
+		expect($router.push).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})
