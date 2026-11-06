@@ -47,6 +47,7 @@
 
 <script>
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
+import { afterLogin } from '@/router/afterLogin'
 
 export default {
 
@@ -156,7 +157,7 @@ export default {
 			// not knowing it. The minute after an update is precisely when the core
 			// is still restarting and that call fails, and signing in again once it
 			// answered is what made an update cost two logins.
-			this.$router.push('/')
+			this.$router.push(afterLogin(this.$route?.query?.redirect))
 		},
 		showError(err) {
 			this.message = this.$t(err.response?.data?.message || err.message)

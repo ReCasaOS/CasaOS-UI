@@ -61,6 +61,17 @@ export default [
 		},
 	},
 	{
+		// the Terminal alone, the whole window: a link or bookmark opens it
+		path: '/terminal',
+		name: 'Terminal',
+		hidden: true,
+		component: () => import('@/views/TerminalTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
 		path: '/vms',
 		name: 'VirtualMachines',
 		hidden: true,

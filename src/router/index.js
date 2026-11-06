@@ -69,7 +69,8 @@ router.beforeEach(async (to, from, next) => {
 			next('/welcome')
 		} else {
 			if (requireAuth && !accessToken) {
-				next('/login')
+				// where it was going, so signing in ends there and not on the dashboard
+				next(to.fullPath === '/' ? '/login' : { path: '/login', query: { redirect: to.fullPath } })
 			} else {
 				// The `return`s matter: both of these used to fall through to the
 				// unconditional next() below. v4 applies only the first call, so

@@ -2830,6 +2830,7 @@
   "Leave": "Quitter",
   "Add a box": "Ajouter une box",
   "Add this box": "Ajouter cette box",
+  "This box could not add itself to its fleet: {error}": "Cette box n'a pas pu s'ajouter à sa flotte : {error}",
   "New code": "Nouveau code",
   "New code needed": "Nouveau code requis",
   "New code for {name}": "Nouveau code pour {name}",
