@@ -2897,5 +2897,10 @@
   "Jump to now": "Now",
   "The logs could not be read": "The logs could not be read",
   "Open the Terminal full screen": "Open the Terminal full screen",
-  "Login incorrect": "Login incorrect"
+  "Login incorrect": "Login incorrect",
+  "Welcome back to ReCasaOS": "Welcome back to ReCasaOS",
+  "Enter the username": "Enter the username",
+  "Enter the password": "Enter the password",
+  "New login page (beta)": "New login page (beta)",
+  "The login page could not be changed": "The login page could not be changed"
 }

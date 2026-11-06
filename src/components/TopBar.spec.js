@@ -919,3 +919,54 @@ describe('the logs row', () => {
 		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: LogsSettingsModal, hasModalCard: true, canCancel: ['escape'] }))
 	})
 })
+
+// The new login page switch: the box keeps the choice, for every browser.
+describe('the new login page switch', () => {
+	function bar(setLoginStyle) {
+		const vm = {
+			loginBeta: true,
+			loginBetaSaving: false,
+			$api: { users: { setLoginStyle } },
+			$buefy: { toast: { open: vi.fn() } },
+			$store: { commit: vi.fn() },
+			$t: s => s,
+		}
+		return vm
+	}
+
+	it('sits under the new dashboard switch', () => {
+		expect(source.indexOf('<!-- Beta login page Switch Start')).toBeGreaterThan(source.indexOf('<!-- Beta dashboard Switch End -->'))
+	})
+
+	// the router's status call has the answer already: no call of its own, so a
+	// late answer can never move the switch back
+	it('starts from the store and asks nothing when the bar mounts', () => {
+		expect(TopBar.data.call({ $store: { state: { loginStyle: 'beta' } }, getInitLang: () => 'en_us' }).loginBeta).toBe(true)
+		expect(TopBar.data.call({ $store: { state: { loginStyle: 'classic' } }, getInitLang: () => 'en_us' }).loginBeta).toBe(false)
+		expect(source).not.toMatch(/getLoginStyle|getUserStatus\(\)\.then\(\(res\) => \{\s*this\.loginBeta/)
+	})
+
+	it('tells the box, and the store (and this browser) follow', async () => {
+		const setLoginStyle = vi.fn(() => Promise.resolve({ data: { success: 200 } }))
+		const vm = bar(setLoginStyle)
+		await TopBar.methods.setLoginBeta.call(vm, true)
+		expect(setLoginStyle).toHaveBeenCalledWith('beta')
+		expect(vm.$store.commit).toHaveBeenCalledWith('SET_LOGIN_STYLE', 'beta')
+		expect(vm.loginBeta).toBe(true)
+		expect(vm.loginBetaSaving).toBe(false)
+
+		vm.loginBeta = false
+		await TopBar.methods.setLoginBeta.call(vm, false)
+		expect(setLoginStyle).toHaveBeenLastCalledWith('classic')
+		expect(vm.$store.commit).toHaveBeenLastCalledWith('SET_LOGIN_STYLE', 'classic')
+	})
+
+	it('goes back where it was when the box refuses, and says so', async () => {
+		const vm = bar(() => Promise.reject(new Error('500')))
+		await TopBar.methods.setLoginBeta.call(vm, true)
+		expect(vm.loginBeta).toBe(false)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith(expect.objectContaining({ message: 'The login page could not be changed', type: 'is-danger' }))
+		expect(vm.$store.commit).not.toHaveBeenCalled()
+		expect(vm.loginBetaSaving).toBe(false)
+	})
+})

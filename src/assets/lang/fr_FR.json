@@ -2900,5 +2900,10 @@
   "Jump to now": "Maintenant",
   "The logs could not be read": "Les journaux n'ont pas pu être lus",
   "Open the Terminal full screen": "Ouvrir le terminal en plein écran",
-  "Login incorrect": "Connexion refusée"
+  "Login incorrect": "Connexion refusée",
+  "Welcome back to ReCasaOS": "Bon retour sur ReCasaOS",
+  "Enter the username": "Saisissez le nom d'utilisateur",
+  "Enter the password": "Saisissez le mot de passe",
+  "New login page (beta)": "Nouvelle page de connexion (bêta)",
+  "The login page could not be changed": "La page de connexion n'a pas pu être modifiée"
 }
