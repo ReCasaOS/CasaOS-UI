@@ -200,15 +200,69 @@ describe('the Fleet page', () => {
 		expect(cardOf('Garage').text()).not.toContain('1970')
 	})
 
-	it('sums the fleet in four tiles above the cards', async () => {
+	it('sums the fleet in tiles above the cards, without a tile for virtual machines when there are none', async () => {
 		boxes([A, { ...B, online: false }])
 		await mountPage()
 		const tiles = wrapper.findAll('.fleet-stat').map(t => t.text())
+		expect(tiles).toHaveLength(3)
 		expect(tiles[0]).toContain('1 / 2')
 		expect(tiles[0]).toContain('1 offline')
 		expect(tiles[1]).toContain('1 / 2')
 		expect(tiles[1]).toContain('1 down')
-		expect(tiles[3]).toContain('1')
+		expect(tiles[2]).toContain('1')
+		expect(wrapper.find('.fleet-overview').text()).not.toContain('Virtual Machines')
+	})
+
+	it('shows the virtual machines of a box that has some', async () => {
+		serve({ a: { '/v2/virt_management/vms': [{ state: 'running' }, { state: 'shut off' }] } })
+		await mountPage()
+		expect(cardOf('Home').text()).toContain('Virtual Machines')
+		expect(cardOf('Home').text()).toContain('1/2')
+		expect(cardOf('Shop').text()).not.toContain('Virtual Machines')
+		expect(wrapper.findAll('.fleet-stat')).toHaveLength(4)
+	})
+
+	it('says under each meter what the box has: cores, frequency, sizes', async () => {
+		serve({ a: { '/v1/sys/utilization': { cpu: { percent: 10, num: 8, freq: 3400, temperature: 52 }, mem: { usedPercent: 50, used: 4 * 1024 ** 3, total: 8 * 1024 ** 3 }, sys_disk: { size: 100 * 1024 ** 3, used: 25 * 1024 ** 3 } } } })
+		await mountPage()
+		const details = cardOf('Home').findAll('.fleet-meter-detail').map(d => d.text())
+		expect(details).toEqual(['8 cores · 3.4 GHz · 52°C', '4 GB / 8 GB', '25 GB / 100 GB'])
+		// a box that sends no cores, no frequency and no totals gets no detail line
+		expect(cardOf('Shop').findAll('.fleet-meter-detail')).toHaveLength(1)
+	})
+
+	it('updates ReCasaOS on a box from its tag, after asking', async () => {
+		await mountPage()
+		const tag = () => cardOf('Home').find('button.fleet-update')
+		expect(tag().text()).toBe('Update available: 0.4.81')
+		await tag().trigger('click')
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toHaveLength(0)
+		expect(document.body.textContent).toContain('Update ReCasaOS on Home?')
+		dialogButton('Update').click()
+		await flushPromises()
+		expect(relayCalls('a', 'post')).toEqual([['a', 'post', '/v1/sys/update']])
+		expect(tag().exists()).toBe(false)
+		expect(cardOf('Home').text()).toContain('Updating…')
+	})
+
+	it('says why an update did not start, and leaves the tag', async () => {
+		serve({ a: { 'post /v1/sys/update': failure(409, { message: 'busy' }) } })
+		await mountPage()
+		await cardOf('Home').find('button.fleet-update').trigger('click')
+		await flushPromises()
+		dialogButton('Update').click()
+		await flushPromises()
+		expect(document.body.textContent).toContain('busy')
+		expect(cardOf('Home').find('button.fleet-update').exists()).toBe(true)
+	})
+
+	it('does not offer to update the master from the page', async () => {
+		boxes([{ ...A, self: true }, B])
+		await mountPage()
+		expect(cardOf('Home').find('button.fleet-update').exists()).toBe(false)
+		expect(cardOf('Home').text()).toContain('Update available: 0.4.81')
+		expect(cardOf('Shop').find('button.fleet-update').exists()).toBe(true)
 	})
 
 	it('filters the cards with the chips and counts each filter', async () => {
