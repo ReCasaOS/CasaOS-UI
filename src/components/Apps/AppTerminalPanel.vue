@@ -14,7 +14,7 @@
 					<b-tab-item :label="$t('Logs')" value="logs">
 						<template v-if="streamed">
 							<div class="is-flex">
-								<b-button class="ml-auto" icon-left="download" size="is-small" @click="$refs.stream.download()">
+								<b-button class="ml-auto" icon-left="download" size="is-small" @click="$refs.stream?.download()">
 									{{ $t('Download') }}
 								</b-button>
 							</div>
@@ -96,7 +96,8 @@ export default {
 			this.onInput(this.activeTab)
 		hasLogs().then((streamed) => {
 			this.streamed = streamed
-			if (!streamed) {
+			// closed before AppManagement answered: no polling left running behind it
+			if (!streamed && !this.closed) {
 				this.getLogs()
 				this.startPolling()
 				this.$nextTick(() => this.$refs.logs?.active(this.activeTab === 'logs'))
@@ -146,6 +147,7 @@ export default {
 		},
 	},
 	unmounted() {
+		this.closed = true
 		clearInterval(this.timer)
 	},
 }
