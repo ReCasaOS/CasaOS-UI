@@ -145,10 +145,12 @@ describe('app section virtual machines card', () => {
 	function section(names) {
 		const vm = {
 			appList: names.map(name => ({ name })),
+			cardsProbing: [],
 			saveSortData: vi.fn(),
 		}
 		vm.sortApps = AppSection.methods.sortApps.bind(vm)
 		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		vm.probeCard = AppSection.methods.probeCard.bind(vm)
 		return vm
 	}
 	const names = vm => vm.appList.map(app => app.name)
@@ -268,11 +270,12 @@ describe('app section built-in cards', () => {
 			appListErrorMessage: '',
 			gridMissing: false,
 			savedOrder: [],
+			cardsProbing: [],
 			getLinkAppList: () => Promise.resolve([]),
 			sortApps: AppSection.methods.sortApps,
 			getList: vi.fn(),
 		}
-		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'onSortEnd']) {
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'onSortEnd']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, toast, setCustomStorage }
@@ -352,6 +355,62 @@ describe('app section built-in cards', () => {
 		await AppSection.methods.getList.call(vm)
 
 		expect(toast).toHaveBeenCalledTimes(1)
+	})
+})
+
+// ReCasaOS/CasaOS#97: each card's probe answers on its own. A card that answers
+// first saves the order while a slower one is not shown yet: that save must keep
+// the slower card's place, or the next read of the grid puts it last.
+describe('app section cards whose probes answer one after the other', () => {
+	function section(savedOrder) {
+		const stored = { order: savedOrder }
+		const setCustomStorage = vi.fn((key, { data }) => {
+			stored.order = data
+		})
+		const vm = {
+			$baseIp: 'localhost',
+			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'jellyfin' }] } }) } },
+			$api: { users: {
+				getCustomStorage: () => Promise.resolve({ data: { data: { data: stored.order } } }),
+				setCustomStorage,
+			} },
+			appList: [],
+			retryCount: 0,
+			appListErrorMessage: '',
+			gridMissing: false,
+			savedOrder: [],
+			getLinkAppList: () => Promise.resolve([]),
+			sortApps: AppSection.methods.sortApps,
+		}
+		Object.assign(vm, AppSection.data.call(vm), { appList: [], savedOrder: [] })
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere']) {
+			vm[method] = AppSection.methods[method].bind(vm)
+		}
+		return { vm, stored, setCustomStorage }
+	}
+
+	it('keeps Logs at its saved place when the Virtual Machines card answers first', async () => {
+		const saved = ['App Store', 'Files', 'Statistics', 'logs', 'Virtual Machines', 'jellyfin']
+		let logsAnswer
+		hasVirtualMachines.mockResolvedValue(true)
+		hasLogs.mockImplementationOnce(() => new Promise((resolve) => {
+			logsAnswer = resolve
+		}))
+		const { vm, stored, setCustomStorage } = section(saved)
+
+		await vm.getList()
+		await vi.waitFor(() => expect(vm.appList.map(app => app.name)).toContain('Virtual Machines'))
+		logsAnswer(true)
+		await vi.waitFor(() => expect(vm.appList.map(app => app.name)).toContain('logs'))
+		// the next read of the grid, five seconds later
+		await vm.getList()
+
+		for (const [, { data }] of setCustomStorage.mock.calls) {
+			expect(data).toContain('logs')
+		}
+		expect(stored.order.indexOf('logs')).toBe(stored.order.indexOf('Statistics') + 1)
+		const names = vm.appList.map(app => app.name)
+		expect(names.indexOf('logs')).toBe(names.indexOf('Statistics') + 1)
 	})
 })
 
@@ -710,10 +769,12 @@ describe('app section fleet card', () => {
 	function section(names) {
 		const vm = {
 			appList: names.map(name => ({ name })),
+			cardsProbing: [],
 			saveSortData: vi.fn(),
 		}
 		vm.sortApps = AppSection.methods.sortApps.bind(vm)
 		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		vm.probeCard = AppSection.methods.probeCard.bind(vm)
 		return vm
 	}
 	const names = vm => vm.appList.map(app => app.name)
@@ -844,10 +905,12 @@ describe('app section logs card', () => {
 	function section(names) {
 		const vm = {
 			appList: names.map(name => ({ name })),
+			cardsProbing: [],
 			saveSortData: vi.fn(),
 		}
 		vm.sortApps = AppSection.methods.sortApps.bind(vm)
 		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		vm.probeCard = AppSection.methods.probeCard.bind(vm)
 		return vm
 	}
 	const names = vm => vm.appList.map(app => app.name)

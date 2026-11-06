@@ -310,6 +310,8 @@ export default {
 			gridMissing: false,
 			// the order last read or saved: what saving keeps for apps not shown
 			savedOrder: [],
+			// the cards whose probe has not answered yet: a save keeps their place
+			cardsProbing: [],
 			skCount: 0,
 			ListRefreshTimer: null,
 			isCheckingImages: false,
@@ -769,9 +771,17 @@ export default {
 			})
 		},
 
+		// Runs a card's probe; until it answers, a save keeps the card's saved place.
+		probeCard(name, probe) {
+			this.cardsProbing.push(name)
+			return probe().finally(() => {
+				this.cardsProbing.splice(this.cardsProbing.indexOf(name), 1)
+			})
+		},
+
 		// Adds the Fleet card at its saved place once the core says master.
 		addFleetCardWhenThere(savedOrder) {
-			return hasFleet().then((available) => {
+			return this.probeCard(FLEET_APP_NAME, hasFleet).then((available) => {
 				if (available && !this.appList.some(app => app.name === FLEET_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, fleetApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
@@ -783,7 +793,7 @@ export default {
 
 		// Adds the Logs card at its saved place once AppManagement says it keeps logs.
 		addLogsCardWhenThere(savedOrder) {
-			return hasLogs().then((available) => {
+			return this.probeCard(LOGS_APP_NAME, hasLogs).then((available) => {
 				if (available && !this.appList.some(app => app.name === LOGS_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, logsApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
@@ -795,7 +805,7 @@ export default {
 
 		// a save while the grid's apps are missing keeps them (saveSortData, gridMissing)
 		addVmCardWhenThere(savedOrder) {
-			return hasVirtualMachines().then((available) => {
+			return this.probeCard(VM_APP_NAME, hasVirtualMachines).then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, vmApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
@@ -869,15 +879,16 @@ export default {
 		 * @return {*}
 		 */
 		saveSortData() {
-			let newList = this.appList.map((item) => {
+			const shown = this.appList.map((item) => {
 				// compose milestone :: name is unique, global index.
 				return item.name
 			})
-			// the grid's apps are not shown (a drag while the grid fails): they keep
-			// their saved place, behind the app saved before them
-			if (this.gridMissing) {
-				newList = keepUnshown(newList, this.savedOrder || [])
-			}
+			// apps not shown keep their saved place, behind the app saved before them:
+			// the grid's apps while the grid fails (a drag meanwhile), and a card whose
+			// probe has not answered yet (another card's probe answered first)
+			const probing = this.cardsProbing || []
+			const kept = (this.savedOrder || []).filter(name => this.gridMissing || shown.includes(name) || probing.includes(name))
+			const newList = keepUnshown(shown, kept)
 			this.savedOrder = newList
 			const data = {
 				data: newList,
