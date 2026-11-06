@@ -51,7 +51,7 @@
 </template>
 
 <script>
-import { shareMembers } from './shareMembers'
+import { NEVER_OFFERED, legacyUsername, shareMembers } from './shareMembers'
 import PathPicker from '@/components/VirtualMachines/PathPicker.vue'
 
 export default {
@@ -148,7 +148,7 @@ export default {
 				const res = await this.$api.folder.getList('/DATA')
 				const content = res.data.data?.content || []
 				content
-					.filter(e => e.is_dir && !e.name.startsWith('.'))
+					.filter(e => e.is_dir && !e.name.startsWith('.') && !NEVER_OFFERED.includes(e.path))
 					.forEach(e => folders.push({ path: e.path, disk: false }))
 			} catch {
 				// a box whose /DATA cannot be read
@@ -193,6 +193,21 @@ export default {
 			})
 		},
 
+		// the protected shares this account is to open, and how
+		wantedShares() {
+			return this.shares
+				.filter(s => shareMembers(s).length > 0 && this.selected[s.path])
+				.map(s => ({ id: s.id, read_only: this.access[s.path] === 'ro' }))
+		},
+
+		// the folders ticked that are not shared yet, as shares of this account alone
+		freshShares() {
+			return this.rows.filter(r => !r.share && this.selected[r.path]).map((r) => {
+				const members = [{ username: this.username, read_only: this.access[r.path] === 'ro' }]
+				return { path: r.path, anonymous: false, username: legacyUsername(members), members, time_machine: false }
+			})
+		},
+
 		async save() {
 			if (!this.canSave) {
 				return
@@ -202,23 +217,16 @@ export default {
 			this.error = ''
 
 			try {
-				// Folders not shared yet become shares of this account alone.
-				const fresh = this.rows.filter(r => !r.share && this.selected[r.path])
-				if (fresh.length > 0) {
-					await this.$api.samba.createShare(fresh.map(r => ({
-						path: r.path,
-						anonymous: false,
-						members: [{ username: this.username, read_only: this.access[r.path] === 'ro' }],
-						time_machine: false,
-					})))
-					const res = await this.$api.samba.getShares()
-					this.shares = res.data.data || []
-				}
+				// The shares there are first: the core may refuse (a share this
+				// account is the only member of, unticked), and then nothing was
+				// created. Shares made after are not in this list, and keep the account.
+				await this.$api.samba.setUserShares(this.username, this.wantedShares())
 
-				const wanted = this.shares
-					.filter(s => shareMembers(s).length > 0 && this.selected[s.path])
-					.map(s => ({ id: s.id, read_only: this.access[s.path] === 'ro' }))
-				await this.$api.samba.setUserShares(this.username, wanted)
+				// Folders not shared yet become shares of this account alone.
+				const fresh = this.freshShares()
+				if (fresh.length > 0) {
+					await this.$api.samba.createShare(fresh)
+				}
 
 				this.$emit('saved')
 				this.$emit('close')

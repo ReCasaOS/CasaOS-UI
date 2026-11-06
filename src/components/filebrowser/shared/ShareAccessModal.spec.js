@@ -38,6 +38,7 @@ describe('sharing a folder that is not shared yet', () => {
 		expect(create).toHaveBeenCalledWith([{
 			path: '/DATA/flare',
 			anonymous: false,
+			username: 'plex',
 			members: [{ username: 'plex', read_only: false }],
 			time_machine: false,
 		}])
@@ -52,7 +53,7 @@ describe('sharing a folder that is not shared yet', () => {
 		await save()
 
 		expect(create).toHaveBeenCalledWith([
-			{ path: '/DATA/flare', anonymous: true, members: [], time_machine: false },
+			{ path: '/DATA/flare', anonymous: true, username: '', members: [], time_machine: false },
 		])
 	})
 
@@ -82,6 +83,8 @@ describe('changing an existing share', () => {
 
 		expect(create).not.toHaveBeenCalled()
 		expect(update).toHaveBeenCalledWith(7, {
+			anonymous: false,
+			username: 'plex',
 			members: [{ username: 'plex', read_only: false }, { username: 'anna', read_only: true }],
 			time_machine: false,
 		})
@@ -110,5 +113,40 @@ describe('changing an existing share', () => {
 		expect(vm.canSave).toBe(false)
 		vm.timeMachine = true
 		expect(vm.canSave).toBe(true)
+	})
+})
+
+// A CasaOS without members reads username alone: without it a protected share
+// would be created, or edited back, as a guest share open to anybody.
+describe('a box whose CasaOS knows no members', () => {
+	it('gets the account that can write as username, else the first', async () => {
+		const { vm, update, save } = modal({ id: 4, path: '/DATA/flare', members: [{ username: 'anna', read_only: true }] })
+
+		vm.selected.plex = true
+		vm.access.plex = 'rw'
+		await save()
+
+		expect(update).toHaveBeenCalledWith(4, expect.objectContaining({ anonymous: false, username: 'plex' }))
+
+		const ro = modal({ id: 5, path: '/DATA/b', members: [{ username: 'anna', read_only: true }] })
+		ro.vm.timeMachine = true
+		await ro.save()
+		expect(ro.update).toHaveBeenCalledWith(5, expect.objectContaining({ username: 'anna' }))
+	})
+})
+
+// A member that is not a share account (a share made before, on another
+// account) is listed and kept: a save, even of Time Machine alone, must not drop it.
+describe('a member the dialog does not know', () => {
+	it('is kept on save', async () => {
+		const { vm, update, save } = modal({ id: 6, path: '/DATA/old', members: [{ username: 'vince', read_only: false }, { username: 'anna', read_only: true }] })
+
+		expect(vm.accounts).toEqual(['plex', 'anna', 'vince'])
+		vm.timeMachine = true
+		await save()
+
+		expect(update).toHaveBeenCalledWith(6, expect.objectContaining({
+			members: [{ username: 'anna', read_only: true }, { username: 'vince', read_only: false }],
+		}))
 	})
 })

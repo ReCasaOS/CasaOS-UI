@@ -8,3 +8,16 @@ export function shareMembers(share) {
 
 	return share.username ? [{ username: share.username, read_only: false }] : []
 }
+
+// The one account a CasaOS without members reads from a request: a member who
+// can write, else the first. Sent next to members, it keeps a protected share
+// protected on such a box, which takes a share without username for a guest
+// one open to anybody; a core that knows members ignores it.
+export function legacyUsername(members) {
+	const writer = members.find(m => !m.read_only)
+	return (writer || members[0] || {}).username || ''
+}
+
+// The folders of /DATA never offered as a new share: AppData holds the apps'
+// data and secrets.
+export const NEVER_OFFERED = ['/DATA/AppData']

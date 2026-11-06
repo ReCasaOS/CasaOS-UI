@@ -24,13 +24,13 @@
 			</p>
 
 			<template v-else>
-				<p v-if="users.length === 0" class="has-text-full-03 is-size-7 mt-3">
+				<p v-if="accounts.length === 0" class="has-text-full-03 is-size-7 mt-3">
 					{{ $t('No share account yet.') }}
 				</p>
 
-				<div v-for="user in users" :key="user" class="share-member">
+				<div v-for="user in accounts" :key="user" class="share-member">
 					<b-checkbox v-model="selected[user]" class="mr-0" />
-					<span class="share-member-name">{{ user }}</span>
+					<span class="share-member-name">{{ user }}<span v-if="!users.includes(user)" class="has-text-full-03 is-size-7"> · {{ $t('not a share account') }}</span></span>
 					<b-select v-model="access[user]" :disabled="!selected[user]" class="plain-select">
 						<option value="rw">{{ $t('Read and write') }}</option>
 						<option value="ro">{{ $t('Read only') }}</option>
@@ -68,7 +68,7 @@
 
 <script>
 import SambaUsersModal from './SambaUsersModal.vue'
-import { shareMembers } from './shareMembers'
+import { legacyUsername, shareMembers } from './shareMembers'
 
 export default {
 	name: 'ShareAccessModal',
@@ -106,13 +106,21 @@ export default {
 			return !this.share.id
 		},
 
+		// The accounts listed: the share accounts, and a member the share has
+		// that is not one (an older share made on another account), which a save
+		// must not drop silently.
+		accounts() {
+			const others = shareMembers(this.share).map(m => m.username).filter(u => !this.users.includes(u))
+			return [...this.users, ...others]
+		},
+
 		// Who may open the folder once saved, in the order the accounts are listed.
 		members() {
 			if (!this.requireAccount) {
 				return []
 			}
 
-			return this.users
+			return this.accounts
 				.filter(u => this.selected[u])
 				.map(u => ({ username: u, read_only: this.access[u] === 'ro' }))
 		},
@@ -175,11 +183,14 @@ export default {
 					await this.$api.samba.createShare([{
 						path: this.share.path,
 						anonymous: members.length === 0,
+						username: legacyUsername(members),
 						members,
 						time_machine: this.timeMachine,
 					}])
 				} else {
 					await this.$api.samba.updateShare(this.share.id, {
+						anonymous: members.length === 0,
+						username: legacyUsername(members),
 						members,
 						time_machine: this.timeMachine,
 					})

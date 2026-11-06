@@ -69,16 +69,16 @@ import ContextMenu from './ContextMenu.vue'
 import { mixin } from '@/mixins/mixin'
 
 export default {
-	props: {
-		listData: Array,
-		isLoading: Boolean,
-	},
 	components: {
 		ActionButton,
 		ContextMenu,
 		ListIconContainer,
 	},
 	mixins: [mixin],
+	props: {
+		listData: Array,
+		isLoading: Boolean,
+	},
 
 	data() {
 		return {

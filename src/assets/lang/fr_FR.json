@@ -2908,5 +2908,6 @@
   "Opens only with the accounts {names}.": "S'ouvre uniquement avec les comptes {names}.",
   "Read and write": "Lecture et écriture",
   "Read only": "Lecture seule",
-  "The folders this account can open:": "Les dossiers que ce compte peut ouvrir :"
+  "The folders this account can open:": "Les dossiers que ce compte peut ouvrir :",
+  "not a share account": "pas un compte de partage"
 }

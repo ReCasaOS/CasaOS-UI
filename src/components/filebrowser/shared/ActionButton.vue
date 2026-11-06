@@ -37,11 +37,11 @@ import ShareDetial from './ShareDetial.vue'
 import events from '@/events/events'
 
 export default {
+	components: {},
 	props: {
 		index: Number,
 		item: Object,
 	},
-	components: {},
 	data() {
 		return {
 			verticalPos: 'bottom',

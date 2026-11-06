@@ -2905,5 +2905,6 @@
   "Opens only with the accounts {names}.": "Opens only with the accounts {names}.",
   "Read and write": "Read and write",
   "Read only": "Read only",
-  "The folders this account can open:": "The folders this account can open:"
+  "The folders this account can open:": "The folders this account can open:",
+  "not a share account": "not a share account"
 }

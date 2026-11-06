@@ -1130,5 +1130,6 @@
   "Read and write": "Lettura e scrittura",
   "Read only": "Sola lettura",
   "The folders this account can open:": "Le cartelle che questo account può aprire:",
-  "Folders": "Cartelle"
+  "Folders": "Cartelle",
+  "not a share account": "non è un account di condivisione"
 }

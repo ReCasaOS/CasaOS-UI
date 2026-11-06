@@ -124,7 +124,11 @@ export default {
 		},
 
 		folderCount(username) {
-			return this.shares.filter(s => shareMembers(s).some(m => m.username === username)).length
+			// a guest share opens for this account too, as Folders shows it
+			return this.shares.filter((s) => {
+				const members = shareMembers(s)
+				return members.length === 0 || members.some(m => m.username === username)
+			}).length
 		},
 
 		// which folders an account opens, and how
