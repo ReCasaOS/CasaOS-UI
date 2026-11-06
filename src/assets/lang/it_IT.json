@@ -1130,5 +1130,6 @@
   "Dashboard": "Dashboard",
   "Login screen": "Schermata di accesso",
   "Shown behind the login box. The first wallpaper is the default one.": "Mostrato dietro la finestra di accesso. Il primo sfondo è quello predefinito.",
-  "Login screen wallpaper saved.": "Sfondo della schermata di accesso salvato."
+  "Login screen wallpaper saved.": "Sfondo della schermata di accesso salvato.",
+  "Only the first account can choose the login screen's wallpaper.": "Solo il primo account può scegliere lo sfondo della schermata di accesso."
 }

@@ -2928,5 +2928,6 @@
   "Dashboard": "Dashboard",
   "Login screen": "Login screen",
   "Shown behind the login box. The first wallpaper is the default one.": "Shown behind the login box. The first wallpaper is the default one.",
-  "Login screen wallpaper saved.": "Login screen wallpaper saved."
+  "Login screen wallpaper saved.": "Login screen wallpaper saved.",
+  "Only the first account can choose the login screen's wallpaper.": "Only the first account can choose the login screen's wallpaper."
 }

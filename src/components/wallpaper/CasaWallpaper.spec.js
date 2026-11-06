@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import CasaWallpaper from './CasaWallpaper.vue'
 
 describe('wallpaper dialog', () => {
@@ -12,6 +12,12 @@ describe('wallpaper dialog', () => {
 
 describe('the login screen wallpaper', () => {
 	const watcher = CasaWallpaper.watch['$route.path'].handler
+	// the tests swap the browser's Image and localStorage: put them back
+	const { Image, localStorage } = globalThis
+	afterEach(() => {
+		globalThis.Image = Image
+		globalThis.localStorage = localStorage
+	})
 
 	function background(path, found) {
 		const vm = {
