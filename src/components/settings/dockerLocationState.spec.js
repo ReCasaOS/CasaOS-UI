@@ -10,9 +10,11 @@ describe('the Docker data move', () => {
 		expect(moving(null)).toBe(false)
 	})
 
-	it('says how far the copy is, never past 100', () => {
+	// the two sizes are measured differently: an estimate that never says 100 while copying
+	it('says how far the copy is, never past 99', () => {
 		expect(copyPercent({ total_bytes: 200, copied_bytes: 50 })).toBe(25)
-		expect(copyPercent({ total_bytes: 200, copied_bytes: 210 })).toBe(100)
+		expect(copyPercent({ total_bytes: 200, copied_bytes: 200 })).toBe(99)
+		expect(copyPercent({ total_bytes: 200, copied_bytes: 210 })).toBe(99)
 		expect(copyPercent({ total_bytes: 200 })).toBeNull()
 	})
 

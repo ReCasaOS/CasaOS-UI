@@ -42,14 +42,18 @@
 				</div>
 			</template>
 
-			<b-field :label="$t('Move to')" :message="checkMessage" :type="check && !check.ok ? 'is-danger' : ''">
+			<!-- from a folder, only back: a move to another folder goes through the default place -->
+			<p v-if="state.location" class="is-size-7 _hint">
+				{{ $t('To put Docker\'s data in another folder, move it back to the default place first.') }}
+			</p>
+			<b-field v-if="!state.location" :label="$t('Move to')" :message="checkMessage" :type="check && !check.ok ? 'is-danger' : ''">
 				<b-input :model-value="target" expanded readonly size="is-small"
 					:placeholder="$t('A folder under /DATA or /media')"></b-input>
 				<p class="control">
 					<b-button size="is-small" @click="pick">{{ $t('Browse…') }}</b-button>
 				</p>
 			</b-field>
-			<p class="is-size-7 _hint">
+			<p v-if="!state.location" class="is-size-7 _hint">
 				{{ $t('Docker stops, its data is copied, and it starts again from the new place with the apps that were running. If anything goes wrong, everything goes back as it was. The old data stays until you delete it.') }}
 			</p>
 		</section>
@@ -60,7 +64,7 @@
 					{{ $t('Back to the default place') }}
 				</b-button>
 				<b-button rounded @click="$emit('close')">{{ $t('Close') }}</b-button>
-				<b-button :disabled="!check || !check.ok || busy" :loading="busy" rounded type="is-primary" @click="move(target)">
+				<b-button v-if="!state.location" :disabled="!check || !check.ok || busy" :loading="busy" rounded type="is-primary" @click="move(target)">
 					{{ $t('Move') }}
 				</b-button>
 			</template>
@@ -202,7 +206,12 @@ export default {
 				this.state = res.data.data || {}
 				this.refresh()
 			} catch (e) {
-				this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger' })
+				// a POST that timed out may have started the move all the same:
+				// ask, and follow it if it runs
+				await this.refresh()
+				if (!this.isMoving) {
+					this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger' })
+				}
 			} finally {
 				this.busy = false
 			}
@@ -220,8 +229,14 @@ export default {
 						const res = await dockerLocationApi.deleteOldCopy()
 						this.state = res.data.data || {}
 					} catch (e) {
-						this.state = e.response?.data?.data || this.state
-						this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger' })
+						if (!e.response) {
+							// no answer in time: the box goes on deleting
+							this.$buefy.toast.open({ message: this.$t('The old copy is still being deleted. Reopen this page in a while to see it gone.'), type: 'is-info' })
+							await this.refresh()
+							return
+						}
+						this.state = e.response.data?.data || this.state
+						this.$buefy.toast.open({ message: e.response.data?.message || e.message, type: 'is-danger' })
 					} finally {
 						this.deleting = false
 					}

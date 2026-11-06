@@ -1153,5 +1153,7 @@
   "Stopping the apps and Docker…": "Arresto delle app e di Docker…",
   "Copying the data…": "Copia dei dati…",
   "Switching to the new place…": "Passaggio alla nuova posizione…",
-  "Starting Docker and the apps…": "Avvio di Docker e delle app…"
+  "Starting Docker and the apps…": "Avvio di Docker e delle app…",
+  "The old copy is still being deleted. Reopen this page in a while to see it gone.": "La vecchia copia è ancora in cancellazione. Riapri questa pagina tra poco per vederla sparita.",
+  "To put Docker's data in another folder, move it back to the default place first.": "Per mettere i dati di Docker in un'altra cartella, riportali prima nella posizione predefinita."
 }

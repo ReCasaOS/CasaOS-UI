@@ -2953,5 +2953,7 @@
   "Move Docker's data back?": "Move Docker's data back?",
   "It goes back to /var/lib/docker on the system disk. The apps stop while the data is copied.": "It goes back to /var/lib/docker on the system disk. The apps stop while the data is copied.",
   "Delete the old copy?": "Delete the old copy?",
-  "It is not used any more; deleting it frees its space. This cannot be undone.": "It is not used any more; deleting it frees its space. This cannot be undone."
+  "It is not used any more; deleting it frees its space. This cannot be undone.": "It is not used any more; deleting it frees its space. This cannot be undone.",
+  "The old copy is still being deleted. Reopen this page in a while to see it gone.": "The old copy is still being deleted. Reopen this page in a while to see it gone.",
+  "To put Docker's data in another folder, move it back to the default place first.": "To put Docker's data in another folder, move it back to the default place first."
 }
