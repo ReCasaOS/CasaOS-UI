@@ -16,7 +16,7 @@ describe('logsModel', () => {
 
 	it('turns an event into a row with a sentence', () => {
 		const r = toRow({ at: '2026-11-05T10:00:00Z', app: 'jellyfin', service: 'jellyfin', container: 'jellyfin', kind: 'died', exit_code: 137 })
-		expect(r).toMatchObject({ kind: 'event', level: 'error', key: 'event/jellyfin/jellyfin/died/2026-11-05T10:00:00Z', text: 'jellyfin/jellyfin died, exit code 137' })
+		expect(r).toMatchObject({ kind: 'event', level: 'error', key: 'event/jellyfin/jellyfin/died/1793872800000', text: 'jellyfin/jellyfin died, exit code 137' })
 		expect(r.event.exit_code).toBe(137)
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'stopped' }).level).toBe('warn')
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'oom-killed' }).text).toBe('a/s oom killed')
@@ -92,10 +92,18 @@ describe('logsModel', () => {
 		expect(keys.size).toBe(MAX_LINES)
 	})
 
+	it('keys an event on its time, whatever the zone it is written in', () => {
+		const died = at => toRow({ kind: 'died', at, app: 'plex', container: 'c1' })
+		const stream = died('2026-11-06T11:00:00+01:00')
+		const history = died('2026-11-06T10:00:00Z')
+		expect(stream.key).toBe(history.key)
+		expect(insertRows([stream], [history]).buffer).toHaveLength(1)
+	})
+
 	it('builds a skipped marker', () => {
 		const at = new Date(1000)
 		expect(skippedMarker(4, at)).toEqual({ kind: 'marker', key: 'marker/1000/4', at, n: 4, text: '4 lines skipped' })
-		expect(skippedMarker(0, at).text).toBe('lines skipped')
+		expect(skippedMarker(0, at).text).toBe('catching up')
 	})
 
 	it('reads the query, strings only', () => {

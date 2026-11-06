@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FileSaver from 'file-saver'
 import LogStream from './LogStream.vue'
 import { logsApi } from '@/service/logs'
+import { instance } from '@/service/service.js'
 import i18n from '@/plugins/i18n'
 
 // The English strings, so that what a spec reads is what a person reads.
@@ -118,16 +119,29 @@ describe('the log stream', () => {
 		expect(rows()).toHaveLength(5)
 	})
 
-	it('fills the gap from the last live row after a reconnect, not from the page load', async () => {
+	it('reads again from the load cursor 1.5 s after the socket opens, past the second history holds back', async () => {
+		await mountStream()
+		socket().onopen()
+		await tick(1400)
+		expect(logsApi.query).toHaveBeenCalledTimes(2)
+		await tick(100)
+		expect(logsApi.query).toHaveBeenNthCalledWith(3, null, { app: ['plex'], since: 'c3', limit: 1000 })
+	})
+
+	it('fills a reconnect from the last live row when the socket dropped, not from rows that come after', async () => {
 		await mountStream()
 		socket().onopen()
 		socket().send({ t: 'line', line: line(4) })
-		await tick()
+		await tick(1500)
+		expect(logsApi.query).toHaveBeenCalledTimes(3)
 		socket().onclose()
 		await tick(1000)
 		socket().onopen()
-		await flushPromises()
-		expect(logsApi.query).toHaveBeenNthCalledWith(3, null, { app: ['plex'], since: AFTER_4, limit: 1000 })
+		socket().send({ t: 'line', line: line(9) })
+		await tick()
+		expect(logsApi.query).toHaveBeenCalledTimes(3)
+		await tick(1400)
+		expect(logsApi.query).toHaveBeenNthCalledWith(4, null, { app: ['plex'], since: AFTER_4, limit: 1000 })
 	})
 
 	it('does not count again, while scrolled up, the rows a reconnect reads again', async () => {
@@ -138,13 +152,14 @@ describe('the log stream', () => {
 		Object.defineProperty(el, 'scrollTop', { value: 100, writable: true, configurable: true })
 		el.dispatchEvent(new Event('scroll'))
 		socket().onopen()
+		await tick(1500)
 		socket().send({ t: 'line', line: line(4) })
 		await tick()
 		logsApi.query.mockImplementation((box, p) => (p.since === AFTER_4 ? page([...LINES, line(4), line(5)], 'c5') : page([], '')))
 		socket().onclose()
 		await tick(1000)
 		socket().onopen()
-		await flushPromises()
+		await tick(1500)
 		await tick()
 		expect(wrapper.find('.log-banner').text()).toBe('2 new lines')
 	})
@@ -157,6 +172,52 @@ describe('the log stream', () => {
 		const blob = FileSaver.saveAs.mock.calls[0][0]
 		expect((await blob.text()).trim().split(/\n/)).toHaveLength(80)
 		expect(logsApi.query.mock.calls.slice(-3).map(c => c[1].since)).toEqual(['0:0:_', 'p1', 'p2'])
+	})
+
+	it('says when a fleet box download stops at the page bound', async () => {
+		await mountStream({ box: 'b1', range: { since: null, until: '2026-11-06T11:00:00Z' } })
+		let n = 0
+		logsApi.query.mockImplementation(() => page([line(1)], `p${++n}`))
+		await wrapper.vm.download()
+		await flushPromises()
+		expect(FileSaver.saveAs).toHaveBeenCalledTimes(1)
+		expect(document.body.textContent).toContain('Download stopped at 100 lines')
+	})
+
+	it('exports this box without the request timeout', async () => {
+		await mountStream()
+		instance.request.mockResolvedValue({ data: new Blob(['x']), headers: {} })
+		await wrapper.vm.download()
+		expect(instance.request).toHaveBeenCalledWith(expect.objectContaining({ responseType: 'blob', timeout: 0 }))
+	})
+
+	it('marks a relay that is behind as catching up, at the time of the last row', async () => {
+		let n = 0
+		logsApi.query.mockImplementation((box, p) => (p.since ? page([line(10 + n++)], `n${n}`) : page([...LINES].reverse(), 'c1')))
+		await mountStream({ box: 'b1' })
+		await tick()
+		const marker = wrapper.vm.buffer.find(r => r.kind === 'marker')
+		expect(marker.at).toEqual(new Date(line(15).at))
+		expect(wrapper.find('.log-row.is-marker').text()).toBe('Catching up…')
+	})
+
+	it('opens a line on a click, but not on the click that ends a text selection', async () => {
+		await mountStream()
+		const selection = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'line 1' })
+		await rows()[0].trigger('click')
+		expect(wrapper.find('.log-expanded').exists()).toBe(false)
+		selection.mockReturnValue({ toString: () => '' })
+		await rows()[0].trigger('click')
+		expect(wrapper.find('.log-expanded').exists()).toBe(true)
+		selection.mockRestore()
+	})
+
+	it('asks by app only, a whole app beside the services of another, and filters here', async () => {
+		const mixed = [line(1, 'a', 'web'), line(2, 'a', 'db'), line(3, 'b', 'web'), line(4, 'b', 'db')]
+		logsApi.query.mockImplementation((box, p) => (p.since ? page(mixed, 'c4') : page([...mixed].reverse(), 'c1')))
+		await mountStream({ apps: ['a', 'b'], services: ['a/web'] })
+		expect(logsApi.query).toHaveBeenNthCalledWith(1, null, { app: ['a', 'b'], limit: 500 })
+		expect(rows().map(r => r.find('.log-text').text())).toEqual(['line 1', 'line 3', 'line 4'])
 	})
 
 	it('asks by app and keeps the pairs here when services of several apps are ticked', async () => {

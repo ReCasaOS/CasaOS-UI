@@ -21,7 +21,7 @@
 					<span class="log-text">{{ row.text }}</span>
 				</div>
 				<div v-else-if="row.kind === 'marker'" class="log-row is-marker">{{ markerText(row) }}</div>
-				<div v-else :class="lineClass(row)" class="log-row is-line" @click="expanded = row">
+				<div v-else :class="lineClass(row)" class="log-row is-line" @click="openRow(row)">
 					<span :title="row.at.toISOString()" class="log-time">{{ timeOf(row.at) }}</span>
 					<span :class="`hue-${hueOf(row)}`" class="log-label">{{ labelOf(row) }}</span>
 					<span class="log-text">{{ row.text }}</span>
@@ -61,6 +61,8 @@ const OVERSCAN = 20
 const BATCH_MS = 100
 const SKIP_EVERY_MS = 5000
 const GAP_PAGES = 5
+// history holds back its last second: a fill waits for it to be readable
+const GAP_DELAY_MS = 1500
 const DOWNLOAD_PAGES = 100
 // sorts before every line: a forwards walk from the first one
 const ZERO = '0:0:_'
@@ -198,18 +200,20 @@ export default {
 			return p
 		},
 		// `services` holds names, or "app/service" pairs. The server's filter is apps × services: when the pairs
-		// span several apps, only the apps are asked for and the pairs are kept here (keep).
+		// span several apps, or an app is ticked whole beside them, only the apps are asked for and the pairs are
+		// kept here (keep), a whole app as "app/*".
 		serviceScope() {
 			const list = this.services ?? []
-			const apps = new Set(list.map(x => (x.includes('/') ? x.split('/')[0] : '')))
-			if (apps.size <= 1) {
+			const paired = new Set(list.map(x => (x.includes('/') ? x.split('/')[0] : '')))
+			const whole = list.some(x => x.includes('/')) ? (this.apps ?? []).filter(a => !paired.has(a)) : []
+			if (paired.size <= 1 && !whole.length) {
 				return { names: list.map(x => x.split('/').pop()), keep: null }
 			}
-			return { names: [], keep: new Set(list) }
+			return { names: [], keep: new Set([...list, ...whole.map(a => `${a}/*`)]) }
 		},
 		wanted(rows) {
 			const keep = this.serviceScope().keep
-			return keep ? rows.filter(r => r.kind === 'marker' || keep.has(`${r.app}/${r.service}`)) : rows
+			return keep ? rows.filter(r => r.kind === 'marker' || keep.has(`${r.app}/${r.service}`) || keep.has(`${r.app}/*`)) : rows
 		},
 		until() {
 			if (this.focused && this.focusAt) {
@@ -235,6 +239,8 @@ export default {
 			this.newCount = 0
 			this.expanded = null
 			this.lastLiveAt = null
+			this.dropCursor = null
+			this.fillFrom = null
 			this.oldestCursor = ''
 			this.newestCursor = ''
 			this.exhausted = false
@@ -292,6 +298,7 @@ export default {
 					since: this.newestCursor,
 					onRows: (rows, next) => {
 						this.newestCursor = next || this.newestCursor
+						this.track(rows)
 						this.receive(rows)
 					},
 					onSkipped: () => this.skipped(),
@@ -302,16 +309,12 @@ export default {
 					url: () => logsApi.streamUrl(base, this.$store?.state?.access_token, { wsProtocol: this.$wsProtocol, baseURL: this.$baseURL }),
 					WebSocket: this.wsFactory || window.WebSocket,
 					onRows: (rows) => {
-						for (const r of rows) {
-							if (!this.lastLiveAt || r.at > this.lastLiveAt) {
-								this.lastLiveAt = r.at
-							}
-						}
+						this.track(rows)
 						this.receive(rows)
 					},
 					onLag: (n) => {
 						this.$emit('lag', n)
-						this.receive([skippedMarker(n, new Date())])
+						this.receive([skippedMarker(n, this.lastAt())])
 					},
 					onState,
 				})
@@ -324,21 +327,48 @@ export default {
 			source?.stop()
 			clearTimeout(this.flushTimer)
 			this.flushTimer = null
+			clearTimeout(this.gapTimer)
+			this.gapTimer = null
+		},
+		track(rows) {
+			for (const r of rows) {
+				if (!this.lastLiveAt || r.at > this.lastLiveAt) {
+					this.lastLiveAt = r.at
+				}
+			}
+		},
+		// a marker sits after the last row received, not at the client's clock
+		lastAt() {
+			return this.lastLiveAt || this.buffer.at(-1)?.at || new Date()
 		},
 		sourceState(s) {
-			// the socket carries no cursor: what was missed while it was down is read from the history
-			if (s === 'open' && this.retrying && !this.box) {
-				this.fillGap()
+			// The socket carries no cursor and the history holds back its last second, so on every open what lies
+			// between the cursor of that moment and the socket is read again a little later: the load's cursor on
+			// the first open, on a reconnect the last live row's, taken when the socket dropped. A fill still
+			// waiting keeps its earlier cursor.
+			if (!this.box && s === 'retrying' && this.connected) {
+				this.dropCursor = this.lastLiveAt ? cursorAt(this.lastLiveAt) : this.newestCursor
 			}
-			this.retrying = s === 'retrying'
+			if (!this.box && s === 'open') {
+				this.fillFrom ??= this.dropCursor ?? this.newestCursor
+				this.dropCursor = null
+				clearTimeout(this.gapTimer)
+				const gen = this.generation
+				this.gapTimer = setTimeout(() => {
+					const cursor = this.fillFrom
+					this.gapTimer = null
+					this.fillFrom = null
+					if (gen === this.generation) {
+						this.fillGap(cursor)
+					}
+				}, GAP_DELAY_MS)
+			}
 			this.connected = s === 'open'
 			this.emitStatus()
 		},
-		// From the last live row the socket gave (the rows of that millisecond come again, merged by key), or from
-		// the load's cursor when none came.
-		async fillGap() {
+		// Forwards from a cursor sorting before the gap (the rows read again are merged by key), page by page.
+		async fillGap(cursor) {
 			const gen = this.generation
-			let cursor = this.lastLiveAt ? cursorAt(this.lastLiveAt) : this.newestCursor
 			for (let i = 0; i < GAP_PAGES; i++) {
 				const res = await logsApi.query(this.box, { ...this.params(), since: cursor, limit: FORWARD_PAGE })
 				if (gen !== this.generation || !res.ok) {
@@ -359,7 +389,7 @@ export default {
 			const now = Date.now()
 			if (now - this.lastSkip >= SKIP_EVERY_MS) {
 				this.lastSkip = now
-				this.receive([skippedMarker(0, new Date())])
+				this.receive([skippedMarker(0, this.lastAt())])
 			}
 		},
 
@@ -506,14 +536,16 @@ export default {
 			}
 			try {
 				if (!this.box) {
-					const res = await instance.request({ method: 'get', url: logsApi.exportUrl(p), responseType: 'blob' })
+					// unbounded: a long export streams for longer than the instance's 60 s timeout
+					const res = await instance.request({ method: 'get', url: logsApi.exportUrl(p), responseType: 'blob', timeout: 0 })
 					const name = /filename="?([^";]+)"?/.exec(res.headers?.['content-disposition'] || '')?.[1]
 					FileSaver.saveAs(res.data, name || 'recasaos-logs.log')
 					return
 				}
 				const out = []
 				let cursor = p.since || ZERO
-				for (let i = 0; i < DOWNLOAD_PAGES; i++) {
+				let more = true
+				for (let i = 0; i < DOWNLOAD_PAGES && more; i++) {
 					const res = await logsApi.query(this.box, { ...p, since: cursor, limit: FORWARD_PAGE })
 					if (!res.ok) {
 						throw new Error(res.error)
@@ -525,13 +557,14 @@ export default {
 					}
 					// a page cut by size is short but not the last: only an empty page or a cursor that stays put ends
 					const next = res.data?.next
-					if (!lines.length || !next || next === cursor) {
-						break
-					}
+					more = !!(lines.length && next && next !== cursor)
 					cursor = next
 				}
 				const name = `recasaos-logs-${this.apps?.length === 1 ? this.apps[0] : 'all'}-${this.range?.since ? stamp(this.range.since) : 'start'}-${p.until ? stamp(p.until) : 'now'}.log`
 				FileSaver.saveAs(new Blob(out, { type: 'text/plain' }), name)
+				if (more) {
+					this.$buefy?.toast.open({ message: this.$t('Download stopped at {n} lines', { n: out.length }), type: 'is-warning' })
+				}
 			} catch (e) {
 				this.$buefy?.toast.open({ message: (await messageOf(e)) || this.$t('Error'), type: 'is-danger' })
 			}
@@ -553,7 +586,13 @@ export default {
 			return ICONS[kind] || 'information-outline'
 		},
 		markerText(row) {
-			return row.n ? this.$t('{n} lines skipped', { n: row.n }) : this.$t('Lines skipped')
+			return row.n ? this.$t('{n} lines skipped', { n: row.n }) : this.$t('Catching up…')
+		},
+		// a click that ends a text selection is a copy, not a request for the overlay
+		openRow(row) {
+			if (!window.getSelection?.()?.toString()) {
+				this.expanded = row
+			}
 		},
 	},
 }

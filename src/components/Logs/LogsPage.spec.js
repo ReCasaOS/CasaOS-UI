@@ -72,6 +72,29 @@ describe('the Logs page', () => {
 		expect(wrapper.text()).toContain('Update this box to read its logs')
 	})
 
+	it('falls back to this box for a box it does not know, keeping the app and the moment', async () => {
+		fleetApi.status.mockResolvedValue({ data: { data: { role: 'master', master: { boxes: BOXES } } } })
+		await mountPage({ initialBox: 'gone', initialApp: 'plex', initialAt: '2026-11-06T10:00:00Z' })
+		const stream = wrapper.findComponent({ name: 'LogStream' })
+		expect(stream.props('box')).toBe(null)
+		expect(stream.props('apps')).toEqual(['plex'])
+		expect(stream.props('focusAt')).toBe('2026-11-06T10:00:00Z')
+		expect(logsApi.apps).toHaveBeenLastCalledWith(null)
+		expect(wrapper.text()).not.toContain('Update this box')
+	})
+
+	it('offers Restart and Stop for a compose app, not for a v1 app', async () => {
+		fleetApi.status.mockRejectedValue(new Error('down'))
+		const v1 = { app: 'nginx', title: null, icon: null, uninstalled: false, services: [{ service: 'main', container: 'nginx', running: true }] }
+		logsApi.apps.mockResolvedValue({ ok: true, status: 200, data: [...APPS, v1] })
+		await mountPage({ initialApp: 'plex' })
+		expect(wrapper.text()).toContain('Restart')
+		wrapper.unmount()
+		await mountPage({ initialApp: 'nginx' })
+		expect(wrapper.text()).not.toContain('Restart')
+		expect(wrapper.text()).not.toContain('Stop')
+	})
+
 	it('starts on the app and the moment it was opened for', async () => {
 		fleetApi.status.mockRejectedValue(new Error('down'))
 		await mountPage({ initialApp: 'plex', initialAt: '2026-11-06T10:00:00Z' })

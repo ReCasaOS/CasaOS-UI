@@ -53,12 +53,13 @@ function dateOf(at) {
 	return Number.isNaN(d.getTime()) ? new Date(0) : d
 }
 
-// A wire line or event → a row; an event is told apart by its kind. Never throws, so a bad row cannot wedge a source.
+// A wire line or event → a row; an event is told apart by its kind, and keyed on its parsed time (the stream and
+// the history may write it in different zones). Never throws, so a bad row cannot wedge a source.
 export function toRow(x) {
 	x ??= {}
 	const { at, app, service, container } = x
 	if (x.kind) {
-		return { kind: 'event', at: dateOf(at), key: `event/${app}/${container}/${x.kind}/${at}`, app, service, container, event: x, level: EVENT_LEVELS[x.kind] || 'info', text: sentence(x) }
+		return { kind: 'event', at: dateOf(at), key: `event/${app}/${container}/${x.kind}/${dateOf(at).getTime()}`, app, service, container, event: x, level: EVENT_LEVELS[x.kind] || 'info', text: sentence(x) }
 	}
 	const text = String(x.text ?? '')
 	return { kind: 'line', at: dateOf(at), key: `${app}/${service}/${container}/${at}/${hash(text).toString(36)}`, app, service, container, stream: x.stream, level: levelOf(x.stream, text), text, json: parseJson(text) }
@@ -95,7 +96,7 @@ export function insertRows(buffer, rows, keys = new Set(buffer.map(r => r.key)))
 	return { buffer: dropped ? out.slice(dropped) : out, keys, dropped }
 }
 
-export const skippedMarker = (n, at) => ({ kind: 'marker', key: `marker/${at?.getTime?.() || 0}/${n}`, at, n, text: n ? `${n} lines skipped` : 'lines skipped' })
+export const skippedMarker = (n, at) => ({ kind: 'marker', key: `marker/${at?.getTime?.() || 0}/${n}`, at, n, text: n ? `${n} lines skipped` : 'catching up' })
 
 const first = v => [].concat(v ?? []).find(x => typeof x === 'string') ?? ''
 

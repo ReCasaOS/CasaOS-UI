@@ -171,8 +171,11 @@ export default {
 		selectedApp() {
 			return this.selectedApps.length === 1 ? this.apps.find(a => a.app === this.selectedApps[0]) : null
 		},
+		// Restart and Stop are compose routes: a v1 app, whose one service the server names "main", has none
 		controlled() {
-			return !!this.selectedApp && !this.selectedApp.uninstalled && this.selectedApp.app !== '_other'
+			const app = this.selectedApp
+			const v1 = app?.services?.length === 1 && app.services[0].service === 'main'
+			return !!app && !app.uninstalled && app.app !== '_other' && !v1
 		},
 		capText() {
 			const s = this.settings
@@ -185,9 +188,13 @@ export default {
 	},
 	watch: {
 		box() {
-			this.selectedApps = []
-			this.selectedServices = []
-			this.focusAt = null
+			if (this.keepSelection) {
+				this.keepSelection = false
+			} else {
+				this.selectedApps = []
+				this.selectedServices = []
+				this.focusAt = null
+			}
 			this.loadApps()
 		},
 		// the search is asked of the server: one query per pause in the typing, not per key
@@ -201,6 +208,11 @@ export default {
 	mounted() {
 		listBoxes().catch(() => []).then((boxes) => {
 			this.boxes = boxes
+			// a box of the URL this master does not know: this box, with the app and the moment kept
+			if (this.box && !boxes.some(b => b.id === this.box)) {
+				this.keepSelection = true
+				this.box = null
+			}
 		})
 		this.loadApps()
 		logsApi.settings().then((res) => {
