@@ -10,6 +10,30 @@ const LogsPage = defineAsyncComponent(() => import('./LogsPage.vue'))
 // The name of the card in the app grid, which also keeps its place in the saved order.
 export const LOGS_APP_NAME = 'logs'
 
+let probe = null
+
+// Whether AppManagement keeps logs. Asked once: an AppManagement older than the feature (404) has none and is not
+// asked again; any other failure is asked again next time.
+export function hasLogs() {
+	if (!probe) {
+		// the HTTP client is loaded here, not at the top: the app grid and the top bar import this file
+		probe = import('@/service/logs').then(({ logsApi }) => logsApi.settings()).then((res) => {
+			if (!res.ok && res.status !== 404) {
+				probe = null
+			}
+			return res.ok
+		}).catch(() => {
+			probe = null
+			return false
+		})
+	}
+	return probe
+}
+
+export function forgetLogs() {
+	probe = null
+}
+
 export function logsApplication() {
 	return {
 		id: '4',

@@ -81,6 +81,16 @@ export default [
 		},
 	},
 	{
+		path: '/logs',
+		name: 'Logs',
+		hidden: true,
+		component: () => import('@/components/Logs/LogsTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
 		path: '/fleet',
 		name: 'Fleet',
 		hidden: true,

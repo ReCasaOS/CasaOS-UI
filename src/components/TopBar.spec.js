@@ -10,16 +10,20 @@ import FleetModal from './settings/FleetModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
+import LogsSettingsModal from './settings/LogsSettingsModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import createEventBus from '@/events/eventBus'
 import events from '@/events/events'
 import { fleetApi } from '@/service/fleet'
+import { hasLogs } from '@/components/Logs/entry'
 
 // The locale table is assembled with webpack's `require.context`, which Vite has
 // no equivalent for; TopBar only reads the language names from it.
 vi.mock('@/assets/lang', () => ({ default: { en_us: { lang_name: 'English' } } }))
 vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(() => new Promise(() => {})) } }))
+vi.mock('@/components/Logs/entry', () => ({ hasLogs: vi.fn() }))
+vi.mock('@/service/logs', () => ({ logsApi: {} }))
 
 // From the project root: import.meta.url is not a file URL under happy-dom.
 const source = readFileSync('src/components/TopBar.vue', 'utf8')
@@ -86,6 +90,7 @@ describe('the anonymous statistics switch', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
@@ -201,6 +206,7 @@ describe('the automatic update row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
@@ -408,6 +414,7 @@ describe('the alerts row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -503,6 +510,7 @@ describe('the modules row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -825,6 +833,7 @@ describe('the fleet row', () => {
 			getModules: vi.fn(),
 			getOs: vi.fn(),
 			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			checkVersion: vi.fn(),
 			getUserInfo: vi.fn(),
 			getUsbStatus: vi.fn(),
@@ -855,5 +864,58 @@ describe('the fleet row', () => {
 	it('says "Fleet" in English and French', () => {
 		expect(en.Fleet).toBe('Fleet')
 		expect(fr.Fleet).toBe('Flotte')
+	})
+})
+
+describe('the logs row', () => {
+	function bar() {
+		const vm = {
+			logsAvailable: false,
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getLogs', 'showLogsSettings'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('shows, after Alerts, once AppManagement answers the logs settings', async () => {
+		hasLogs.mockResolvedValue(true)
+		const vm = bar()
+
+		await vm.getLogs()
+
+		expect(vm.logsAvailable).toBe(true)
+		expect(source).toMatch(/<!-- Alerts End -->\s*<!-- Logs Start -->\s*<div v-if="logsAvailable"[\s\S]*?text-box-outline[\s\S]*?\$t\("Logs"\)[\s\S]*?@click="showLogsSettings"[\s\S]*?\$t\("Configure"\)[\s\S]*?<!-- Logs End -->/)
+	})
+
+	// an AppManagement older than the feature answers 404: no row
+	it('shows no row against an older AppManagement', async () => {
+		hasLogs.mockResolvedValue(false)
+		const vm = bar()
+
+		await vm.getLogs()
+
+		expect(vm.logsAvailable).toBe(false)
+	})
+
+	it('asks when the bar mounts', () => {
+		const vm = { $EventBus: createEventBus() }
+		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
+			vm[name] = vi.fn()
+
+		TopBar.mounted.call(vm)
+
+		expect(vm.getLogs).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens the settings from Configure', async () => {
+		const vm = bar()
+
+		await vm.showLogsSettings()
+
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: LogsSettingsModal, hasModalCard: true, canCancel: ['escape'] }))
 	})
 })

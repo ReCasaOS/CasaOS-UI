@@ -12,21 +12,33 @@
 						<terminal-card ref="terminal" :init-ws-url="wsUrl"></terminal-card>
 					</b-tab-item>
 					<b-tab-item :label="$t('Logs')" value="logs">
-						<div class="is-flex is-align-items-center">
-							<b-select :model-value="lines" size="is-small" @update:model-value="onLinesChange">
-								<option :value="100">{{ $t('Last 100 lines') }}</option>
-								<option :value="1000">{{ $t('Last 1000 lines') }}</option>
-								<option :value="-1">{{ $t('Whole log') }}</option>
-							</b-select>
-							<span v-if="isWholeLog" class="ml-3 is-size-7 has-text-grey">
-								{{ $t('The whole log does not refresh on its own.') }}
-							</span>
-							<b-button :disabled="!logData" class="ml-auto" icon-left="download" size="is-small"
-								@click="downloadLogs">
-								{{ $t('Download') }}
-							</b-button>
-						</div>
-						<logs-card ref="logs" :data="logData"></logs-card>
+						<template v-if="streamed">
+							<div class="is-flex">
+								<b-button class="ml-auto" icon-left="download" size="is-small" @click="$refs.stream.download()">
+									{{ $t('Download') }}
+								</b-button>
+							</div>
+							<!-- as tall as the polled log was -->
+							<LogStream ref="stream" :apps="[appName]" :services="serviceName ? [serviceName] : null" embedded style="height: 35rem" />
+						</template>
+						<!-- an AppManagement older than the Logs feature: the log read every five seconds -->
+						<template v-else-if="streamed === false">
+							<div class="is-flex is-align-items-center">
+								<b-select :model-value="lines" size="is-small" @update:model-value="onLinesChange">
+									<option :value="100">{{ $t('Last 100 lines') }}</option>
+									<option :value="1000">{{ $t('Last 1000 lines') }}</option>
+									<option :value="-1">{{ $t('Whole log') }}</option>
+								</b-select>
+								<span v-if="isWholeLog" class="ml-3 is-size-7 has-text-grey">
+									{{ $t('The whole log does not refresh on its own.') }}
+								</span>
+								<b-button :disabled="!logData" class="ml-auto" icon-left="download" size="is-small"
+									@click="downloadLogs">
+									{{ $t('Download') }}
+								</b-button>
+							</div>
+							<logs-card ref="logs" :data="logData"></logs-card>
+						</template>
 					</b-tab-item>
 				</b-tabs>
 			</div>
@@ -37,9 +49,11 @@
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue'
 import FileSaver from 'file-saver'
 import TerminalCard from '@/components/logsAndTerminal/TerminalCard.vue'
 import LogsCard from '@/components/logsAndTerminal/LogsCard.vue'
+import { hasLogs } from '@/components/Logs/entry'
 
 // The backend reads -1 as "every line there is".
 const WHOLE_LOG = -1
@@ -49,12 +63,16 @@ export default {
 	components: {
 		TerminalCard,
 		LogsCard,
+		// loaded when shown: its HTTP client would pull the store into every importer of the app panel
+		LogStream: defineAsyncComponent(() => import('@/components/Logs/LogStream.vue')),
 	},
 	data() {
 		return {
 			isLoading: false,
 			activeTab: this.initialTab,
 			wsUrl: `${this.$wsProtocol}//${this.$baseURL}/v1/container/${this.appid}/terminal?token=${this.$store.state.access_token}`,
+			// null until AppManagement says whether it streams logs
+			streamed: null,
 			logData: '',
 			timer: '',
 			lines: 1000,
@@ -76,8 +94,14 @@ export default {
 		// right tab, but the two cards still have to be told which one is on screen.
 		if (this.activeTab !== 'terminal')
 			this.onInput(this.activeTab)
-		this.getLogs()
-		this.startPolling()
+		hasLogs().then((streamed) => {
+			this.streamed = streamed
+			if (!streamed) {
+				this.getLogs()
+				this.startPolling()
+				this.$nextTick(() => this.$refs.logs?.active(this.activeTab === 'logs'))
+			}
+		})
 	},
 	methods: {
 		getLogs() {
@@ -114,10 +138,10 @@ export default {
 			this.activeTab = e
 			if (e == 'terminal') {
 				this.$refs.terminal.active(true)
-				this.$refs.logs.active(false)
+				this.$refs.logs?.active(false)
 			} else {
 				this.$refs.terminal.active(false)
-				this.$refs.logs.active(true)
+				this.$refs.logs?.active(true)
 			}
 		},
 	},

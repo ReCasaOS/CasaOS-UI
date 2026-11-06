@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '@/components/VirtualMachines/entry'
 import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
+import { hasLogs } from '@/components/Logs/entry'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -25,6 +26,11 @@ vi.mock('@/components/Fleet/entry', async importOriginal => ({
 	hasFleet: vi.fn(() => Promise.resolve(false)),
 	forgetFleet: vi.fn(),
 	fleetApplication: () => ({ name: 'Fleet' }),
+}))
+vi.mock('@/components/Logs/entry', async importOriginal => ({
+	...await importOriginal(),
+	hasLogs: vi.fn(() => Promise.resolve(false)),
+	logsApplication: () => ({ name: 'logs' }),
 }))
 
 // The grid, not the card, is what has to be read again after an update: the app that
@@ -235,6 +241,7 @@ describe('app section built-in cards', () => {
 			saveSortIfChanged: vi.fn(),
 			addVmCardWhenThere: vi.fn(),
 			addFleetCardWhenThere: vi.fn(),
+			addLogsCardWhenThere: vi.fn(),
 		}
 		await AppSection.methods.getList.call(vm)
 		const names = vm.appList.map(app => app.name)
@@ -265,7 +272,7 @@ describe('app section built-in cards', () => {
 			sortApps: AppSection.methods.sortApps,
 			getList: vi.fn(),
 		}
-		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'onSortEnd']) {
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'onSortEnd']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, toast, setCustomStorage }
@@ -829,5 +836,32 @@ describe('app section system subtitles (beta dashboard)', () => {
 		expect(subtitle('App Store', { appList: [{ update_available: true }, {}, { update_available: true }] })).toBe('Updates: 2')
 		expect(subtitle('Virtual Machines')).toBe('Virtual Machines')
 		expect(subtitle('Virtual Machines', { vms: [{}, {}, {}] })).toBe('VMs: 3')
+	})
+})
+
+// The Logs card is there only where AppManagement keeps logs: an older one shows nothing new.
+describe('app section logs card', () => {
+	function section(names) {
+		const vm = {
+			appList: names.map(name => ({ name })),
+			saveSortData: vi.fn(),
+		}
+		vm.sortApps = AppSection.methods.sortApps.bind(vm)
+		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		return vm
+	}
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('is there only where AppManagement keeps logs, at its saved place', async () => {
+		hasLogs.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files', 'Statistics', 'jellyfin'])
+		await AppSection.methods.addLogsCardWhenThere.call(vm, ['App Store', 'Files', 'Statistics', 'logs', 'jellyfin'])
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Statistics', 'logs', 'jellyfin'])
+		expect(vm.saveSortData).not.toHaveBeenCalled()
+
+		hasLogs.mockResolvedValue(false)
+		const other = section(['App Store', 'Files'])
+		await AppSection.methods.addLogsCardWhenThere.call(other, [])
+		expect(names(other)).toEqual(['App Store', 'Files'])
 	})
 })

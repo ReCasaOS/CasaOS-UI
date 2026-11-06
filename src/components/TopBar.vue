@@ -293,6 +293,21 @@
 					</div>
 					<!-- Alerts End -->
 
+					<!-- Logs Start -->
+					<div v-if="logsAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="text-box-outline" size="is-20" />
+							{{ $t("Logs") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showLogsSettings">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Logs End -->
+
 					<!-- Fleet Start -->
 					<div v-if="fleetAvailable"
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -640,6 +655,7 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			logsAvailable: false,
 			// true once the core answers GET /v1/fleet: a core older than the
 			// feature shows no row.
 			fleetAvailable: false,
@@ -770,6 +786,7 @@ export default {
 		this.getTelemetry()
 		this.getAutoUpdate()
 		this.getAlerts()
+		this.getLogs()
 		this.getFleet()
 		this.getModules()
 		this.getOs()
@@ -899,6 +916,28 @@ export default {
 				canCancel: ['escape'],
 				scroll: 'keep',
 				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, from mounted(): an AppManagement older than the feature shows no row. Loaded here, not at the
+		// top, like the fleet's client below.
+		getLogs() {
+			return import('@/components/Logs/entry').then(({ hasLogs }) => hasLogs()).then((available) => {
+				this.logsAvailable = available
+			})
+		},
+
+		showLogsSettings() {
+			this.$refs.settingsDrop.toggle()
+			return import('./settings/LogsSettingsModal.vue').then(({ default: LogsSettingsModal }) => {
+				this.$buefy.modal.open({
+					component: LogsSettingsModal,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: ['escape'],
+					scroll: 'keep',
+					animation: 'zoom-in',
+				})
 			})
 		},
 

@@ -55,9 +55,10 @@
 </template>
 
 <script>
-import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, FLEET_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, FLEET_LAUNCH_ID, LOGS_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { hasFleet } from '@/components/Fleet/entry'
+import { hasLogs } from '@/components/Logs/entry'
 
 export default {
 	name: 'AppLaunchModal',
@@ -67,6 +68,7 @@ export default {
 			exceptions: [...(this.$store.state.appLaunchExceptions || [])],
 			apps: [],
 			hasVMs: false,
+			logsAvailable: false,
 			isMaster: false,
 			isLoading: true,
 			loadError: '',
@@ -79,6 +81,9 @@ export default {
 				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
 				{ id: STATS_LAUNCH_ID, title: this.$t('Statistics') },
 			]
+			if (this.logsAvailable) {
+				builtins.push({ id: LOGS_LAUNCH_ID, title: this.$t('Logs') })
+			}
 			if (this.hasVMs) {
 				builtins.push({ id: VMS_LAUNCH_ID, title: this.$t('Virtual Machines') })
 			}
@@ -94,6 +99,9 @@ export default {
 		})
 		hasFleet().then((master) => {
 			this.isMaster = master
+		})
+		hasLogs().then((available) => {
+			this.logsAvailable = available
 		})
 
 		try {

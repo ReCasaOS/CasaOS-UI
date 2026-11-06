@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import Buefy from 'buefy'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '@/plugins/i18n'
@@ -8,8 +8,10 @@ import AppCard from '@/components/Apps/AppCard.vue'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
+vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
@@ -614,6 +616,42 @@ describe('the Fleet card', () => {
 		const vm = { $buefy: { modal: { open: vi.fn() } }, $store: { state: { appLaunchInIframe: true, appLaunchExceptions: [] } } }
 		AppCard.methods.openSystemApps.call(vm, { name: FLEET_APP_NAME, app_type: 'system' })
 		expect(openFleet).toHaveBeenCalledWith(vm.$buefy, vm.$store.state)
+	})
+})
+
+describe('logs', () => {
+	const state = { appLaunchInIframe: true, appLaunchExceptions: [] }
+	const labels = () => [...document.body.querySelectorAll('button')].map(b => b.textContent.trim())
+
+	it('opens the Logs page from its card', () => {
+		const vm = { $buefy: {}, $store: { state } }
+		AppCard.methods.openSystemApps.call(vm, { name: LOGS_APP_NAME, app_type: 'system' })
+		expect(openLogs).toHaveBeenCalledWith(vm.$buefy, state)
+	})
+
+	it('offers Logs in the menu of a compose app only where AppManagement keeps logs', async () => {
+		hasLogs.mockResolvedValueOnce(true)
+		let wrapper = await card({})
+		await flushPromises()
+		expect(labels()).toContain('Logs')
+		wrapper.unmount()
+
+		wrapper = await card({})
+		await flushPromises()
+		expect(labels()).not.toContain('Logs')
+		wrapper.unmount()
+	})
+
+	it('opens a compose app on its project, and a v1 app on the name of its container', async () => {
+		const vm = { $buefy: {}, $store: { state }, item: { name: 'immich' }, isV1App: false }
+		await AppCard.methods.showLogs.call(vm)
+		expect(openLogs).toHaveBeenLastCalledWith(vm.$buefy, state, { app: 'immich' })
+
+		const getDetail = vi.fn().mockResolvedValue({ data: { data: { name: 'jellyfin' } } })
+		const v1 = { ...vm, item: { name: 'ab12cd34ef56' }, isV1App: true, $api: { container: { getDetail } } }
+		await AppCard.methods.showLogs.call(v1)
+		expect(getDetail).toHaveBeenCalledWith('ab12cd34ef56')
+		expect(openLogs).toHaveBeenLastCalledWith(v1.$buefy, state, { app: 'jellyfin' })
 	})
 })
 
