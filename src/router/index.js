@@ -11,6 +11,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import route from './route.js'
 import api from '@/service/api'
 import store from '@/store'
+import { LOGIN_PORT_KEY, LOGIN_USER_KEY } from '@/components/logsAndTerminal/terminalLogin'
 
 const routes = route
 
@@ -87,6 +88,9 @@ router.beforeEach(async (to, from, next) => {
 						forgetTokens()
 						localStorage.removeItem('wallpaper')
 						localStorage.removeItem('user')
+						// the Terminal's last login is the signed-in person's, not the next one's
+						localStorage.removeItem(LOGIN_USER_KEY)
+						localStorage.removeItem(LOGIN_PORT_KEY)
 						return next('/login')
 
 					// No `default` that throws the session away when `version` is not in

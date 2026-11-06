@@ -20,6 +20,8 @@ import { AttachAddon } from 'xterm-addon-attach'
 import { LOGIN_PORT_KEY, LOGIN_USER_KEY, opensFullScreen, parseLogin } from './terminalLogin'
 
 const fitAddon = new FitAddon()
+// the name the login prompt gives the machine, as a console's
+const CONSOLE_NAME = 'recasaos'
 export default {
 	name: 'terminal-card',
 	props: {
@@ -29,9 +31,9 @@ export default {
 	},
 	data() {
 		return {
-			// the Settings switch says how it opens
-			fullscreen: opensFullScreen(),
-			isConnecting: false,
+			// set once the terminal exists, when the Settings switch says so:
+			// vue-fullscreen acts on a change of this, not on its first value
+			fullscreen: false,
 			term: '',
 			rows: 40,
 			cols: 100,
@@ -63,6 +65,9 @@ export default {
 		// measures nothing, and draws nothing of what is written to it
 		this.startTimer = setTimeout(() => {
 			this.createTerm()
+			if (opensFullScreen()) {
+				this.fullscreen = true
+			}
 			if (this.initWsUrl) {
 				this.isVaild = true
 				this.wsUrl = this.initWsUrl
@@ -74,7 +79,12 @@ export default {
 	},
 	beforeUnmount() {
 		clearTimeout(this.startTimer)
+		// the close that follows must not bring the login back on a terminal that is gone
+		this.isVaild = false
+		this.inputHandler?.dispose()
+		this.inputHandler = null
 		if (this.socket) {
+			this.socket.onclose = null
 			this.socket.close()
 		}
 		if (this.term != '')
@@ -88,17 +98,30 @@ export default {
 			const last = localStorage.getItem(LOGIN_USER_KEY) || ''
 			this.step = 'user'
 			this.line = ''
-			this.term.write(`\r\n${this.$t('recasos login')}${last ? ` (${last})` : ''}: `)
+			// a console's prompt is not translated
+			this.term.write(`\r\n${CONSOLE_NAME} login${last ? ` (${last})` : ''}: `)
 			this.inputHandler?.dispose()
 			this.inputHandler = this.term.onData(data => this.onLoginInput(data, last))
 		},
 		// Typing at the login prompt: the user is echoed, the password is not.
+		// A paste may hold both lines ("user⏎password⏎"): each Enter ends one.
 		onLoginInput(data, last) {
+			let previous = ''
 			for (const ch of data) {
-				if (ch === '\r') {
+				const lf = ch === '\n'
+				if (lf && previous === '\r') {
+					previous = ch
+					continue
+				}
+				previous = ch
+				if (ch === '\r' || lf) {
 					this.term.write('\r\n')
 					this.submitLine(last)
-					return
+					// the password was sent: what follows is not the login's
+					if (!this.inputHandler) {
+						return
+					}
+					continue
 				}
 				if (ch === '\u0003') { // Ctrl+C starts over
 					this.term.write('^C')
@@ -144,7 +167,6 @@ export default {
 		},
 		async checkLogin() {
 			this.$messageBus('terminallogs_connect')
-			this.isConnecting = true
 			const postData = {
 				username: String(this.sshUser),
 				password: String(this.sshPassword),
@@ -164,7 +186,6 @@ export default {
 				this.promptLogin()
 			} finally {
 				this.sshPassword = ''
-				this.isConnecting = false
 			}
 		},
 		toggleFullScreen() {
@@ -230,6 +251,9 @@ export default {
 			this.socket = null
 			this.isVaild = false
 			if (!this.initWsUrl) {
+				// whatever the session left on (bracketed paste, the alternate screen of
+				// vim) would garble the prompt or a pasted password
+				this.term.reset()
 				this.promptLogin()
 			}
 		},
