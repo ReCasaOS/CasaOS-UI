@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card logs-page">
+	<div class="modal-card logs-page touch-targets">
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<button :aria-expanded="String(drawer)" :aria-label="$t('Show the apps')" class="logs-drawer-toggle mr-2" type="button" @click="drawer = !drawer">
