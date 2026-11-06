@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card stats-page">
+	<div class="modal-card stats-page touch-targets">
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 ref="title" class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Statistics') }}</h3>
@@ -717,7 +717,7 @@ $stats-narrow: 44rem;
 		flex-shrink: 0;
 		padding: 0 0.4rem;
 		border-radius: 1rem;
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		color: var(--casa-text-warning);
 		background: var(--casa-warning-tint);
 	}
@@ -804,7 +804,7 @@ $stats-narrow: 44rem;
 
 			// a finger, not a pointer
 			@media (max-width: 600px) {
-				min-height: 2.25rem;
+				min-height: 2.75rem;
 			}
 
 			&:focus-visible {
