@@ -43,6 +43,7 @@ describe('the Fleet settings', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		fleetApi.status.mockReturnValue(answer(NONE))
+		fleetApi.addBox.mockReturnValue(answer({ box: { id: 's', self: true }, code: 'ENROL-self' }))
 	})
 	afterEach(() => {
 		wrapper?.unmount()
@@ -89,12 +90,35 @@ describe('the Fleet settings', () => {
 		await button('Enable').trigger('click')
 		await flushPromises()
 		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.official.test' })
+		// the master is in its own fleet at once
+		expect(fleetApi.addBox).toHaveBeenCalledWith({ name: window.location.hostname, url: '', self: true })
 		fleetApi.setMaster.mockClear()
 		await pick('master')
 		await field('relay').setValue('  https://relay.mine.example  ')
 		await button('Enable').trigger('click')
 		await flushPromises()
 		expect(fleetApi.setMaster).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.mine.example' })
+	})
+
+	it('stays master and says so when the master cannot add itself', async () => {
+		await open()
+		await pick('master')
+		fleetApi.setMaster.mockReturnValue(answer({}))
+		fleetApi.addBox.mockImplementation(() => refusal(400, 'gateway address is not local'))
+		fleetApi.status.mockReturnValue(answer(MASTER))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(wrapper.text()).toContain('This box could not add itself to its fleet: gateway address is not local')
+		expect(bus.$emit).toHaveBeenCalledWith(events.FLEET_CHANGED)
+	})
+
+	it('does not add itself when the master role is refused', async () => {
+		await open()
+		await pick('master')
+		fleetApi.setMaster.mockImplementation(() => refusal(502, 'relay down'))
+		await button('Enable').trigger('click')
+		await flushPromises()
+		expect(fleetApi.addBox).not.toHaveBeenCalled()
 	})
 
 	it('says what the relay sees, and offers the official relay again once the field was changed', async () => {
