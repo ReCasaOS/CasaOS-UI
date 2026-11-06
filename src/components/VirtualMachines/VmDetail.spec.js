@@ -37,6 +37,14 @@ describe('the detail of a virtual machine', () => {
 		expect(isos).toEqual(['/DATA/VM/iso/alpine.iso'])
 	})
 
+	it('names every button, the plus and minus of the number fields included', () => {
+		open()
+
+		const unnamed = wrapper.findAll('button').filter(b => !(b.attributes('aria-label') || b.attributes('title') || b.text()))
+		expect(unnamed).toHaveLength(0)
+		expect(wrapper.find('button[aria-label="Increase"]').exists()).toBe(true)
+	})
+
 	it('keeps the disc in the drive in the list, wherever it is', async () => {
 		open({ vm: aVm({ state: 'shut-off', cdrom: '/media/usb/VM/iso/debian.iso' }), images: [] })
 		await wrapper.setData({ tab: 'storage' })

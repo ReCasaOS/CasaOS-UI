@@ -116,7 +116,7 @@
 
 					<div v-if="editing === disk.target && mode === 'resize'" class="disk-edit">
 						<b-field :message="$t('The guest sees the larger disk; growing its partition is done inside the guest.')">
-							<b-numberinput v-model="newSize" :min="diskGiB(disk.capacity_bytes) + 1" controls-position="compact"
+							<b-numberinput v-model="newSize" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :min="diskGiB(disk.capacity_bytes) + 1" controls-position="compact"
 								expanded size="is-small"></b-numberinput>
 							<p class="control"><span class="button is-small is-static">GB</span></p>
 						</b-field>
@@ -152,7 +152,7 @@
 				</div>
 
 				<b-field v-if="canAddDisk(current)" class="mt-2" :message="addMessage">
-					<b-numberinput v-model="addSize" :disabled="hasSnapshots" :min="1" controls-position="compact" expanded
+					<b-numberinput v-model="addSize" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :disabled="hasSnapshots" :min="1" controls-position="compact" expanded
 						size="is-small"></b-numberinput>
 					<p class="control"><span class="button is-small is-static">GB</span></p>
 					<p class="control">
@@ -776,7 +776,7 @@ export default {
 		flex-shrink: 0;
 		padding: 0.05rem 0.5rem;
 		border-radius: 0.25rem;
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.02em;
