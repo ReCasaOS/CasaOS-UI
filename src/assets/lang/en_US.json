@@ -2827,6 +2827,7 @@
   "Leave": "Leave",
   "Add a box": "Add a box",
   "Add this box": "Add this box",
+  "This box could not add itself to its fleet: {error}": "This box could not add itself to its fleet: {error}",
   "New code": "New code",
   "New code needed": "New code needed",
   "New code for {name}": "New code for {name}",

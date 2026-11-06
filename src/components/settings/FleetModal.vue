@@ -212,7 +212,7 @@ export default {
 					this.error = this.$t('The address must start with https://')
 					return
 				}
-				this.run(() => fleetApi.setMaster({ enabled: true, address }))
+				this.run(() => this.becomeMaster({ address }))
 				return
 			}
 			const relay = this.relay.trim()
@@ -220,7 +220,17 @@ export default {
 				this.error = this.$t('The relay must start with https://')
 				return
 			}
-			this.run(() => fleetApi.setMaster({ enabled: true, relay }))
+			this.run(() => this.becomeMaster({ relay }))
+		},
+		// The master is a box of its own fleet from the start. If it cannot add itself, the role stays on and
+		// "Add this box" on the Fleet page is the way to try again.
+		async becomeMaster(fields) {
+			await fleetApi.setMaster({ enabled: true, ...fields })
+			try {
+				await fleetApi.addBox({ name: window.location.hostname, url: '', self: true })
+			} catch (e) {
+				this.error = this.$t('This box could not add itself to its fleet: {error}', { error: this.readable(e) })
+			}
 		},
 		confirmDisable() {
 			this.$buefy.dialog.confirm({
