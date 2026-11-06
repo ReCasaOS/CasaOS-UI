@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import { containerRows, failureCode, filterBoxes, fleetSummary, overviewRow, sortBoxes, sortRows, updatesRow, vmRows } from './fleetData'
+import { CONTAINER_FILTERS, VM_FILTERS, containerRows, countRows, failureCode, filterBoxes, fleetSummary, groupByBox, overviewRow, sortBoxes, sortRows, updatesRow, vmRows } from './fleetData'
 
 // the payload of each route, as the box sends it under `data`
 const ok = data => ({ ok: true, data })
@@ -143,5 +143,23 @@ describe('the summary, the filters and the order of the boxes', () => {
 		expect(sortBoxes(rows, 'name').map(r => r.name)).toEqual(['a-shop', 'b-home', 'c-cave', 'd-new'])
 		expect(sortBoxes(rows, 'state').map(r => r.name)).toEqual(['c-cave', 'd-new', 'b-home', 'a-shop'])
 		expect(rows[0].name).toBe('b-home')
+	})
+})
+
+describe('the chips and the groups of the Containers and Virtual Machines tabs', () => {
+	const rows = [
+		{ key: 'a/x', boxId: 'a', boxName: 'Home', title: 'Jellyfin', status: 'running', updateAvailable: true },
+		{ key: 'a/y', boxId: 'a', boxName: 'Home', title: 'Db', status: 'exited', updateAvailable: false },
+		{ key: 'b/!', boxId: 'b', boxName: 'Shop', title: '', status: '', error: 'offline' },
+	]
+
+	it('counts what each chip keeps, an unreadable box not counted', () => {
+		expect(countRows(rows, CONTAINER_FILTERS)).toEqual({ all: 2, running: 1, stopped: 1, update: 1 })
+		expect(countRows([{ state: 'running' }, { state: 'paused' }, { state: 'crashed' }, { state: 'shut-off' }], VM_FILTERS)).toEqual({ all: 4, running: 1, stopped: 1, attention: 2 })
+	})
+
+	it('groups the rows by box and keeps why a box could not be read', () => {
+		const groups = groupByBox(rows)
+		expect(groups.map(g => [g.name, g.rows.length, g.error])).toEqual([['Home', 2, ''], ['Shop', 0, 'offline']])
 	})
 })

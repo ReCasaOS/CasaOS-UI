@@ -81,6 +81,25 @@ export default {
 		sameRow(a, b) {
 			return a.key === b.key
 		},
+		isChecked(row) {
+			return this.checkedRows.some(r => r.key === row.key)
+		},
+		toggle(row) {
+			this.checkedRows = this.isChecked(row) ? this.checkedRows.filter(r => r.key !== row.key) : [...this.checkedRows, row]
+		},
+		// the rows of one box that can be checked, and whether all of them are
+		actionableOf(rows) {
+			return rows.filter(r => r.actionable)
+		},
+		allChecked(rows) {
+			const own = this.actionableOf(rows)
+			return own.length > 0 && own.every(r => this.isChecked(r))
+		},
+		toggleAll(rows) {
+			const own = this.actionableOf(rows)
+			const keys = new Set(own.map(r => r.key))
+			this.checkedRows = this.allChecked(rows) ? this.checkedRows.filter(r => !keys.has(r.key)) : [...this.checkedRows.filter(r => !keys.has(r.key)), ...own]
+		},
 		// what an empty cell says: the source failed on a box that is there, or nothing to say
 		blank(row, source) {
 			return row.online && row.errors.includes(source) ? this.$t('Could not be read') : '—'

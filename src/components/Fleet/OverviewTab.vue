@@ -381,37 +381,6 @@ $panel: rgba(255, 255, 255, 0.06);
 	font-size: 0.75rem;
 }
 
-.fleet-chip {
-	display: inline-flex;
-	gap: 0.5rem;
-	align-items: center;
-	min-height: 2.25rem;
-	padding: 0 0.875rem;
-	border: 1px solid $line;
-	border-radius: 1.125rem;
-	background: $panel;
-	color: inherit;
-	font: inherit;
-	font-weight: 600;
-	cursor: pointer;
-
-	&.is-selected {
-		border-color: #3b82f6;
-		background: #3b82f6;
-		color: #fff;
-	}
-
-	&:focus-visible {
-		outline: 2px solid #fff;
-		outline-offset: 2px;
-	}
-}
-
-.fleet-chip-count {
-	font-size: 0.75rem;
-	opacity: 0.85;
-}
-
 .fleet-boxes {
 	position: relative;
 	display: grid;
@@ -611,17 +580,5 @@ $panel: rgba(255, 255, 255, 0.06);
 	min-height: 2.75rem;
 	border-radius: 0.75rem;
 	font-weight: 600;
-}
-
-.fleet-dot {
-	display: inline-block;
-	width: 0.6rem;
-	height: 0.6rem;
-	border-radius: 50%;
-	background: #f14668;
-
-	&.is-online {
-		background: #3dd26b;
-	}
 }
 </style>

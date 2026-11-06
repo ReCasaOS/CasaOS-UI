@@ -187,3 +187,43 @@ export function sortBoxes(rows, mode) {
 	const rank = row => (!row.online ? 0 : row.needsRecode ? 1 : row.version?.available ? 2 : 3)
 	return [...rows].sort((a, b) => (mode === 'state' ? rank(a) - rank(b) : 0) || compare(a.name, b.name))
 }
+
+// The chips of the Containers and Virtual Machines tabs. A row that stands for a box that could not be read has
+// no status or state, so it belongs to "all" only.
+export const CONTAINER_FILTERS = {
+	all: () => true,
+	running: row => row.status === 'running',
+	stopped: row => ['exited', 'dead'].includes(row.status),
+	update: row => row.updateAvailable === true,
+}
+
+export const VM_FILTERS = {
+	all: () => true,
+	running: row => row.state === 'running',
+	stopped: row => row.state === 'shut-off',
+	attention: row => ['paused', 'crashed'].includes(row.state),
+}
+
+// How many rows each filter keeps, the unreadable boxes' rows not counted.
+export function countRows(rows, filters) {
+	const own = rows.filter(row => !row.error)
+	return Object.fromEntries(Object.keys(filters).map(key => [key, own.filter(filters[key]).length]))
+}
+
+// The sorted rows as one group per box, in the order the boxes first appear: `error` is why the box could not be
+// read ('' when it could), `rows` what it lists.
+export function groupByBox(rows) {
+	const groups = new Map()
+	for (const row of rows) {
+		if (!groups.has(row.boxId)) {
+			groups.set(row.boxId, { id: row.boxId, name: row.boxName, error: '', rows: [] })
+		}
+		const group = groups.get(row.boxId)
+		if (row.error) {
+			group.error = row.error
+		} else {
+			group.rows.push(row)
+		}
+	}
+	return [...groups.values()]
+}
