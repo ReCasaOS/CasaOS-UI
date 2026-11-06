@@ -2895,5 +2895,7 @@
   "{app} is restarting": "{app} is restarting",
   "{app} is stopping": "{app} is stopping",
   "Jump to now": "Now",
-  "The logs could not be read": "The logs could not be read"
+  "The logs could not be read": "The logs could not be read",
+  "Open the Terminal full screen": "Open the Terminal full screen",
+  "Login incorrect": "Login incorrect"
 }

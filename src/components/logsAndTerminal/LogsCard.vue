@@ -1,11 +1,11 @@
 <template>
-	<fullscreen :class="{ 'mt-4': !fullscreen }" v-model:fullscreen="fullscreen" :page-only="true" :teleport="true"
+	<fullscreen v-model:fullscreen="fullscreen" :class="{ 'mt-4': !fullscreen }" :page-only="true" :teleport="true"
 		class="fullScreen  pl-2 pt-2 pb-2 fdark-bg" @change="onWindowResize">
 		<a class="fullscreen-button" @click="toggleFullScreen">
 			<b-icon :icon="buttonIcon"></b-icon>
 		</a>
 		<div id="logs" :class="[fullscreen ? 'fullheight' : 'sheight']" class="logs scrollbars">
-			<div contenteditable v-dompurify-html="data" class="content"></div>
+			<div v-dompurify-html="data" contenteditable class="content"></div>
 		</div>
 	</fullscreen>
 </template>
@@ -13,14 +13,14 @@
 <script>
 export default {
 	name: 'logs-card',
+	props: {
+		data: String,
+	},
 	data() {
 		return {
 			fullscreen: false,
 			state: true,
 		}
-	},
-	props: {
-		data: String,
 	},
 	computed: {
 		buttonSzie() {

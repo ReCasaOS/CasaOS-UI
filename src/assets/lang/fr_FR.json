@@ -2898,5 +2898,7 @@
   "{app} is restarting": "{app} redémarre",
   "{app} is stopping": "{app} s'arrête",
   "Jump to now": "Maintenant",
-  "The logs could not be read": "Les journaux n'ont pas pu être lus"
+  "The logs could not be read": "Les journaux n'ont pas pu être lus",
+  "Open the Terminal full screen": "Ouvrir le terminal en plein écran",
+  "Login incorrect": "Connexion refusée"
 }
