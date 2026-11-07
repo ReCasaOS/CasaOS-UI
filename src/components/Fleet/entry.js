@@ -4,6 +4,7 @@ import { defineAsyncComponent } from 'vue'
 import fleetIcon from '@/assets/img/app/fleet.svg'
 import { openWithEscape } from '@/components/VirtualMachines/modalStack'
 import { FLEET_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { openPage } from '@/router/pageTabs'
 
 const FleetPage = defineAsyncComponent(() => import('./FleetPage.vue'))
 
@@ -53,7 +54,7 @@ export function openFleet(buefy, state) {
 	}
 
 	if (builtinOpensInNewTab(FLEET_LAUNCH_ID, state)) {
-		window.open(`${window.location.pathname}#/fleet`, '_blank')
+		openPage('fleet')
 		return null
 	}
 

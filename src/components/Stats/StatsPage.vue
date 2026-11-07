@@ -4,6 +4,7 @@
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 ref="title" class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Statistics') }}</h3>
 			</div>
+			<NewTabButton :params="{ item: selectedKey }" page="stats" />
 			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa" />
 			</button>
@@ -145,6 +146,7 @@ import { formatDateTime, formatValue, localeTag } from './statsFormat'
 import { clean } from '@/components/settings/osPlan'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { STATS_SOURCES, statsApi } from '@/service/stats'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const REFRESH_MS = 5000
 
@@ -190,7 +192,7 @@ function failureCode(e) {
 
 export default {
 	name: 'StatsPage',
-	components: { AlertSettingsDialog, StatsChart },
+	components: { NewTabButton, AlertSettingsDialog, StatsChart },
 	props: {
 		initialItem: { type: String, default: '' },
 	},

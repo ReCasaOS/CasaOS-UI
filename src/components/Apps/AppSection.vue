@@ -188,6 +188,7 @@ import events from '@/events/events'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { ice_i18n } from '@/mixins/base/common-i18n'
+import { openPage } from '@/router/pageTabs'
 
 // Syncthing in the app store: the old store numbered its apps, the v2 one names
 // them, and asking it for 74 is a 404
@@ -915,8 +916,7 @@ export default {
 			} else if (builtinOpensInNewTab(APP_STORE_LAUNCH_ID, this.$store.state)) {
 				// the store follows the App launching setting; a custom install is a
 				// form, and stays here
-				const query = storeId ? `?store=${storeId}` : ''
-				window.open(`${window.location.pathname}#/appstore${query}`, '_blank')
+				openPage('appstore', { store: storeId })
 				return
 			}
 			this.isShowing = true

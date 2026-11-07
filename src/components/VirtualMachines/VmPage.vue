@@ -12,6 +12,7 @@
 			<span v-if="available" class="kvm-badge" :class="[host.kvm ? 'is-on' : 'is-off']">
 				QEMU / KVM {{ host.kvm ? $t('active') : $t('not available') }}
 			</span>
+			<NewTabButton :params="{ vm: selectedId }" page="vms" />
 			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa" />
 			</button>
@@ -94,6 +95,7 @@ import StorageSettingsModal from './StorageSettingsModal.vue'
 import VmDetail from './VmDetail.vue'
 import { openWithEscape } from './modalStack'
 import { allowedActions, applyOrder, isDots, listAddress, stateDot, stateLabel } from './vms'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const ORDER_KEY = 'vm_order'
 // how long after a failed read, made when the message bus connected, the one
@@ -110,6 +112,7 @@ const ASKED_KEEP = 200
 export default {
 	name: 'VmPage',
 	components: {
+		NewTabButton,
 		Draggable: draggable,
 		OsIcon,
 		VmDetail,

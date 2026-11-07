@@ -4,6 +4,7 @@ import { defineAsyncComponent } from 'vue'
 import logsIcon from '@/assets/img/app/logs.svg'
 import { openWithEscape } from '@/components/VirtualMachines/modalStack'
 import { LOGS_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { openPage } from '@/router/pageTabs'
 
 const LogsPage = defineAsyncComponent(() => import('./LogsPage.vue'))
 
@@ -51,8 +52,7 @@ export function openLogs(buefy, state, { app, box, at } = {}) {
 	const asked = Object.fromEntries(Object.entries({ app, box, at }).filter(([, v]) => v))
 
 	if (builtinOpensInNewTab(LOGS_LAUNCH_ID, state)) {
-		const query = new URLSearchParams(asked).toString()
-		window.open(`${window.location.pathname}#/logs${query ? `?${query}` : ''}`, '_blank')
+		openPage('logs', asked)
 		return null
 	}
 

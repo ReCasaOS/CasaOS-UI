@@ -86,6 +86,8 @@
 					</b-tooltip>
 					<div v-if="currentSlide < 2"
 						class="is-flex is-align-items-center modal-close-container modal-close-container-line">
+						<NewTabButton v-if="state === 'install' && currentSlide === 0"
+							:params="{ store: sidebarOpen ? appDetailData.id : '' }" class="mr-2" page="appstore" />
 						<b-icon class="close-button" icon="close-outline" pack="casa" @click="$emit('close')" />
 					</div>
 					<div v-else-if="currentSlide === 2" class="is-flex is-align-items-center">
@@ -665,6 +667,7 @@ import { pickContainerId } from '@/components/Apps/containerSummary'
 import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import AppsInstallationLocation from '@/components/Apps/AppsInstallationLocation'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const data = [
 	'AUDIT_CONTROL',
@@ -698,6 +701,7 @@ const data = [
 
 export default {
 	components: {
+		NewTabButton,
 		AppStoreSourceManagement,
 		AppDetailInfo,
 		AppSideBar,

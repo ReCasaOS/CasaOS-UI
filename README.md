@@ -23,6 +23,18 @@ Four routes, hash mode, in [`src/router/route.js`](src/router/route.js):
 | `/` | the dashboard: wallpaper, sidebar widgets, app grid, top bar, file browser |
 | `/launch` | the waiting screen while an app starts, before it opens |
 
+The built-in pages also have an address of their own, so a link or a bookmark opens one alone on a tab. Without a session they go to the login and come back to the page afterwards. Each window has an *Open in a new tab* button that opens its address where the window is (folder, VM, item…), and Settings → App launching → "new tab" opens them this way from the dashboard.
+
+| Address | Page | Opens on |
+|---|---|---|
+| `/#/files` | Files | `?path=/DATA/...`, a folder |
+| `/#/terminal` | Terminal | |
+| `/#/vms` | Virtual Machines | `?vm=<id>`, one VM |
+| `/#/stats` | Statistics | `?item=...`, one item |
+| `/#/logs` | Logs | `?app=`, `?box=`, `?at=<ISO time>` |
+| `/#/fleet` | Fleet | |
+| `/#/appstore` | App Store | `?store=<id>`, one app |
+
 It calls `/v1/...` on CasaOS core for accounts, Samba shares, system information and files, `/v2/...` on AppManagement, LocalStorage and UserService, and holds a socket.io connection to `/v2/message_bus/socket.io/` for live app and installation events.
 
 Per-account preferences are stored on the box, not in the browser: the wallpaper, the app-grid order, the sidebar widgets, the top bar, the external links and the file-browser shortcuts all go through `/v1/users/current/custom/<key>`. An uploaded wallpaper is written to `/v1/users/current/image/<key>` and the account avatar to `/v1/users/avatar`. All of it follows the account, so it survives a new browser.

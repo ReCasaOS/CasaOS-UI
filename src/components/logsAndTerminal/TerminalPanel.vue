@@ -9,6 +9,7 @@
 				<b-icon v-show="showTabName === 'logs'" class="close-button" icon="downloads-outline" pack="casa"
 					@click="downloadSystemLog" />
 			</b-tooltip>
+			<NewTabButton page="terminal" />
 			<b-icon class="close-button ml-2" icon="close-outline" pack="casa" @click="$emit('close');" />
 
 		</header>
@@ -39,10 +40,12 @@
 import qs from 'qs'
 import TerminalCard from './TerminalCard.vue'
 import LogsCard from './LogsCard.vue'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 export default {
 	name: 'terminal-panel',
 	components: {
+		NewTabButton,
 		TerminalCard,
 		LogsCard,
 	},
