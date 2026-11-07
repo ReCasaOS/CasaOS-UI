@@ -83,7 +83,7 @@ export default {
 		// window's texts falls back to English, and so does its date. The title is the
 		// key asked, because $te reads a key with a full stop as a path.
 		locale() {
-			return this.$te('Operating system') ? this.$i18n.locale : 'en_us'
+			return this.$te('Operating system', this.$i18n.locale) ? this.$i18n.locale : 'en_us'
 		},
 		statusText() {
 			const sentence = supportSentence(this.os.support, this.locale, this.os.id)
