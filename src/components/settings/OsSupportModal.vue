@@ -17,7 +17,7 @@
 			</p>
 
 			<b-message v-if="statusText"
-				:type="os.support.state === 'security_ended' ? 'is-danger' : 'is-warning'"
+				:type="{ security_ended: 'is-danger', ending_soon: 'is-warning' }[os.support.state] || 'is-success'"
 				class="os-status mt-3"
 				size="is-small">
 				{{ statusText }}

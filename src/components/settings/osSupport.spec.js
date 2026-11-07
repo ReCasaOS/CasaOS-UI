@@ -27,9 +27,23 @@ describe('the badge', () => {
 		expect(osBadge(view({ state: 'security_ended' }, { id }))).not.toBe(null)
 	})
 
+	// the upgrade is offered whatever the end: a supported system's badge says until when
+	it.each([
+		['day', 'fr_fr', 'System supported until {date}', '30 juin 2028'],
+		['month', 'en_us', 'System supported until around {date}', 'June 2028'],
+	])('says until when a supported system is supported (%s, %s)', (precision, locale, label, date) => {
+		expect(osBadge(view({ state: 'supported', ends: '2028-06-30', precision }), locale))
+			.toEqual({ tone: 'neutral', label, date, icon: 'information-outline' })
+	})
+
 	// the keys of the badge's table are states; a state named like an Object method is not one
-	it.each(['supported', 'unknown', '', undefined, null, 'constructor', '__proto__', 'toString', 'SECURITY_ENDED'])('shows nothing for the state %s', (state) => {
-		expect(osBadge(view({ state }))).toBe(null)
+	it.each(['unknown', '', undefined, null, 'constructor', '__proto__', 'toString', 'SECURITY_ENDED'])('shows the quiet badge, with no date, for the state %s', (state) => {
+		expect(osBadge(view({ state, ends: '2028-06-30', precision: 'day' }), 'en_us')).toEqual({ tone: 'neutral', label: 'Operating system', icon: 'information-outline' })
+	})
+
+	it('shows the quiet badge, with no date, for a supported system whose date is not one', () => {
+		expect(osBadge(view({ state: 'supported', ends: '2028-02-31', precision: 'day' }), 'en_us')).toEqual(expect.objectContaining({ label: 'Operating system' }))
+		expect(osBadge(view({ state: 'supported' }), 'en_us')).toEqual(expect.objectContaining({ label: 'Operating system' }))
 	})
 
 	it('shows nothing for a system the core does not know, whatever the state says', () => {
@@ -105,7 +119,21 @@ describe('the sentence', () => {
 		}
 	})
 
-	it.each(['supported', 'unknown', '', undefined, 'constructor'])('says nothing for the state %s', (state) => {
+	it.each([
+		['2028-06-30', 'day', 'June 30, 2028', 'Free security updates for {name} run until {date}.', 'Standard security support for {name} runs until {date}.'],
+		['2028-06-30', 'month', 'June 2028', 'Free security updates for {name} run until around {date}.', 'Standard security support for {name} runs until around {date}.'],
+	])('for a supported system ending %s at precision %s', (ends, precision, date, debian, ubuntu) => {
+		const support = { state: 'supported', ends, precision }
+		expect(supportSentence(support, 'en_us', 'debian')).toEqual({ key: debian, date })
+		expect(supportSentence(support, 'en_us', 'ubuntu')).toEqual({ key: ubuntu, date })
+	})
+
+	it('says nothing for a supported system without a date', () => {
+		expect(supportSentence({ state: 'supported' }, 'en_us', 'debian')).toBe(null)
+		expect(supportSentence({ state: 'supported', ends: '2028-02-31', precision: 'day' }, 'en_us', 'ubuntu')).toBe(null)
+	})
+
+	it.each(['unknown', '', undefined, 'constructor'])('says nothing for the state %s', (state) => {
 		expect(supportSentence({ state, ends: '2026-08-31', precision: 'day' }, 'en_us', 'debian')).toBe(null)
 	})
 
@@ -118,8 +146,8 @@ describe('the sentence', () => {
 		expect(supportSentence(null, 'en_us', 'debian')).toBe(null)
 	})
 
-	it('lists the twelve sentences, for the language files\' test', () => {
-		expect(new Set(SUPPORT_SENTENCES).size).toBe(12)
+	it('lists the sixteen sentences, for the language files\' test', () => {
+		expect(new Set(SUPPORT_SENTENCES).size).toBe(16)
 		expect(SUPPORT_SENTENCES.every(key => key.includes('{name}'))).toBe(true)
 	})
 

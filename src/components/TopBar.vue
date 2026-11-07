@@ -630,7 +630,7 @@
 			</div>
 			<!-- Terminal  End -->
 
-			<!-- System support badge Start: only when the system's security updates have ended or end soon -->
+			<!-- System support badge Start: the end of the system's support, and the way to its upgrade -->
 			<button v-if="osSupportBadge"
 				:class="`is-${osSupportBadge.tone}`"
 				aria-haspopup="dialog"
@@ -638,7 +638,7 @@
 				type="button"
 				@click="showOsSupport">
 				<b-icon :icon="osSupportBadge.icon" size="is-small" />
-				<span>{{ $t(osSupportBadge.label) }}</span>
+				<span>{{ $t(osSupportBadge.label, { date: osSupportBadge.date }) }}</span>
 			</button>
 			<!-- System support badge End -->
 		</div>
@@ -808,9 +808,10 @@ export default {
 		isRaspberryPi() {
 			return this.deviceModel.toLowerCase().includes('raspberry')
 		},
-		// The badge for the system's end of support, or null
+		// The badge for the system's end of support, or null. Its date is in the language of
+		// the window it opens, which falls back to English like the window does.
 		osSupportBadge() {
-			return osBadge(this.os)
+			return osBadge(this.os, this.$te('Operating system', this.$i18n.locale) ? this.$i18n.locale : 'en_us')
 		},
 		// The automatic update's state line. Paused is always the last attempt's
 		// version: its second failure is what paused it.
@@ -1853,6 +1854,13 @@ export default {
 		--os-badge-signal: var(--casa-text-attention);
 
 		background: var(--casa-danger-tint);
+	}
+
+	&.is-neutral {
+		--os-badge-signal: var(--casa-text-muted);
+
+		border-color: var(--casa-border-strong);
+		background: var(--casa-surface-raised);
 	}
 
 	&:focus-visible {
