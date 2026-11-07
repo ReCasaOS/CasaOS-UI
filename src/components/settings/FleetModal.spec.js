@@ -83,6 +83,23 @@ describe('the Fleet settings', () => {
 		expect(fleetApi.join).toHaveBeenLastCalledWith('ENROL-abc', { leaveRemote: true })
 	})
 
+	it('shows the Join button loading while the first join is pending', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		let release
+		fleetApi.join.mockImplementationOnce(() => new Promise((resolve) => {
+			release = resolve
+		}))
+		await button('Join').trigger('click')
+		await flushPromises()
+		const join = wrapper.findAll('button').find(b => b.text() === 'Join')
+		expect(join.classes()).toContain('is-loading')
+		fleetApi.status.mockReturnValue(answer(member()))
+		release({ data: { success: 200, data: {} } })
+		await flushPromises()
+	})
+
 	it('sends nothing more and keeps the code when the join is cancelled', async () => {
 		await open()
 		await pick('member')

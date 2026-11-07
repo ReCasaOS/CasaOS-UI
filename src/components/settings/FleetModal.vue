@@ -267,8 +267,12 @@ export default {
 		},
 		async join() {
 			const code = this.code.trim()
+			this.busy = true
+			this.error = ''
 			try {
 				await fleetApi.join(code)
+				this.code = ''
+				await this.changed()
 			} catch (e) {
 				// the core refuses once while remote access is on: the owner decides, the code stays in the field
 				if (e?.response?.status === 409 && /has remote access/i.test(e.response.data?.message)) {
@@ -276,10 +280,9 @@ export default {
 				} else {
 					this.error = this.readable(e)
 				}
-				return
+			} finally {
+				this.busy = false
 			}
-			this.code = ''
-			await this.changed()
 		},
 		confirmJoinLeavingRemote(code) {
 			this.$buefy.dialog.confirm({
