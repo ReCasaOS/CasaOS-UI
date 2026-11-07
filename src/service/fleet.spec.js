@@ -56,6 +56,21 @@ describe('the fleet service', () => {
 		expect(instance.delete).toHaveBeenCalledWith('/v1/fleet/member')
 	})
 
+	it('builds the remote access routes', async () => {
+		await fleetApi.setRemote({ enabled: true })
+		expect(instance.put).toHaveBeenCalledWith('/v1/fleet/remote', { enabled: true }, { timeout: RELAY_MS })
+		await fleetApi.remote()
+		expect(instance.get).toHaveBeenCalledWith('/v1/fleet/remote', { timeout: RELAY_MS })
+		await fleetApi.addDevice()
+		expect(instance.post).toHaveBeenCalledWith('/v1/fleet/remote/devices')
+		await fleetApi.removeDevice('1 2')
+		expect(instance.delete).toHaveBeenCalledWith('/v1/fleet/remote/devices/1%202')
+		await fleetApi.join('C')
+		expect(instance.put).toHaveBeenLastCalledWith('/v1/fleet/member', { code: 'C' }, { timeout: RELAY_MS })
+		await fleetApi.join('C', { leaveRemote: true })
+		expect(instance.put).toHaveBeenLastCalledWith('/v1/fleet/member', { code: 'C', leave_remote: true }, { timeout: RELAY_MS })
+	})
+
 	it('gives the routes that wait on the relay two and a half minutes', async () => {
 		// the core takes up to two minutes to join a private network
 		expect(RELAY_MS).toBe(150000)

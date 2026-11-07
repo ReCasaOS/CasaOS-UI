@@ -33,7 +33,13 @@ export const fleetApi = {
 	renameBox: (id, fields) => instance.patch(box(id), fields),
 	removeBox: id => instance.delete(box(id)),
 	rotateCode: id => instance.post(`${box(id)}/code`),
-	join: code => instance.put('/v1/fleet/member', { code }, { timeout: RELAY_MS }),
+	// the remote access: the box's own remote settings, and the devices allowed to reach it
+	setRemote: fields => instance.put('/v1/fleet/remote', fields, { timeout: RELAY_MS }),
+	remote: () => instance.get('/v1/fleet/remote', { timeout: RELAY_MS }),
+	addDevice: () => instance.post('/v1/fleet/remote/devices'),
+	removeDevice: id => instance.delete(`/v1/fleet/remote/devices/${encodeURIComponent(id)}`),
+	// leaveRemote: also leave the remote access when the box joins a fleet
+	join: (code, { leaveRemote = false } = {}) => instance.put('/v1/fleet/member', leaveRemote ? { code, leave_remote: true } : { code }, { timeout: RELAY_MS }),
 	leave: () => instance.delete('/v1/fleet/member'),
 	relay: (boxId, method, path, { params, data, timeout } = {}) => instance.request({
 		method,

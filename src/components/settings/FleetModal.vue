@@ -163,7 +163,7 @@ export default {
 				this.view = view && typeof view === 'object' ? view : { role: 'none' }
 				this.role = ['master', 'member'].includes(this.view.role) ? this.view.role : 'none'
 				this.address = typeof this.view.master?.address === 'string' ? this.view.master.address : ''
-				this.relay = this.view.relay || this.view.default_relay || OFFICIAL_RELAY
+				this.relay = this.view.remote?.relay || this.view.relay || this.view.default_relay || OFFICIAL_RELAY
 			}).catch(() => {
 				this.view = null
 				this.error = this.$t('The fleet could not be read.')
@@ -175,7 +175,7 @@ export default {
 			this.$EventBus.$emit(events.FLEET_CHANGED)
 			return this.load()
 		},
-		async run(call) {
+		async run(call, reloadOnError = false) {
 			this.busy = true
 			this.error = ''
 			try {
@@ -184,6 +184,10 @@ export default {
 				await this.changed()
 			} catch (e) {
 				this.error = this.readable(e)
+				// the core may already have turned remote access off before the join failed
+				if (reloadOnError) {
+					await this.changed()
+				}
 			} finally {
 				this.busy = false
 			}
@@ -237,7 +241,8 @@ export default {
 		confirmDisable() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Disable the master role?'),
-				message: this.view?.relay ? this.$t('Disabling the master also deletes the fleet at the relay') : this.$t('The list of boxes is erased.'),
+				message: (this.view?.relay ? this.$t('Disabling the master also deletes the fleet at the relay') : this.$t('The list of boxes is erased.'))
+					+ (this.view?.remote ? ` ${this.$t('Your phones and PCs lose remote access too.')}` : ''),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Disable'),
@@ -264,9 +269,36 @@ export default {
 				onConfirm: () => this.run(() => fleetApi.setRelay(relay)),
 			})
 		},
-		join() {
+		async join() {
 			const code = this.code.trim()
-			this.run(() => fleetApi.join(code))
+			this.busy = true
+			this.error = ''
+			try {
+				await fleetApi.join(code)
+				this.code = ''
+				await this.changed()
+			} catch (e) {
+				// the core refuses once while remote access is on: the owner decides, the code stays in the field
+				if (e?.response?.status === 409 && /has remote access/i.test(e.response.data?.message)) {
+					this.confirmJoinLeavingRemote(code)
+				} else {
+					this.error = this.readable(e)
+				}
+			} finally {
+				this.busy = false
+			}
+		},
+		confirmJoinLeavingRemote(code) {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Join this fleet and turn remote access off?'),
+				message: this.$t('Your phones and PCs lose access to this box. Add them again on the master afterwards.'),
+				type: 'is-danger',
+				hasIcon: true,
+				confirmText: this.$t('Join'),
+				cancelText: this.$t('Cancel'),
+				focusOn: 'cancel',
+				onConfirm: () => this.run(() => fleetApi.join(code, { leaveRemote: true }), true),
+			})
 		},
 		confirmLeave() {
 			this.$buefy.dialog.confirm({

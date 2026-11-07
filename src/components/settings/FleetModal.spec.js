@@ -65,6 +65,87 @@ describe('the Fleet settings', () => {
 		expect(bus.$emit).toHaveBeenCalledWith(events.FLEET_CHANGED)
 	})
 
+	it('asks before joining when remote access is on', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		fleetApi.join.mockImplementationOnce(() => refusal(409, 'this box has remote access: joining a fleet turns it off and its phones and PCs lose access; confirm to go on'))
+		await button('Join').trigger('click')
+		await flushPromises()
+		expect(fleetApi.join).toHaveBeenCalledTimes(1)
+		expect(document.body.textContent).toContain('Join this fleet and turn remote access off?')
+		expect(document.body.textContent).toContain('Your phones and PCs lose access to this box. Add them again on the master afterwards.')
+		fleetApi.join.mockReturnValue(answer({}))
+		fleetApi.status.mockReturnValue(answer(member()))
+		dialogButton('Join').click()
+		await flushPromises()
+		expect(fleetApi.join).toHaveBeenCalledTimes(2)
+		expect(fleetApi.join).toHaveBeenLastCalledWith('ENROL-abc', { leaveRemote: true })
+	})
+
+	it('reloads the status and tells the app when the confirmed join fails', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		fleetApi.join.mockImplementationOnce(() => refusal(409, 'this box has remote access: joining a fleet turns it off and its phones and PCs lose access; confirm to go on'))
+		await button('Join').trigger('click')
+		await flushPromises()
+		fleetApi.join.mockImplementationOnce(() => refusal(502, 'bad gateway'))
+		bus.$emit.mockClear()
+		fleetApi.status.mockClear()
+		dialogButton('Join').click()
+		await flushPromises()
+		expect(fleetApi.status).toHaveBeenCalledTimes(1)
+		expect(bus.$emit).toHaveBeenCalledWith(events.FLEET_CHANGED)
+		expect(wrapper.text()).toContain('Relay unreachable')
+	})
+
+	it('shows the Join button loading while the first join is pending', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		let release
+		fleetApi.join.mockImplementationOnce(() => new Promise((resolve) => {
+			release = resolve
+		}))
+		await button('Join').trigger('click')
+		await flushPromises()
+		const join = wrapper.findAll('button').find(b => b.text() === 'Join')
+		expect(join.classes()).toContain('is-loading')
+		fleetApi.status.mockReturnValue(answer(member()))
+		release({ data: { success: 200, data: {} } })
+		await flushPromises()
+	})
+
+	it('sends nothing more and keeps the code when the join is cancelled', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		fleetApi.join.mockImplementationOnce(() => refusal(409, 'this box has remote access: joining a fleet turns it off and its phones and PCs lose access; confirm to go on'))
+		await button('Join').trigger('click')
+		await flushPromises()
+		dialogButton('Cancel').click()
+		await flushPromises()
+		expect(fleetApi.join).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('textarea').element.value).toBe('ENROL-abc')
+	})
+
+	it('warns that devices go with the master', async () => {
+		fleetApi.status.mockReturnValue(answer({ ...MASTER, remote: { relay: 'https://relay.official.test', connected: true } }))
+		await open()
+		await button('Disable the master role').trigger('click')
+		await flushPromises()
+		expect(document.body.textContent).toContain('The list of boxes is erased.')
+		expect(document.body.textContent).toContain('Your phones and PCs lose remote access too.')
+	})
+
+	it('proposes the remote access relay when enabling the master', async () => {
+		fleetApi.status.mockReturnValue(answer({ ...NONE, remote: { relay: 'https://relay.remote.example', alone: true } }))
+		await open()
+		await pick('master')
+		expect(field('relay').element.value).toBe('https://relay.remote.example')
+	})
+
 	it('leaves after confirming', async () => {
 		fleetApi.status.mockReturnValue(answer(member()))
 		fleetApi.leave.mockReturnValue(answer({}))
