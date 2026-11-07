@@ -137,9 +137,9 @@ describe('the Remote access window', () => {
 		afterEach(() => vi.useRealTimers())
 
 		it('asks the relay once', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval'] })
 			await open()
 			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
-			vi.useFakeTimers()
 			vi.advanceTimersByTime(10 * 60 * 1000)
 			await flushPromises()
 			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
@@ -194,6 +194,30 @@ describe('the Remote access window', () => {
 			const copy = (await import('clipboard-copy')).default
 			await wrapper.find('.box-copy').trigger('click')
 			expect(copy).toHaveBeenCalledWith('http://100.64.0.20')
+		})
+
+		it('escapes a hostile name in the remove dialog', async () => {
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, devices: [{ id: 'x', hostname: '<img src=x onerror=alert(1)>', online: true }] }))
+			await open()
+			await button('Remove').trigger('click')
+			await flushPromises()
+			expect(document.body.querySelector('img')).toBeNull()
+			expect(document.body.querySelector('.dialog').textContent).toContain('<img src=x onerror=alert(1)> will no longer reach this box.')
+		})
+
+		it('forgets the list when remote access is turned off', async () => {
+			fleetApi.setRemote.mockReturnValue(answer({}))
+			await open()
+			await button('Turn remote access off').trigger('click')
+			await flushPromises()
+			fleetApi.status.mockReturnValue(answer(NONE))
+			dialogButton('Turn off').click()
+			await flushPromises()
+			fleetApi.status.mockReturnValue(answer(ON))
+			fleetApi.remote.mockReturnValue(new Promise(() => {}))
+			await button('Turn remote access on').trigger('click')
+			await flushPromises()
+			expect(wrapper.text()).not.toContain('phone-gary')
 		})
 
 		it('refreshes on demand', async () => {

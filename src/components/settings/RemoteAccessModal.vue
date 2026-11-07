@@ -79,6 +79,7 @@
 
 <script>
 import copy from 'clipboard-copy'
+import escape from 'lodash/escape'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
 
 const HTTPS = /^https:\/\/.+/i
@@ -153,7 +154,7 @@ export default {
 		confirmRemove(d) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Remove this device?'),
-				message: this.$t('{name} will no longer reach this box.', { name: d.hostname }),
+				message: this.$t('{name} will no longer reach this box.', { name: escape(d.hostname) }),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Remove'),
@@ -233,7 +234,10 @@ export default {
 				confirmText: this.$t('Turn off'),
 				cancelText: this.$t('Cancel'),
 				focusOn: 'cancel',
-				onConfirm: () => this.run(() => fleetApi.setRemote({ enabled: false })),
+				onConfirm: () => {
+					this.list = null
+					return this.run(() => fleetApi.setRemote({ enabled: false }))
+				},
 			})
 		},
 		async copyAddress(addr) {
@@ -249,3 +253,13 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+.remote-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 0.25rem;
+	overflow-wrap: anywhere;
+}
+</style>
