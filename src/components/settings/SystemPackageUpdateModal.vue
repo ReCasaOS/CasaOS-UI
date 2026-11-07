@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card system-package-update-modal">
+	<div class="modal-card system-package-update-modal touch-targets">
 		<header class="modal-card-head">
 			<div class="is-flex-grow-1">
 				<h3 class="title is-header">{{ $t('System packages') }}</h3>

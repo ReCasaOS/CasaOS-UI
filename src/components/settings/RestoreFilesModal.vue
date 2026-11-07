@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card restore-files">
+	<div class="modal-card restore-files touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">{{ $t('Put back files of {app}', { app }) }}</h3>
 		</header>
@@ -7,7 +7,7 @@
 		<section class="modal-card-body">
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
 
-			<p class="_has-text-gray is-size-7 mb-3">
+			<p class="settings-intro mb-3">
 				{{ $t('The backup taken on {when}. Open a folder by clicking its name, tick what to put back. Nothing else is touched.', { when }) }}
 			</p>
 

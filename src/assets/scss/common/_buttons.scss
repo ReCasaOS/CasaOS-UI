@@ -222,9 +222,22 @@
         button,
         .button,
         select,
+        input:not([type='checkbox'], [type='radio']),
         .close-button {
             min-width: 2.75rem;
             min-height: 2.75rem;
+        }
+
+        // the wrapper follows its select: at a fixed height the select spilled over the field below
+        .select {
+            height: auto;
+            min-height: 2.75rem;
+        }
+
+        // beside a paragraph, a button shrinks under its own label
+        button,
+        .button {
+            flex-shrink: 0;
         }
     }
 }

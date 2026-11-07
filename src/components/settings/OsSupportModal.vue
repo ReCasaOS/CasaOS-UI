@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card os-support-modal">
+	<div class="modal-card os-support-modal touch-targets">
 		<header class="modal-card-head">
 			<!-- takes the focus when the window opens, to be read; nobody types into it -->
 			<h3 ref="title" class="title is-header os-title" tabindex="-1">

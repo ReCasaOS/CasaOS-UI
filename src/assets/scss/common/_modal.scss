@@ -147,6 +147,31 @@
         }
     }
 
+    // A section of a settings window: one thing (a destination, a schedule, a form)
+    // on a raised card, so a long window reads as a few blocks rather than a column of text.
+    .settings-card {
+        background: var(--casa-surface-raised);
+        border: 1px solid var(--casa-divider-soft);
+        border-radius: 12px;
+        padding: .75rem 1rem;
+
+        &:not(:last-child) {
+            margin-bottom: .75rem;
+        }
+
+        h4,
+        .has-text-weight-semibold {
+            color: var(--casa-text-strong);
+        }
+    }
+
+    // the sentence under a tab or a title that says what the window is for
+    .settings-intro {
+        color: var(--casa-text-secondary);
+        font-size: .8125rem;
+        line-height: 1.45;
+    }
+
     .modal-card-foot {
         padding: .75rem 1.5rem 1.5rem 1.5rem;
         border-top: 1px solid var(--casa-divider-soft);

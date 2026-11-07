@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card">
+	<div class="modal-card touch-targets">
 		<!-- Modal-Card Header Start -->
 		<header class="modal-card-head">
 			<div class="is-flex-grow-1">

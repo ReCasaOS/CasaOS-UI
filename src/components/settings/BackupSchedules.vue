@@ -1,7 +1,7 @@
 <template>
 	<div>
 		<div class="is-flex is-align-items-center mb-2">
-			<p class="_has-text-gray is-size-7 is-flex-grow-1">
+			<p class="settings-intro is-flex-grow-1 mr-2">
 				{{ $t('Backups that run on their own. A missed slot catches up at the next check rather than waiting for the next day.') }}
 			</p>
 			<b-button :loading="isLoading" rounded size="is-small" @click="load">{{ $t('Refresh') }}</b-button>
@@ -13,7 +13,7 @@
 			{{ $t('Nothing is scheduled.') }}
 		</p>
 
-		<div v-for="(schedule, index) in schedules" :key="index" class="schedule mb-3 pb-2">
+		<div v-for="(schedule, index) in schedules" :key="index" class="schedule settings-card">
 			<div class="is-flex is-align-items-center mb-1">
 				<b-select v-model="schedule.app" class="mr-1" expanded size="is-small">
 					<option v-for="app in apps" :key="app" :value="app">{{ app }}</option>
@@ -22,7 +22,7 @@
 				<b-select v-model="schedule.destination" class="mr-1" expanded size="is-small">
 					<option v-for="name in destinations" :key="name" :value="name">{{ name }}</option>
 				</b-select>
-				<b-button icon-left="close-outline" icon-pack="casa" rounded size="is-small"
+				<b-button :title="$t('Remove')" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
 					@click="schedules.splice(index, 1)" />
 			</div>
 

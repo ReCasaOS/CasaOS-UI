@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card backup-destinations">
+	<div class="modal-card backup-destinations touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">{{ $t('Backups') }}</h3>
 		</header>
@@ -7,7 +7,7 @@
 			<b-tabs v-model="tab">
 				<b-tab-item :label="$t('Destinations')">
 					<div class="is-flex is-align-items-center mb-2">
-						<p class="_has-text-gray is-size-7 is-flex-grow-1">
+						<p class="settings-intro is-flex-grow-1 mr-2">
 							{{ $t('Where backups are sent. Credentials are kept by rclone, alongside the cloud drives this box already mounts.') }}
 						</p>
 						<b-button :loading="isLoading" rounded size="is-small" @click="load">
@@ -26,9 +26,9 @@
 					<!-- the check result sits under the name: an rclone error is a paragraph,
 						and beside the buttons it pushed them off a phone -->
 					<div v-for="name in destinations" :key="name"
-						class="destination is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center mb-2">
+						class="destination settings-card is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
 						<div class="_text mr-3">
-							<p class="has-text-weight-medium">{{ name }}</p>
+							<p class="_name">{{ name }}</p>
 							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
 							<p v-if="restic[name] && restic[name].enabled" class="_has-text-gray is-size-7">{{ $t('Kept with restic') }}</p>
 							<p v-if="restic[name] && restic[name].kept && !restic[name].enabled" class="_has-text-gray is-size-7">
@@ -40,29 +40,30 @@
 							</p>
 						</div>
 
-						<!-- ml-auto: on a line of their own, the buttons stay on the right -->
-						<div class="is-flex ml-auto">
-							<b-button :loading="busy === `check:${name}`" class="mr-1" rounded size="is-small"
+						<!-- ml-auto: on a line of their own, the buttons stay on the right; they wrap
+							rather than run off a phone -->
+						<div class="is-flex is-flex-wrap-wrap is-gap-1 ml-auto">
+							<b-button :loading="busy === `check:${name}`" rounded size="is-small"
 								@click="check(name)">
 								{{ $t('Check') }}
 							</b-button>
 							<b-button v-if="restic[name] && restic[name].available && !restic[name].kept"
-								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="confirmRestic(name)">
+								:loading="busy === `restic:${name}`" rounded size="is-small" @click="confirmRestic(name)">
 								{{ $t('Keep with restic\u2026') }}
 							</b-button>
 							<b-button v-if="restic[name] && restic[name].available && restic[name].kept && !restic[name].enabled"
-								:loading="busy === `restic:${name}`" class="mr-1" rounded size="is-small" @click="enableRestic(name, '')">
+								:loading="busy === `restic:${name}`" rounded size="is-small" @click="enableRestic(name, '')">
 								{{ $t('Resume restic') }}
 							</b-button>
-							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticcheck:${name}`" class="mr-1"
+							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticcheck:${name}`"
 								rounded size="is-small" @click="checkRestic(name)">
 								{{ $t('Check repository') }}
 							</b-button>
-							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticback:${name}`" class="mr-1"
+							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticback:${name}`"
 								rounded size="is-small" @click="confirmSwitchBack(name)">
 								{{ $t('Switch back to rclone\u2026') }}
 							</b-button>
-							<b-button class="mr-1" rounded size="is-small" @click="browse(name)">
+							<b-button rounded size="is-small" @click="browse(name)">
 								{{ $t('Restore\u2026') }}
 							</b-button>
 							<b-button :loading="busy === `delete:${name}`" rounded size="is-small" type="is-danger"
@@ -75,8 +76,8 @@
 					<!-- The box itself: users, shares and their accounts, schedules, the
 						destinations above. Restored from the destination browser like an app,
 						under "This box". -->
-					<div v-if="destinations.length" class="is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center mt-3 mb-2">
-						<p class="_text _has-text-gray is-size-7 mr-2">
+					<div v-if="destinations.length" class="settings-card is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
+						<p class="_text settings-intro mr-2">
 							{{ $t('Back up this box itself: its users, its shares and their accounts, its schedules, these destinations.') }}
 						</p>
 						<b-select v-model="systemDestination" class="mr-2" size="is-small">
@@ -88,90 +89,91 @@
 						</b-button>
 					</div>
 
-					<hr>
+					<div class="settings-card">
 
-					<b-field :label="$t('Name')" label-position="on-border">
-						<b-input v-model="draft.name" placeholder="offsite" expanded size="is-small" />
-					</b-field>
-
-					<b-field :label="$t('Backend')" label-position="on-border">
-						<b-select v-model="draft.backend" expanded size="is-small" @update:model-value="fillSuggestions">
-							<option v-for="backend in backends" :key="backend.id" :value="backend.id">
-								{{ backend.label }}
-							</option>
-						</b-select>
-					</b-field>
-
-					<b-field :label="draft.backend === 's3' ? $t('Bucket') : $t('Folder (optional)')" label-position="on-border">
-						<b-input v-model="draft.root" :placeholder="draft.backend === 's3' ? 'my-box-backups' : ''" expanded size="is-small" />
-					</b-field>
-					<p v-if="draft.backend === 's3'" class="_has-text-gray is-size-7 mb-2">
-						{{ $t('The bucket you made at your provider. Without one, each app is put in a bucket named after it, which most providers refuse because bucket names are shared by everyone.') }}
-					</p>
-
-					<div v-if="canSignIn(draft.backend)" class="mb-3">
-						<b-button :loading="busy === 'signin'" rounded size="is-small" type="is-info" @click="startSignIn">
-							{{ $t('Sign in with {provider}', { provider: backendLabel(draft.backend) }) }}
-						</b-button>
-						<template v-if="signIn.url">
-							<a :href="signIn.url" class="is-size-7 ml-2" rel="noopener noreferrer" target="_blank">{{ $t('Open the sign-in page again') }}</a>
-							<p class="_has-text-gray is-size-7 mt-2 mb-1">
-								{{ $t('When you are done, your browser shows a page that does not load (127.0.0.1:53682). That is expected: copy the whole address of that page from the address bar and paste it below.') }}
-							</p>
-							<div class="is-flex">
-								<b-input v-model="signIn.redirected" :placeholder="$t('Address of the page that did not load')" autocomplete="off"
-									class="mr-1" expanded size="is-small" />
-								<b-button :disabled="!signIn.redirected" :loading="busy === 'signin-finish'" rounded size="is-small"
-									type="is-primary" @click="finishSignIn">
-									{{ $t('Finish sign-in') }}
-								</b-button>
-							</div>
-						</template>
-					</div>
-
-					<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
-						{{ $t(backendHelp(draft.backend)) }}
-					</p>
-					<p class="_has-text-gray is-size-7 mb-2">
-						{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}
-					</p>
-
-					<!-- new-password on anything typed as a password: otherwise the browser
-						fills the dashboard's own login in, and it is sent to rclone -->
-					<div v-for="(row, index) in draft.rows" :key="index" class="is-flex mb-1">
-						<b-input v-model="row.key" :placeholder="$t('Option')" class="mr-1" expanded size="is-small" />
-						<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
-							:placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
-							expanded password-reveal size="is-small" />
-						<b-button class="ml-1" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
-							@click="draft.rows.splice(index, 1)" />
-					</div>
-
-					<b-field class="mt-3">
-						<b-checkbox v-model="draft.encrypt" size="is-small">{{ $t('Encrypt this destination') }}</b-checkbox>
-					</b-field>
-					<template v-if="draft.encrypt">
-						<b-field :label="$t('Encryption password')" label-position="on-border">
-							<b-input v-model="draft.password" autocomplete="new-password" expanded password-reveal size="is-small"
-								type="password" />
+						<b-field :label="$t('Name')" label-position="on-border">
+							<b-input v-model="draft.name" placeholder="offsite" expanded size="is-small" />
 						</b-field>
-						<!-- said here rather than in a dialog later: the password is kept by
+
+						<b-field :label="$t('Backend')" label-position="on-border">
+							<b-select v-model="draft.backend" expanded size="is-small" @update:model-value="fillSuggestions">
+								<option v-for="backend in backends" :key="backend.id" :value="backend.id">
+									{{ backend.label }}
+								</option>
+							</b-select>
+						</b-field>
+
+						<b-field :label="draft.backend === 's3' ? $t('Bucket') : $t('Folder (optional)')" label-position="on-border">
+							<b-input v-model="draft.root" :placeholder="draft.backend === 's3' ? 'my-box-backups' : ''" expanded size="is-small" />
+						</b-field>
+						<p v-if="draft.backend === 's3'" class="_has-text-gray is-size-7 mb-2">
+							{{ $t('The bucket you made at your provider. Without one, each app is put in a bucket named after it, which most providers refuse because bucket names are shared by everyone.') }}
+						</p>
+
+						<div v-if="canSignIn(draft.backend)" class="mb-3">
+							<b-button :loading="busy === 'signin'" rounded size="is-small" type="is-info" @click="startSignIn">
+								{{ $t('Sign in with {provider}', { provider: backendLabel(draft.backend) }) }}
+							</b-button>
+							<template v-if="signIn.url">
+								<a :href="signIn.url" class="is-size-7 ml-2" rel="noopener noreferrer" target="_blank">{{ $t('Open the sign-in page again') }}</a>
+								<p class="_has-text-gray is-size-7 mt-2 mb-1">
+									{{ $t('When you are done, your browser shows a page that does not load (127.0.0.1:53682). That is expected: copy the whole address of that page from the address bar and paste it below.') }}
+								</p>
+								<div class="is-flex">
+									<b-input v-model="signIn.redirected" :placeholder="$t('Address of the page that did not load')" autocomplete="off"
+										class="mr-1" expanded size="is-small" />
+									<b-button :disabled="!signIn.redirected" :loading="busy === 'signin-finish'" rounded size="is-small"
+										type="is-primary" @click="finishSignIn">
+										{{ $t('Finish sign-in') }}
+									</b-button>
+								</div>
+							</template>
+						</div>
+
+						<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
+							{{ $t(backendHelp(draft.backend)) }}
+						</p>
+						<p class="_has-text-gray is-size-7 mb-2">
+							{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}
+						</p>
+
+						<!-- new-password on anything typed as a password: otherwise the browser
+						fills the dashboard's own login in, and it is sent to rclone -->
+						<div v-for="(row, index) in draft.rows" :key="index" class="is-flex mb-1">
+							<b-input v-model="row.key" :placeholder="$t('Option')" class="mr-1" expanded size="is-small" />
+							<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
+								:placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
+								expanded password-reveal size="is-small" />
+							<b-button :title="$t('Remove')" class="ml-1" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
+								@click="draft.rows.splice(index, 1)" />
+						</div>
+
+						<b-field class="mt-3">
+							<b-checkbox v-model="draft.encrypt" size="is-small">{{ $t('Encrypt this destination') }}</b-checkbox>
+						</b-field>
+						<template v-if="draft.encrypt">
+							<b-field :label="$t('Encryption password')" label-position="on-border">
+								<b-input v-model="draft.password" autocomplete="new-password" expanded password-reveal size="is-small"
+									type="password" />
+							</b-field>
+							<!-- said here rather than in a dialog later: the password is kept by
 							rclone and never comes back, and a destination without it is a
 							bucket of ciphertext -->
-						<p class="_has-text-gray is-size-7 mb-2">
-							{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}
-						</p>
-					</template>
+							<p class="_has-text-gray is-size-7 mb-2">
+								{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}
+							</p>
+						</template>
 
-					<div class="is-flex is-align-items-center mt-2">
-						<b-button class="mr-2" rounded size="is-small" @click="draft.rows.push({ key: '', value: '' })">
-							{{ $t('Add') }}
-						</b-button>
-						<div class="is-flex-grow-1"></div>
-						<b-button :disabled="!draft.name || !draft.backend || (draft.encrypt && !draft.password)" :loading="busy === 'save'"
-							rounded size="is-small" type="is-primary" @click="save">
-							{{ $t('Save destination') }}
-						</b-button>
+						<div class="is-flex is-align-items-center mt-2">
+							<b-button class="mr-2" rounded size="is-small" @click="draft.rows.push({ key: '', value: '' })">
+								{{ $t('Add') }}
+							</b-button>
+							<div class="is-flex-grow-1"></div>
+							<b-button :disabled="!draft.name || !draft.backend || (draft.encrypt && !draft.password)" :loading="busy === 'save'"
+								rounded size="is-small" type="is-primary" @click="save">
+								{{ $t('Save destination') }}
+							</b-button>
+						</div>
 					</div>
 				</b-tab-item>
 
@@ -564,6 +566,11 @@ export default {
   // controls on a wide card and takes its own line on a phone
   ._text {
     flex: 1 1 14rem;
+  }
+
+  ._name {
+    font-weight: 600;
+    color: var(--casa-text-strong);
   }
 }
 </style>
