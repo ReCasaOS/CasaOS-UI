@@ -45,7 +45,23 @@
 <script>
 import Artplayer from 'artplayer'
 import { parseWebStream } from 'music-metadata'
+import { defaultSubtitle, playerLang, subtitlesFor } from './subtitles'
 import { mixin } from '@/mixins/mixin'
+
+// ArtPlayer 5 carries English and Chinese; the other languages it has are
+// loaded when the dashboard is in one of them
+const PLAYER_I18N = {
+	ar: () => import('artplayer/i18n/ar'),
+	cs: () => import('artplayer/i18n/cs'),
+	es: () => import('artplayer/i18n/es'),
+	fa: () => import('artplayer/i18n/fa'),
+	fr: () => import('artplayer/i18n/fr'),
+	id: () => import('artplayer/i18n/id'),
+	pl: () => import('artplayer/i18n/pl'),
+	ru: () => import('artplayer/i18n/ru'),
+	tr: () => import('artplayer/i18n/tr'),
+	vi: () => import('artplayer/i18n/vi'),
+}
 
 export default {
 	mixins: [mixin],
@@ -74,6 +90,7 @@ export default {
 			poster: '',
 			audioTitle: this.item.name,
 			audioArtist: '...',
+			destroyed: false,
 		}
 	},
 	computed: {
@@ -122,30 +139,13 @@ export default {
 					this.audioArtist = metadata.common.artist
 				})()
 			} else {
-				this.instance = new Artplayer({
-					url: this.getFileUrl(this.item),
-					container: this.$refs.artRef,
-					setting: true,
-					flip: true,
-					playbackRate: true,
-					aspectRatio: true,
-					subtitleOffset: true,
-					fullscreenWeb: true,
-					fullscreen: true,
-					autoplay: true,
-					pip: true,
-					theme: '#007AE5',
-					playsInline: true,
-					screenshot: true,
-					airplay: true,
-					playsinline: true,
-					lang: this.$i18n.locale.replace('_', '-'),
-				})
+				this.createPlayer()
 			}
 		})
 	},
 
 	beforeUnmount() {
+		this.destroyed = true
 		if (this.instance && this.instance.destroy) {
 			this.instance.destroy(false)
 		}
@@ -153,6 +153,63 @@ export default {
 	methods: {
 		close() {
 			this.$emit('close')
+		},
+
+		// The subtitle files in the video's folder go in the settings menu; one
+		// named after the video is shown at start.
+		async createPlayer() {
+			const lang = playerLang(this.$i18n.locale)
+			const i18n = PLAYER_I18N[lang] ? { [lang]: (await PLAYER_I18N[lang]()).default } : undefined
+			// closed while its language loaded
+			if (this.destroyed) {
+				return
+			}
+			const subtitles = subtitlesFor(this.item, this.list)
+			const shown = defaultSubtitle(subtitles)
+			const track = subtitle => ({ url: this.getFileUrl(subtitle), type: subtitle.type, name: subtitle.name })
+			const settings = subtitles.length === 0
+				? []
+				: [{
+						html: this.$t('Subtitles'),
+						tooltip: shown ? shown.name : this.$t('No subtitles'),
+						selector: [
+							{ html: this.$t('No subtitles'), default: !shown },
+							...subtitles.map(subtitle => ({ html: subtitle.name, default: subtitle === shown, subtitle })),
+						],
+						onSelect: (option) => {
+							if (option.subtitle) {
+								const { url, ...rest } = track(option.subtitle)
+								this.instance.subtitle.switch(url, rest)
+								this.instance.subtitle.show = true
+							} else {
+								this.instance.subtitle.show = false
+							}
+							return option.html
+						},
+					}]
+			this.instance = new Artplayer({
+				url: this.getFileUrl(this.item),
+				container: this.$refs.artRef,
+				setting: true,
+				flip: true,
+				playbackRate: true,
+				aspectRatio: true,
+				subtitleOffset: true,
+				fullscreenWeb: true,
+				fullscreen: true,
+				autoplay: true,
+				pip: true,
+				theme: '#007AE5',
+				playsInline: true,
+				screenshot: true,
+				airplay: true,
+				playsinline: true,
+				lang,
+				settings,
+				// ArtPlayer checks its options' types: an absent one is left out
+				...(i18n && { i18n }),
+				...(shown && { subtitle: track(shown) }),
+			})
 		},
 	},
 }
