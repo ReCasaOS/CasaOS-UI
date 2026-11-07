@@ -165,10 +165,20 @@ describe('the plan section, when it is shown', () => {
 		expect(wrapper.find('.os-plan-vanished').exists()).toBe(false)
 	})
 
+	// the guide sends the reader to this section when no plan can be made: it says the core's reason, with no button that starts one
 	it.each([
-		['a machine that cannot be planned', { plannable: false, reason: 'identity_unsupported', state: 'idle' }],
-		['a core that is not root', { plannable: false, reason: 'not_root', state: 'idle' }],
-		['a hop that is not planned', { plannable: false, reason: 'hop_not_planned', state: 'idle' }],
+		['a machine that cannot be planned', 'identity_unsupported', 'This machine is not one that a plan can be made for: it is not a release that ReCasaOS knows how to upgrade, or it has no later one.'],
+		['a core that is not root', 'not_root', 'ReCasaOS does not run as root on this machine, so it cannot plan the upgrade.'],
+		['a hop that is not planned', 'hop_not_planned', 'ReCasaOS cannot plan the upgrade from this release yet.'],
+	])('says why for %s, and offers no plan', async (_, reason, sentence) => {
+		await open({ plannable: false, reason, state: 'idle' })
+
+		expect(text('.os-plan-cannot p')).toBe(sentence)
+		expect(wrapper.find('.os-plan-start').exists()).toBe(false)
+		expect(wrapper.find('[role="status"] .os-plan-cannot').exists()).toBe(true)
+	})
+
+	it.each([
 		['an answer that does not say it can be', { state: 'idle' }],
 		['an answer that says it as a word', { plannable: 'true', state: 'idle' }],
 		['a state it does not know', { plannable: true, state: 'from-the-future' }],
@@ -1098,13 +1108,14 @@ describe('a machine that could not be asked, a plan that is blocked, and a folde
 		expect(getOsPlan).toHaveBeenCalledTimes(3)
 	})
 
-	it('is a machine that cannot be planned, and says nothing of it, when the core says so on the next ask', async () => {
+	it('is a machine that cannot be planned, and says why, when the core says so on the next ask', async () => {
 		await open(core.status_unknown)
 		getOsPlan.mockReturnValueOnce(answer({ plannable: false, reason: 'not_root', state: 'idle' }))
 		await wrapper.find('.os-plan-ask-again').trigger('click')
 		await tick()
 
-		expect(wrapper.find('.os-plan').exists()).toBe(false)
+		expect(wrapper.find('.os-plan-unknown').exists()).toBe(false)
+		expect(text('.os-plan-cannot p')).toBe('ReCasaOS does not run as root on this machine, so it cannot plan the upgrade.')
 	})
 
 	it('is not shown for a system that is the latest, even when the machine could not be asked', async () => {
@@ -1317,7 +1328,8 @@ describe('each answer that the core gives to GET plan, in the window', () => {
 		for (const name of ['status_not_root', 'status_hop_not_planned', 'status_identity_unsupported']) {
 			close()
 			await open(core[name])
-			expect(wrapper.find('.os-plan').exists(), name).toBe(false)
+			expect(wrapper.find('.os-plan-start').exists(), name).toBe(false)
+			expect(wrapper.find('.os-plan-cannot').exists(), name).toBe(true)
 		}
 	})
 

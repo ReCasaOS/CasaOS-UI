@@ -174,6 +174,11 @@ export const PLAN_SOURCE_REASONS = {
 	// the core refuses it when it has not read the lists of a source that is not a known archive host: it says to run apt-get update first
 	undecided: 'The plan could not tell whether this source is the distribution\'s own. Update the package lists first (apt-get update, or the System packages window), then make the plan again.',
 	deb822: 'A .sources file (the deb822 form) is not read by this plan yet.',
+	// the .sources files of the hop from Debian 12 to 13
+	deb822_form: 'A line of the .sources file is neither a field of a stanza (a name, a colon, a value) nor the continuation of one.',
+	field: 'A stanza of the .sources file has a field that apt does not read.',
+	field_twice: 'A stanza of the .sources file has the same field twice.',
+	enabled: 'A stanza of the .sources file says Enabled, which the plan writes itself: remove the stanza, or the field, then make the plan again.',
 	unreadable: 'The file could not be read.',
 	no_distribution_line: 'No line of the distribution\'s own sources was found to plan against.',
 	other: 'The line is not in a form the plan reads.',

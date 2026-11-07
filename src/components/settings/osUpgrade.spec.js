@@ -235,8 +235,9 @@ describe('the tables, and the core\'s words', () => {
 
 	it('has a title for the blocks the core can run', () => {
 		expect(Object.keys(BLOCK_NUMBERS)).toEqual(BLOCK_IDS.slice(0, 9))
-		// the nine of the hop, the four of the refresh and the one that mends a hop
-		expect(BLOCK_TITLES).toHaveLength(14)
+		// the nine of the hop, the four of the refresh, the one that mends a hop, and block 3 of the hop from Debian 12 to 13
+		expect(BLOCK_TITLES).toHaveLength(15)
+		expect(BLOCK_TITLES).toContain('write the sources of Debian 13, and read the plan again')
 	})
 
 	// the last sentence of each code has no placeholder: a core that sent no data still gets its sentence

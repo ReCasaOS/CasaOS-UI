@@ -799,6 +799,8 @@ export const BLOCK_TITLES = [
 	'bring the packages of the old release to their last state',
 	'put the sources and the timers back, and say whether the machine wants a restart',
 	'mend what an interrupted upgrade left half done',
+	// block 3 of the hop from Debian 12 to 13, the one title that names a release: last, so that the place of the others does not move
+	'write the sources of Debian 13, and read the plan again',
 ]
 
 // How long the list of blocks of an attempt is, by its phase (osrun.BlockList): what a repair has depends on where the hop stopped, and the

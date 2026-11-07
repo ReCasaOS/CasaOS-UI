@@ -379,7 +379,7 @@ describe('the plan section of the operating system window', () => {
 		expect(wrapper.find('.os-plan-title').text()).toBe('Que ferait la mise à niveau ?')
 	})
 
-	it('is not in the window when the core says the machine cannot be planned', async () => {
+	it('says in the window why the core says the machine cannot be planned, and offers no plan', async () => {
 		const api = {
 			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: false, reason: 'identity_unsupported', state: 'idle' })),
 			getOsReadiness: vi.fn(),
@@ -388,7 +388,8 @@ describe('the plan section of the operating system window', () => {
 		await flushPromises()
 
 		expect(section().exists()).toBe(true)
-		expect(wrapper.find('.os-plan').exists()).toBe(false)
+		expect(wrapper.find('.os-plan-cannot').exists()).toBe(true)
+		expect(wrapper.find('.os-plan-start').exists()).toBe(false)
 		// the readiness section is none the worse
 		expect(wrapper.find('.os-readiness-title').exists()).toBe(true)
 	})
