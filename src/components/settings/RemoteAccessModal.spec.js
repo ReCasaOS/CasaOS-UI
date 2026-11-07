@@ -29,6 +29,7 @@ describe('the Remote access window', () => {
 	beforeEach(() => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
+		window.happyDOM.setURL('http://localhost:8080/')
 		fleetApi.status.mockReturnValue(answer(NONE))
 	})
 	afterEach(() => {
@@ -117,6 +118,11 @@ describe('the Remote access window', () => {
 			[400, 'this box is a member of a fleet: phones and PCs are added on the master\'s dashboard', 'This box is a member of a fleet'],
 			[400, 'the master runs at an address typed by hand: move it onto a relay to get remote access', 'typed by hand'],
 			[409, 'remote access already runs over another relay: turn it off first', 'already runs over another relay'],
+			[409, 'this box is already in another private network', 'This box is already in another private network'],
+			[409, 'the relay refused: limit of boxes reached', 'The relay refused: the fleet is full'],
+			[400, 'the relay no longer knows this fleet', 'The relay no longer knows this fleet: change the relay'],
+			[400, 'the gateway listens on loopback only', 'set its address to 0.0.0.0 (or leave it empty) in the gateway settings'],
+			[503, 'relay is full', 'try again later, or use another relay'],
 		]
 		for (const [status, message, shown] of cases) {
 			fleetApi.setRemote.mockImplementation(() => refusal(status, message))
@@ -220,6 +226,61 @@ describe('the Remote access window', () => {
 			expect(wrapper.text()).not.toContain('phone-gary')
 		})
 
+		it('shows this box with the gateway port, as a link, and the others without', async () => {
+			fleetApi.status.mockReturnValue(answer(MASTER_ON))
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, boxes: [{ id: 'b0', name: 'master', addr: '100.64.0.1', online: true }, { id: 'b1', name: 'salon', addr: '100.64.0.8', online: true }] }))
+			await open()
+			const copy = (await import('clipboard-copy')).default
+			const hrefs = wrapper.findAll('a[target=_blank]').map(a => [a.attributes('href'), a.attributes('rel'), a.text()])
+			expect(hrefs).toEqual([
+				['http://100.64.0.1:8080', 'noopener noreferrer', 'http://100.64.0.1:8080'],
+				['http://100.64.0.1:8080', 'noopener noreferrer', 'http://100.64.0.1:8080'],
+				['http://100.64.0.8', 'noopener noreferrer', 'http://100.64.0.8'],
+			])
+			await wrapper.findAll('.box-copy')[1].trigger('click')
+			expect(copy).toHaveBeenCalledWith('http://100.64.0.8')
+			await wrapper.findAll('.box-copy')[0].trigger('click')
+			expect(copy).toHaveBeenCalledWith('http://100.64.0.1:8080')
+		})
+
+		it('shows no address line without an address, and no port when the page has none', async () => {
+			window.happyDOM.setURL('https://box.example/')
+			fleetApi.status.mockReturnValue(answer({ ...ON, remote: { ...ON.remote, addr: '' } }))
+			await open()
+			expect(wrapper.text()).not.toContain('Address of this box')
+			expect(wrapper.text()).not.toContain('http://')
+			wrapper.unmount()
+			fleetApi.status.mockReturnValue(answer(ON))
+			await open()
+			expect(wrapper.find('a[target=_blank]').attributes('href')).toBe('https://100.64.0.7')
+		})
+
+		it('names what each copy button copies and says the copy failed generically', async () => {
+			const copy = (await import('clipboard-copy')).default
+			fleetApi.status.mockReturnValue(answer(MASTER_ON))
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, boxes: [{ id: 'b1', name: 'salon', addr: '100.64.0.8', online: true }] }))
+			await open()
+			expect(wrapper.find('[aria-label="Copy this box\'s address"]').exists()).toBe(true)
+			expect(wrapper.find('[aria-label="Copy salon\'s address"]').exists()).toBe(true)
+			copy.mockImplementationOnce(() => Promise.reject(new Error('denied')))
+			await wrapper.find('.box-copy').trigger('click')
+			await flushPromises()
+			expect(wrapper.text()).toContain('This could not be copied')
+			await wrapper.find('.box-copy').trigger('click')
+			await flushPromises()
+			expect(wrapper.find('.box-copy').text()).toBe('Copied')
+		})
+
+		it('keeps the list when turning off fails', async () => {
+			fleetApi.setRemote.mockImplementation(() => refusal(500, 'boom'))
+			await open()
+			await button('Turn remote access off').trigger('click')
+			await flushPromises()
+			dialogButton('Turn off').click()
+			await flushPromises()
+			expect(wrapper.text()).toContain('phone-gary')
+		})
+
 		it('refreshes on demand', async () => {
 			await open()
 			await button('Refresh').trigger('click')
@@ -279,6 +340,7 @@ describe('the Remote access window', () => {
 			vi.advanceTimersByTime(2 * 1000)
 			await flushPromises()
 			expect(wrapper.text()).toContain('This code has expired.')
+			expect(wrapper.find('[role=status]').text()).toBe('This code has expired.')
 			expect(fleetApi.addDevice).toHaveBeenCalledTimes(1)
 			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
 			fleetApi.addDevice.mockReturnValue(answer({ code: 'WXYZ-6789', expires_at: new Date(Date.now() + 600 * 1000).toISOString() }))

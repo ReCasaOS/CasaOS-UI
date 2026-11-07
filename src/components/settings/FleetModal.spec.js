@@ -83,6 +83,23 @@ describe('the Fleet settings', () => {
 		expect(fleetApi.join).toHaveBeenLastCalledWith('ENROL-abc', { leaveRemote: true })
 	})
 
+	it('reloads the status and tells the app when the confirmed join fails', async () => {
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		fleetApi.join.mockImplementationOnce(() => refusal(409, 'this box has remote access: joining a fleet turns it off and its phones and PCs lose access; confirm to go on'))
+		await button('Join').trigger('click')
+		await flushPromises()
+		fleetApi.join.mockImplementationOnce(() => refusal(502, 'bad gateway'))
+		bus.$emit.mockClear()
+		fleetApi.status.mockClear()
+		dialogButton('Join').click()
+		await flushPromises()
+		expect(fleetApi.status).toHaveBeenCalledTimes(1)
+		expect(bus.$emit).toHaveBeenCalledWith(events.FLEET_CHANGED)
+		expect(wrapper.text()).toContain('Relay unreachable')
+	})
+
 	it('shows the Join button loading while the first join is pending', async () => {
 		await open()
 		await pick('member')

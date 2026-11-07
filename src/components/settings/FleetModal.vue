@@ -175,7 +175,7 @@ export default {
 			this.$EventBus.$emit(events.FLEET_CHANGED)
 			return this.load()
 		},
-		async run(call) {
+		async run(call, reloadOnError = false) {
 			this.busy = true
 			this.error = ''
 			try {
@@ -184,6 +184,10 @@ export default {
 				await this.changed()
 			} catch (e) {
 				this.error = this.readable(e)
+				// the core may already have turned remote access off before the join failed
+				if (reloadOnError) {
+					await this.changed()
+				}
 			} finally {
 				this.busy = false
 			}
@@ -293,7 +297,7 @@ export default {
 				confirmText: this.$t('Join'),
 				cancelText: this.$t('Cancel'),
 				focusOn: 'cancel',
-				onConfirm: () => this.run(() => fleetApi.join(code, { leaveRemote: true })),
+				onConfirm: () => this.run(() => fleetApi.join(code, { leaveRemote: true }), true),
 			})
 		},
 		confirmLeave() {

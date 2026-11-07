@@ -12,9 +12,9 @@
 				<template v-if="remote">
 					<div class="settings-card">
 						<p class="mb-1">{{ $t('Relay server') }}: <span class="has-text-weight-medium">{{ remote.relay }}</span></p>
-						<p class="mb-1">
-							{{ $t('Address of this box: http://{addr}', { addr: remote.addr }) }}
-							<b-button class="ml-1" size="is-small" type="is-text" @click="copyAddress(remote.addr)">{{ copied === remote.addr ? $t('Copied') : $t('Copy') }}</b-button>
+						<p v-if="remote.addr" class="mb-1">
+							{{ $t('Address of this box') }}: <a :href="boxUrl(remote.addr, true)" target="_blank" rel="noopener noreferrer">{{ boxUrl(remote.addr, true) }}</a>
+							<b-button class="ml-1" size="is-small" type="is-text" :aria-label="$t(`Copy this box's address`)" @click="copyValue(boxUrl(remote.addr, true))">{{ copied === boxUrl(remote.addr, true) ? $t('Copied (one)') : $t('Copy') }}</b-button>
 						</p>
 						<p v-if="remote.error">{{ $t('Not connected: {error}', { error: remote.error }) }}</p>
 						<p v-else-if="remote.connected">{{ $t('Connected to the private network') }}</p>
@@ -24,7 +24,7 @@
 					<p v-else class="is-size-7">{{ $t('Remote access comes with the master role: disabling the master turns it off.') }}</p>
 
 					<div class="settings-card">
-						<div class="is-flex is-align-items-center is-justify-content-space-between mb-2">
+						<div class="is-flex is-flex-wrap-wrap is-align-items-center is-justify-content-space-between mb-2">
 							<p class="has-text-weight-medium">{{ $t('Phones and PCs') }}</p>
 							<span>
 								<b-button v-if="!adding" :disabled="busy" size="is-small" type="is-text" @click="addDevice">{{ $t('Add a phone or PC') }}</b-button>
@@ -33,7 +33,7 @@
 						</div>
 						<div v-if="adding" class="remote-add mb-3">
 							<p class="remote-code">{{ adding.code }}
-								<b-button class="remote-code-copy" size="is-small" type="is-text" @click="copyValue(adding.code)">{{ copied === adding.code ? $t('Copied') : $t('Copy') }}</b-button>
+								<b-button class="remote-code-copy" size="is-small" type="is-text" :aria-label="$t('Copy the code')" @click="copyValue(adding.code)">{{ copied === adding.code ? $t('Copied (one)') : $t('Copy') }}</b-button>
 							</p>
 							<template v-if="remaining > 0">
 								<p class="is-size-7 mb-2">{{ $t('valid for {time}', { time: countdown }) }}</p>
@@ -45,13 +45,13 @@
 								</ol>
 								<p class="remote-command">
 									<code>{{ platform === 'windows' ? loginCommand : addingRelay }}</code>
-									<b-button class="remote-relay-copy" size="is-small" type="is-text" @click="copyValue(platform === 'windows' ? loginCommand : addingRelay)">{{ copied === (platform === 'windows' ? loginCommand : addingRelay) ? $t('Copied') : $t('Copy') }}</b-button>
+									<b-button class="remote-relay-copy" size="is-small" type="is-text" :aria-label="platform === 'windows' ? $t('Copy the command') : $t('Copy the relay address')" @click="copyValue(platform === 'windows' ? loginCommand : addingRelay)">{{ copied === (platform === 'windows' ? loginCommand : addingRelay) ? $t('Copied (one)') : $t('Copy') }}</b-button>
 								</p>
 								<p class="is-size-7 mt-2">{{ $t('A page then opens in the browser: type the code shown above.') }}</p>
 								<p class="is-size-7 mt-1">{{ $t('Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.') }}</p>
 							</template>
 							<template v-else>
-								<p class="mb-2">{{ $t('This code has expired.') }}</p>
+								<p class="mb-2" role="status">{{ $t('This code has expired.') }}</p>
 								<b-button :disabled="busy" size="is-small" rounded @click="addDevice">{{ $t('New code') }}</b-button>
 							</template>
 							<div class="mt-2">
@@ -64,7 +64,7 @@
 								<span class="has-text-weight-medium">{{ d.hostname }}</span>
 								<span class="is-size-7 ml-1">{{ d.online ? $t('Online') : $t('Offline') }}</span>
 								<span v-if="lastSeen(d)" class="is-size-7 ml-1">{{ $t('last seen {time}', { time: lastSeen(d) }) }}</span>
-								<b-button class="ml-1" :disabled="busy" size="is-small" type="is-text" @click="confirmRemove(d)">{{ $t('Remove') }}</b-button>
+								<b-button class="ml-1" :disabled="busy" size="is-small" type="is-text" @click="confirmRemove(d)">{{ $t('Remove device') }}</b-button>
 							</li>
 						</ul>
 					</div>
@@ -75,8 +75,8 @@
 								<span class="has-text-weight-medium">{{ b.name }}</span>
 								<span v-if="!b.online" class="is-size-7 ml-1">{{ $t('Offline') }}</span>
 								<template v-if="b.addr">
-									<span class="ml-1">http://{{ b.addr }}</span>
-									<b-button class="ml-1 box-copy" size="is-small" type="is-text" @click="copyAddress(b.addr)">{{ copied === b.addr ? $t('Copied') : $t('Copy') }}</b-button>
+									<a class="ml-1" :href="boxUrl(b.addr, b.addr === remote.addr)" target="_blank" rel="noopener noreferrer">{{ boxUrl(b.addr, b.addr === remote.addr) }}</a>
+									<b-button class="ml-1 box-copy" size="is-small" type="is-text" :aria-label="$t(`Copy {name}'s address`, { name: b.name })" @click="copyValue(boxUrl(b.addr, b.addr === remote.addr))">{{ copied === boxUrl(b.addr, b.addr === remote.addr) ? $t('Copied (one)') : $t('Copy') }}</b-button>
 								</template>
 								<span v-else class="is-size-7 ml-1">{{ $t('not on the private network') }}</span>
 							</li>
@@ -235,7 +235,7 @@ export default {
 		},
 		lastSeen(d) {
 			const t = d.last_seen ? new Date(d.last_seen) : null
-			return t && !Number.isNaN(t.getTime()) ? t.toLocaleString() : ''
+			return t && !Number.isNaN(t.getTime()) ? t.toLocaleString(this.$i18n.locale.replace('_', '-')) : ''
 		},
 		confirmRemove(d) {
 			this.$buefy.dialog.confirm({
@@ -243,7 +243,7 @@ export default {
 				message: this.$t('{name} will no longer reach this box.', { name: escape(d.hostname) }),
 				type: 'is-danger',
 				hasIcon: true,
-				confirmText: this.$t('Remove'),
+				confirmText: this.$t('Remove device'),
 				cancelText: this.$t('Cancel'),
 				focusOn: 'cancel',
 				onConfirm: async () => {
@@ -287,13 +287,16 @@ export default {
 				return this.$t('Relay unreachable')
 			}
 			const known = [
-				[/relay is full/i, 'The relay is full'],
+				[/relay is full/i, 'The relay is full: try again later, or use another relay'],
+				[/another private network/i, 'This box is already in another private network'],
+				[/limit of boxes/i, 'The relay refused: the fleet is full'],
+				[/no longer knows this fleet/i, 'The relay no longer knows this fleet: change the relay (the same one will do) in the Fleet settings, then give each box a new code.'],
 				[/does not offer remote access yet/i, 'This relay does not offer remote access yet'],
 				[/no longer knows this box's network/i, 'The relay no longer knows this box\'s network: turn remote access off and on again'],
 				[/too many codes not used yet/i, 'Too many codes are not used yet: use or wait for them to expire'],
 				[/is a member of a fleet/i, 'This box is a member of a fleet: it has no remote access of its own'],
 				[/typed by hand/i, 'The master runs at an address typed by hand: move it onto a relay (Fleet settings) to get remote access.'],
-				[/loopback only/i, 'The gateway only listens on this box: remote access needs it reachable from the network'],
+				[/loopback only/i, 'The gateway only listens on this box: set its address to 0.0.0.0 (or leave it empty) in the gateway settings'],
 				[/already runs over another relay/i, 'Remote access already runs over another relay: turn it off first'],
 			]
 			// the core's texts are matched whatever the status: it answers 400 for some and 409 for others
@@ -320,14 +323,20 @@ export default {
 				confirmText: this.$t('Turn off'),
 				cancelText: this.$t('Cancel'),
 				focusOn: 'cancel',
-				onConfirm: () => {
-					this.list = null
-					return this.run(() => fleetApi.setRemote({ enabled: false }))
+				onConfirm: async () => {
+					await this.run(() => fleetApi.setRemote({ enabled: false }))
+					// only once the box answered that it is off
+					if (!this.remote) {
+						this.list = null
+					}
 				},
 			})
 		},
-		copyAddress(addr) {
-			return this.copyValue(`http://${addr}`, addr)
+		// this box is served by its own gateway: the page's protocol and port are the right ones
+		// shortcut: the other boxes of a fleet get plain http on the default port (their gateway port is unknown here); the core would have to send each box's gateway port
+		boxUrl(addr, self) {
+			const { protocol, port } = window.location
+			return self ? `${protocol}//${addr}${port ? `:${port}` : ''}` : `http://${addr}`
 		},
 		async addDevice() {
 			const request = ++this.addRequest
@@ -374,7 +383,7 @@ export default {
 				clearTimeout(this.copyTimer)
 				this.copyTimer = setTimeout(() => (this.copied = ''), 2000)
 			} catch {
-				this.error = this.$t('The address could not be copied')
+				this.error = this.$t('This could not be copied')
 			}
 		},
 	},
