@@ -52,8 +52,8 @@ importers:
         specifier: 4.1.0
         version: 4.1.0
       artplayer:
-        specifier: ^4.6.2
-        version: 4.6.2
+        specifier: ^5.4.0
+        version: 5.4.0
       axios:
         specifier: ^0.34.0
         version: 0.34.0
@@ -2544,8 +2544,8 @@ packages:
   arraybuffer.slice@0.0.7:
     resolution: {integrity: sha512-wGUIVQXuehL5TCqQun8OW81jGzAWycqzFF8lFp+GOM5BXLYj3bKNsYC4daB7n6XjCqxQA/qgTJ+8ANR3acjrog==}
 
-  artplayer@4.6.2:
-    resolution: {integrity: sha512-9RMfFFy2wGgHUCnrwk+M2Z5OiLWQcBL+YzkSBwSi6IuJG6oM+TlfJJZt09RL2iag6DNQ+AUYtB879WUHxbqfIQ==}
+  artplayer@5.4.0:
+    resolution: {integrity: sha512-2B+plbx8N2yNsjK4nJU3+EOG8TULm1LRZk/QPkWRAMEX2Ee/MSnZG/WJYz8kcoZxZuLKcQ3uXifqLuPxZOH29A==}
 
   asn1.js@4.10.1:
     resolution: {integrity: sha512-p32cOF5q0Zqs9uBiONKYLm6BClCoBCM5O9JfeUSlnQLBTxYdTK+pW+nXflm8UkKd2UYlEbYz5qEi0JuZR9ckSw==}
@@ -10416,7 +10416,7 @@ snapshots:
 
   arraybuffer.slice@0.0.7: {}
 
-  artplayer@4.6.2:
+  artplayer@5.4.0:
     dependencies:
       option-validator: 2.0.6
 

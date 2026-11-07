@@ -2976,5 +2976,7 @@
   "Switching to the new place…": "Passage au nouvel emplacement…",
   "Starting Docker and the apps…": "Démarrage de Docker et des apps…",
   "The old copy is still being deleted. Reopen this page in a while to see it gone.": "L'ancienne copie est encore en cours de suppression. Rouvrez cette page dans un moment pour la voir disparue.",
-  "To put Docker's data in another folder, move it back to the default place first.": "Pour placer les données de Docker dans un autre dossier, ramenez-les d'abord à leur emplacement par défaut."
+  "To put Docker's data in another folder, move it back to the default place first.": "Pour placer les données de Docker dans un autre dossier, ramenez-les d'abord à leur emplacement par défaut.",
+  "Subtitles": "Sous-titres",
+  "No subtitles": "Sans sous-titres"
 }
