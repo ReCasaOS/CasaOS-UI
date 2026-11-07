@@ -59,6 +59,10 @@
 								rounded size="is-small" @click="checkRestic(name)">
 								{{ $t('Check repository') }}
 							</b-button>
+							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticpass:${name}`"
+								rounded size="is-small" @click="readResticPassword(name)">
+								{{ $t('Restic password') }}
+							</b-button>
 							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticback:${name}`"
 								rounded size="is-small" @click="confirmSwitchBack(name)">
 								{{ $t('Switch back to rclone\u2026') }}
@@ -87,6 +91,13 @@
 							@click="backupSystem">
 							{{ $t('Back up this box') }}
 						</b-button>
+						<details class="_what is-size-7 mt-1">
+							<summary>{{ $t('What is copied') }}</summary>
+							<ul class="mt-1">
+								<li v-for="part in systemParts" :key="part.path"><code>{{ part.path }}</code> {{ $t(part.what) }}</li>
+							</ul>
+							<p class="mt-1">{{ $t('Not copied: the apps and their data, the files in your folders, and the restic passwords (keep each one with its Restic password button). Back the apps up on their own, or schedule them with this box.') }}</p>
+						</details>
 					</div>
 
 					<div class="settings-card">
@@ -221,6 +232,16 @@ export default {
 			backends: BACKUP_BACKENDS,
 			draft: { name: '', backend: 's3', root: '', rows: suggestedFields('s3'), encrypt: false, password: '' },
 			systemDestination: '',
+			// shortcut: copied by hand from systemPaths in AppManagement's service/backup_system.go;
+			// serve it from there if the list starts to change.
+			systemParts: [
+				{ path: '/etc/casaos', what: 'the settings of the ReCasaOS services' },
+				{ path: '/etc/samba/smb.casa.conf', what: 'the shared folders' },
+				{ path: '/var/lib/casaos/db', what: 'users and their passwords, shares, disks and merged storage' },
+				{ path: '/var/lib/casaos/conf', what: 'each user\'s dashboard settings' },
+				{ path: '/root/.config/rclone/rclone.conf', what: 'the backup destinations and cloud drives, with their credentials' },
+				{ path: '/var/lib/casaos/backups/schedules.json', what: 'the backup schedules' },
+			],
 			// the sign-in waiting: the provider's address, and what was pasted back
 			signIn: { url: '', redirected: '' },
 		}
@@ -382,18 +403,44 @@ export default {
 				if (password || !made) {
 					this.$buefy.toast.open({ message: this.$t('Backups to {name} are now kept with restic.', { name }), type: 'is-success', duration: 5000 })
 				} else {
-					// shown once, and never again: without it the repository cannot be read
-					this.$buefy.dialog.alert({
-						title: this.$t('Write this password down'),
-						message: `${this.$t('This is the password of the restic repository at {name}. It is shown once. Without it the backups there cannot be read, and this box does not hold a copy anywhere else.', { name: this.htmlEscape(name) })}<br><br><code>${this.htmlEscape(made)}</code>`,
-						confirmText: this.$t('I have written it down'),
-					})
+					this.showResticPassword(name, made)
 				}
 			} catch (error) {
 				this.error = this.messageOf(error)
 			} finally {
 				this.busy = ''
 			}
+		},
+
+		async readResticPassword(name) {
+			this.busy = `resticpass:${name}`
+			this.error = ''
+			try {
+				const res = await this.$api.backup.getResticPassword(name)
+				this.showResticPassword(name, res.data.data.password)
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+		},
+
+		// The box's own backup leaves this password out, so a lost box takes it along:
+		// it is worth a copy somewhere else, which is what Download is for.
+		showResticPassword(name, password) {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Write this password down'),
+				message: `${this.$t('This is the password of the restic repository at {name}. Without it the backups there cannot be read, and the backup of this box does not hold it: keep a copy away from this box.', { name: this.htmlEscape(name) })}<br><br><code>${this.htmlEscape(password)}</code>`,
+				confirmText: this.$t('Download'),
+				cancelText: this.$t('Close'),
+				onConfirm: () => {
+					const link = document.createElement('a')
+					link.href = URL.createObjectURL(new Blob([`${password}\n`], { type: 'text/plain' }))
+					link.download = `restic-password-${name}.txt`
+					link.click()
+					URL.revokeObjectURL(link.href)
+				},
+			})
 		},
 
 		// Said before it is done: nothing is deleted, the repository and its password stay,
@@ -566,6 +613,14 @@ export default {
   // controls on a wide card and takes its own line on a phone
   ._text {
     flex: 1 1 14rem;
+  }
+
+  ._what {
+    flex-basis: 100%;
+
+    summary {
+      cursor: pointer;
+    }
   }
 
   ._name {

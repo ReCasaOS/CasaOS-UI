@@ -222,8 +222,9 @@ describe('a destination kept with restic', () => {
 			getResticState: state({ nas: { available: true, enabled: false } }),
 			enableRestic: vi.fn(() => Promise.resolve({ data: { data: { password: 'Zm9vYmFy-_' } } })),
 		})
+		// the password dialog is a confirm: Download or Close
 		const alert = vi.fn()
-		wrapper.vm.$buefy.dialog.alert = alert
+		wrapper.vm.$buefy.dialog.confirm = alert
 		const toast = vi.fn()
 		wrapper.vm.$buefy.toast.open = toast
 
@@ -244,8 +245,9 @@ describe('a destination kept with restic', () => {
 			enableRestic: () => Promise.resolve({ data: { data: { password: 'abc' } } }),
 			getResticState: state({}),
 		})
+		// the password dialog is a confirm: Download or Close
 		const alert = vi.fn()
-		wrapper.vm.$buefy.dialog.alert = alert
+		wrapper.vm.$buefy.dialog.confirm = alert
 
 		await wrapper.vm.enableRestic('<img src=x onerror=alert(1)>', '')
 		expect(alert.mock.calls[0][0].message).not.toContain('<img')
@@ -425,6 +427,70 @@ describe('choosing files of a backup', () => {
 		wrapper.vm.$buefy.modal.open = opened
 		wrapper.vm.chooseFiles({ app: 'blog' })
 		expect(opened.mock.calls[0][0].props).toEqual({ destination: 'nas', app: 'blog', stamp })
+		wrapper.unmount()
+	})
+})
+
+describe('the schedules', () => {
+	const nightly = { destination: 'nas', every: 'daily', at: '03:00', weekday: 1, keep: 7, hold_still: true, enabled: true }
+
+	it('shows the apps that share their settings as one schedule, with this box, and saves one per app', async () => {
+		const saveSchedules = vi.fn(() => Promise.resolve())
+		const wrapper = await open(BackupSchedules, {
+			getSchedules: answer([{ app: 'blog', ...nightly }, { app: 'casaos-system', ...nightly }]),
+			getDestinations: answer(['nas']),
+			saveSchedules,
+		})
+
+		expect(wrapper.findAll('.schedule')).toHaveLength(1)
+		const checked = wrapper.findAll('.b-checkbox input').filter(box => box.element.checked)
+		expect(checked).toHaveLength(2)
+		expect(wrapper.text()).toContain('This box')
+
+		await wrapper.vm.save()
+		expect(saveSchedules).toHaveBeenCalledWith([{ app: 'blog', ...nightly }, { app: 'casaos-system', ...nightly }])
+		wrapper.unmount()
+	})
+
+	it('saves nothing while a schedule covers no app', async () => {
+		const saveSchedules = vi.fn(() => Promise.resolve())
+		const wrapper = await open(BackupSchedules, { getSchedules: answer([]), getDestinations: answer(['nas']), saveSchedules })
+
+		wrapper.vm.add()
+		await wrapper.vm.save()
+		await flushPromises()
+		expect(saveSchedules).not.toHaveBeenCalled()
+		expect(wrapper.text()).toContain('Each schedule needs at least one app, or this box.')
+		wrapper.unmount()
+	})
+})
+
+describe('the password of a restic repository', () => {
+	const state = states => name => Promise.resolve({ data: { data: states[name] } })
+
+	it('is offered wherever this box keeps the key, shown, and downloaded as a text file', async () => {
+		const getResticPassword = vi.fn(() => Promise.resolve({ data: { data: { password: 's3cr<et' } } }))
+		const wrapper = await open(BackupDestinations, {
+			getDestinations: answer(['nas', 'old', 'plain']),
+			getResticState: state({ nas: { available: true, enabled: true, kept: true }, old: { available: true, enabled: false, kept: true }, plain: { available: true } }),
+			getResticPassword,
+		})
+		const rows = wrapper.findAll('.destination')
+		expect(rows.map(row => row.text().includes('Restic password'))).toEqual([true, true, false])
+
+		const confirm = vi.fn()
+		wrapper.vm.$buefy.dialog.confirm = confirm
+		await wrapper.vm.readResticPassword('old')
+		expect(getResticPassword).toHaveBeenCalledWith('old')
+		const dialog = confirm.mock.calls[0][0]
+		expect(dialog.message).toContain('<code>s3cr&#60;et</code>')
+
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+			expect(this.download).toBe('restic-password-old.txt')
+		})
+		dialog.onConfirm()
+		expect(click).toHaveBeenCalled()
+		click.mockRestore()
 		wrapper.unmount()
 	})
 })
