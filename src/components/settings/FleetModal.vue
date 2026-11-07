@@ -1,11 +1,11 @@
 <template>
-	<div class="modal-card fleet-settings-modal">
+	<div class="modal-card fleet-settings-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">{{ $t('Fleet') }}</h3>
 		</header>
 
 		<section class="modal-card-body">
-			<p class="is-size-7 mb-3">
+			<p class="settings-intro mb-3">
 				{{ $t('Several boxes seen and driven from one of them: this box can be the master the others join, or join a master with the code it gives.') }}
 			</p>
 
@@ -21,12 +21,14 @@
 
 				<template v-if="role === 'master'">
 					<template v-if="view.role === 'master'">
-						<p class="mb-1">{{ $t('Address the boxes join it at') }}: <span class="has-text-weight-medium">{{ view.master.address }}</span></p>
-						<template v-if="view.relay">
-							<p class="mb-1">{{ $t('Relay server') }}: <span class="has-text-weight-medium">{{ view.relay }}</span></p>
-							<p v-if="view.net?.addr" class="mb-1">{{ $t('Address on the private network') }}: <span class="has-text-weight-medium">{{ view.net.addr }}</span></p>
-						</template>
-						<p class="mb-3">{{ $t('{count} boxes in the fleet', { count: boxes.length }) }}</p>
+						<div class="settings-card">
+							<p class="mb-1">{{ $t('Address the boxes join it at') }}: <span class="has-text-weight-medium">{{ view.master.address }}</span></p>
+							<template v-if="view.relay">
+								<p class="mb-1">{{ $t('Relay server') }}: <span class="has-text-weight-medium">{{ view.relay }}</span></p>
+								<p v-if="view.net?.addr" class="mb-1">{{ $t('Address on the private network') }}: <span class="has-text-weight-medium">{{ view.net.addr }}</span></p>
+							</template>
+							<p>{{ $t('{count} boxes in the fleet', { count: boxes.length }) }}</p>
+						</div>
 						<div class="buttons">
 							<b-button rounded size="is-small" type="is-primary" @click="openPage">{{ $t('Open the Fleet page') }}</b-button>
 							<b-button :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmDisable">{{ $t('Disable the master role') }}</b-button>

@@ -1,20 +1,23 @@
 <template>
 	<div>
 		<div class="is-flex is-align-items-center mb-2">
-			<p class="_has-text-gray is-size-7 is-flex-grow-1">
+			<p class="settings-intro is-flex-grow-1 mr-2">
 				{{ $t('The last few hundred runs, newest first. Failures are kept too — a record that only showed successes would hide a box backing nothing up.') }}
 			</p>
 			<b-button :loading="isLoading" rounded size="is-small" @click="load">{{ $t('Refresh') }}</b-button>
 		</div>
 
+		<!-- Destination moves under the app, Copied and Stopped drop out on a phone: the Restore
+			button is the last column, and off the screen the table is a list nobody can act on -->
 		<b-message v-if="error" class="mb-0" size="is-small" type="is-danger">{{ error }}</b-message>
 
 		<b-table v-else :data="runs" :loading="isLoading" :mobile-cards="false" class="is-size-7">
 			<b-table-column v-slot="{ row }" :label="$t('App')" field="app">
 				{{ row.app === 'casaos-system' ? $t('This box') : row.app }}
+				<span class="is-hidden-tablet is-block _has-text-gray">{{ row.destination }}</span>
 			</b-table-column>
 
-			<b-table-column v-slot="{ row }" :label="$t('Destination')" field="destination">
+			<b-table-column v-slot="{ row }" :label="$t('Destination')" cell-class="is-hidden-mobile" field="destination" header-class="is-hidden-mobile">
 				{{ row.destination }}
 			</b-table-column>
 
@@ -30,11 +33,11 @@
 				</b-tooltip>
 			</b-table-column>
 
-			<b-table-column v-slot="{ row }" :label="$t('Copied')" field="copied" numeric>
+			<b-table-column v-slot="{ row }" :label="$t('Copied')" cell-class="is-hidden-mobile" field="copied" header-class="is-hidden-mobile" numeric>
 				{{ row.copied }}
 			</b-table-column>
 
-			<b-table-column v-slot="{ row }" :label="$t('Stopped')" field="containers_stopped">
+			<b-table-column v-slot="{ row }" :label="$t('Stopped')" cell-class="is-hidden-mobile" field="containers_stopped" header-class="is-hidden-mobile">
 				<!-- a copy taken from a running app may not restore, which is worth
 					knowing about a backup before trying to restore it -->
 				<span v-if="row.containers_stopped">{{ $t('Yes') }}</span>
@@ -119,3 +122,13 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+// five columns have to fit a phone: the default cell padding takes the Restore button off the screen
+@media screen and (max-width: 768px) {
+	:deep(.table td),
+	:deep(.table th) {
+		padding: 0.5em 0.35em;
+	}
+}
+</style>

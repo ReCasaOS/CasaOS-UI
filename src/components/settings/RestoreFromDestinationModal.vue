@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card restore-from-destination">
+	<div class="modal-card restore-from-destination touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">{{ $t('Restore from {name}', { name: destination }) }}</h3>
 		</header>
@@ -7,7 +7,7 @@
 		<section class="modal-card-body">
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
 
-			<p class="_has-text-gray is-size-7 mb-3">
+			<p class="settings-intro mb-3">
 				{{ $t('What this destination holds. An app this box does not run is installed first, from the compose file its backup kept.') }}
 			</p>
 

@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card app-launch-modal">
+	<div class="modal-card app-launch-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('App launching') }}
@@ -18,7 +18,7 @@
 			</p>
 
 			<template v-if="inIframe">
-				<p class="is-size-7 mb-2">
+				<p class="settings-intro mb-2">
 					{{ $t('Always open these apps in a new tab:') }}
 				</p>
 

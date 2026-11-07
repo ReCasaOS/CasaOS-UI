@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card logs-settings-modal">
+	<div class="modal-card logs-settings-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('Logs') }}

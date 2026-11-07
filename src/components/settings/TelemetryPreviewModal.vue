@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card telemetry-preview-modal">
+	<div class="modal-card telemetry-preview-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('What is sent') }}
@@ -7,7 +7,7 @@
 		</header>
 
 		<section class="modal-card-body">
-			<p class="is-size-7 mb-3">
+			<p class="settings-intro mb-3">
 				{{ $t('When statistics are on, these properties go to PostHog (EU) every three hours and after each install or update.') }}
 				<a href="https://github.com/ReCasaOS/CasaOS-Install#anonymous-statistics" rel="noopener noreferrer" target="_blank">{{ $t('Learn more') }}</a>
 			</p>

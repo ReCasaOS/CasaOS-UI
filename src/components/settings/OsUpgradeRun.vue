@@ -85,7 +85,7 @@
 					</p>
 					<!-- a state that this page does not know: the core's word for it, as text, and no button -->
 					<p v-if="!view.known" class="os-run-unknown mt-1">
-						<code>{{ view.state }}</code>
+						<code class="is-size-7">{{ view.state }}</code>
 					</p>
 					<p v-if="view.cause" class="os-run-cause mt-1">
 						{{ say(view.cause) }}
@@ -110,7 +110,7 @@
 					<!-- the codes of the core, small, for support -->
 					<p v-if="view.codes.length" class="os-run-codes is-size-7 mt-2">
 						<span>{{ $t(TEXT.summary.codes) }}</span>
-						<code v-for="code in view.codes" :key="code" class="ml-1">{{ code }}</code>
+						<code v-for="code in view.codes" :key="code" class="ml-1 is-size-7">{{ code }}</code>
 					</p>
 				</b-message>
 
