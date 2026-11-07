@@ -644,9 +644,25 @@ describe('the system support badge', () => {
 		expect(wrapper.find('.navbar-menu .os-support-badge').exists()).toBe(false)
 	})
 
+	// the upgrade is offered whatever the end of support
+	it('says quietly until when a supported system is supported', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'supported', ends: '2028-06-30', precision: 'day' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('System supported until {date}')
+		expect(badge(wrapper).classes()).toContain('is-neutral')
+		expect(badge(wrapper).find('b-icon-stub').attributes('icon')).toBe('information-outline')
+	})
+
+	it('names the operating system when the core gives no end', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'unknown' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('Operating system')
+		expect(badge(wrapper).classes()).toContain('is-neutral')
+	})
+
 	it.each([
-		['a supported system', osView({ state: 'supported', ends: '2028-06-30', precision: 'day' })],
-		['an unknown state', osView({ state: 'unknown' })],
 		['a system the core does not know', osView({ state: 'unknown' }, { id: 'linuxmint', known: false, next: undefined })],
 		['a known flag of false with a state that would show', osView({ state: 'security_ended' }, { known: false })],
 		// Raspberry Pi OS and its kind say debian: the core says known:false and a variant, nothing more

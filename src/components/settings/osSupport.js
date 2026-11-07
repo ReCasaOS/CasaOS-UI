@@ -15,9 +15,11 @@
 // One sentence per distribution, per state and per precision of the date, and one for a
 // date that is missing. The date's own words ("on", "until", "around") are in the
 // sentence because they do not carry over from one language to the next as a piece to
-// glue in. A distribution that is not here has no sentence, and no badge.
+// glue in. A distribution that is not here has no sentence, and no badge. A supported
+// system without a date has no sentence: there is nothing to say about it.
 const ENDED = 'ended'
 const ENDING = 'ending'
+const RUNNING = 'running'
 const SENTENCES = new Map([
 	['debian', {
 		[ENDED]: {
@@ -29,6 +31,10 @@ const SENTENCES = new Map([
 			day: 'Free security updates for {name} end on {date}.',
 			month: 'Free security updates for {name} end around {date}.',
 			none: 'Free security updates for {name} will end soon.',
+		},
+		[RUNNING]: {
+			day: 'Free security updates for {name} run until {date}.',
+			month: 'Free security updates for {name} run until around {date}.',
 		},
 	}],
 	['ubuntu', {
@@ -42,9 +48,13 @@ const SENTENCES = new Map([
 			month: 'Standard security support for {name} ends around {date}.',
 			none: 'Standard security support for {name} will end soon.',
 		},
+		[RUNNING]: {
+			day: 'Standard security support for {name} runs until {date}.',
+			month: 'Standard security support for {name} runs until around {date}.',
+		},
 	}],
 ])
-const KINDS = new Map([['security_ended', ENDED], ['ending_soon', ENDING]])
+const KINDS = new Map([['security_ended', ENDED], ['ending_soon', ENDING], ['supported', RUNNING]])
 
 // Every key of the sentences above, for the language files' test.
 export const SUPPORT_SENTENCES = [...SENTENCES.values()].flatMap(kinds => Object.values(kinds).flatMap(Object.values))
@@ -57,22 +67,35 @@ const EXTENDED = {
 }
 export const EXTENDED_SENTENCES = Object.values(EXTENDED)
 
-// The two states that call for a badge. `supported` and `unknown` show nothing.
+// The two states that call for attention. Any other state gets the quiet badge, which still
+// opens the window: the upgrade is offered whatever the end of support.
 const BADGES = new Map([
 	['ending_soon', { tone: 'warning', label: 'System support ends soon', icon: 'alert-outline' }],
 	['security_ended', { tone: 'danger', label: 'System support ended', icon: 'alert-circle-outline' }],
 ])
+const SUPPORTED_UNTIL = {
+	day: 'System supported until {date}',
+	month: 'System supported until around {date}',
+}
+export const BADGE_LABELS = [...[...BADGES.values()].map(badge => badge.label), ...Object.values(SUPPORTED_UNTIL), 'Operating system']
 
 /**
- * The badge for what the core answered, or null: nothing for a supported or an unknown
- * system, for one the core does not know or knows as a variant (Raspberry Pi OS,
- * Armbian... say debian and are not Debian), for a distribution that has no sentence, or
- * for an answer that is not a view.
+ * The badge for what the core answered, or null: nothing for a system the core does not
+ * know or knows as a variant (Raspberry Pi OS, Armbian... say debian and are not Debian),
+ * for a distribution that has no sentence, or for an answer that is not a view. A
+ * supported system's badge carries the end of its support, written in `locale`.
  */
-export function osBadge(os) {
+export function osBadge(os, locale) {
 	if (!os || os.known === false || os.variant || !SENTENCES.has(os.id))
 		return null
-	return BADGES.get(os.support?.state) ?? null
+	const support = os.support
+	const alert = BADGES.get(support?.state)
+	if (alert)
+		return alert
+	const date = support?.state === 'supported' && formatDate(support.ends, support.precision, locale)
+	if (date)
+		return { tone: 'neutral', label: SUPPORTED_UNTIL[support.precision === 'month' ? 'month' : 'day'], date, icon: 'information-outline' }
+	return { tone: 'neutral', label: 'Operating system', icon: 'information-outline' }
 }
 
 /**
@@ -86,7 +109,7 @@ export function supportSentence(support, locale, distro) {
 		return null
 	const date = formatDate(support.ends, support.precision, locale)
 	if (!date)
-		return { key: sentences.none }
+		return sentences.none ? { key: sentences.none } : null
 	return { key: sentences[support.precision === 'month' ? 'month' : 'day'], date }
 }
 
