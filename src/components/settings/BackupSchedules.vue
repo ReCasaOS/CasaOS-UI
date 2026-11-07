@@ -15,15 +15,19 @@
 
 		<div v-for="(schedule, index) in schedules" :key="index" class="schedule settings-card">
 			<div class="is-flex is-align-items-center mb-1">
-				<b-select v-model="schedule.app" class="mr-1" expanded size="is-small">
-					<option v-for="app in apps" :key="app" :value="app">{{ app }}</option>
-				</b-select>
-				<span class="mr-1 _has-text-gray is-size-7">{{ $t('to') }}</span>
+				<span class="mr-1 _has-text-gray is-size-7">{{ $t('Back up to') }}</span>
 				<b-select v-model="schedule.destination" class="mr-1" expanded size="is-small">
 					<option v-for="name in destinations" :key="name" :value="name">{{ name }}</option>
 				</b-select>
 				<b-button :title="$t('Remove')" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
 					@click="schedules.splice(index, 1)" />
+			</div>
+
+			<div class="is-flex is-flex-wrap-wrap is-row-gap-1 mb-1">
+				<b-checkbox v-for="app in appChoices(schedule)" :key="app" v-model="schedule.apps" :native-value="app"
+					class="mr-3" size="is-small">
+					{{ app === systemApp ? $t('This box') : app }}
+				</b-checkbox>
 			</div>
 
 			<div class="is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
@@ -52,7 +56,7 @@
 		</p>
 
 		<div class="is-flex is-align-items-center">
-			<b-button :disabled="!apps.length || !destinations.length" class="mr-2" rounded size="is-small" @click="add">
+			<b-button :disabled="!destinations.length" class="mr-2" rounded size="is-small" @click="add">
 				{{ $t('Add') }}
 			</b-button>
 			<div class="is-flex-grow-1"></div>
@@ -64,6 +68,8 @@
 </template>
 
 <script>
+import { SYSTEM_APP, groupSchedules, spreadGroups } from './backupScheduleGroups.js'
+
 export default {
 	name: 'backup-schedules',
 	data() {
@@ -71,6 +77,7 @@ export default {
 			schedules: [],
 			destinations: [],
 			apps: [],
+			systemApp: SYSTEM_APP,
 			isLoading: false,
 			busy: false,
 			error: '',
@@ -91,7 +98,7 @@ export default {
 					this.$openAPI.appGrid.getAppGrid(),
 				])
 
-				this.schedules = schedules.data.data || []
+				this.schedules = groupSchedules(schedules.data.data || [])
 				this.destinations = destinations.data.data || []
 				// only compose apps: the others have no backup route
 				this.apps = (grid.data.data || [])
@@ -105,9 +112,17 @@ export default {
 			}
 		},
 
+		// This box, the apps, then any app a schedule names that is not installed any
+		// more: left out, it would be saved again without anybody seeing it.
+		appChoices(schedule) {
+			const installed = [SYSTEM_APP, ...this.apps]
+
+			return [...installed, ...schedule.apps.filter(app => !installed.includes(app))]
+		},
+
 		add() {
 			this.schedules.push({
-				app: this.apps[0],
+				apps: [],
 				destination: this.destinations[0],
 				every: 'daily',
 				at: '03:00',
@@ -120,10 +135,15 @@ export default {
 		},
 
 		async save() {
+			if (this.schedules.some(schedule => !schedule.apps.length)) {
+				this.error = this.$t('Each schedule needs at least one app, or this box.')
+				return
+			}
+
 			this.busy = true
 			this.error = ''
 			try {
-				await this.$api.backup.saveSchedules(this.schedules)
+				await this.$api.backup.saveSchedules(spreadGroups(this.schedules))
 				this.$buefy.toast.open({ message: this.$t('Saved'), type: 'is-success' })
 				await this.load()
 			} catch (error) {

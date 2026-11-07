@@ -108,10 +108,15 @@ const backup = {
 	},
 
 	// Switches a destination to restic. Without a password a repository is made and
-	// its password comes back, once; with one, the destination is attached to the
+	// its password comes back (getResticPassword reads it again later); with one, the destination is attached to the
 	// repository already there.
 	enableRestic(name, password = '') {
 		return api.put(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic`, password ? { password } : {})
+	},
+
+	// The password of a destination's restic repository, read back from this box.
+	getResticPassword(name) {
+		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic/password`)
 	},
 
 	// Sends the next backups of a destination back to rclone. Nothing is deleted: the
