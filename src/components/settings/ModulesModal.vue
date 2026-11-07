@@ -669,7 +669,7 @@ export default {
 	computed: {
 		// The language of the dates and sizes, as the other settings windows say their own: a language without these texts falls back to English.
 		locale() {
-			return this.$te('Modules') ? this.$i18n.locale : 'en_us'
+			return this.$te('Modules', this.$i18n.locale) ? this.$i18n.locale : 'en_us'
 		},
 		// the buttons are shut while a call or a job is out, while the window looks for one, and while the core says it is busy
 		disabled() {

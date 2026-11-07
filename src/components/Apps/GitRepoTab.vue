@@ -368,7 +368,7 @@ export default {
 			const delivery = this.webhook.last_delivery
 			// the time in the language of the message: a language without it falls
 			// back to English, and a free-text locale never reaches Intl
-			const locale = this.$te('Received {when}') ? this.$i18n.locale : 'en_us'
+			const locale = this.$te('Received {when}', this.$i18n.locale) ? this.$i18n.locale : 'en_us'
 			return [
 				this.$t('Received {when}', { when: timeAgo(delivery.at, locale) }),
 				FORGES[delivery.forge] || this.$t('Unknown forge'),
