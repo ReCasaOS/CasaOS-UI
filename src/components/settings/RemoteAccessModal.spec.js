@@ -243,6 +243,26 @@ describe('the Remote access window', () => {
 			expect(copy).toHaveBeenCalledWith('http://100.64.0.1:8080')
 		})
 
+		it('uses the dashboard URL the master sends for a box, and only a plain http(s) origin', async () => {
+			const copy = (await import('clipboard-copy')).default
+			const boxes = [
+				{ id: 'b1', name: 'salon', addr: '100.64.0.8', url: 'http://100.64.0.8:8080', online: true },
+				{ id: 'b2', name: 'cave', addr: '100.64.0.9', online: true },
+				{ id: 'b3', name: 'evil1', addr: '100.64.0.10', url: 'javascript:alert(1)', online: true },
+				{ id: 'b4', name: 'evil2', addr: '100.64.0.11', url: 'http://x/../evil', online: true },
+				{ id: 'b5', name: 'evil3', addr: '100.64.0.12', url: 'ftp://x', online: true },
+			]
+			fleetApi.status.mockReturnValue(answer(MASTER_ON))
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, boxes }))
+			await open()
+			const links = wrapper.findAll('li a[target=_blank]').map(a => a.attributes('href'))
+			expect(links).toEqual(['http://100.64.0.8:8080', 'http://100.64.0.9', 'http://100.64.0.10', 'http://100.64.0.11', 'http://100.64.0.12'])
+			await wrapper.findAll('.box-copy')[0].trigger('click')
+			expect(copy).toHaveBeenCalledWith('http://100.64.0.8:8080')
+			await wrapper.findAll('.box-copy')[2].trigger('click')
+			expect(copy).toHaveBeenCalledWith('http://100.64.0.10')
+		})
+
 		it('shows no address line without an address, and no port when the page has none', async () => {
 			window.happyDOM.setURL('https://box.example/')
 			fleetApi.status.mockReturnValue(answer({ ...ON, remote: { ...ON.remote, addr: '' } }))

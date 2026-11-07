@@ -75,8 +75,8 @@
 								<span class="has-text-weight-medium">{{ b.name }}</span>
 								<span v-if="!b.online" class="is-size-7 ml-1">{{ $t('Offline') }}</span>
 								<template v-if="b.addr">
-									<a class="ml-1" :href="boxUrl(b.addr, b.addr === remote.addr)" target="_blank" rel="noopener noreferrer">{{ boxUrl(b.addr, b.addr === remote.addr) }}</a>
-									<b-button class="ml-1 box-copy" size="is-small" type="is-text" :aria-label="$t(`Copy {name}'s address`, { name: b.name })" @click="copyValue(boxUrl(b.addr, b.addr === remote.addr))">{{ copied === boxUrl(b.addr, b.addr === remote.addr) ? $t('Copied (one)') : $t('Copy') }}</b-button>
+									<a class="ml-1" :href="boxUrl(b.addr, b.addr === remote.addr, b.url)" target="_blank" rel="noopener noreferrer">{{ boxUrl(b.addr, b.addr === remote.addr, b.url) }}</a>
+									<b-button class="ml-1 box-copy" size="is-small" type="is-text" :aria-label="$t(`Copy {name}'s address`, { name: b.name })" @click="copyValue(boxUrl(b.addr, b.addr === remote.addr, b.url))">{{ copied === boxUrl(b.addr, b.addr === remote.addr, b.url) ? $t('Copied (one)') : $t('Copy') }}</b-button>
 								</template>
 								<span v-else class="is-size-7 ml-1">{{ $t('not on the private network') }}</span>
 							</li>
@@ -332,9 +332,13 @@ export default {
 				},
 			})
 		},
-		// this box is served by its own gateway: the page's protocol and port are the right ones
-		// shortcut: the other boxes of a fleet get plain http on the default port (their gateway port is unknown here); the core would have to send each box's gateway port
-		boxUrl(addr, self) {
+		// a box of the list: the master sends its dashboard URL (scheme and port of its own gateway), kept only if it is a bare http(s) origin
+		// otherwise this box is served by its own gateway: the page's protocol and port are the right ones
+		// shortcut: a box of an older core sends no url, so it gets plain http on the default port (its gateway port is unknown here); gone once every core is updated
+		boxUrl(addr, self, url) {
+			if (typeof url === 'string' && /^https?:\/\/[^\s/]+$/.test(url)) {
+				return url
+			}
 			const { protocol, port } = window.location
 			return self ? `${protocol}//${addr}${port ? `:${port}` : ''}` : `http://${addr}`
 		},
