@@ -336,7 +336,7 @@ export default {
 		// otherwise this box is served by its own gateway: the page's protocol and port are the right ones
 		// shortcut: a box of an older core sends no url, so it gets plain http on the default port (its gateway port is unknown here); gone once every core is updated
 		boxUrl(addr, self, url) {
-			if (typeof url === 'string' && /^https?:\/\/[^\s/]+$/.test(url)) {
+			if (typeof url === 'string' && /^https?:\/\/[^\s/@]+$/.test(url)) {
 				return url
 			}
 			const { protocol, port } = window.location

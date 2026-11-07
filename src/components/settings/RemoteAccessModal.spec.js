@@ -251,12 +251,13 @@ describe('the Remote access window', () => {
 				{ id: 'b3', name: 'evil1', addr: '100.64.0.10', url: 'javascript:alert(1)', online: true },
 				{ id: 'b4', name: 'evil2', addr: '100.64.0.11', url: 'http://x/../evil', online: true },
 				{ id: 'b5', name: 'evil3', addr: '100.64.0.12', url: 'ftp://x', online: true },
+				{ id: 'b6', name: 'evil4', addr: '100.64.0.13', url: 'http://user@100.64.0.8', online: true },
 			]
 			fleetApi.status.mockReturnValue(answer(MASTER_ON))
 			fleetApi.remote.mockReturnValue(answer({ ...LIST, boxes }))
 			await open()
 			const links = wrapper.findAll('li a[target=_blank]').map(a => a.attributes('href'))
-			expect(links).toEqual(['http://100.64.0.8:8080', 'http://100.64.0.9', 'http://100.64.0.10', 'http://100.64.0.11', 'http://100.64.0.12'])
+			expect(links).toEqual(['http://100.64.0.8:8080', 'http://100.64.0.9', 'http://100.64.0.10', 'http://100.64.0.11', 'http://100.64.0.12', 'http://100.64.0.13'])
 			await wrapper.findAll('.box-copy')[0].trigger('click')
 			expect(copy).toHaveBeenCalledWith('http://100.64.0.8:8080')
 			await wrapper.findAll('.box-copy')[2].trigger('click')
