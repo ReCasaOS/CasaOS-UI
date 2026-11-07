@@ -60,7 +60,7 @@
 					</b-tooltip>
 				</template>
 
-				<b-dropdown-item :focusable="false" aria-role="menu-item" class="p-0" custom>
+				<b-dropdown-item :focusable="false" aria-role="menu-item" class="p-0 touch-targets" custom>
 					<h2 class="_title mb-2 has-text-weight-bold">
 						{{ $t("Settings") }}
 					</h2>
@@ -71,516 +71,522 @@
 					<p class="_settings-group">
 						{{ $t("Display") }}
 					</p>
+					<div class="_settings-section">
 
-					<!-- Search Engine Switch Start  -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="show-search-outline" pack="casa" size="is-20" />
-							{{ $t("Show Search Bar") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="barData.search_switch"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="saveData" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Search Engine Switch End  -->
-
-					<!-- Search Engine Start -->
-					<div v-if="barData.search_switch"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="search-outline" pack="casa" size="is-20" />
-							{{ $t("Search Engine") }}
-						</div>
-						<div>
-							<b-field>
-								<b-select v-model="barData.search_engine"
-									class="set-select"
-									size="is-small"
-									@update:model-value="saveData">
-									<option v-for="item in searchEngines" :key="item.name" :value="item.url">
-										{{ item.name }}
-									</option>
-								</b-select>
-							</b-field>
-						</div>
-					</div>
-					<!-- Search Engine End -->
-
-					<!-- Language Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="language-outline" pack="casa" size="is-20" />
-							{{ $t("Language") }}
-						</div>
-						<div>
-							<b-field>
-								<b-select v-model="barData.lang" class="set-select" size="is-small" @update:model-value="saveData">
-									<option v-for="lang in languages" :key="lang.lang" :value="lang.lang">
-										{{ lang.name }}
-									</option>
-								</b-select>
-							</b-field>
-						</div>
-					</div>
-					<!-- Language End -->
-
-					<!-- Appearance Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="theme-light-dark" size="is-20" />
-							{{ $t("Appearance") }}
-						</div>
-						<div>
-							<b-field>
-								<b-select v-model="theme" class="set-select" size="is-small" @update:model-value="setThemePreference">
-									<option v-for="item in themes" :key="item.value" :value="item.value">
-										{{ $t(item.label) }}
-									</option>
-								</b-select>
-							</b-field>
-						</div>
-					</div>
-					<!-- Appearance End -->
-
-					<!-- Background Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="wallpaper-outline" pack="casa" size="is-20" />
-							{{ $t("Wallpaper") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showChangeWallpaperModal">
-								{{ $t("Change") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Background End -->
-
-					<!--  Show other Docker container app(s) Switch Start  -->
-					<div v-if="$store.state.notImportList.length > 0"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="docker-outline" pack="casa" size="is-20" />
-							{{ $t("Show other Docker container app(s)") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="barData.existing_apps_switch"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="saveData" />
-							</b-field>
-						</div>
-					</div>
-					<!--  Show other Docker container app(s) Switch End  -->
-
-					<!--  Recommended modules Switch Start  -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2"
-								icon="display-applications-outline"
-								pack="casa"
-								size="is-20" />
-							{{ $t("Show Recommended Apps") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="barData.recommend_switch"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="saveData" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Recommended modules Switch End  -->
-
-					<!-- Beta dashboard Switch Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="flask-outline" size="is-20" />
-							{{ $t("New dashboard (beta)") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="barData.dashboard_beta"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="saveData" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Beta dashboard Switch End -->
-
-					<!-- Beta login page Switch Start: for the whole box, not this user -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="login-variant" size="is-20" />
-							{{ $t("New login page (beta)") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="loginBeta"
-									:disabled="loginBetaSaving"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="setLoginBeta" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Beta login page Switch End -->
-
-					<!-- Terminal full screen Switch Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="terminal-outline" pack="casa" size="is-20" />
-							{{ $t("Open the Terminal full screen") }}
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="terminalFullScreen"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="setTerminalFullScreen" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Terminal full screen Switch End -->
-
-					<!-- App Launching Start -->
-					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
+						<!-- Search Engine Switch Start  -->
+						<div
+							class="is-flex is-align-items-center _row _box">
 							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="open-in-app" size="is-20" />
-								{{ $t("App launching") }}
+								<b-icon class="mr-1 ml-2" icon="show-search-outline" pack="casa" size="is-20" />
+								{{ $t("Show Search Bar") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="barData.search_switch"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="saveData" />
+								</b-field>
+							</div>
+						</div>
+						<!-- Search Engine Switch End  -->
+
+						<!-- Search Engine Start -->
+						<div v-if="barData.search_switch"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="search-outline" pack="casa" size="is-20" />
+								{{ $t("Search Engine") }}
+							</div>
+							<div>
+								<b-field>
+									<b-select v-model="barData.search_engine"
+										class="set-select"
+										size="is-small"
+										@update:model-value="saveData">
+										<option v-for="item in searchEngines" :key="item.name" :value="item.url">
+											{{ item.name }}
+										</option>
+									</b-select>
+								</b-field>
+							</div>
+						</div>
+						<!-- Search Engine End -->
+
+						<!-- Language Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="language-outline" pack="casa" size="is-20" />
+								{{ $t("Language") }}
+							</div>
+							<div>
+								<b-field>
+									<b-select v-model="barData.lang" class="set-select" size="is-small" @update:model-value="saveData">
+										<option v-for="lang in languages" :key="lang.lang" :value="lang.lang">
+											{{ lang.name }}
+										</option>
+									</b-select>
+								</b-field>
+							</div>
+						</div>
+						<!-- Language End -->
+
+						<!-- Appearance Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="theme-light-dark" size="is-20" />
+								{{ $t("Appearance") }}
+							</div>
+							<div>
+								<b-field>
+									<b-select v-model="theme" class="set-select" size="is-small" @update:model-value="setThemePreference">
+										<option v-for="item in themes" :key="item.value" :value="item.value">
+											{{ $t(item.label) }}
+										</option>
+									</b-select>
+								</b-field>
+							</div>
+						</div>
+						<!-- Appearance End -->
+
+						<!-- Background Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="wallpaper-outline" pack="casa" size="is-20" />
+								{{ $t("Wallpaper") }}
 							</div>
 							<div class="ml-2">
-								<b-button rounded size="is-small" type="is-dark" @click.stop="showAppLaunchModal">
-									{{ $t("Configure") }}
+								<b-button rounded size="is-small" type="is-dark" @click="showChangeWallpaperModal">
+									{{ $t("Change") }}
 								</b-button>
 							</div>
 						</div>
-						<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
-							{{ $t($store.state.appLaunchInIframe ? "Apps open inside CasaOS" : "Apps open in a new tab") }}
+						<!-- Background End -->
+
+						<!--  Show other Docker container app(s) Switch Start  -->
+						<div v-if="$store.state.notImportList.length > 0"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="docker-outline" pack="casa" size="is-20" />
+								{{ $t("Show other Docker container app(s)") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="barData.existing_apps_switch"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="saveData" />
+								</b-field>
+							</div>
 						</div>
-					</div>
+						<!--  Show other Docker container app(s) Switch End  -->
+
+						<!--  Recommended modules Switch Start  -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2"
+									icon="display-applications-outline"
+									pack="casa"
+									size="is-20" />
+								{{ $t("Show Recommended Apps") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="barData.recommend_switch"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="saveData" />
+								</b-field>
+							</div>
+						</div>
+						<!-- Recommended modules Switch End  -->
+
+						<!-- Beta dashboard Switch Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="flask-outline" size="is-20" />
+								{{ $t("New dashboard (beta)") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="barData.dashboard_beta"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="saveData" />
+								</b-field>
+							</div>
+						</div>
+						<!-- Beta dashboard Switch End -->
+
+						<!-- Beta login page Switch Start: for the whole box, not this user -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="login-variant" size="is-20" />
+								{{ $t("New login page (beta)") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="loginBeta"
+										:disabled="loginBetaSaving"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="setLoginBeta" />
+								</b-field>
+							</div>
+						</div>
+						<!-- Beta login page Switch End -->
+
+						<!-- Terminal full screen Switch Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="terminal-outline" pack="casa" size="is-20" />
+								{{ $t("Open the Terminal full screen") }}
+							</div>
+							<div>
+								<b-field>
+									<b-switch v-model="terminalFullScreen"
+										class="is-flex-direction-row-reverse mr-0 _small"
+										type="is-dark"
+										@update:model-value="setTerminalFullScreen" />
+								</b-field>
+							</div>
+						</div>
+						<!-- Terminal full screen Switch End -->
+
+						<!-- App Launching Start -->
+						<div class="_row">
+							<div class="is-flex is-align-items-center">
+								<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+									<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="open-in-app" size="is-20" />
+									{{ $t("App launching") }}
+								</div>
+								<div class="ml-2">
+									<b-button rounded size="is-small" type="is-dark" @click.stop="showAppLaunchModal">
+										{{ $t("Configure") }}
+									</b-button>
+								</div>
+							</div>
+							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+								{{ $t($store.state.appLaunchInIframe ? "Apps open inside CasaOS" : "Apps open in a new tab") }}
+							</div>
+						</div>
 					<!-- App Launching End -->
+					</div>
 
 					<p class="_settings-group">
 						{{ $t("System") }}
 					</p>
+					<div class="_settings-section">
 
-					<!-- WebUI Port Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="port-outline" pack="casa" size="is-20" />
-							{{ $t("WebUI Port") }}
-						</div>
-						<div class="_has-text-gray">
-							{{ port }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showPortPanel">
-								{{ $t("Change") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- WebUI Port End -->
-
-					<!-- Backup destinations Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="cloud-outline" pack="casa" size="is-20" />
-							{{ $t("Backup destinations") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showBackupDestinations">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Backup destinations End -->
-
-					<!-- Docker data Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="database-outline" size="is-20" />
-							{{ $t("Docker data") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showDockerLocation">
-								{{ $t("Change") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Docker data End -->
-					<!-- Share accounts Start -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="account-multiple-outline" size="is-20" />
-							{{ $t("Share accounts") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showShareAccounts">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Share accounts End -->
-
-					<!-- Alerts Start -->
-					<div v-if="alertsAvailable"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="bell-outline" size="is-20" />
-							{{ $t("Alerts") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showAlerts">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Alerts End -->
-
-					<!-- Logs Start -->
-					<div v-if="logsAvailable"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="text-box-outline" size="is-20" />
-							{{ $t("Logs") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showLogsSettings">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Logs End -->
-
-					<!-- Fleet Start -->
-					<div v-if="fleetAvailable"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="server-network" size="is-20" />
-							{{ $t("Fleet") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showFleet">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Fleet End -->
-
-					<!-- Remote access Start -->
-					<div v-if="fleetAvailable"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="cellphone-link" size="is-20" />
-							{{ $t("Remote access") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showRemoteAccess">
-								{{ $t("Configure") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- Remote access End -->
-
-					<!-- Automount USB Drive Start  -->
-					<div
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" icon="usb-outline" pack="casa" size="is-20" />
-							{{ $t("Automount USB Drive") }}
-							<b-tooltip v-if="isRaspberryPi"
-								:label="
-									$t(
-										'Enabling this function may cause boot failures when the Raspberry Pi device is booted from USB',
-									)
-								"
-								multilined
-								type="is-dark">
-								<b-icon class="ml-1" icon="question-outline" pack="casa" size="is-small" />
-							</b-tooltip>
-						</div>
-						<div>
-							<b-field>
-								<b-switch v-model="autoUsbMount"
-									class="is-flex-direction-row-reverse mr-0 _small"
-									type="is-dark"
-									@update:model-value="usbAutoMount" />
-							</b-field>
-						</div>
-					</div>
-					<!-- Automount USB Drive End  -->
-
-					<!-- Anonymous statistics Start -->
-					<div v-if="telemetryEnabled !== null" class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
+						<!-- WebUI Port Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
 							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="chart-box-outline" size="is-20" />
-								{{ $t("Anonymous usage statistics") }}
+								<b-icon class="mr-1 ml-2" icon="port-outline" pack="casa" size="is-20" />
+								{{ $t("WebUI Port") }}
+							</div>
+							<div class="_has-text-gray">
+								{{ port }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showPortPanel">
+									{{ $t("Change") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- WebUI Port End -->
+
+						<!-- Backup destinations Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="cloud-outline" pack="casa" size="is-20" />
+								{{ $t("Backup destinations") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showBackupDestinations">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Backup destinations End -->
+
+						<!-- Docker data Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="database-outline" size="is-20" />
+								{{ $t("Docker data") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showDockerLocation">
+									{{ $t("Change") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Docker data End -->
+						<!-- Share accounts Start -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="account-multiple-outline" size="is-20" />
+								{{ $t("Share accounts") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showShareAccounts">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Share accounts End -->
+
+						<!-- Alerts Start -->
+						<div v-if="alertsAvailable"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="bell-outline" size="is-20" />
+								{{ $t("Alerts") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showAlerts">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Alerts End -->
+
+						<!-- Logs Start -->
+						<div v-if="logsAvailable"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="text-box-outline" size="is-20" />
+								{{ $t("Logs") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showLogsSettings">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Logs End -->
+
+						<!-- Fleet Start -->
+						<div v-if="fleetAvailable"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="server-network" size="is-20" />
+								{{ $t("Fleet") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showFleet">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Fleet End -->
+
+						<!-- Remote access Start -->
+						<div v-if="fleetAvailable"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="cellphone-link" size="is-20" />
+								{{ $t("Remote access") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showRemoteAccess">
+									{{ $t("Configure") }}
+								</b-button>
+							</div>
+						</div>
+						<!-- Remote access End -->
+
+						<!-- Automount USB Drive Start  -->
+						<div
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" icon="usb-outline" pack="casa" size="is-20" />
+								{{ $t("Automount USB Drive") }}
+								<b-tooltip v-if="isRaspberryPi"
+									:label="
+										$t(
+											'Enabling this function may cause boot failures when the Raspberry Pi device is booted from USB',
+										)
+									"
+									multilined
+									type="is-dark">
+									<b-icon class="ml-1" icon="question-outline" pack="casa" size="is-small" />
+								</b-tooltip>
 							</div>
 							<div>
 								<b-field>
-									<b-switch :model-value="telemetryEnabled"
-										:disabled="telemetrySaving"
+									<b-switch v-model="autoUsbMount"
 										class="is-flex-direction-row-reverse mr-0 _small"
 										type="is-dark"
-										@update:model-value="setTelemetry" />
+										@update:model-value="usbAutoMount" />
 								</b-field>
 							</div>
 						</div>
-						<div class="pl-55 ml-1 mt-1 is-size-7">
-							<a href="#" @click.prevent="showTelemetryPreview">{{ $t("See what is sent") }}</a>
+						<!-- Automount USB Drive End  -->
+
+						<!-- Anonymous statistics Start -->
+						<div v-if="telemetryEnabled !== null" class="_row">
+							<div class="is-flex is-align-items-center">
+								<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+									<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="chart-box-outline" size="is-20" />
+									{{ $t("Anonymous usage statistics") }}
+								</div>
+								<div>
+									<b-field>
+										<b-switch :model-value="telemetryEnabled"
+											:disabled="telemetrySaving"
+											class="is-flex-direction-row-reverse mr-0 _small"
+											type="is-dark"
+											@update:model-value="setTelemetry" />
+									</b-field>
+								</div>
+							</div>
+							<div class="pl-55 ml-1 mt-1 is-size-7">
+								<a href="#" @click.prevent="showTelemetryPreview">{{ $t("See what is sent") }}</a>
+							</div>
 						</div>
-					</div>
 					<!-- Anonymous statistics End -->
+					</div>
 
 					<p class="_settings-group">
 						{{ $t("Updates") }}
 					</p>
+					<div class="_settings-section">
 
-					<!-- Update Start -->
-					<div class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
-							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" icon="update-outline" pack="casa" size="is-20" />
-								<div :class="{ 'update-text-dot': updateInfo.need_update }">
-									{{ $t("Current version") }}
+						<!-- Update Start -->
+						<div class="_row">
+							<div class="is-flex is-align-items-center">
+								<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+									<b-icon class="mr-1 ml-2" icon="update-outline" pack="casa" size="is-20" />
+									<div :class="{ 'update-text-dot': updateInfo.need_update }">
+										{{ $t("Current version") }}
+									</div>
+								</div>
+								<div class="_has-text-gray">
+									v{{ updateInfo.current_version }}
+								</div>
+								<div v-if="updateInfo.need_update" class="ml-2">
+									<b-button rounded size="is-small" type="is-dark" @click="showUpdateModal">
+										{{ $t("Update") }}
+									</b-button>
 								</div>
 							</div>
-							<div class="_has-text-gray">
-								v{{ updateInfo.current_version }}
-							</div>
-							<div v-if="updateInfo.need_update" class="ml-2">
-								<b-button rounded size="is-small" type="is-dark" @click="showUpdateModal">
-									{{ $t("Update") }}
-								</b-button>
-							</div>
-						</div>
 
-						<div v-if="updateInfo.image_managed" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
-							{{ $t("Updated with the system") }}
-						</div>
-						<div v-else-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
-							{{ $t(latestText) }}
-							<b-icon class="ml-1" custom-size="mdi-18px" icon="check" type="is-success" />
-						</div>
-						<div v-else class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
-							{{ $t(updateText) }}
-						</div>
-					</div>
-					<!-- Update End -->
-
-					<!-- Automatic update Start -->
-					<div v-if="autoUpdate" class="mb-1 _is-large hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center">
-							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="autorenew" size="is-20" />
-								{{ $t("Update automatically") }}
+							<div v-if="updateInfo.image_managed" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
+								{{ $t("Updated with the system") }}
 							</div>
-							<div>
-								<b-field>
-									<b-switch :model-value="autoUpdate.enabled"
+							<div v-else-if="!updateInfo.need_update" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7 _has-text-gray">
+								{{ $t(latestText) }}
+								<b-icon class="ml-1" custom-size="mdi-18px" icon="check" type="is-success" />
+							</div>
+							<div v-else class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+								{{ $t(updateText) }}
+							</div>
+						</div>
+						<!-- Update End -->
+
+						<!-- Automatic update Start -->
+						<div v-if="autoUpdate" class="_row">
+							<div class="is-flex is-align-items-center">
+								<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+									<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="autorenew" size="is-20" />
+									{{ $t("Update automatically") }}
+								</div>
+								<div>
+									<b-field>
+										<b-switch :model-value="autoUpdate.enabled"
+											:disabled="autoUpdateSaving"
+											class="is-flex-direction-row-reverse mr-0 _small"
+											type="is-dark"
+											@update:model-value="setAutoUpdate({ enabled: $event })" />
+									</b-field>
+								</div>
+							</div>
+							<template v-if="autoUpdate.enabled">
+								<div class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
+									{{ $t("Between") }}
+									<b-select :model-value="autoUpdate.window.start"
 										:disabled="autoUpdateSaving"
-										class="is-flex-direction-row-reverse mr-0 _small"
+										class="set-select mx-1"
+										size="is-small"
+										@update:model-value="setAutoUpdate({ window_start: $event })">
+										<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.end" :value="hour">
+											{{ hour }}
+										</option>
+									</b-select>
+									{{ $t("and") }}
+									<b-select :model-value="autoUpdate.window.end"
+										:disabled="autoUpdateSaving"
+										class="set-select mx-1"
+										size="is-small"
+										@update:model-value="setAutoUpdate({ window_end: $event })">
+										<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.start" :value="hour">
+											{{ hour }}
+										</option>
+									</b-select>
+								</div>
+								<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+									{{ $t("New releases install at night, one day after they come out, never during a backup or an app operation.") }}
+								</div>
+								<div :class="{ '_has-text-gray': autoUpdate.state !== 'paused' }" class="pl-55 ml-1 mt-1 is-size-7 _is-wrap">
+									{{ autoUpdateStateText }}
+								</div>
+								<div v-if="autoUpdate.state === 'paused'" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
+									<a href="#" @click.prevent="showUpgradeLog">{{ $t("See the log") }}</a>
+									<b-button :disabled="autoUpdateSaving"
+										class="ml-2"
+										rounded
+										size="is-small"
 										type="is-dark"
-										@update:model-value="setAutoUpdate({ enabled: $event })" />
-								</b-field>
-							</div>
+										@click="setAutoUpdate({ resume: true })">
+										{{ $t("Try again") }}
+									</b-button>
+								</div>
+							</template>
 						</div>
-						<template v-if="autoUpdate.enabled">
-							<div class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
-								{{ $t("Between") }}
-								<b-select :model-value="autoUpdate.window.start"
-									:disabled="autoUpdateSaving"
-									class="set-select mx-1"
-									size="is-small"
-									@update:model-value="setAutoUpdate({ window_start: $event })">
-									<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.end" :value="hour">
-										{{ hour }}
-									</option>
-								</b-select>
-								{{ $t("and") }}
-								<b-select :model-value="autoUpdate.window.end"
-									:disabled="autoUpdateSaving"
-									class="set-select mx-1"
-									size="is-small"
-									@update:model-value="setAutoUpdate({ window_end: $event })">
-									<option v-for="hour in hours" :key="hour" :disabled="hour === autoUpdate.window.start" :value="hour">
-										{{ hour }}
-									</option>
-								</b-select>
+						<!-- Automatic update End -->
+
+						<!-- System Package Update Start -->
+						<div v-if="!updateInfo.image_managed"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="package-variant-closed" size="is-20" />
+								{{ $t("System packages") }}
 							</div>
-							<div class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
-								{{ $t("New releases install at night, one day after they come out, never during a backup or an app operation.") }}
-							</div>
-							<div :class="{ '_has-text-gray': autoUpdate.state !== 'paused' }" class="pl-55 ml-1 mt-1 is-size-7 _is-wrap">
-								{{ autoUpdateStateText }}
-							</div>
-							<div v-if="autoUpdate.state === 'paused'" class="is-flex is-align-items-center pl-55 ml-1 mt-1 is-size-7">
-								<a href="#" @click.prevent="showUpgradeLog">{{ $t("See the log") }}</a>
-								<b-button :disabled="autoUpdateSaving"
-									class="ml-2"
-									rounded
-									size="is-small"
-									type="is-dark"
-									@click="setAutoUpdate({ resume: true })">
-									{{ $t("Try again") }}
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click.stop="showSystemPackageUpdateModal">
+									{{ $t("Check") }}
 								</b-button>
 							</div>
-						</template>
-					</div>
-					<!-- Automatic update End -->
+						</div>
+						<!-- System Package Update End -->
 
-					<!-- System Package Update Start -->
-					<div v-if="!updateInfo.image_managed"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="package-variant-closed" size="is-20" />
-							{{ $t("System packages") }}
+						<!-- Modules Start: only against a core that has the feature -->
+						<div v-if="modulesAvailable"
+							class="is-flex is-align-items-center _row _box">
+							<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+								<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="puzzle-outline" size="is-20" />
+								{{ $t("Modules") }}
+							</div>
+							<div class="ml-2">
+								<b-button rounded size="is-small" type="is-dark" @click="showModules">
+									{{ $t("Manage") }}
+								</b-button>
+							</div>
 						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click.stop="showSystemPackageUpdateModal">
-								{{ $t("Check") }}
-							</b-button>
-						</div>
-					</div>
-					<!-- System Package Update End -->
-
-					<!-- Modules Start: only against a core that has the feature -->
-					<div v-if="modulesAvailable"
-						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
-						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
-							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="puzzle-outline" size="is-20" />
-							{{ $t("Modules") }}
-						</div>
-						<div class="ml-2">
-							<b-button rounded size="is-small" type="is-dark" @click="showModules">
-								{{ $t("Manage") }}
-							</b-button>
-						</div>
-					</div>
 					<!-- Modules End -->
+					</div>
 
 					<!-- Restart or Shutdown Start -->
 					<div
@@ -1529,11 +1535,38 @@ export default {
 </script>
 
 <style lang="scss">
-._is-large {
-	// bulma 3rem;
-	//height: 2.5rem;
-	padding-bottom: 0.625rem;
-	padding-top: 0.625rem;
+// A group of settings on one raised card, its rows parted by hairlines: the
+// panel reads as three blocks rather than a column of thirty lines.
+._settings-section {
+	margin: 0 1rem;
+	background: var(--casa-surface-card);
+	border: 1px solid var(--casa-divider-soft);
+	border-radius: 12px;
+	overflow: hidden;
+}
+
+._row {
+	padding: 0.625rem 0.5rem 0.625rem 0;
+
+	& + ._row {
+		border-top: 1px solid var(--casa-divider-soft);
+	}
+
+	&:hover {
+		background: var(--casa-hover-tint);
+	}
+
+	// the icon on a small tinted tile; the lines under a label still start where the label does
+	._is-normal > .icon:first-child {
+		width: 1.75rem;
+		height: 1.75rem;
+		border-radius: 8px;
+		background: var(--casa-hover-tint);
+	}
+
+	.pl-55 {
+		padding-left: 2.25rem;
+	}
 }
 
 ._box {
@@ -1578,7 +1611,7 @@ export default {
 
 // the heading of a group of rows, in line with the rows' icons
 ._settings-group {
-	margin: 0.75rem 1.5rem 0.25rem;
+	margin: 1rem 1.5rem 0.375rem;
 	font-size: 0.75rem;
 	font-weight: 600;
 	line-height: 1rem;
@@ -1736,6 +1769,17 @@ export default {
 	.button {
 		&.is-small {
 			height: 2em;
+		}
+
+		// a tint with a hairline rather than a dark pill lost on the dark panel
+		&.is-dark {
+			background: var(--casa-hover-tint);
+			border: 1px solid var(--casa-divider);
+			color: var(--casa-text);
+
+			&:hover {
+				background: var(--casa-active);
+			}
 		}
 	}
 

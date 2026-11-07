@@ -1232,7 +1232,7 @@ export default {
 
 .modules-card {
 	padding: 0.75rem 1rem;
-	background: var(--casa-surface-raised);
+	background: var(--casa-surface-card);
 	border: 1px solid var(--casa-divider-soft);
 	border-radius: 12px;
 }
