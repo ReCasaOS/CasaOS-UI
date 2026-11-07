@@ -316,6 +316,43 @@ describe('the Remote access window', () => {
 			expect(vi.getTimerCount()).toBe(0)
 		})
 
+		it('copies the relay address', async () => {
+			const copy = (await import('clipboard-copy')).default
+			await add()
+			await wrapper.find('.remote-relay-copy').trigger('click')
+			expect(copy).toHaveBeenCalledWith('https://relay.official.test')
+			await button('Windows').trigger('click')
+			await wrapper.find('.remote-relay-copy').trigger('click')
+			expect(copy).toHaveBeenCalledWith('tailscale login --login-server=https://relay.official.test')
+		})
+
+		it('starts no timer when closed while the code is pending', async () => {
+			await open()
+			vi.clearAllTimers()
+			let resolve
+			fleetApi.addDevice.mockReturnValue(new Promise(r => (resolve = r)))
+			await button('Add a phone or PC').trigger('click')
+			wrapper.unmount()
+			wrapper = null
+			resolve({ data: { data: code() } })
+			await flushPromises()
+			expect(vi.getTimerCount()).toBe(0)
+		})
+
+		it('stays closed when done is pressed while a new code is pending', async () => {
+			await add()
+			vi.advanceTimersByTime(601 * 1000)
+			await flushPromises()
+			let resolve
+			fleetApi.addDevice.mockReturnValue(new Promise(r => (resolve = r)))
+			await button('New code').trigger('click')
+			await button('Done').trigger('click')
+			resolve({ data: { data: code() } })
+			await flushPromises()
+			expect(wrapper.text()).not.toContain('ABCD-2345')
+			expect(vi.getTimerCount()).toBe(0)
+		})
+
 		it('says so when there are too many codes', async () => {
 			fleetApi.addDevice.mockImplementation(() => refusal(409, 'too many codes not used yet'))
 			await add()

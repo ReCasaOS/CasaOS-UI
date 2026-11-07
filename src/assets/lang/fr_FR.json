@@ -3007,7 +3007,7 @@
   "Remove this device?": "Retirer cet appareil ?",
   "{name} will no longer reach this box.": "{name} n'aura plus accès à cette box.",
   "Add a phone or PC": "Ajouter un téléphone ou un PC",
-  "valid for {time}": "valable {time}",
+  "valid for {time}": "valable encore {time}",
   "iPhone / iPad": "iPhone / iPad",
   "Open the Tailscale app, then the menu at the top right.": "Ouvrez l'application Tailscale, puis le menu en haut à droite.",
   "Choose \"Use a custom coordination server\".": "Choisissez « Use a custom coordination server ».",
@@ -3021,5 +3021,6 @@
   "Choose \"Debug\", then \"Custom Login Server\", then \"Add Account\".": "Choisissez « Debug », puis « Custom Login Server », puis « Add Account ».",
   "A page then opens in the browser: type the code shown above.": "Une page s'ouvre alors dans le navigateur : saisissez le code affiché ci-dessus.",
   "Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.": "Vous utilisez déjà l'application Tailscale pour un autre réseau ? Ajoutez d'abord un compte dans l'application : un seul réseau est actif à la fois.",
-  "This code has expired.": "Ce code a expiré."
+  "This code has expired.": "Ce code a expiré.",
+  "Done adding": "Terminé"
 }

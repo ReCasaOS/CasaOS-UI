@@ -38,14 +38,14 @@
 							<template v-if="remaining > 0">
 								<p class="is-size-7 mb-2">{{ $t('valid for {time}', { time: countdown }) }}</p>
 								<div class="buttons mb-2">
-									<b-button v-for="p in platforms" :key="p.id" size="is-small" rounded :type="platform === p.id ? 'is-primary' : ''" @click="platform = p.id">{{ p.label }}</b-button>
+									<b-button v-for="p in platforms" :key="p.id" size="is-small" rounded :aria-pressed="String(platform === p.id)" :type="platform === p.id ? 'is-primary' : ''" @click="platform = p.id">{{ p.label }}</b-button>
 								</div>
 								<ol class="remote-steps">
 									<li v-for="(step, i) in steps" :key="platform + i">{{ step }}</li>
 								</ol>
-								<p v-if="platform === 'windows'" class="remote-command">
-									<code>{{ loginCommand }}</code>
-									<b-button size="is-small" type="is-text" @click="copyValue(loginCommand)">{{ copied === loginCommand ? $t('Copied') : $t('Copy') }}</b-button>
+								<p class="remote-command">
+									<code>{{ platform === 'windows' ? loginCommand : addingRelay }}</code>
+									<b-button class="remote-relay-copy" size="is-small" type="is-text" @click="copyValue(platform === 'windows' ? loginCommand : addingRelay)">{{ copied === (platform === 'windows' ? loginCommand : addingRelay) ? $t('Copied') : $t('Copy') }}</b-button>
 								</p>
 								<p class="is-size-7 mt-2">{{ $t('A page then opens in the browser: type the code shown above.') }}</p>
 								<p class="is-size-7 mt-1">{{ $t('Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.') }}</p>
@@ -55,7 +55,7 @@
 								<b-button :disabled="busy" size="is-small" rounded @click="addDevice">{{ $t('New code') }}</b-button>
 							</template>
 							<div class="mt-2">
-								<b-button size="is-small" rounded type="is-primary" @click="doneAdding">{{ $t('Done') }}</b-button>
+								<b-button size="is-small" rounded type="is-primary" @click="doneAdding">{{ $t('Done adding') }}</b-button>
 							</div>
 						</div>
 						<p v-if="!devices.length" class="is-size-7">{{ $t('No phone or PC yet.') }}</p>
@@ -131,6 +131,7 @@ export default {
 			adding: null,
 			now: Date.now(),
 			platform: 'ios',
+			addRequest: 0,
 		}
 	},
 	computed: {
@@ -204,6 +205,7 @@ export default {
 	},
 	beforeUnmount() {
 		clearTimeout(this.copyTimer)
+		this.addRequest++
 		this.stopTicker()
 	},
 	methods: {
@@ -328,11 +330,16 @@ export default {
 			return this.copyValue(`http://${addr}`, addr)
 		},
 		async addDevice() {
+			const request = ++this.addRequest
 			this.busy = true
 			this.error = ''
 			this.stopTicker()
 			try {
 				const res = await fleetApi.addDevice()
+				// closed, or Done pressed, while the code was being fetched
+				if (request !== this.addRequest) {
+					return
+				}
 				this.adding = res.data.data
 				this.now = Date.now()
 				this.ticker = setInterval(() => {
@@ -342,13 +349,16 @@ export default {
 					}
 				}, 1000)
 			} catch (e) {
-				this.adding = null
-				this.error = this.readable(e)
+				if (request === this.addRequest) {
+					this.adding = null
+					this.error = this.readable(e)
+				}
 			} finally {
 				this.busy = false
 			}
 		},
 		doneAdding() {
+			this.addRequest++
 			this.stopTicker()
 			this.adding = null
 			return this.loadList()
@@ -373,23 +383,23 @@ export default {
 
 <style lang="scss" scoped>
 .remote-code {
-font-family: monospace;
-font-size: 2rem;
-letter-spacing: 0.1em;
+	font-family: monospace;
+	font-size: 2rem;
+	letter-spacing: 0.1em;
 }
 .remote-command {
-display: flex;
-flex-wrap: wrap;
-align-items: center;
-gap: 0 0.5rem;
-code {
-	overflow-wrap: anywhere;
-}
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0 0.5rem;
+	code {
+		overflow-wrap: anywhere;
+	}
 }
 .remote-steps {
-list-style: decimal;
-padding-left: 1.25rem;
-margin-bottom: 0.5rem;
+	list-style: decimal;
+	padding-left: 1.25rem;
+	margin-bottom: 0.5rem;
 }
 .remote-item {
 	display: flex;
