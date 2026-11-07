@@ -7,7 +7,7 @@ import { fleetApi } from '@/service/fleet'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn() } }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })
@@ -124,5 +124,91 @@ describe('the Remote access window', () => {
 			await flushPromises()
 			expect(wrapper.text()).toContain(shown)
 		}
+	})
+
+	describe('devices and boxes', () => {
+		const LIST = { relay: 'r', addr: '100.64.0.7', devices: [{ id: 'd1', hostname: 'phone-gary', ip: '100.64.0.9', online: true, last_seen: '2026-11-07T10:00:00Z' }, { id: 'd2', hostname: 'old-pc', ip: '100.64.0.10', online: false, last_seen: '' }] }
+
+		beforeEach(() => {
+			fleetApi.status.mockReturnValue(answer(ON))
+			fleetApi.remote.mockReturnValue(answer(LIST))
+			fleetApi.removeDevice.mockReturnValue(answer({}))
+		})
+		afterEach(() => vi.useRealTimers())
+
+		it('asks the relay once', async () => {
+			await open()
+			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
+			vi.useFakeTimers()
+			vi.advanceTimersByTime(10 * 60 * 1000)
+			await flushPromises()
+			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
+		})
+
+		it('does not ask the relay while off', async () => {
+			fleetApi.status.mockReturnValue(answer(NONE))
+			await open()
+			expect(fleetApi.remote).not.toHaveBeenCalled()
+		})
+
+		it('lists devices and removes one after confirming', async () => {
+			await open()
+			expect(wrapper.text()).toContain('phone-gary')
+			expect(wrapper.text()).toContain('old-pc')
+			expect(wrapper.text()).toContain('Offline')
+			await button('Remove').trigger('click')
+			await flushPromises()
+			expect(document.body.textContent).toContain('phone-gary will no longer reach this box.')
+			dialogButton('Cancel').click()
+			await flushPromises()
+			expect(fleetApi.removeDevice).not.toHaveBeenCalled()
+			await button('Remove').trigger('click')
+			await flushPromises()
+			dialogButton('Remove').click()
+			await flushPromises()
+			expect(fleetApi.removeDevice).toHaveBeenCalledWith('d1')
+			expect(fleetApi.remote).toHaveBeenCalledTimes(2)
+		})
+
+		it('says so when there is no device', async () => {
+			fleetApi.remote.mockReturnValue(answer({ relay: 'r', addr: 'a', devices: [] }))
+			await open()
+			expect(wrapper.text()).toContain('No phone or PC yet.')
+		})
+
+		it('shows device names as text', async () => {
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, devices: [{ id: 'x', hostname: '<img src=x onerror=alert(1)>', online: true }] }))
+			await open()
+			expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>')
+			expect(wrapper.find('img').exists()).toBe(false)
+		})
+
+		it('lists the boxes of a master with their addresses', async () => {
+			fleetApi.status.mockReturnValue(answer(MASTER_ON))
+			fleetApi.remote.mockReturnValue(answer({ ...LIST, boxes: [{ id: 'b1', name: 'salon', addr: '100.64.0.20', online: true }, { id: 'b2', name: 'cave', addr: '', online: false }] }))
+			await open()
+			expect(wrapper.text()).toContain('salon')
+			expect(wrapper.text()).toContain('http://100.64.0.20')
+			expect(wrapper.text()).toContain('cave')
+			expect(wrapper.text()).toContain('not on the private network')
+			const copy = (await import('clipboard-copy')).default
+			await wrapper.find('.box-copy').trigger('click')
+			expect(copy).toHaveBeenCalledWith('http://100.64.0.20')
+		})
+
+		it('refreshes on demand', async () => {
+			await open()
+			await button('Refresh').trigger('click')
+			await flushPromises()
+			expect(fleetApi.remote).toHaveBeenCalledTimes(2)
+		})
+
+		it('shows the relay error when the list cannot be read', async () => {
+			fleetApi.remote.mockImplementation(() => refusal(409, 'the relay no longer knows this box\'s network'))
+			await open()
+			expect(wrapper.text()).toContain('The relay no longer knows this box')
+			expect(wrapper.text()).toContain('Address of this box: http://100.64.0.7')
+			expect(button('Refresh')).toBeTruthy()
+		})
 	})
 })

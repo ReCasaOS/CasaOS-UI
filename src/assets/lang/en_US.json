@@ -2997,5 +2997,11 @@
   "This box is a member of a fleet: it has no remote access of its own": "This box is a member of a fleet: it has no remote access of its own",
   "The gateway only listens on this box: remote access needs it reachable from the network": "The gateway only listens on this box: remote access needs it reachable from the network",
   "Remote access already runs over another relay: turn it off first": "Remote access already runs over another relay: turn it off first",
-  "The address could not be copied": "The address could not be copied"
+  "The address could not be copied": "The address could not be copied",
+  "Phones and PCs": "Phones and PCs",
+  "No phone or PC yet.": "No phone or PC yet.",
+  "last seen {time}": "last seen {time}",
+  "not on the private network": "not on the private network",
+  "Remove this device?": "Remove this device?",
+  "{name} will no longer reach this box.": "{name} will no longer reach this box."
 }

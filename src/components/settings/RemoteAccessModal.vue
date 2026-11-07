@@ -14,7 +14,7 @@
 						<p class="mb-1">{{ $t('Relay server') }}: <span class="has-text-weight-medium">{{ remote.relay }}</span></p>
 						<p class="mb-1">
 							{{ $t('Address of this box: http://{addr}', { addr: remote.addr }) }}
-							<b-button class="ml-1" size="is-small" type="is-text" @click="copyAddress">{{ copied ? $t('Copied') : $t('Copy') }}</b-button>
+							<b-button class="ml-1" size="is-small" type="is-text" @click="copyAddress(remote.addr)">{{ copied === remote.addr ? $t('Copied') : $t('Copy') }}</b-button>
 						</p>
 						<p v-if="remote.error">{{ $t('Not connected: {error}', { error: remote.error }) }}</p>
 						<p v-else-if="remote.connected">{{ $t('Connected to the private network') }}</p>
@@ -22,6 +22,36 @@
 					</div>
 					<b-button v-if="remote.alone" :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmOff">{{ $t('Turn remote access off') }}</b-button>
 					<p v-else class="is-size-7">{{ $t('Remote access comes with the master role: disabling the master turns it off.') }}</p>
+
+					<div class="settings-card">
+						<div class="is-flex is-align-items-center is-justify-content-space-between mb-2">
+							<p class="has-text-weight-medium">{{ $t('Phones and PCs') }}</p>
+							<b-button :disabled="busy" size="is-small" type="is-text" @click="refresh">{{ $t('Refresh') }}</b-button>
+						</div>
+						<p v-if="!devices.length" class="is-size-7">{{ $t('No phone or PC yet.') }}</p>
+						<ul v-else>
+							<li v-for="d in devices" :key="d.id" class="mb-2 remote-item">
+								<span class="has-text-weight-medium">{{ d.hostname }}</span>
+								<span class="is-size-7 ml-1">{{ d.online ? $t('Online') : $t('Offline') }}</span>
+								<span v-if="lastSeen(d)" class="is-size-7 ml-1">{{ $t('last seen {time}', { time: lastSeen(d) }) }}</span>
+								<b-button class="ml-1" :disabled="busy" size="is-small" type="is-text" @click="confirmRemove(d)">{{ $t('Remove') }}</b-button>
+							</li>
+						</ul>
+					</div>
+					<div v-if="boxes.length" class="settings-card">
+						<p class="has-text-weight-medium mb-2">{{ $t('Boxes') }}</p>
+						<ul>
+							<li v-for="b in boxes" :key="b.id" class="mb-2 remote-item">
+								<span class="has-text-weight-medium">{{ b.name }}</span>
+								<span v-if="!b.online" class="is-size-7 ml-1">{{ $t('Offline') }}</span>
+								<template v-if="b.addr">
+									<span class="ml-1">http://{{ b.addr }}</span>
+									<b-button class="ml-1 box-copy" size="is-small" type="is-text" @click="copyAddress(b.addr)">{{ copied === b.addr ? $t('Copied') : $t('Copy') }}</b-button>
+								</template>
+								<span v-else class="is-size-7 ml-1">{{ $t('not on the private network') }}</span>
+							</li>
+						</ul>
+					</div>
 				</template>
 
 				<p v-else-if="view.role === 'member'">{{ $t("Phones and PCs are added on the master's dashboard.") }}</p>
@@ -63,12 +93,20 @@ export default {
 			error: '',
 			relay: OFFICIAL_RELAY,
 			busy: false,
-			copied: false,
+			copied: '',
+			// GET /v1/fleet/remote: devices, and boxes on a master; the relay is asked only on open, refresh and removal
+			list: null,
 		}
 	},
 	computed: {
 		remote() {
 			return this.view?.remote || null
+		},
+		devices() {
+			return this.list?.devices || []
+		},
+		boxes() {
+			return this.list?.boxes || []
 		},
 		officialRelay() {
 			return this.view?.default_relay || OFFICIAL_RELAY
@@ -78,7 +116,7 @@ export default {
 		},
 	},
 	mounted() {
-		this.load()
+		this.load().then(() => this.remote && this.loadList())
 	},
 	beforeUnmount() {
 		clearTimeout(this.copyTimer)
@@ -92,6 +130,47 @@ export default {
 			}).catch(() => {
 				this.view = null
 				this.error = this.$t('The fleet could not be read.')
+			})
+		},
+		// an error here leaves the rest of the window and the last list in place
+		async loadList() {
+			try {
+				const res = await fleetApi.remote()
+				this.list = res?.data?.data || null
+				this.error = ''
+			} catch (e) {
+				this.error = this.readable(e)
+			}
+		},
+		refresh() {
+			this.busy = true
+			return this.loadList().finally(() => (this.busy = false))
+		},
+		lastSeen(d) {
+			const t = d.last_seen ? new Date(d.last_seen) : null
+			return t && !Number.isNaN(t.getTime()) ? t.toLocaleString() : ''
+		},
+		confirmRemove(d) {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Remove this device?'),
+				message: this.$t('{name} will no longer reach this box.', { name: d.hostname }),
+				type: 'is-danger',
+				hasIcon: true,
+				confirmText: this.$t('Remove'),
+				cancelText: this.$t('Cancel'),
+				focusOn: 'cancel',
+				onConfirm: async () => {
+					this.busy = true
+					this.error = ''
+					try {
+						await fleetApi.removeDevice(d.id)
+						await this.loadList()
+					} catch (e) {
+						this.error = this.readable(e)
+					} finally {
+						this.busy = false
+					}
+				},
 			})
 		},
 		async run(call) {
@@ -157,12 +236,12 @@ export default {
 				onConfirm: () => this.run(() => fleetApi.setRemote({ enabled: false })),
 			})
 		},
-		async copyAddress() {
+		async copyAddress(addr) {
 			try {
-				await copy(`http://${this.remote.addr}`)
-				this.copied = true
+				await copy(`http://${addr}`)
+				this.copied = addr
 				clearTimeout(this.copyTimer)
-				this.copyTimer = setTimeout(() => (this.copied = false), 2000)
+				this.copyTimer = setTimeout(() => (this.copied = ''), 2000)
 			} catch {
 				this.error = this.$t('The address could not be copied')
 			}

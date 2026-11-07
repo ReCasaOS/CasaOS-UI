@@ -2999,5 +2999,11 @@
   "This box is a member of a fleet: it has no remote access of its own": "Cette box est membre d'une flotte : elle n'a pas d'accès à distance propre",
   "The gateway only listens on this box: remote access needs it reachable from the network": "La passerelle n'écoute que sur cette box : l'accès à distance a besoin qu'elle soit joignable depuis le réseau",
   "Remote access already runs over another relay: turn it off first": "L'accès à distance passe déjà par un autre relais : désactivez-le d'abord",
-  "The address could not be copied": "L'adresse n'a pas pu être copiée"
+  "The address could not be copied": "L'adresse n'a pas pu être copiée",
+  "Phones and PCs": "Téléphones et PC",
+  "No phone or PC yet.": "Aucun téléphone ni PC pour l'instant.",
+  "last seen {time}": "vu {time}",
+  "not on the private network": "pas sur le réseau privé",
+  "Remove this device?": "Retirer cet appareil ?",
+  "{name} will no longer reach this box.": "{name} n'aura plus accès à cette box."
 }
