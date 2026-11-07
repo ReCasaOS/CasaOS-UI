@@ -26,7 +26,37 @@
 					<div class="settings-card">
 						<div class="is-flex is-align-items-center is-justify-content-space-between mb-2">
 							<p class="has-text-weight-medium">{{ $t('Phones and PCs') }}</p>
-							<b-button :disabled="busy" size="is-small" type="is-text" @click="refresh">{{ $t('Refresh') }}</b-button>
+							<span>
+								<b-button v-if="!adding" :disabled="busy" size="is-small" type="is-text" @click="addDevice">{{ $t('Add a phone or PC') }}</b-button>
+								<b-button :disabled="busy" size="is-small" type="is-text" @click="refresh">{{ $t('Refresh') }}</b-button>
+							</span>
+						</div>
+						<div v-if="adding" class="remote-add mb-3">
+							<p class="remote-code">{{ adding.code }}
+								<b-button class="remote-code-copy" size="is-small" type="is-text" @click="copyValue(adding.code)">{{ copied === adding.code ? $t('Copied') : $t('Copy') }}</b-button>
+							</p>
+							<template v-if="remaining > 0">
+								<p class="is-size-7 mb-2">{{ $t('valid for {time}', { time: countdown }) }}</p>
+								<div class="buttons mb-2">
+									<b-button v-for="p in platforms" :key="p.id" size="is-small" rounded :type="platform === p.id ? 'is-primary' : ''" @click="platform = p.id">{{ p.label }}</b-button>
+								</div>
+								<ol class="remote-steps">
+									<li v-for="(step, i) in steps" :key="platform + i">{{ step }}</li>
+								</ol>
+								<p v-if="platform === 'windows'" class="remote-command">
+									<code>{{ loginCommand }}</code>
+									<b-button size="is-small" type="is-text" @click="copyValue(loginCommand)">{{ copied === loginCommand ? $t('Copied') : $t('Copy') }}</b-button>
+								</p>
+								<p class="is-size-7 mt-2">{{ $t('A page then opens in the browser: type the code shown above.') }}</p>
+								<p class="is-size-7 mt-1">{{ $t('Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.') }}</p>
+							</template>
+							<template v-else>
+								<p class="mb-2">{{ $t('This code has expired.') }}</p>
+								<b-button :disabled="busy" size="is-small" rounded @click="addDevice">{{ $t('New code') }}</b-button>
+							</template>
+							<div class="mt-2">
+								<b-button size="is-small" rounded type="is-primary" @click="doneAdding">{{ $t('Done') }}</b-button>
+							</div>
 						</div>
 						<p v-if="!devices.length" class="is-size-7">{{ $t('No phone or PC yet.') }}</p>
 						<ul v-else>
@@ -97,6 +127,10 @@ export default {
 			copied: '',
 			// GET /v1/fleet/remote: devices, and boxes on a master; the relay is asked only on open, refresh and removal
 			list: null,
+			// the code being shown: { code, expires_at }; the countdown only reads the clock, never the network
+			adding: null,
+			now: Date.now(),
+			platform: 'ios',
 		}
 	},
 	computed: {
@@ -108,6 +142,55 @@ export default {
 		},
 		boxes() {
 			return this.list?.boxes || []
+		},
+		addingRelay() {
+			return this.remote?.relay || ''
+		},
+		remaining() {
+			const end = this.adding ? new Date(this.adding.expires_at).getTime() : 0
+			return Number.isNaN(end) ? 0 : Math.max(0, Math.ceil((end - this.now) / 1000))
+		},
+		countdown() {
+			const m = String(Math.floor(this.remaining / 60)).padStart(2, '0')
+			return `${m}:${String(this.remaining % 60).padStart(2, '0')}`
+		},
+		platforms() {
+			return [
+				{ id: 'ios', label: this.$t('iPhone / iPad') },
+				{ id: 'android', label: 'Android' },
+				{ id: 'windows', label: 'Windows' },
+				{ id: 'mac', label: 'Mac' },
+			]
+		},
+		loginCommand() {
+			return `tailscale login --login-server=${this.addingRelay}`
+		},
+		steps() {
+			const relay = this.addingRelay
+			const steps = {
+				ios: [
+					this.$t('Open the Tailscale app, then the menu at the top right.'),
+					this.$t('Choose "Use a custom coordination server".'),
+					this.$t('Type the relay address: {relay}', { relay }),
+					this.$t('Choose "Log in".'),
+				],
+				android: [
+					this.$t('Open the Tailscale app, then its settings.'),
+					this.$t('Choose "Accounts", then open the "⋮" menu.'),
+					this.$t('Choose "Use an alternate server".'),
+					this.$t('Type the relay address: {relay}', { relay }),
+					this.$t('Choose "Log in".'),
+				],
+				windows: [
+					this.$t('The app has no field for this: open a terminal and run this command.'),
+				],
+				mac: [
+					this.$t('Option+click the Tailscale icon in the menu bar.'),
+					this.$t('Choose "Debug", then "Custom Login Server", then "Add Account".'),
+					this.$t('Type the relay address: {relay}', { relay }),
+				],
+			}
+			return steps[this.platform]
 		},
 		officialRelay() {
 			return this.view?.default_relay || OFFICIAL_RELAY
@@ -121,6 +204,7 @@ export default {
 	},
 	beforeUnmount() {
 		clearTimeout(this.copyTimer)
+		this.stopTicker()
 	},
 	methods: {
 		load() {
@@ -240,10 +324,43 @@ export default {
 				},
 			})
 		},
-		async copyAddress(addr) {
+		copyAddress(addr) {
+			return this.copyValue(`http://${addr}`, addr)
+		},
+		async addDevice() {
+			this.busy = true
+			this.error = ''
+			this.stopTicker()
 			try {
-				await copy(`http://${addr}`)
-				this.copied = addr
+				const res = await fleetApi.addDevice()
+				this.adding = res.data.data
+				this.now = Date.now()
+				this.ticker = setInterval(() => {
+					this.now = Date.now()
+					if (this.remaining <= 0) {
+						this.stopTicker()
+					}
+				}, 1000)
+			} catch (e) {
+				this.adding = null
+				this.error = this.readable(e)
+			} finally {
+				this.busy = false
+			}
+		},
+		doneAdding() {
+			this.stopTicker()
+			this.adding = null
+			return this.loadList()
+		},
+		stopTicker() {
+			clearInterval(this.ticker)
+			this.ticker = null
+		},
+		async copyValue(text, key = text) {
+			try {
+				await copy(text)
+				this.copied = key
 				clearTimeout(this.copyTimer)
 				this.copyTimer = setTimeout(() => (this.copied = ''), 2000)
 			} catch {
@@ -255,6 +372,25 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.remote-code {
+font-family: monospace;
+font-size: 2rem;
+letter-spacing: 0.1em;
+}
+.remote-command {
+display: flex;
+flex-wrap: wrap;
+align-items: center;
+gap: 0 0.5rem;
+code {
+	overflow-wrap: anywhere;
+}
+}
+.remote-steps {
+list-style: decimal;
+padding-left: 1.25rem;
+margin-bottom: 0.5rem;
+}
 .remote-item {
 	display: flex;
 	flex-wrap: wrap;

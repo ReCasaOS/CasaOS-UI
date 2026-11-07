@@ -3003,5 +3003,21 @@
   "last seen {time}": "last seen {time}",
   "not on the private network": "not on the private network",
   "Remove this device?": "Remove this device?",
-  "{name} will no longer reach this box.": "{name} will no longer reach this box."
+  "{name} will no longer reach this box.": "{name} will no longer reach this box.",
+  "Add a phone or PC": "Add a phone or PC",
+  "valid for {time}": "valid for {time}",
+  "iPhone / iPad": "iPhone / iPad",
+  "Open the Tailscale app, then the menu at the top right.": "Open the Tailscale app, then the menu at the top right.",
+  "Choose \"Use a custom coordination server\".": "Choose \"Use a custom coordination server\".",
+  "Type the relay address: {relay}": "Type the relay address: {relay}",
+  "Choose \"Log in\".": "Choose \"Log in\".",
+  "Open the Tailscale app, then its settings.": "Open the Tailscale app, then its settings.",
+  "Choose \"Accounts\", then open the \"⋮\" menu.": "Choose \"Accounts\", then open the \"⋮\" menu.",
+  "Choose \"Use an alternate server\".": "Choose \"Use an alternate server\".",
+  "The app has no field for this: open a terminal and run this command.": "The app has no field for this: open a terminal and run this command.",
+  "Option+click the Tailscale icon in the menu bar.": "Option+click the Tailscale icon in the menu bar.",
+  "Choose \"Debug\", then \"Custom Login Server\", then \"Add Account\".": "Choose \"Debug\", then \"Custom Login Server\", then \"Add Account\".",
+  "A page then opens in the browser: type the code shown above.": "A page then opens in the browser: type the code shown above.",
+  "Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.": "Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.",
+  "This code has expired.": "This code has expired."
 }

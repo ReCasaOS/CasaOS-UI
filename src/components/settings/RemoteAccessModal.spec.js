@@ -7,7 +7,7 @@ import { fleetApi } from '@/service/fleet'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn(), addDevice: vi.fn() } }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })
@@ -233,6 +233,94 @@ describe('the Remote access window', () => {
 			expect(wrapper.text()).toContain('The relay no longer knows this box')
 			expect(wrapper.text()).toContain('Address of this box: http://100.64.0.7')
 			expect(button('Refresh')).toBeTruthy()
+		})
+	})
+
+	describe('adding a device', () => {
+		const NOW = new Date('2026-11-07T12:00:00Z')
+		const LIST = { relay: 'r', addr: '100.64.0.7', devices: [] }
+		const code = (secs = 600) => ({ code: 'ABCD-2345', expires_at: new Date(NOW.getTime() + secs * 1000).toISOString() })
+
+		beforeEach(() => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
+			vi.setSystemTime(NOW)
+			fleetApi.status.mockReturnValue(answer(ON))
+			fleetApi.remote.mockReturnValue(answer(LIST))
+			fleetApi.addDevice.mockReturnValue(answer(code()))
+		})
+		afterEach(() => vi.useRealTimers())
+
+		const add = async () => {
+			await open()
+			await button('Add a phone or PC').trigger('click')
+			await flushPromises()
+		}
+
+		it('shows the code and the steps', async () => {
+			await add()
+			expect(wrapper.text()).toContain('ABCD-2345')
+			expect(wrapper.text()).toContain('valid for 10:00')
+			expect(wrapper.text()).toContain('https://relay.official.test')
+			expect(wrapper.text()).toContain('"Use a custom coordination server"')
+			expect(wrapper.text()).toContain('Already using the Tailscale app for another network?')
+			await button('Windows').trigger('click')
+			expect(wrapper.text()).toContain('tailscale login --login-server=https://relay.official.test')
+			await button('Android').trigger('click')
+			expect(wrapper.text()).toContain('"Use an alternate server"')
+			await button('Mac').trigger('click')
+			expect(wrapper.text()).toContain('Custom Login Server')
+		})
+
+		it('expires the code locally', async () => {
+			await add()
+			vi.advanceTimersByTime(599 * 1000)
+			await flushPromises()
+			expect(wrapper.text()).toContain('valid for 00:01')
+			vi.advanceTimersByTime(2 * 1000)
+			await flushPromises()
+			expect(wrapper.text()).toContain('This code has expired.')
+			expect(fleetApi.addDevice).toHaveBeenCalledTimes(1)
+			expect(fleetApi.remote).toHaveBeenCalledTimes(1)
+			fleetApi.addDevice.mockReturnValue(answer({ code: 'WXYZ-6789', expires_at: new Date(Date.now() + 600 * 1000).toISOString() }))
+			await button('New code').trigger('click')
+			await flushPromises()
+			expect(fleetApi.addDevice).toHaveBeenCalledTimes(2)
+			expect(wrapper.text()).toContain('WXYZ-6789')
+			expect(wrapper.text()).not.toContain('This code has expired.')
+		})
+
+		it('copies the code', async () => {
+			const copy = (await import('clipboard-copy')).default
+			await add()
+			await wrapper.find('.remote-code-copy').trigger('click')
+			await flushPromises()
+			expect(copy).toHaveBeenCalledWith('ABCD-2345')
+		})
+
+		it('reloads the devices once when done', async () => {
+			await add()
+			await button('Done').trigger('click')
+			await flushPromises()
+			expect(wrapper.text()).not.toContain('ABCD-2345')
+			expect(fleetApi.remote).toHaveBeenCalledTimes(2)
+		})
+
+		it('clears its timer when closed', async () => {
+			await open()
+			vi.clearAllTimers() // Buefy's own transition timers are not ours
+			await button('Add a phone or PC').trigger('click')
+			await flushPromises()
+			expect(vi.getTimerCount()).toBe(1)
+			wrapper.unmount()
+			wrapper = null
+			expect(vi.getTimerCount()).toBe(0)
+		})
+
+		it('says so when there are too many codes', async () => {
+			fleetApi.addDevice.mockImplementation(() => refusal(409, 'too many codes not used yet'))
+			await add()
+			expect(wrapper.text()).toContain('Too many codes are not used yet')
+			expect(wrapper.text()).not.toContain('valid for')
 		})
 	})
 })
