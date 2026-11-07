@@ -7,6 +7,7 @@ import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FleetModal from './settings/FleetModal.vue'
+import RemoteAccessModal from './settings/RemoteAccessModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
@@ -852,6 +853,15 @@ describe('the fleet row', () => {
 		expect(source).toMatch(/<!-- Fleet Start -->[\s\S]*?@click="showFleet"[\s\S]*?<!-- Fleet End -->/)
 		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
 		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: FleetModal }))
+	})
+
+	it('shows the remote access row with the fleet row and opens its window', async () => {
+		expect(source).toMatch(/<!-- Fleet End -->\s*<!-- Remote access Start -->\s*<div v-if="fleetAvailable"[\s\S]*?icon="cellphone-link"[\s\S]*?@click="showRemoteAccess"[\s\S]*?<!-- Remote access End -->/)
+		const vm = bar()
+		vm.showRemoteAccess = TopBar.methods.showRemoteAccess.bind(vm)
+		await vm.showRemoteAccess()
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: RemoteAccessModal }))
 	})
 
 	// an icon name the installed font lacks draws nothing

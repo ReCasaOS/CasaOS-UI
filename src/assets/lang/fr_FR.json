@@ -3022,5 +3022,8 @@
   "A page then opens in the browser: type the code shown above.": "Une page s'ouvre alors dans le navigateur : saisissez le code affiché ci-dessus.",
   "Already using the Tailscale app for another network? Add an account in the app first: one network is active at a time.": "Vous utilisez déjà l'application Tailscale pour un autre réseau ? Ajoutez d'abord un compte dans l'application : un seul réseau est actif à la fois.",
   "This code has expired.": "Ce code a expiré.",
-  "Done adding": "Terminé"
+  "Done adding": "Terminé",
+  "Join this fleet and turn remote access off?": "Rejoindre cette flotte et désactiver l'accès à distance ?",
+  "Your phones and PCs lose access to this box. Add them again on the master afterwards.": "Vos téléphones et vos PC perdent l'accès à ce boîtier. Ajoutez-les de nouveau sur le master ensuite.",
+  "Your phones and PCs lose remote access too.": "Vos téléphones et vos PC perdent aussi l'accès à distance."
 }

@@ -389,6 +389,21 @@
 					</div>
 					<!-- Fleet End -->
 
+					<!-- Remote access Start -->
+					<div v-if="fleetAvailable"
+						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
+						<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+							<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="cellphone-link" size="is-20" />
+							{{ $t("Remote access") }}
+						</div>
+						<div class="ml-2">
+							<b-button rounded size="is-small" type="is-dark" @click="showRemoteAccess">
+								{{ $t("Configure") }}
+							</b-button>
+						</div>
+					</div>
+					<!-- Remote access End -->
+
 					<!-- Automount USB Drive Start  -->
 					<div
 						class="is-flex is-align-items-center mb-1 _is-large _box hover-effect _is-radius pr-2 mr-4 ml-4">
@@ -1077,6 +1092,20 @@ export default {
 			return import('./settings/FleetModal.vue').then(({ default: FleetModal }) => {
 				this.$buefy.modal.open({
 					component: FleetModal,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: ['escape'],
+					scroll: 'keep',
+					animation: 'zoom-in',
+				})
+			})
+		},
+
+		showRemoteAccess() {
+			this.$refs.settingsDrop.toggle()
+			return import('./settings/RemoteAccessModal.vue').then(({ default: RemoteAccessModal }) => {
+				this.$buefy.modal.open({
+					component: RemoteAccessModal,
 					hasModalCard: true,
 					trapFocus: true,
 					canCancel: ['escape'],
