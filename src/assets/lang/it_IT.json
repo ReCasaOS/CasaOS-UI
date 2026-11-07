@@ -1178,6 +1178,7 @@
   "Starting Docker and the apps…": "Avvio di Docker e delle app…",
   "The old copy is still being deleted. Reopen this page in a while to see it gone.": "La vecchia copia è ancora in cancellazione. Riapri questa pagina tra poco per vederla sparita.",
   "To put Docker's data in another folder, move it back to the default place first.": "Per mettere i dati di Docker in un'altra cartella, riportali prima nella posizione predefinita.",
+  "Open in a new tab": "Apri in una nuova scheda",
   "Subtitles": "Sottotitoli",
   "No subtitles": "Senza sottotitoli"
 }

@@ -78,6 +78,7 @@ import UpdateCompleteModal from '@/components/settings/UpdateCompleteModal.vue'
 import { mixin } from '@/mixins/mixin'
 import { FILES_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import events from '@/events/events'
+import { openPage } from '@/router/pageTabs'
 
 const wallpaperConfig = 'wallpaper'
 
@@ -236,8 +237,7 @@ export default {
 		showFiles(path) {
 			// the App launching setting covers Files as it covers the apps
 			if (builtinOpensInNewTab(FILES_LAUNCH_ID, this.$store.state)) {
-				const query = path ? `?path=${encodeURIComponent(path)}` : ''
-				window.open(`${window.location.pathname}#/files${query}`, '_blank')
+				openPage('files', { path })
 				return
 			}
 

@@ -4,6 +4,7 @@
 import { defineAsyncComponent } from 'vue'
 import { openWithEscape } from './modalStack'
 import { VMS_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { openPage } from '@/router/pageTabs'
 
 // loaded when first opened: a box without the module never downloads the page
 const VmPage = defineAsyncComponent(() => import('./VmPage.vue'))
@@ -58,8 +59,7 @@ export function forgetVirtualMachines() {
 // setting sends apps, or this one, to a new tab. With a VM's id, on that VM.
 export function openVirtualMachines(buefy, state, vmId = '') {
 	if (builtinOpensInNewTab(VMS_LAUNCH_ID, state)) {
-		const query = vmId ? `?vm=${encodeURIComponent(vmId)}` : ''
-		window.open(`${window.location.pathname}#/vms${query}`, '_blank')
+		openPage('vms', { vm: vmId })
 		return null
 	}
 

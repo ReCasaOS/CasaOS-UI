@@ -105,6 +105,7 @@
 									<!--  Close Button Start -->
 									<div
 										class="is-flex is-align-items-center modal-close-container modal-close-container-line">
+										<NewTabButton :params="{ path: currentPath }" class="mr-2" page="files" />
 										<div class="close-button" @click="$emit('close')">
 											<b-icon icon="close-outline" pack="casa"></b-icon>
 										</div>
@@ -278,6 +279,7 @@ import events from '@/events/events'
 import VueBreakpointMixin from '@/mixins/breakpoint'
 import { filterHiddenFiles } from '@/mixins/file_utils'
 import { mixin } from '@/mixins/mixin'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const SHOW_HIDDEN_FILES_STORAGE_KEY = 'casaos-filebrowser-show-hidden-files'
 
@@ -290,6 +292,7 @@ export default {
 		}
 	},
 	components: {
+		NewTabButton,
 		ListView,
 		GirdView,
 		FileBreadcrumb,

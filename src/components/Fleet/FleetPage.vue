@@ -4,6 +4,7 @@
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 ref="title" class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Fleet') }}</h3>
 			</div>
+			<NewTabButton page="fleet" />
 			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa" />
 			</button>
@@ -34,10 +35,11 @@ import OverviewTab from './OverviewTab.vue'
 import ContainersTab from './ContainersTab.vue'
 import VmsTab from './VmsTab.vue'
 import UpdatesTab from './UpdatesTab.vue'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 export default {
 	name: 'FleetPage',
-	components: { OverviewTab, ContainersTab, VmsTab, UpdatesTab },
+	components: { NewTabButton, OverviewTab, ContainersTab, VmsTab, UpdatesTab },
 	emits: ['close'],
 	data() {
 		return {

@@ -7,6 +7,7 @@
 				</button>
 				<h3 class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Logs') }}</h3>
 			</div>
+			<NewTabButton :params="{ app: selectedApps.length === 1 ? selectedApps[0] : '', box }" page="logs" />
 			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa" />
 			</button>
@@ -116,6 +117,7 @@ import { rangeBounds } from './logsModel'
 import { listBoxes } from '@/components/Fleet/fleetLoader'
 import { fleetApi } from '@/service/fleet'
 import { logsApi } from '@/service/logs'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const RANGES = [
 	{ id: 'live', label: 'Live' },
@@ -129,7 +131,7 @@ const DAY_MS = 86400000
 
 export default {
 	name: 'LogsPage',
-	components: { LogStream },
+	components: { NewTabButton, LogStream },
 	props: {
 		initialApp: { type: String, default: '' },
 		initialAt: { type: String, default: '' },

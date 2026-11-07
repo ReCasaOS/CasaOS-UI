@@ -3,6 +3,7 @@
 import { defineAsyncComponent } from 'vue'
 import { openWithEscape } from '@/components/VirtualMachines/modalStack'
 import { STATS_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
+import { openPage } from '@/router/pageTabs'
 
 const StatsPage = defineAsyncComponent(() => import('./StatsPage.vue'))
 
@@ -23,8 +24,7 @@ export function openStatistics(buefy, state, { item } = {}) {
 	}
 
 	if (builtinOpensInNewTab(STATS_LAUNCH_ID, state)) {
-		const query = item ? `?item=${encodeURIComponent(item)}` : ''
-		window.open(`${window.location.pathname}#/stats${query}`, '_blank')
+		openPage('stats', { item })
 		return null
 	}
 
