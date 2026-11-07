@@ -110,6 +110,13 @@ describe('the Remote access window', () => {
 			[409, 'the relay does not offer remote access yet', 'This relay does not offer remote access yet'],
 			[503, 'relay is full', 'The relay is full'],
 			[429, 'slow down', 'The relay is busy, try again later'],
+			[502, 'bad gateway', 'Relay unreachable'],
+			[409, 'the relay no longer knows this box\'s network', 'The relay no longer knows this box\'s network'],
+			[409, 'too many codes not used yet', 'Too many codes are not used yet'],
+			[400, 'the gateway listens on this box\'s loopback only, so your phones and PCs cannot reach it: set its address to 0.0.0.0', 'The gateway only listens on this box'],
+			[400, 'this box is a member of a fleet: phones and PCs are added on the master\'s dashboard', 'This box is a member of a fleet'],
+			[400, 'the master runs at an address typed by hand: move it onto a relay to get remote access', 'typed by hand'],
+			[409, 'remote access already runs over another relay: turn it off first', 'already runs over another relay'],
 		]
 		for (const [status, message, shown] of cases) {
 			fleetApi.setRemote.mockImplementation(() => refusal(status, message))

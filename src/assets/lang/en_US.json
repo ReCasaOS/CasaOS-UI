@@ -2995,5 +2995,7 @@
   "The relay no longer knows this box's network: turn remote access off and on again": "The relay no longer knows this box's network: turn remote access off and on again",
   "Too many codes are not used yet: use or wait for them to expire": "Too many codes are not used yet: use or wait for them to expire",
   "This box is a member of a fleet: it has no remote access of its own": "This box is a member of a fleet: it has no remote access of its own",
-  "The gateway only listens on this box: remote access needs it reachable from the network": "The gateway only listens on this box: remote access needs it reachable from the network"
+  "The gateway only listens on this box: remote access needs it reachable from the network": "The gateway only listens on this box: remote access needs it reachable from the network",
+  "Remote access already runs over another relay: turn it off first": "Remote access already runs over another relay: turn it off first",
+  "The address could not be copied": "The address could not be copied"
 }

@@ -2997,5 +2997,7 @@
   "The relay no longer knows this box's network: turn remote access off and on again": "Le relais ne connaît plus le réseau de cette box : désactivez puis réactivez l'accès à distance",
   "Too many codes are not used yet: use or wait for them to expire": "Trop de codes ne sont pas encore utilisés : utilisez-les ou attendez leur expiration",
   "This box is a member of a fleet: it has no remote access of its own": "Cette box est membre d'une flotte : elle n'a pas d'accès à distance propre",
-  "The gateway only listens on this box: remote access needs it reachable from the network": "La passerelle n'écoute que sur cette box : l'accès à distance a besoin qu'elle soit joignable depuis le réseau"
+  "The gateway only listens on this box: remote access needs it reachable from the network": "La passerelle n'écoute que sur cette box : l'accès à distance a besoin qu'elle soit joignable depuis le réseau",
+  "Remote access already runs over another relay: turn it off first": "L'accès à distance passe déjà par un autre relais : désactivez-le d'abord",
+  "The address could not be copied": "L'adresse n'a pas pu être copiée"
 }

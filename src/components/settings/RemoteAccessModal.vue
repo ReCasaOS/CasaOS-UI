@@ -80,6 +80,9 @@ export default {
 	mounted() {
 		this.load()
 	},
+	beforeUnmount() {
+		clearTimeout(this.copyTimer)
+	},
 	methods: {
 		load() {
 			return fleetApi.status().then((res) => {
@@ -117,28 +120,20 @@ export default {
 			if (status === 502) {
 				return this.$t('Relay unreachable')
 			}
-			if (status === 503 && /relay is full/i.test(text)) {
-				return this.$t('The relay is full')
-			}
-			if (status === 409) {
-				if (/does not offer remote access yet/i.test(text)) {
-					return this.$t('This relay does not offer remote access yet')
-				}
-				if (/no longer knows this box's network/i.test(text)) {
-					return this.$t('The relay no longer knows this box\'s network: turn remote access off and on again')
-				}
-				if (/too many codes not used yet/i.test(text)) {
-					return this.$t('Too many codes are not used yet: use or wait for them to expire')
-				}
-				if (/is a member of a fleet/i.test(text)) {
-					return this.$t('This box is a member of a fleet: it has no remote access of its own')
-				}
-				if (/typed by hand/i.test(text)) {
-					return this.$t('The master runs at an address typed by hand: move it onto a relay (Fleet settings) to get remote access.')
-				}
-				if (/loopback only/i.test(text)) {
-					return this.$t('The gateway only listens on this box: remote access needs it reachable from the network')
-				}
+			const known = [
+				[/relay is full/i, 'The relay is full'],
+				[/does not offer remote access yet/i, 'This relay does not offer remote access yet'],
+				[/no longer knows this box's network/i, 'The relay no longer knows this box\'s network: turn remote access off and on again'],
+				[/too many codes not used yet/i, 'Too many codes are not used yet: use or wait for them to expire'],
+				[/is a member of a fleet/i, 'This box is a member of a fleet: it has no remote access of its own'],
+				[/typed by hand/i, 'The master runs at an address typed by hand: move it onto a relay (Fleet settings) to get remote access.'],
+				[/loopback only/i, 'The gateway only listens on this box: remote access needs it reachable from the network'],
+				[/already runs over another relay/i, 'Remote access already runs over another relay: turn it off first'],
+			]
+			// the core's texts are matched whatever the status: it answers 400 for some and 409 for others
+			const hit = known.find(([re]) => re.test(text))
+			if (hit) {
+				return this.$t(hit[1])
 			}
 			return text || e?.message || this.$t('Could not be read')
 		},
@@ -163,9 +158,14 @@ export default {
 			})
 		},
 		async copyAddress() {
-			await copy(`http://${this.remote.addr}`)
-			this.copied = true
-			setTimeout(() => (this.copied = false), 2000)
+			try {
+				await copy(`http://${this.remote.addr}`)
+				this.copied = true
+				clearTimeout(this.copyTimer)
+				this.copyTimer = setTimeout(() => (this.copied = false), 2000)
+			} catch {
+				this.error = this.$t('The address could not be copied')
+			}
 		},
 	},
 }
