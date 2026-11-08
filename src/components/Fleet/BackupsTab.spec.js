@@ -213,6 +213,43 @@ describe('the Backups tab', () => {
 		remove.mockRestore()
 	})
 
+	describe('the detail of a box the master cannot vouch for', () => {
+		const resticCouple = () => couple({ verify: { state: 'passed', at: ago(MIN), error: '' }, restic_check: { ok: true, at: ago(MIN), error: '' } })
+
+		it('shows a fresh, online box in green, all three marks', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [resticCouple()] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(wrapper.findAll('.fleet-backups-couples .is-ok')).toHaveLength(3)
+		})
+
+		it.each([['offline', { online: false }], ['stale', { stale: true }]])('has no green mark in the couples of a box that is %s, whose last snapshot was ok', async (_, over) => {
+			fleetApi.backups.mockResolvedValue(answer([box({ ...over, couples: [resticCouple()] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			const marks = wrapper.findAll('.fleet-backups-couples .backup-mark')
+			expect(marks).toHaveLength(3)
+			expect(marks.every(m => m.classes().includes('is-none'))).toBe(true)
+			// the words are kept
+			expect(coupleLine('immich').text()).toContain('Integrity check: Passed')
+		})
+	})
+
+	it('shows only the error, not "Not read yet", for an old box with an error and no read', async () => {
+		fleetApi.backups.mockResolvedValue(answer([box({ couples: [], polled_at: '', state: 'unknown', green: false, error: 'this box is too old' })]))
+		await mountTab()
+		await toggle().trigger('click')
+		expect(wrapper.text()).toContain('this box is too old')
+		expect(wrapper.text()).not.toContain('Not read yet')
+	})
+
+	it('writes the integrity check as one sentence', async () => {
+		fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic_check: { ok: false, at: ago(MIN), error: 'bad pack' } })] })]))
+		await mountTab()
+		await toggle().trigger('click')
+		expect(coupleLine('immich').text()).toContain('Integrity check: Failed')
+	})
+
 	describe('without couples', () => {
 		it('says no backup is scheduled only for a box that was read', async () => {
 			fleetApi.backups.mockResolvedValue(answer([box({ couples: [] })]))
@@ -371,10 +408,21 @@ describe('the Backups tab', () => {
 		})
 
 		it('says why Verify is disabled in its accessible name, not only in a tooltip', async () => {
-			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '' })] })]))
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '', state: 'never' })] })]))
 			await mountTab()
 			await toggle().trigger('click')
 			expect(lineButton('immich', 'Verify').attributes('aria-label')).toContain('no backup has succeeded')
+		})
+
+		it('does not say no backup has succeeded when the couple is ok but its records are gone', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '', state: 'ok' })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			const verify = lineButton('immich', 'Verify')
+			expect(verify.attributes('aria-label')).not.toContain('no backup has succeeded')
+			expect(verify.attributes('aria-label')).toContain('No run of it is left in the log of the box')
+			expect(verify.attributes('title')).toBe('No run of it is left in the log of the box')
+			expect(verify.attributes('disabled')).toBeDefined()
 		})
 
 		it('verifies a couple with its last good stamp', async () => {

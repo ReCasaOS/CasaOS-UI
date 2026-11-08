@@ -1203,6 +1203,11 @@ export default {
 				.app-text {
 					width: 100%;
 					text-align: center;
+
+					// the title and its backup badge, centred like the rest of the tile
+					.title-row {
+						justify-content: center;
+					}
 				}
 
 				.app-state {

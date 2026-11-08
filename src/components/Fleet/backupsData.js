@@ -84,6 +84,11 @@ export function badgeFor(box, app) {
 	if (!vouchedFor(box)) {
 		return 'attention'
 	}
+	// a box that is not green with nothing in it to show why holds an alert the master carries (a backup running, a
+	// verification it cannot read): no app of it is green
+	if (!box.green && !box.couples.some(c => c.state !== 'ok' || verifyFailed(c))) {
+		return 'attention'
+	}
 	if (own.some(c => c.state === 'failed' || verifyFailed(c))) {
 		return 'failed'
 	}

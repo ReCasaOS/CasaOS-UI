@@ -173,6 +173,26 @@ describe('badgeFor', () => {
 		}
 	})
 
+	it('is attention on a box that is not green with nothing in it to show why (a carried alert)', () => {
+		const carried = over => box({ green: false, problems: 0, ...over })
+		// a backup running, or a restic couple whose verify is unknown, keeps the master's alert up
+		expect(badgeFor(carried({ couples: [couple({ running: true })] }), 'immich')).toBe('attention')
+		expect(badgeFor(carried({ couples: [couple({ restic: false, verify: { state: 'unknown', error: '' } })] }), 'immich')).toBe('attention')
+		// every app of that box with a couple, not only the one that explains it
+		expect(badgeFor(carried({ couples: [couple(), couple({ app: 'plex' })] }), 'plex')).toBe('attention')
+		// still nothing for an app without a schedule
+		expect(badgeFor(carried({ couples: [couple()] }), 'plex')).toBeNull()
+	})
+
+	it('keeps ok on a not green box when a couple of the box explains it, for an app that is fine', () => {
+		const late = box({ green: false, state: 'late', couples: [couple(), couple({ app: 'plex', state: 'late' })] })
+		expect(badgeFor(late, 'immich')).toBe('ok')
+		expect(badgeFor(late, 'plex')).toBe('attention')
+		const verifyFailed = box({ green: false, couples: [couple(), couple({ app: 'plex', verify: { state: 'failed', error: '' } })] })
+		expect(badgeFor(verifyFailed, 'immich')).toBe('ok')
+		expect(badgeFor(verifyFailed, 'plex')).toBe('failed')
+	})
+
 	it('is still null for an offline box that has no couple of the app', () => {
 		expect(badgeFor(box({ online: false }), 'plex')).toBeNull()
 	})

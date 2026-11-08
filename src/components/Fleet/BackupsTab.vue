@@ -82,8 +82,9 @@
 					<template #detail="{ row }">
 						<p v-if="row.error" class="fleet-backups-box-error">{{ row.error }}</p>
 						<!-- no couples because nothing could be read is not "nothing is scheduled" -->
-						<p v-if="!couples(row).length && neverRead(row)" class="fleet-backups-unread has-text-full-03">{{ $t('Not read yet') }}</p>
-						<p v-else-if="!couples(row).length && row.error" class="fleet-backups-unread has-text-full-03">{{ $t('The backups of this box could not be read') }}</p>
+						<!-- an error first: an old box that cannot answer was never read either, and the error is the news -->
+						<p v-if="!couples(row).length && row.error" class="fleet-backups-unread has-text-full-03">{{ $t('The backups of this box could not be read') }}</p>
+						<p v-else-if="!couples(row).length && neverRead(row)" class="fleet-backups-unread has-text-full-03">{{ $t('Not read yet') }}</p>
 						<p v-else-if="!couples(row).length" class="has-text-full-03">{{ $t('No backup is scheduled on this box') }}</p>
 						<table v-else class="table is-narrow fleet-backups-couples">
 							<thead>
@@ -103,7 +104,7 @@
 									<td>{{ c.destination }}</td>
 									<td>
 										<div class="fleet-backups-state">
-											<backup-mark :label="stateWord(c.state)" :level="stateLevel(c.state)" />
+											<backup-mark :label="stateWord(c.state)" :level="calm(row, stateLevel(c.state))" />
 											<span>{{ stateWord(c.state) }}</span>
 											<b-tag v-if="c.running" size="is-small" type="is-info">{{ $t('Running') }}</b-tag>
 										</div>
@@ -119,13 +120,13 @@
 									</td>
 									<td class="fleet-backups-verify">
 										<div class="fleet-backups-state">
-											<backup-mark :label="verifyWord(c)" :level="verifyLevel(c)" />
+											<backup-mark :label="verifyWord(c)" :level="calm(row, verifyLevel(c))" />
 											<span>{{ verifyWord(c) }}</span>
 											<span v-if="c.verify && c.verify.at" class="has-text-full-03">({{ age(c.verify.at) }})</span>
 										</div>
 										<div v-if="c.verify && c.verify.error" class="fleet-backups-error">{{ c.verify.error }}</div>
 										<div v-if="c.restic && c.restic_check" class="fleet-backups-state fleet-backups-check">
-											<backup-mark :label="checkWord(c)" :level="c.restic_check.ok ? 'ok' : 'danger'" />
+											<backup-mark :label="checkWord(c)" :level="calm(row, c.restic_check.ok ? 'ok' : 'danger')" />
 											<span>{{ checkWord(c) }}</span>
 											<span v-if="c.restic_check.at" class="has-text-full-03">({{ age(c.restic_check.at) }})</span>
 										</div>
@@ -138,7 +139,7 @@
 											<b-button v-else
 												:aria-label="verifyLabel(c)"
 												:disabled="!c.last_ok_stamp || coupleBusy(row, c)"
-												:title="c.last_ok_stamp ? '' : $t('Nothing to verify yet: no backup has succeeded')"
+												:title="c.last_ok_stamp ? '' : noVerifyReason(c)"
 												rounded
 												size="is-small"
 												@click="verifyCouple(row, c)">{{ $t('Verify') }}</b-button>
@@ -160,7 +161,7 @@ import BackupMark from './BackupMark.vue'
 import ResultCell from './ResultCell.vue'
 import VerificationScheduleModal from './VerificationScheduleModal.vue'
 import { actions, runBulk } from './bulk'
-import { ageText, boxLevel, couplesOf, lastOkOf, lastVerifyOf, nextOf, stateLevel, summaryOf } from './backupsData'
+import { ageText, boxLevel, couplesOf, lastOkOf, lastVerifyOf, nextOf, stateLevel, summaryOf, vouchedFor } from './backupsData'
 import { BACKUP_WORDS, VERIFY_WORDS } from './fleetWords'
 import { fleetApi } from '@/service/fleet'
 import { createPoller } from '@/components/Stats/poller'
@@ -285,7 +286,15 @@ export default {
 		},
 		verifyLabel(c) {
 			const label = this.$t('Verify {app} on {destination}', c)
-			return c.last_ok_stamp ? label : `${label}. ${this.$t('Nothing to verify yet: no backup has succeeded')}`
+			return c.last_ok_stamp ? label : `${label}. ${this.noVerifyReason(c)}`
+		},
+		// why a couple without a last good stamp cannot be verified: it never succeeded, or the box no longer lists its runs
+		noVerifyReason(c) {
+			return this.$t(c.state === 'never' ? 'Nothing to verify yet: no backup has succeeded' : 'No run of it is left in the log of the box')
+		},
+		// a box the master cannot vouch for is never green, whatever its last snapshot said
+		calm(box, level) {
+			return vouchedFor(box) ? level : 'none'
 		},
 		coupleKey: (box, c) => `${box.box_id}/${c.app}/${c.destination}`,
 		// the box answers at once and runs on: read again a moment later
@@ -408,7 +417,7 @@ export default {
 			return state === 'failed' ? 'danger' : 'none'
 		},
 		checkWord(couple) {
-			return `${this.$t('Integrity check')}: ${couple.restic_check.ok ? this.$t('Passed') : this.$t('Failed')}`
+			return this.$t('Integrity check: {result}', { result: couple.restic_check.ok ? this.$t('Passed') : this.$t('Failed') })
 		},
 	},
 }
