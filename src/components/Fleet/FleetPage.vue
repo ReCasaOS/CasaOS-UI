@@ -25,6 +25,9 @@
 				<b-tab-item :label="$t('Updates')" value="updates">
 					<updates-tab v-if="tab === 'updates'" />
 				</b-tab-item>
+				<b-tab-item :label="$t('Backups')" value="backups">
+					<backups-tab v-if="tab === 'backups'" />
+				</b-tab-item>
 			</b-tabs>
 		</section>
 	</div>
@@ -35,11 +38,12 @@ import OverviewTab from './OverviewTab.vue'
 import ContainersTab from './ContainersTab.vue'
 import VmsTab from './VmsTab.vue'
 import UpdatesTab from './UpdatesTab.vue'
+import BackupsTab from './BackupsTab.vue'
 import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 export default {
 	name: 'FleetPage',
-	components: { NewTabButton, OverviewTab, ContainersTab, VmsTab, UpdatesTab },
+	components: { NewTabButton, OverviewTab, ContainersTab, VmsTab, UpdatesTab, BackupsTab },
 	emits: ['close'],
 	data() {
 		return {
