@@ -854,7 +854,7 @@ describe('a reason that the window has a sentence for, and one that it says by t
 		expect(isKnown(view.sentence.key)).toBe(true)
 	})
 
-	it.each(['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line'])('says a source that is refused for %s with a reason of its own, and not the one of a reason it does not know', (reason) => {
+	it.each(['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled'])('says a source that is refused for %s with a reason of its own, and not the one of a reason it does not know', (reason) => {
 		const { reason: said } = errorView({ code: 'sources_format', data: { file: 'x.list', reason } })
 
 		expect(said).toBe(PLAN_SOURCE_REASONS[reason])
@@ -1102,7 +1102,7 @@ describe('why a plan could not be made', () => {
 	})
 
 	it('says every reason a source is refused for, which the core has', () => {
-		const reasons = ['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line']
+		const reasons = ['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled']
 		expect(Object.keys(PLAN_SOURCE_REASONS).sort()).toEqual([...reasons, 'other'].sort())
 	})
 

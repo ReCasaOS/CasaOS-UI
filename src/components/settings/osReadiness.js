@@ -329,6 +329,17 @@ export const READINESS_CHECKS = {
 		label: 'SSH server version',
 		text: 'The SSH server is older than the version needed before upgrading to Debian 13. The upgrade brings it up to date first, so there is nothing to do.',
 	},
+	ssh_dsa_hostkey: {
+		label: 'SSH server keys',
+		refuse: [
+			'Every key the SSH server uses to identify the machine is a DSA key ({names}), which the OpenSSH of Debian 13 no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
+			'Every key the SSH server uses to identify the machine is a DSA key, which the OpenSSH of Debian 13 no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
+		],
+		text: [
+			'The SSH server uses a DSA key ({names}), which the OpenSSH of Debian 13 no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
+			'The SSH server uses a DSA key, which the OpenSSH of Debian 13 no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
+		],
+	},
 	host_services: {
 		label: 'Server software on this machine',
 		text: [
@@ -431,6 +442,18 @@ export const READINESS_CHECKS = {
 	log_on_tmpfs: {
 		label: 'Where the logs are kept',
 		text: 'ReCasaOS\'s logs (/var/log/casaos) are kept in memory, which is emptied at every restart, so the record of the upgrade would be lost. Move them to a disk.',
+	},
+	cryptsetup_missing: {
+		label: 'Encrypted volumes',
+		text: 'Debian 13 opens the encrypted volumes of /etc/crypttab with a new package, systemd-cryptsetup, which the upgrade normally installs. Before you restart, check that it is installed (sudo apt install systemd-cryptsetup): without it, these volumes do not open at start-up.',
+	},
+	sysctl_conf: {
+		label: 'Settings in /etc/sysctl.conf',
+		text: 'Debian 13 no longer reads /etc/sysctl.conf, so the settings in it would silently stop applying after the restart. Move them to a file in /etc/sysctl.d, such as /etc/sysctl.d/local.conf.',
+	},
+	tmp_tmpfs: {
+		label: 'The /tmp folder',
+		text: 'In Debian 13, /tmp is kept in memory: it can take up to half of it, and is emptied at every start. What an application keeps in /tmp is lost at the restart. To keep /tmp on the disk, run sudo systemctl mask tmp.mount before restarting.',
 	},
 	disk_root: {
 		label: 'Free space on the system disk',

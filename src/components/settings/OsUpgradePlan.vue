@@ -25,6 +25,12 @@
 			<b-message v-if="callError" class="os-plan-call-failure" size="is-small" type="is-danger">
 				{{ say(callError) }}
 			</b-message>
+			<!-- the core said why no plan can be made for this machine (hop_not_planned, not_root, identity_unsupported): said here, where the
+				guide sends the reader, with the button that asks again -->
+			<b-message v-if="cannot" class="os-plan-cannot mt-3" size="is-small" type="is-warning">
+				<p>{{ say(cannot.sentence) }}</p>
+				<b-button class="os-plan-ask-again mt-2" :label="$t('Try again')" :loading="asking" rounded size="is-small" @click="askAgain" />
+			</b-message>
 			<!-- the core could not ask the machine whether a plan can be made: that is not a machine that cannot be planned, and there is no
 				button to start one until it has been asked again -->
 			<b-message v-if="unknown" class="os-plan-unknown mt-3" size="is-small" type="is-warning">
@@ -374,7 +380,7 @@
 import copy from 'clipboard-copy'
 import FileSaver from 'file-saver'
 import { DETAIL_FORMAT, detailLabel } from './osReadiness'
-import { PLAN_CALL_ERRORS, PLAN_ERROR_STEP, PLAN_FAILED_ON, PLAN_LIST_CUT, PLAN_PHASE_UNKNOWN, PLAN_STEP, RUNBOOK_OTHER_FAILURE, RUNBOOK_UNREADABLE_FAILURE, callFailure, planText, readStatus, runbookFailure, runbookView, startRefusal } from './osPlan'
+import { PLAN_CALL_ERRORS, PLAN_ERROR_STEP, PLAN_FAILED_ON, PLAN_LIST_CUT, PLAN_PHASE_UNKNOWN, PLAN_STEP, RUNBOOK_OTHER_FAILURE, RUNBOOK_UNREADABLE_FAILURE, callFailure, errorView, planText, readStatus, runbookFailure, runbookView, startRefusal } from './osPlan'
 
 // What each weight of a finding shows next to it: the icon is for the eye, the badge's words are for the ear.
 const ICONS = {
@@ -454,7 +460,12 @@ export default {
 	},
 	computed: {
 		visible() {
-			return this.ready && (this.plannable || this.unknown) && !NO_PLAN.includes(this.readinessState)
+			return this.ready && (this.plannable || this.unknown || Boolean(this.cannot)) && !NO_PLAN.includes(this.readinessState)
+		},
+		// why the core says no plan can be made for this machine, as the sentence of its code, or null: the guide says to read it here
+		cannot() {
+			const reason = this.ready && !this.plannable && !this.unknown && this.status?.state !== 'running' ? this.status?.reason : ''
+			return reason ? errorView({ code: reason }) : null
 		},
 		// the folder of the sandbox that the last job could not remove, or ''
 		leftBehind() {
