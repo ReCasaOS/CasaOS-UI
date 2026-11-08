@@ -31,7 +31,11 @@ export async function runBulk(rows, call) {
 const appStatus = state => row => relay(row.boxId, 'put', `/v2/app_management/compose/${enc(row.id)}/status`, { data: JSON.stringify(state) })
 // "immich — busy, plex — already running": the pairs a 202 left out, '' when it left none out
 const refusals = res => (res?.data?.data?.refused ?? []).map(r => `${r.app} — ${r.reason}`).join(', ')
-const forceRun = (row, body) => relay(row.id, 'post', '/v2/app_management/backup/schedules/run', { data: body })
+// a 404 on this route is "no schedule matches": the box declined, it did not fail
+function noMatch(e) {
+	throw e?.response?.status === 404 ? Object.assign(e, { response: { ...e.response, status: 409 } }) : e
+}
+const forceRun = (row, body) => relay(row.id, 'post', '/v2/app_management/backup/schedules/run', { data: body }).catch(noMatch)
 const vmAction = action => row => relay(row.boxId, 'post', `/v2/virt_management/vms/${enc(row.id)}/${action}`)
 
 export const actions = {

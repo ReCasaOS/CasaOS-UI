@@ -72,6 +72,35 @@ describe('the verification schedule dialog', () => {
 		expect(applied).toHaveBeenCalledTimes(1)
 	})
 
+	it.each(['', '7.5'])('keeps what was typed (%j), says why it is not applied, and does not post', async (value) => {
+		mountModal()
+		await days().setValue(value)
+		expect(days().element.value).toBe(value)
+		expect(wrapper.find('[role="alert"]').text()).toContain('whole number of days from 1 to 30')
+		expect(button('Apply').attributes('disabled')).toBeDefined()
+		expect(button('Apply').attributes('aria-describedby')).toBe(wrapper.find('[role="alert"]').attributes('id'))
+		await days().trigger('keydown', { key: 'Enter' })
+		await flushPromises()
+		expect(calls()).toEqual([])
+	})
+
+	it('says "Every day" for one day and "Every n days" otherwise', async () => {
+		mountModal()
+		expect(wrapper.text()).toContain('Every 7 days')
+		await days().setValue('1')
+		expect(wrapper.text()).toContain('Every day')
+		expect(wrapper.text()).not.toContain('Every 1 days')
+	})
+
+	it('says when the boxes had different schedules, and starts from the defaults', () => {
+		mountModal({ differ: true })
+		expect(wrapper.text()).toContain('The selected boxes have different schedules; applying will replace them all.')
+		expect(days().element.value).toBe('7')
+		wrapper.unmount()
+		mountModal()
+		expect(wrapper.text()).not.toContain('different schedules')
+	})
+
 	it.each(['0', '31', '-2'])('does not apply %s days', async (value) => {
 		mountModal()
 		await days().setValue(value)

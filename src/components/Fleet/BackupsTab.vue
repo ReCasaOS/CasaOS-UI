@@ -23,23 +23,28 @@
 				<div class="fleet-backups-bar">
 					<span class="has-text-weight-semibold">{{ $t('{n} selected', { n: selectedRows.length }) }}</span>
 					<span class="fleet-backups-bar-gap"></span>
-					<b-button :disabled="!selectedRows.length" rounded size="is-small" type="is-primary" @click="backupNow">{{ $t('Back up now') }}</b-button>
-					<b-button :disabled="!selectedRows.length" rounded size="is-small" @click="openSchedule">{{ $t('Schedule verification…') }}</b-button>
+					<b-button :disabled="!selectedRows.length || barBusy" rounded size="is-small" type="is-primary" @click="backupNow">{{ $t('Back up now') }}</b-button>
+					<b-button :disabled="!selectedRows.length || barBusy" rounded size="is-small" @click="openSchedule">{{ $t('Schedule verification…') }}</b-button>
 				</div>
 
-				<b-table :checked-rows="checkedRows"
-					:custom-is-checked="sameBox"
-					:data="sorted"
+				<b-table :data="sorted"
 					:loading="loading"
 					:mobile-cards="false"
 					:opened-detailed="open"
 					:show-detail-icon="false"
-					checkable
 					class="is-size-7"
 					custom-row-key="box_id"
 					detail-key="box_id"
-					detailed
-					@update:checked-rows="checkedRows = $event">
+					detailed>
+					<b-table-column field="select" width="40">
+						<template #header>
+							<b-checkbox :model-value="allTicked" @update:model-value="tickAll"><span class="is-sr-only">{{ $t('Select all boxes') }}</span></b-checkbox>
+						</template>
+						<template #default="{ row }">
+							<b-checkbox :model-value="isTicked(row)" @update:model-value="tick(row, $event)"><span class="is-sr-only">{{ $t('Select {name}', { name: row.name }) }}</span></b-checkbox>
+						</template>
+					</b-table-column>
+
 					<b-table-column v-slot="{ row }" :label="$t('Box')" field="name">
 						<button :aria-expanded="isOpen(row)" class="fleet-backups-toggle" type="button" @click="toggle(row)">
 							<span aria-hidden="true">{{ isOpen(row) ? '▾' : '▸' }}</span>
@@ -128,10 +133,11 @@
 									</td>
 									<td class="fleet-backups-actions">
 										<div class="fleet-backups-buttons">
-											<b-button rounded size="is-small" @click="backupOne(row, c)">{{ $t('Back up') }}</b-button>
-											<b-button v-if="c.restic" rounded size="is-small" @click="resticCheck(row, c)">{{ $t('Check repository') }}</b-button>
+											<b-button :aria-label="$t('Back up {app} to {destination}', c)" :disabled="coupleBusy(row, c)" rounded size="is-small" @click="backupOne(row, c)">{{ $t('Back up') }}</b-button>
+											<b-button v-if="c.restic" :aria-label="$t('Check repository of {destination}', c)" :disabled="coupleBusy(row, c)" rounded size="is-small" @click="resticCheck(row, c)">{{ $t('Check repository') }}</b-button>
 											<b-button v-else
-												:disabled="!c.last_ok_stamp"
+												:aria-label="verifyLabel(c)"
+												:disabled="!c.last_ok_stamp || coupleBusy(row, c)"
 												:title="c.last_ok_stamp ? '' : $t('Nothing to verify yet: no backup has succeeded')"
 												rounded
 												size="is-small"
@@ -174,7 +180,8 @@ export default {
 			now: new Date(),
 			// the newest read: an older answer never replaces a newer one
 			ticket: 0,
-			checkedRows: [],
+			// the ids of the ticked boxes
+			ticked: [],
 			// box id → { state, message }, the last grouped action's
 			results: {},
 			// "box/app/destination" → { state, message }, the last action on that couple
@@ -208,8 +215,16 @@ export default {
 		},
 		// the ticked boxes as the list has them now, as the rows a grouped action takes
 		selectedRows() {
-			const ids = new Set(this.checkedRows.map(r => r.box_id))
+			const ids = new Set(this.ticked)
 			return (this.data?.boxes ?? []).filter(b => ids.has(b.box_id)).map(b => ({ key: b.box_id, id: b.box_id, name: b.name }))
+		},
+		allTicked() {
+			const boxes = this.data?.boxes ?? []
+			return boxes.length > 0 && boxes.every(b => this.ticked.includes(b.box_id))
+		},
+		// a grouped action is out: its buttons wait for the answers
+		barBusy() {
+			return Object.values(this.results).some(r => r.state === 'running')
 		},
 		// the boxes in trouble first
 		sorted() {
@@ -256,8 +271,21 @@ export default {
 				this.loading = false
 			}
 		},
-		sameBox(a, b) {
-			return a.box_id === b.box_id
+		isTicked(box) {
+			return this.ticked.includes(box.box_id)
+		},
+		tick(box, on) {
+			this.ticked = on ? [...this.ticked.filter(id => id !== box.box_id), box.box_id] : this.ticked.filter(id => id !== box.box_id)
+		},
+		tickAll(on) {
+			this.ticked = on ? (this.data?.boxes ?? []).map(b => b.box_id) : []
+		},
+		coupleBusy(box, c) {
+			return this.coupleResults[this.coupleKey(box, c)]?.state === 'running'
+		},
+		verifyLabel(c) {
+			const label = this.$t('Verify {app} on {destination}', c)
+			return c.last_ok_stamp ? label : `${label}. ${this.$t('Nothing to verify yet: no backup has succeeded')}`
 		},
 		coupleKey: (box, c) => `${box.box_id}/${c.app}/${c.destination}`,
 		// the box answers at once and runs on: read again a moment later
@@ -267,6 +295,10 @@ export default {
 		},
 		// One call per row, a result per row, kept in `store` under the row's key.
 		async act(call, rows, store, keep = false) {
+			// a second click while the first is out neither posts again nor overwrites its result
+			if (rows.some(r => this[store][r.key]?.state === 'running')) {
+				return
+			}
 			const running = Object.fromEntries(rows.map(r => [r.key, { state: 'running', message: '' }]))
 			this[store] = keep ? { ...this[store], ...running } : running
 			const done = await runBulk(rows, call)
@@ -274,6 +306,9 @@ export default {
 			this.refreshSoon()
 		},
 		backupNow() {
+			if (this.barBusy) {
+				return
+			}
 			return this.act(actions.box.backupNow, this.selectedRows, 'results')
 		},
 		couple(box, c, call) {
@@ -290,10 +325,12 @@ export default {
 		},
 		openSchedule() {
 			const rows = this.selectedRows
-			const carried = (this.data?.boxes ?? []).find(b => b.verification_schedule && rows.some(r => r.id === b.box_id))
+			// start from the boxes' schedule when the ticked boxes that have one agree; otherwise from the defaults, and say so
+			const own = (this.data?.boxes ?? []).filter(b => b.verification_schedule && rows.some(r => r.id === b.box_id)).map(b => b.verification_schedule)
+			const same = own.every(s => s.enabled === own[0].enabled && s.every_days === own[0].every_days && s.at === own[0].at)
 			this.$buefy.modal.open({
 				component: VerificationScheduleModal,
-				props: { rows, current: carried?.verification_schedule ?? null, afterApply: () => this.refreshSoon() },
+				props: { rows, current: same ? own[0] ?? null : null, differ: !same, afterApply: () => this.refreshSoon() },
 				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],

@@ -25,7 +25,7 @@ const rows = () => wrapper.findAll('tbody > tr:not(.detail)').filter(r => !r.ele
 const rowOf = text => rows().find(r => r.text().includes(text))
 const toggle = () => rowOf('Home').find('button.fleet-backups-toggle')
 const summary = () => wrapper.find('.fleet-backups-summary')
-const check = row => row.find('label.b-checkbox').trigger('click')
+const check = row => row.find('input[type="checkbox"]').setValue(true)
 const bar = () => wrapper.find('.fleet-backups-bar')
 const barButton = label => bar().findAll('button').find(b => b.text().includes(label))
 const coupleLine = app => wrapper.findAll('.fleet-backups-couples tbody tr').find(l => l.text().includes(app))
@@ -290,7 +290,40 @@ describe('the Backups tab', () => {
 			await barButton('Back up now').trigger('click')
 			await flushPromises()
 			expect(rowOf('Home').find('.fleet-result').text()).toBe('Refused: an operating system upgrade is open')
-			expect(rowOf('Shop').find('.fleet-result').text()).toContain('no schedule matches')
+			expect(rowOf('Shop').find('.fleet-result').text()).toBe('Refused: no schedule matches')
+		})
+
+		it('ignores a second click while the first is running, and keeps the first result', async () => {
+			let finish
+			fleetApi.relay.mockImplementation(() => new Promise((resolve) => {
+				finish = () => resolve({ status: 202, data: { data: { started: [], refused: [] } } })
+			}))
+			await mountTab()
+			await check(rowOf('Home'))
+			const click = barButton('Back up now')
+			click.trigger('click')
+			click.trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toHaveLength(1)
+			expect(barButton('Back up now').attributes('disabled')).toBeDefined()
+			expect(barButton('Schedule verification').attributes('disabled')).toBeDefined()
+			finish()
+			await flushPromises()
+			expect(rowOf('Home').find('.fleet-result').text()).toBe('Done')
+			expect(barButton('Back up now').attributes('disabled')).toBeUndefined()
+		})
+
+		it('names every checkbox for a screen reader, and the header one ticks them all', async () => {
+			fleetApi.backups.mockResolvedValue(two())
+			await mountTab()
+			const label = el => el.element.closest('label').textContent
+			expect(label(rowOf('Home').find('input[type="checkbox"]'))).toContain('Select Home')
+			const all = wrapper.find('thead input[type="checkbox"]')
+			expect(label(all)).toContain('Select all boxes')
+			await all.setValue(true)
+			expect(bar().text()).toContain('2 selected')
+			await all.setValue(false)
+			expect(bar().text()).toContain('0 selected')
 		})
 
 		it('reads again about three seconds after an action', async () => {
@@ -315,6 +348,33 @@ describe('the Backups tab', () => {
 			await flushPromises()
 			expect(relayCalls('a')).toEqual([['a', 'post', '/v2/app_management/backup/schedules/run', { data: { app: 'immich', destination: 'nas' } }]])
 			expect(coupleLine('immich').find('.fleet-result').text()).toBe('Done')
+		})
+
+		it('ignores a second click on a couple while the first is running', async () => {
+			await mountTab()
+			await toggle().trigger('click')
+			const click = lineButton('immich', 'Back up')
+			click.trigger('click')
+			click.trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toHaveLength(1)
+			expect(coupleLine('immich').find('.fleet-result').text()).toBe('Done')
+		})
+
+		it('names each button for a screen reader with its app and destination', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false }), couple({ app: 'plex', destination: 'cloud', restic: true })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(lineButton('immich', 'Back up').attributes('aria-label')).toBe('Back up immich to nas')
+			expect(lineButton('immich', 'Verify').attributes('aria-label')).toBe('Verify immich on nas')
+			expect(lineButton('plex', 'Check repository').attributes('aria-label')).toBe('Check repository of cloud')
+		})
+
+		it('says why Verify is disabled in its accessible name, not only in a tooltip', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '' })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(lineButton('immich', 'Verify').attributes('aria-label')).toContain('no backup has succeeded')
 		})
 
 		it('verifies a couple with its last good stamp', async () => {
@@ -381,6 +441,42 @@ describe('the Backups tab', () => {
 			expect(props.rows).toEqual([{ key: 'a', id: 'a', name: 'Home' }])
 			expect(props.current).toEqual(schedule)
 			expect(typeof props.afterApply).toBe('function')
+			expect(props.differ).toBe(false)
+		})
+
+		const schedulesOf = (a, b) => answer([box({ verification_schedule: a }), box({ box_id: 'b', name: 'Shop', verification_schedule: b })])
+		const openFor = async () => {
+			await check(rowOf('Home'))
+			await check(rowOf('Shop'))
+			const open = vi.spyOn(wrapper.vm.$buefy.modal, 'open').mockReturnValue({})
+			await barButton('Schedule verification').trigger('click')
+			return open.mock.calls[0][0].props
+		}
+
+		it('prefills only when the ticked boxes that carry a schedule agree', async () => {
+			const same = { enabled: true, every_days: 14, at: '04:30' }
+			fleetApi.backups.mockResolvedValue(schedulesOf(same, { ...same }))
+			await mountTab()
+			const props = await openFor()
+			expect(props.current).toEqual(same)
+			expect(props.differ).toBe(false)
+		})
+
+		it('leaves the defaults and says so when the ticked boxes have different schedules', async () => {
+			fleetApi.backups.mockResolvedValue(schedulesOf({ enabled: true, every_days: 14, at: '04:30' }, { enabled: true, every_days: 3, at: '04:30' }))
+			await mountTab()
+			const props = await openFor()
+			expect(props.current).toBeNull()
+			expect(props.differ).toBe(true)
+		})
+
+		it('ignores a box without a schedule when the others agree', async () => {
+			const one = { enabled: false, every_days: 5, at: '01:00' }
+			fleetApi.backups.mockResolvedValue(schedulesOf(one, undefined))
+			await mountTab()
+			const props = await openFor()
+			expect(props.current).toEqual(one)
+			expect(props.differ).toBe(false)
 		})
 	})
 })

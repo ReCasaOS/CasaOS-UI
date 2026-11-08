@@ -3134,8 +3134,16 @@
   "Nothing to verify yet: no backup has succeeded": "Nothing to verify yet: no backup has succeeded",
   "Done, but refused: {message}": "Done, but refused: {message}",
   "Verification schedule": "Verification schedule",
-  "Every": "Every",
-  "days": "days",
   "A verification re-reads data from the destination: it uses bandwidth and quota.": "A verification re-reads data from the destination: it uses bandwidth and quota.",
-  "A restic destination is checked every week by itself: this schedule leaves it out.": "A restic destination is checked every week by itself: this schedule leaves it out."
+  "A restic destination is checked every week by itself: this schedule leaves it out.": "A restic destination is checked every week by itself: this schedule leaves it out.",
+  "Select {name}": "Select {name}",
+  "Select all boxes": "Select all boxes",
+  "Back up {app} to {destination}": "Back up {app} to {destination}",
+  "Verify {app} on {destination}": "Verify {app} on {destination}",
+  "Check repository of {destination}": "Check repository of {destination}",
+  "Interval (days)": "Interval (days)",
+  "Every {n} days": "Every {n} days",
+  "Enter a whole number of days from 1 to 30": "Enter a whole number of days from 1 to 30",
+  "Enter a time as HH:MM": "Enter a time as HH:MM",
+  "The selected boxes have different schedules; applying will replace them all.": "The selected boxes have different schedules; applying will replace them all."
 }

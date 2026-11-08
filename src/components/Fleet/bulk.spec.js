@@ -219,3 +219,13 @@ describe('the backup actions of a box', () => {
 		expect(fleetApi.relay).toHaveBeenCalledWith('a', 'put', '/v2/app_management/backup/verification-schedule', { data: { enabled: true, every_days: 7, at: '03:30' } })
 	})
 })
+
+describe('a backup request that no schedule matches', () => {
+	it('is refused, not failed, with the box\'s reason', async () => {
+		fleetApi.relay.mockImplementation(() => failure(404, { message: 'no schedule matches' }))
+		const results = await runBulk([{ key: 'a', id: 'a' }], actions.box.backupNow)
+		expect(results.get('a')).toEqual({ state: 'refused', message: 'no schedule matches' })
+		const one = await runBulk([{ key: 'a', id: 'a' }], row => actions.box.backupOne(row, { app: 'x', destination: 'y' }))
+		expect(one.get('a')).toEqual({ state: 'refused', message: 'no schedule matches' })
+	})
+})
