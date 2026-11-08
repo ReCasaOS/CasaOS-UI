@@ -319,12 +319,15 @@ export default {
 		async finishSignIn() {
 			this.busy = 'signin-finish'
 			try {
-				const token = (await this.$api.backup.signInFinish(this.signIn.redirected)).data.data.token
-				const row = this.draft.rows.find(candidate => candidate.key === 'token')
-				if (row)
-					row.value = token
-				else
-					this.draft.rows.push({ key: 'token', value: token })
+				const { token, parameters } = (await this.$api.backup.signInFinish(this.signIn.redirected)).data.data
+				// OneDrive also comes back with its drive_id and drive_type
+				for (const [key, value] of Object.entries({ ...parameters, token })) {
+					const row = this.draft.rows.find(candidate => candidate.key === key)
+					if (row)
+						row.value = value
+					else
+						this.draft.rows.push({ key, value })
+				}
 
 				this.signIn = { url: '', redirected: '' }
 				this.$buefy.toast.open({ message: this.$t('Signed in: the token is filled in below. Save the destination to keep it.'), type: 'is-success', duration: 6000 })
