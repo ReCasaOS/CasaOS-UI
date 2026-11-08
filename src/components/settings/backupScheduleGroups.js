@@ -2,8 +2,28 @@
 // set of settings, with every app it covers, so a nightly backup of ten apps is
 // made and changed once, not ten times. Saving spreads it back to one per app.
 
+import { ice_i18n } from '@/mixins/base/common-i18n'
+
 // The name the box's own backups are filed under, as the server knows it.
 export const SYSTEM_APP = 'casaos-system'
+
+// What a backup event is about: the box, or the app by its title. The title is
+// optional JSON (an app with no `x-casaos` has none), so a bad one falls back to the name.
+export function backupSubject(properties, t, box = 'this box') {
+	if (properties['app:name'] === SYSTEM_APP) {
+		return t(box)
+	}
+	try {
+		const title = properties['app:title'] && ice_i18n(JSON.parse(properties['app:title']))
+		if (title) {
+			return title
+		}
+	} catch {
+		// fall through to the name
+	}
+
+	return properties['app:name']
+}
 
 const SETTINGS = ['destination', 'every', 'at', 'weekday', 'keep', 'hold_still', 'enabled']
 

@@ -91,7 +91,10 @@
 							<span v-if="backupChip" :class="`is-${backupChip.level}`" class="panel-chip">{{ backupChip.text }}</span>
 						</div>
 						<div class="panel-body">
-							<p v-if="backup.status === 'none'" class="panel-empty">{{ $t('No backup yet') }}</p>
+							<p v-if="runningBackup" class="tile-detail">
+								{{ $t(runningBackup.restore ? 'Restoring {title}' : 'Backing up {title}', { title: runningBackup.title }) }} · {{ $t('{percent}% done', { percent: runningBackup.percent }) }}
+							</p>
+							<p v-if="backup.status === 'none' && !runningBackup" class="panel-empty">{{ $t('No backup yet') }}</p>
 							<div v-else>
 								<div>{{ $t('Last: {when}', { when: whenOf(new Date(backup.at)) }) }}</div>
 								<div class="tile-detail">{{ lastBackupDetail }}</div>
@@ -148,7 +151,7 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
-import { durationText, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
+import { backupSubject, durationText, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -172,6 +175,9 @@ export default {
 			speed: null,
 			watts: null,
 			runs: [],
+			// the backups and restores going on now, by kind and app, from the socket:
+			// the run log only has the ones that finished
+			running: {},
 			// the schedules, for the next run to come; none on an older box
 			schedules: [],
 			// the names of the backup destinations; none on a box that has not set one up
@@ -221,7 +227,13 @@ export default {
 			// no SMART word for them all: the count alone
 			return { level: 'none', text: String(count) }
 		},
+		runningBackup() {
+			return Object.values(this.running)[0] || null
+		},
 		backupChip() {
+			if (this.runningBackup) {
+				return { level: 'info', text: this.$t('Running') }
+			}
 			if (this.backup.status === 'none') {
 				return null
 			}
@@ -255,7 +267,7 @@ export default {
 				return ''
 			}
 
-			return next.due ? this.$t('at the next check, a slot was missed') : this.whenOf(next.at)
+			return next.due ? this.$t('within a minute') : this.whenOf(next.at)
 		},
 		// null unless this box is a master
 		fleet() {
@@ -501,6 +513,19 @@ export default {
 			this.net = sample
 		},
 
+		followBackup(properties, percent) {
+			const kind = properties['backup:kind'] || 'backup'
+			this.running[`${kind}:${properties['app:name']}`] = { title: backupSubject(properties, this.translate), percent, restore: kind === 'restore' }
+		},
+
+		// the finished run is in the log now: read it rather than wait a minute
+		endBackup(properties) {
+			delete this.running[`${properties['backup:kind'] || 'backup'}:${properties['app:name']}`]
+			if (!this.runningBackup) {
+				this.refreshSlow()
+			}
+		},
+
 		async refreshSlow() {
 			// an older box answers 404 to either: its tile is then left out
 			try {
@@ -540,6 +565,18 @@ export default {
 		},
 	},
 	sockets: {
+		'backup:begin': function (res) {
+			this.followBackup(res.Properties, 0)
+		},
+		'backup:progress': function (res) {
+			this.followBackup(res.Properties, Math.max(0, Number(res.Properties['app:progress']) || 0))
+		},
+		'backup:end': function (res) {
+			this.endBackup(res.Properties)
+		},
+		'backup:error': function (res) {
+			this.endBackup(res.Properties)
+		},
 		'casaos:system:utilization': function (res) {
 			const data = res.Properties
 			const cpu = JSON.parse(data.sys_cpu)
@@ -717,6 +754,11 @@ export default {
 	&.is-danger {
 		background: rgba(239, 68, 68, 0.18);
 		color: #fca5a5;
+	}
+
+	&.is-info {
+		background: rgba(59, 130, 246, 0.18);
+		color: #93c5fd;
 	}
 }
 

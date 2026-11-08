@@ -54,9 +54,9 @@
 					<div class="_grid">
 						<b-checkbox v-for="app in appsOf(schedule)" :key="app.name" v-model="schedule.apps"
 							:class="{ '_is-on': schedule.apps.includes(app.name) }" :native-value="app.name" class="_tile">
-							<img v-if="app.icon" :src="app.icon" alt="" class="_icon">
+							<img v-if="app.icon && !failedIcons[app.name]" :src="app.icon" alt="" class="_icon" @error="failedIcons[app.name] = true">
 							<span v-else class="_icon _initial">{{ app.title.slice(0, 1).toUpperCase() }}</span>
-							<span class="_name">{{ app.title }}</span>
+							<span :title="app.title" class="_name">{{ app.title }}</span>
 						</b-checkbox>
 					</div>
 				</div>
@@ -135,6 +135,8 @@ export default {
 			runs: [],
 			// { name, title, icon } of the installed compose apps
 			apps: [],
+			// an icon URL that would not load shows the initial, not a broken image
+			failedIcons: {},
 			systemApp: SYSTEM_APP,
 			isLoading: false,
 			busy: false,
@@ -209,8 +211,20 @@ export default {
 		// browser's are taken as one: a schedule's time is the box's.
 		runsText(schedule) {
 			const next = nextRun(schedule)
+			let when = this.$t('Disabled').toLowerCase()
+			if (next) {
+				// the server checks every minute: a slot not run yet goes off within one,
+				// and a schedule that never ran has every slot not run yet
+				if (!next.due) {
+					when = this.whenOf(next.at)
+				} else if (schedule.last_run) {
+					when = this.$t('within a minute, to catch up the missed slot ({when})', { when: this.whenOf(next.at) })
+				} else {
+					when = this.$t('the first one, within a minute of saving')
+				}
+			}
 			const parts = [
-				this.$t('Next: {when}', { when: !next ? this.$t('Disabled').toLowerCase() : next.due ? this.$t('at the next check, a slot was missed') : this.whenOf(next.at) }),
+				this.$t('Next: {when}', { when }),
 				this.$t('Last: {when}', { when: schedule.last_run ? this.lastText(schedule) : this.$t('never yet') }),
 			]
 
@@ -280,7 +294,8 @@ export default {
 				what || this.$t('Nothing chosen yet'),
 				schedule.keep ? this.$t('the last {count} are kept', { count: schedule.keep }) : this.$t('everything is kept'),
 			]
-			if (schedule.hold_still) {
+			// this box alone stops no app
+			if (schedule.hold_still && this.chosen(schedule).length) {
 				parts.push(this.$t('apps stopped during the copy'))
 			}
 

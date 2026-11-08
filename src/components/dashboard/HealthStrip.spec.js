@@ -199,7 +199,30 @@ describe('health strip', () => {
 		const panel = wrapper.find('.backups')
 		expect(panel.find('.panel-chip').text()).toBe('Succeeded')
 		expect(panel.text()).toContain('4 min · 3 MB · to nas')
-		expect(panel.text()).toContain('Next: at the next check, a slot was missed')
+		expect(panel.text()).toContain('Next: within a minute')
+	})
+
+	// the last finished run said Succeeded while the next app was still being copied
+	it('says a backup is running until the socket says it ended, then reads the log again', async () => {
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ runs: [{ app: 'blog', destination: 'nas', started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:01:00Z' }] })
+		await settle()
+		const panel = () => wrapper.find('.backups')
+		expect(panel().find('.panel-chip').text()).toBe('Succeeded')
+
+		const sockets = wrapper.vm.$options.sockets
+		const seerr = { 'app:name': 'seerr', 'app:title': '{"en_us":"Seerr"}', 'backup:kind': 'backup' }
+		sockets['backup:begin'].call(wrapper.vm, { Properties: seerr })
+		sockets['backup:progress'].call(wrapper.vm, { Properties: { ...seerr, 'app:progress': '33' } })
+		await wrapper.vm.$nextTick()
+		expect(panel().find('.panel-chip').text()).toBe('Running')
+		expect(panel().text()).toContain('Backing up Seerr · 33% done')
+
+		wrapper.vm.$api.backup.getRuns = getRuns
+		sockets['backup:end'].call(wrapper.vm, { Properties: seerr })
+		await settle()
+		expect(getRuns).toHaveBeenCalled()
+		expect(panel().text()).not.toContain('Backing up')
 	})
 
 	it('opens the storage manager from the storage tile', async () => {

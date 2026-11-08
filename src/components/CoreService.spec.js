@@ -27,7 +27,7 @@ function service() {
 		$buefy: { toast: { open: vi.fn() } },
 		addIdToSessionStorage: vi.fn(),
 	}
-	for (const name of ['addNotice', 'removeNotice', 'appTitle', 'transformAppInstallationProgress'])
+	for (const name of ['addNotice', 'removeNotice', 'appTitle', 'backupTitle', 'backupCardName', 'backupCardTitle', 'transformAppInstallationProgress'])
 		vm[name] = CoreService.methods[name].bind(vm)
 
 	const fire = (event, properties) => CoreService.sockets[event].call(vm, { Properties: properties })
@@ -40,6 +40,20 @@ const sonarr = {
 	'app:title': '{"en_us":"Sonarr"}',
 	'app:icon': 'sonarr.png',
 }
+
+describe('backing up', () => {
+	// the card came up as "Installing Backing up casaos-system"
+	it('titles the backup of the box as the box, not as an install', () => {
+		const { vm, fire } = service()
+
+		fire('backup:begin', { 'app:name': 'casaos-system', 'backup:kind': 'backup' })
+		fire('backup:progress', { 'app:name': 'casaos-system', 'backup:kind': 'backup', 'app:progress': '40' })
+
+		const card = vm.noticesData['backup:casaos-system']
+		expect(card.prelude.title).toBe('Backing up this box')
+		expect(card.content).toEqual({ text: '40% done', value: 40 })
+	})
+})
 
 describe('updating an app', () => {
 	it('draws one card, under the app it is updating', () => {
