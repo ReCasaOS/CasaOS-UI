@@ -3147,5 +3147,10 @@
   "Every {n} days": "Tous les {n} jours",
   "Enter a whole number of days from 1 to 30": "Saisissez un nombre entier de jours, de 1 à 30",
   "Enter a time as HH:MM": "Saisissez une heure au format HH:MM",
-  "The selected boxes have different schedules; applying will replace them all.": "Les boxes sélectionnées ont des planifications différentes : l'application les remplacera toutes."
+  "The selected boxes have different schedules; applying will replace them all.": "Les boxes sélectionnées ont des planifications différentes : l'application les remplacera toutes.",
+  "Backed up {when} to {destination}": "Sauvegardée {when} vers {destination}",
+  "Backup failed: {reason}": "Sauvegarde échouée : {reason}",
+  "Backup late": "Sauvegarde en retard",
+  "Backup state unknown": "État de la sauvegarde inconnu",
+  "Backups paused by a system upgrade": "Sauvegardes suspendues par une mise à niveau du système"
 }
