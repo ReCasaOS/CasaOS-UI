@@ -47,7 +47,7 @@ describe('beta dashboard bell', () => {
 	})
 })
 
-describe('DashboardBeta stacking (#107)', () => {
+describe('beta dashboard stacking (#107)', () => {
 	it('stays below the top bar (z-index 20), so the cards\' badges never cover its open menus', () => {
 		const source = readFileSync('src/components/DashboardBeta.vue', 'utf8')
 		const rule = source.match(/\n\.dashboard-beta \{([^}]*)/)[1]

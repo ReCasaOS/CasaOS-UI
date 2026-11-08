@@ -997,7 +997,7 @@ describe('the new login page switch', () => {
 	})
 })
 
-describe('TopBar dropdown widths (#106)', () => {
+describe('top bar dropdown widths (#106)', () => {
 	const styles = source.slice(source.indexOf('<style'))
 
 	it('makes only the settings panel wide on a PC, not the Account menu', () => {
