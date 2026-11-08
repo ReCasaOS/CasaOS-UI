@@ -60,7 +60,21 @@ export function backupTile(runs) {
 		return { status: 'none', at: '', destination: '', error: '' }
 	}
 	const lastOk = own.find(run => !run.error) || last
-	return { status: last.error ? 'failed' : 'ok', at: lastOk.started_at, destination: lastOk.destination || '', error: last.error || '' }
+	return { status: last.error ? 'failed' : 'ok', at: lastOk.started_at, destination: lastOk.destination || '', error: last.error || '', batch: runBatch(own, lastOk) }
+}
+
+// The runs one go set off, around `last`: one per app, sequential, to the same destination
+// the same way (scheduled or by hand), started within six hours before it. shortcut: the
+// records carry no batch id, so time and destination stand in; two goes are a day apart at least.
+export function runBatch(runs, last) {
+	const anchor = Date.parse(last.started_at)
+
+	return runs.filter((run) => {
+		const started = Date.parse(run.started_at)
+
+		return run.destination === last.destination && !!run.scheduled === !!last.scheduled
+			&& started >= anchor - 6 * 3600000 && started <= anchor + 60000
+	})
 }
 
 // A USB disk of the utilization payload: `used` where the box gives it, size - avail

@@ -63,3 +63,49 @@ export function nextRun(schedule, now = new Date()) {
 
 	return { due: false, at: slot }
 }
+
+// Which schedule goes off first, over all of them: a missed slot (due) before any
+// future one, then the earliest. null when none is enabled.
+export function nextOfAll(schedules, now = new Date()) {
+	return (Array.isArray(schedules) ? schedules : [])
+		.map(schedule => nextRun(schedule, now))
+		.filter(Boolean)
+		.sort((a, b) => (b.due - a.due) || (a.at - b.at))[0] || null
+}
+
+// "4 min", "1 h 30", "12 s"
+export function durationText(ms) {
+	const seconds = Math.max(0, Math.round(ms / 1000))
+	if (seconds < 60) {
+		return `${seconds} s`
+	}
+	const minutes = Math.round(seconds / 60)
+	if (minutes < 60) {
+		return `${minutes} min`
+	}
+
+	return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
+}
+
+// A moment, the way one says it: today, tomorrow or yesterday with the time, a weekday
+// within the week, the date beyond. `t` is the component's $t, bound.
+export function whenOf(date, t) {
+	const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	const days = Math.round((new Date(date).setHours(0, 0, 0, 0) - today) / 86400000)
+	if (days === 0) {
+		return t('today at {time}', { time })
+	}
+	if (days === 1) {
+		return t('tomorrow at {time}', { time })
+	}
+	if (days === -1) {
+		return t('yesterday at {time}', { time })
+	}
+	if (Math.abs(days) < 7) {
+		return date.toLocaleString(undefined, { weekday: 'long', hour: '2-digit', minute: '2-digit' })
+	}
+
+	return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}

@@ -119,7 +119,7 @@
 </template>
 
 <script>
-import { SYSTEM_APP, groupSchedules, nextRun, spreadGroups } from './backupScheduleGroups.js'
+import { SYSTEM_APP, durationText, groupSchedules, nextRun, spreadGroups, whenOf } from './backupScheduleGroups.js'
 import { renderSize } from '@/mixins/file_utils'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
@@ -255,37 +255,11 @@ export default {
 		},
 
 		durationText(ms) {
-			const seconds = Math.max(0, Math.round(ms / 1000))
-			if (seconds < 60) {
-				return `${seconds} s`
-			}
-			const minutes = Math.round(seconds / 60)
-			if (minutes < 60) {
-				return `${minutes} min`
-			}
-
-			return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
+			return durationText(ms)
 		},
 
 		whenOf(date) {
-			const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-			const today = new Date()
-			today.setHours(0, 0, 0, 0)
-			const days = Math.round((new Date(date).setHours(0, 0, 0, 0) - today) / 86400000)
-			if (days === 0) {
-				return this.$t('today at {time}', { time })
-			}
-			if (days === 1) {
-				return this.$t('tomorrow at {time}', { time })
-			}
-			if (days === -1) {
-				return this.$t('yesterday at {time}', { time })
-			}
-			if (Math.abs(days) < 7) {
-				return date.toLocaleString(undefined, { weekday: 'long', hour: '2-digit', minute: '2-digit' })
-			}
-
-			return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+			return whenOf(date, (...args) => this.$t(...args))
 		},
 
 		whenText(schedule) {

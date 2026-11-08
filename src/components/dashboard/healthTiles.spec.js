@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from './healthTiles'
+import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, runBatch, snapraidTile, usbPercent } from './healthTiles'
 
 const t = key => key
 
@@ -46,7 +46,7 @@ describe('backupTile', () => {
 	it('is ok on a last backup that worked', () => {
 		const runs = [{ started_at: '2026-11-02T03:00:00Z', destination: 'nas' }, { started_at: '2026-11-01T03:00:00Z', error: 'x' }]
 
-		expect(backupTile(runs)).toEqual({ status: 'ok', at: '2026-11-02T03:00:00Z', destination: 'nas', error: '' })
+		expect(backupTile(runs)).toEqual({ status: 'ok', at: '2026-11-02T03:00:00Z', destination: 'nas', error: '', batch: [runs[0]] })
 	})
 
 	it('fails on a failed last backup and still dates the last good copy', () => {
@@ -55,7 +55,22 @@ describe('backupTile', () => {
 			{ started_at: '2026-11-02T03:00:00Z' },
 		]
 
-		expect(backupTile(runs)).toEqual({ status: 'failed', at: '2026-11-02T03:00:00Z', destination: '', error: 'no route to host' })
+		expect(backupTile(runs)).toEqual({ status: 'failed', at: '2026-11-02T03:00:00Z', destination: '', error: 'no route to host', batch: [runs[1]] })
+	})
+
+	it('takes as one go the runs to one destination, set off the same way, within six hours before the last', () => {
+		const run = (started_at, more = {}) => ({ destination: 'nas', scheduled: true, started_at, ...more })
+		const last = run('2026-11-02T03:12:00Z')
+		const runs = [
+			last,
+			run('2026-11-02T03:04:00Z'),
+			// by hand, elsewhere, or the night before: not this go
+			run('2026-11-02T03:00:00Z', { scheduled: false }),
+			run('2026-11-02T03:00:00Z', { destination: 'usb' }),
+			run('2026-11-01T03:00:00Z'),
+		]
+
+		expect(runBatch(runs, last)).toEqual([last, runs[1]])
 	})
 })
 
