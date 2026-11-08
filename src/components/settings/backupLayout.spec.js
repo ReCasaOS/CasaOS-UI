@@ -55,6 +55,34 @@ describe('the backup windows on a phone', () => {
 		expect(unnamed(wrapper)).toHaveLength(0)
 	})
 
+	it('opens a schedule on its own, picks every app with All, says This box in the head', async () => {
+		await open(BackupSchedules, {
+			getSchedules: answer([{ app: 'casaos-system', destination: 'offsite', every: 'daily', weekday: 0, at: '03:00', keep: 0, hold_still: true, enabled: true, last_run: '2026-11-07T02:00:00Z' }]),
+			getDestinations: answer(['offsite']),
+			getRuns: answer([
+				{ app: 'casaos-system', destination: 'offsite', scheduled: true, started_at: '2026-11-07T02:00:00Z', finished_at: '2026-11-07T02:04:00Z', bytes: 3 * 1024 * 1024 },
+				// asked for by hand the day before: not the schedule's
+				{ app: 'casaos-system', destination: 'offsite', scheduled: false, started_at: '2026-11-06T15:00:00Z', finished_at: '2026-11-06T15:30:00Z' },
+			]),
+		})
+
+		// one schedule: open, with the box tile and the app grid
+		expect(wrapper.find('._head').text()).toContain('This box')
+		expect(wrapper.findAll('._grid ._tile')).toHaveLength(1)
+		expect(wrapper.find('button[title="Collapse"]').exists()).toBe(true)
+
+		await wrapper.findAll('button').find(b => b.text() === 'All').trigger('click')
+		expect(wrapper.vm.schedules[0].apps).toEqual(['casaos-system', 'immich'])
+
+		await wrapper.findAll('button').find(b => b.text() === 'None').trigger('click')
+		expect(wrapper.vm.schedules[0].apps).toEqual(['casaos-system'])
+
+		// the last run: the scheduled one, 4 minutes, not the one asked for by hand
+		expect(wrapper.vm.lastBatch(wrapper.vm.schedules[0])).toHaveLength(1)
+		expect(wrapper.vm.lastText(wrapper.vm.schedules[0])).toContain('4 min, 3 MB, succeeded')
+		expect(wrapper.vm.durationText(5400000)).toBe('1 h 30')
+	})
+
 	it('lets the buttons of a destination wrap instead of running off the card', async () => {
 		await open(BackupDestinations, { getDestinations: answer(['offsite']) })
 

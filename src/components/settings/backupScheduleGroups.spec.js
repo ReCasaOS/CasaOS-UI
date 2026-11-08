@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupSchedules, spreadGroups } from './backupScheduleGroups.js'
+import { groupSchedules, nextRun, spreadGroups } from './backupScheduleGroups.js'
 
 const nightly = { destination: 'nas', every: 'daily', at: '03:00', weekday: 1, keep: 7, hold_still: true, enabled: true }
 
@@ -12,8 +12,8 @@ describe('schedules shown per set of settings', () => {
 		])
 
 		expect(groups).toEqual([
-			{ ...nightly, apps: ['blog', 'casaos-system'] },
-			{ ...nightly, at: '04:00', apps: ['photos'] },
+			{ ...nightly, apps: ['blog', 'casaos-system'], last_run: '2026-11-06T03:00:00Z' },
+			{ ...nightly, at: '04:00', apps: ['photos'], last_run: '' },
 		])
 	})
 
@@ -27,5 +27,28 @@ describe('schedules shown per set of settings', () => {
 		const loaded = [{ app: 'a', ...nightly }, { app: 'b', ...nightly, every: 'weekly', weekday: 5 }, { app: 'c', ...nightly }]
 
 		expect(spreadGroups(groupSchedules(loaded))).toEqual([loaded[0], loaded[2], loaded[1]])
+	})
+})
+
+describe('the next run of a schedule', () => {
+	// local times, like the box's own clock
+	const at = (day, hour, minute = 0) => new Date(2026, 10, day, hour, minute)
+	const now = at(7, 10)
+
+	it('is the next slot once the last one has run', () => {
+		const next = nextRun({ ...nightly, last_run: at(7, 3).toISOString() }, now)
+		expect(next).toEqual({ due: false, at: at(8, 3) })
+	})
+
+	it('is the missed slot, due at the next check, when the last run is before it', () => {
+		const next = nextRun({ ...nightly, last_run: at(6, 3).toISOString() }, now)
+		expect(next).toEqual({ due: true, at: at(7, 3) })
+	})
+
+	it('steps a week for a weekly schedule, and is null when disabled', () => {
+		// 2026-11-08 is a Sunday
+		const weekly = { ...nightly, every: 'weekly', weekday: 0, last_run: at(1, 3).toISOString() }
+		expect(nextRun(weekly, now)).toEqual({ due: false, at: at(8, 3) })
+		expect(nextRun({ ...weekly, enabled: false }, now)).toBeNull()
 	})
 })

@@ -23,7 +23,8 @@ async function open(component, backup, props = {}) {
 		global: {
 			plugins: [Buefy, i18n],
 			mocks: {
-				$api: { backup },
+				// the schedules read the run log too: empty unless a test says otherwise
+				$api: { backup: { getRuns: answer([]), ...backup } },
 				$openAPI: { appGrid: { getAppGrid: answer([]) } },
 				$buefy: { toast: { open() {} }, dialog: { confirm() {} }, modal: { open() {} } },
 			},
