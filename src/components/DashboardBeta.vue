@@ -65,7 +65,11 @@ export default {
 
 <style lang="scss" scoped>
 // the fixed tab bar of a phone must not cover the last cards
+// a stacking context below the top bar (20), like .main-content of the classic one in Home.vue:
+// the cards' badges (z-index 20 and 30) must stay under the top bar's open menus (#107)
 .dashboard-beta {
+	position: relative;
+	z-index: 10;
 	padding-bottom: 4.5rem;
 
 	@include desktop {

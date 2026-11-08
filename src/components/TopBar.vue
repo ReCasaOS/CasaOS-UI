@@ -42,7 +42,7 @@
 			<b-dropdown ref="settingsDrop"
 				animation="fade1"
 				aria-role="list"
-				class="navbar-item"
+				class="navbar-item settings-drop"
 				@active-change="onOpen">
 				<template #trigger>
 					<b-tooltip :active="!$store.state.isMobile"
@@ -1692,10 +1692,6 @@ export default {
 			// on a phone, the width Buefy leaves the panel, with its margins
 			min-width: min(22.5rem, calc(100vw - 2rem));
 
-			@media screen and (min-width: 1024px) {
-				width: min(72rem, calc(100vw - 5.5rem));
-			}
-
 			.dropdown-content {
 				background: var(--casa-surface);
 				border-radius: 10px;
@@ -1714,6 +1710,13 @@ export default {
 						height: 2rem;
 					}
 				}
+			}
+		}
+
+		// only the settings panel is wide on a PC; the Account menu keeps its own width (#106)
+		.settings-drop .dropdown-menu {
+			@media screen and (min-width: 1024px) {
+				width: min(72rem, calc(100vw - 5.5rem));
 			}
 		}
 	}
