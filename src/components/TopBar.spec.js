@@ -996,3 +996,14 @@ describe('the new login page switch', () => {
 		expect(vm.loginBetaSaving).toBe(false)
 	})
 })
+
+describe('TopBar dropdown widths (#106)', () => {
+	const styles = source.slice(source.indexOf('<style'))
+
+	it('makes only the settings panel wide on a PC, not the Account menu', () => {
+		expect(source).toMatch(/<b-dropdown ref="settingsDrop"[^>]*class="navbar-item settings-drop"/)
+		// the 72rem width sits under .settings-drop, never on every dropdown of the bar
+		expect(styles).toMatch(/\.settings-drop \.dropdown-menu \{\s*@media screen and \(min-width: 1024px\) \{\s*width: min\(72rem/)
+		expect(styles.match(/72rem/g)).toHaveLength(1)
+	})
+})

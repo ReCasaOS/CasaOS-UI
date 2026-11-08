@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import DashboardBeta from './DashboardBeta.vue'
@@ -43,5 +44,14 @@ describe('beta dashboard bell', () => {
 		await wrapper.find('.beta-bell').trigger('click')
 
 		expect(showAttention).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('DashboardBeta stacking (#107)', () => {
+	it('stays below the top bar (z-index 20), so the cards\' badges never cover its open menus', () => {
+		const source = readFileSync('src/components/DashboardBeta.vue', 'utf8')
+		const rule = source.match(/\n\.dashboard-beta \{([^}]*)/)[1]
+		expect(rule).toMatch(/position: relative;/)
+		expect(Number(rule.match(/z-index: (\d+);/)[1])).toBeLessThan(20)
 	})
 })
