@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { durationText, groupSchedules, nextOfAll, nextRun, spreadGroups } from './backupScheduleGroups.js'
+import { durationText, groupSchedules, longestRun, nextOfAll, nextRun, spreadGroups } from './backupScheduleGroups.js'
 
 const nightly = { destination: 'nas', every: 'daily', at: '03:00', weekday: 1, keep: 7, hold_still: true, enabled: true }
 
@@ -42,7 +42,7 @@ describe('the next run of a schedule', () => {
 
 	it('is the missed slot, due at the next check, when the last run is before it', () => {
 		const next = nextRun({ ...nightly, last_run: at(6, 3).toISOString() }, now)
-		expect(next).toEqual({ due: true, at: at(7, 3) })
+		expect(next).toEqual({ due: true, at: at(7, 3), late: 7 * 3600000 })
 	})
 
 	it('steps a week for a weekly schedule, and is null when disabled', () => {
@@ -53,6 +53,46 @@ describe('the next run of a schedule', () => {
 	})
 })
 
+describe('the slots the box gives', () => {
+	const paris = { ...nightly, last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+	// 08:00 UTC: 17:00 in Tokyo, 09:00 in Paris
+	const now = new Date('2026-11-07T08:00:00Z')
+
+	it('serve as they are, in the box\'s wall time whatever zone the browser is in', () => {
+		const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+		process.env.TZ = 'Asia/Tokyo'
+		try {
+			const due = nextRun({ ...paris, last_run: '2026-11-06T02:00:30Z' }, now)
+			expect(due.due).toBe(true)
+			expect([due.at.getDate(), due.at.getHours(), due.at.getMinutes()]).toEqual([7, 3, 0])
+			// due since 02:00 UTC, by the instant and not by the browser's day
+			expect(due.late).toBe(6 * 3600000)
+
+			const done = nextRun({ ...paris, last_run: '2026-11-07T02:00:30Z' }, now)
+			expect(done.due).toBe(false)
+			expect([done.at.getDate(), done.at.getHours(), done.at.getMinutes()]).toEqual([8, 3, 0])
+		} finally {
+			process.env.TZ = zone
+		}
+	})
+
+	it('are left to the old computation when the box does not give them, or the schedule is disabled', () => {
+		const at = (day, hour) => new Date(2026, 10, day, hour)
+		expect(nextRun({ ...nightly, last_run: at(6, 3).toISOString() }, at(7, 10))).toEqual({ due: true, at: at(7, 3), late: 7 * 3600000 })
+		expect(nextRun({ ...paris, enabled: false }, now)).toBeNull()
+	})
+})
+
+describe('how long a go took', () => {
+	it('is the longest run taken alone, not the span from the first start to the last finish', () => {
+		const run = (from, to) => ({ started_at: from, finished_at: to })
+
+		expect(longestRun([run('2026-11-07T03:00:00Z', '2026-11-07T03:02:30Z'), run('2026-11-06T23:00:00Z', '2026-11-07T03:04:00Z')])).toBe(4 * 3600000 + 4 * 60000)
+		expect(longestRun([run('2026-11-07T03:00:00Z', '2026-11-07T03:02:30Z'), run('2026-11-07T03:03:00Z', '2026-11-07T03:04:00Z')])).toBe(150000)
+		expect(longestRun([run('2026-11-07T03:00:00Z', '')])).toBeNull()
+	})
+})
+
 describe('the first run to come over every schedule', () => {
 	const at = (day, hour) => new Date(2026, 10, day, hour)
 	const now = at(7, 10)
@@ -60,7 +100,7 @@ describe('the first run to come over every schedule', () => {
 	it('is a missed slot before a future one, else the earliest, and null without a schedule enabled', () => {
 		const ran = { ...nightly, last_run: at(7, 3).toISOString() }
 		expect(nextOfAll([ran, { ...nightly, at: '01:00', last_run: at(7, 1).toISOString() }], now)).toEqual({ due: false, at: at(8, 1) })
-		expect(nextOfAll([ran, { ...nightly, at: '05:00', last_run: at(6, 5).toISOString() }], now)).toEqual({ due: true, at: at(7, 5) })
+		expect(nextOfAll([ran, { ...nightly, at: '05:00', last_run: at(6, 5).toISOString() }], now)).toEqual({ due: true, at: at(7, 5), late: 5 * 3600000 })
 		expect(nextOfAll([{ ...nightly, enabled: false }], now)).toBeNull()
 		expect(nextOfAll(undefined, now)).toBeNull()
 	})

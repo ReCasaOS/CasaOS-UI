@@ -277,6 +277,7 @@
   "Last: {when}": "Last: {when}",
   "never yet": "never yet",
   "within a minute": "within a minute",
+  "Overdue since {when}": "Overdue since {when}",
   "within a minute, to catch up the missed slot ({when})": "within a minute, to catch up the missed slot ({when})",
   "the first one, within a minute of saving": "the first one, within a minute of saving",
   "today at {time}": "today at {time}",

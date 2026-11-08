@@ -252,6 +252,7 @@
   "Last: {when}": "Dernière : {when}",
   "never yet": "jamais encore",
   "within a minute": "dans la minute",
+  "Overdue since {when}": "En retard depuis {when}",
   "within a minute, to catch up the missed slot ({when})": "dans la minute, pour rattraper le créneau manqué ({when})",
   "the first one, within a minute of saving": "la première, dans la minute qui suit l'enregistrement",
   "today at {time}": "aujourd'hui à {time}",
