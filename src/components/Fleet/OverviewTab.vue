@@ -149,6 +149,11 @@
 								<span :class="{ 'has-text-full-03': row[meter.field] === null }" class="fleet-meter-value">{{ row[meter.field] === null ? blank(row, 'utilization') : pct(row[meter.field]) }}</span>
 								<span v-if="detailOf(row, meter.field)" class="fleet-meter-detail has-text-full-03">{{ detailOf(row, meter.field) }}</span>
 							</div>
+							<div class="fleet-meter fleet-net">
+								<span class="has-text-full-03">{{ $t('Network') }}</span>
+								<span v-if="row.netRate" class="fleet-meter-value">↓ {{ speed(row.netRate.down) }} · ↑ {{ speed(row.netRate.up) }}</span>
+								<span v-else class="has-text-full-03">{{ blank(row, 'utilization') }}</span>
+							</div>
 						</div>
 					</template>
 
@@ -225,7 +230,11 @@ export default {
 	},
 	methods: {
 		build(box, answers) {
-			return overviewRow(box, answers)
+			return overviewRow(box, answers, this.rows.find(r => r.key === box.id))
+		},
+		// bytes per second; a fraction of a byte is not worth a figure
+		speed(bytesPerSecond) {
+			return `${renderSize(Math.round(bytesPerSecond))}/s`
 		},
 		pendingRow(box) {
 			return { ...overviewRow(box, {}), pending: true }
@@ -550,6 +559,14 @@ $panel: rgba(255, 255, 255, 0.06);
 	gap: 0.625rem;
 	align-items: center;
 	font-size: 0.8125rem;
+}
+
+.fleet-net {
+	grid-template-columns: 4.75rem minmax(0, 1fr);
+}
+
+.fleet-net .fleet-meter-value {
+	text-align: left;
 }
 
 .fleet-meter-track {

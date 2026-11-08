@@ -56,6 +56,55 @@ describe('the overview row of one box', () => {
 	})
 })
 
+describe('the network rate of a box', () => {
+	// the counters of one read, as /v1/sys/utilization sends them
+	const read = (time, ...ifaces) => ({ ...all(), utilization: ok({ ...UTIL, net: ifaces.map(([name, sent, recv]) => ({ name, bytesSent: sent, bytesRecv: recv, time })) }) })
+
+	it('has no rate on the first read, and keeps the counters for the next', () => {
+		const first = overviewRow(box, read(100, ['eth0', 1000, 5000]))
+		expect(first.netRate).toBeNull()
+		expect(first.netSample).toHaveLength(1)
+	})
+
+	it('is the change since the previous read, per second', () => {
+		const first = overviewRow(box, read(100, ['eth0', 1000, 5000]))
+		const second = overviewRow(box, read(130, ['eth0', 4000, 35000]), first)
+		expect(second.netRate).toEqual({ up: 100, down: 1000 })
+	})
+
+	it('adds the interfaces both reads have, and ignores one that just appeared', () => {
+		const first = overviewRow(box, read(100, ['eth0', 0, 0], ['wlan0', 0, 0]))
+		const second = overviewRow(box, read(120, ['eth0', 200, 400], ['wlan0', 20, 40], ['eth1', 9e9, 9e9]), first)
+		expect(second.netRate).toEqual({ up: 11, down: 22 })
+	})
+
+	it('keeps the last rate when the read is too close to the previous one', () => {
+		const first = overviewRow(box, read(100, ['eth0', 0, 0]))
+		const second = overviewRow(box, read(130, ['eth0', 3000, 3000]), first)
+		const third = overviewRow(box, read(132, ['eth0', 3000, 90000]), second)
+		expect(third.netRate).toEqual({ up: 100, down: 100 })
+		expect(third.netSample).toBe(second.netSample)
+	})
+
+	it('reads a counter that went back as no traffic', () => {
+		const first = overviewRow(box, read(100, ['eth0', 9000, 9000]))
+		expect(overviewRow(box, read(130, ['eth0', 10, 10]), first).netRate).toEqual({ up: 0, down: 0 })
+	})
+
+	it('starts again after a clock that went back, and from garbage a box sends', () => {
+		const first = overviewRow(box, read(1000, ['eth0', 0, 0]))
+		expect(overviewRow(box, read(100, ['eth0', 5, 5]), first)).toMatchObject({ netRate: null, netSample: [{ time: 100 }] })
+		const junk = { ...all(), utilization: ok({ ...UTIL, net: [null, { name: 'eth0', bytesSent: 'x', bytesRecv: {}, time: 1030 }, { bytesSent: 1 }] }) }
+		expect(overviewRow(box, junk, first).netRate).toBeNull()
+	})
+
+	it('has no sample from a box whose utilization is missing or has no interfaces list', () => {
+		const first = overviewRow(box, read(100, ['eth0', 0, 0]))
+		expect(overviewRow(box, { ...all(), utilization: failed(500) }, first)).toMatchObject({ netRate: null, netSample: null })
+		expect(overviewRow(box, all(), first)).toMatchObject({ netRate: null, netSample: null })
+	})
+})
+
 describe('the rows of the containers and the VMs', () => {
 	it('marks only v2 apps as actionable', () => {
 		const rows = containerRows(box, GRID)

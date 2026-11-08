@@ -307,6 +307,19 @@ describe('the Fleet page', () => {
 		expect(cardOf('Shop').findAll('.fleet-meter-detail')).toHaveLength(1)
 	})
 
+	it('shows the network rate of a box from its second read on', async () => {
+		const MB = 1024 ** 2
+		const net = (time, sent, recv) => ({ '/v1/sys/utilization': { cpu: { percent: 10 }, mem: { usedPercent: 50 }, sys_disk: { size: 100, used: 25 }, net: [{ name: 'eth0', bytesSent: sent, bytesRecv: recv, time }] } })
+		serve({ a: net(100, 0, 0) })
+		await mountPage()
+		const netText = () => cardOf('Home').find('.fleet-net').text()
+		expect(netText()).toBe('Network—')
+		serve({ a: net(130, 15 * MB, 30 * MB) })
+		wrapper.findComponent({ name: 'OverviewTab' }).vm.poller.now()
+		await flushPromises()
+		expect(netText()).toBe('Network↓ 1 MB/s · ↑ 512 KB/s')
+	})
+
 	it('updates ReCasaOS on a box from its tag, after asking', async () => {
 		await mountPage()
 		const tag = () => cardOf('Home').find('button.fleet-update')
