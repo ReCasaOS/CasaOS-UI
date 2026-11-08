@@ -43,6 +43,16 @@ describe('the verification schedule dialog', () => {
 		expect(wrapper.text()).toContain('checked every week')
 	})
 
+	it('names the switch for what it does, not by its state, and says the time is each box local', async () => {
+		mountModal()
+		const name = () => toggle().element.closest('label').textContent
+		expect(name()).toContain('Verify on a schedule')
+		await toggle().setValue(true)
+		expect(name()).toContain('Verify on a schedule')
+		expect(name()).not.toMatch(/Enabled|Disabled/)
+		expect(wrapper.text()).toContain('The time is the local time of each box.')
+	})
+
 	it('starts from the schedule the boxes carry', () => {
 		mountModal({ current: { enabled: true, every_days: 14, at: '04:30', last_run: '2026-11-01T04:30:00Z' } })
 		expect(toggle().element.checked).toBe(true)

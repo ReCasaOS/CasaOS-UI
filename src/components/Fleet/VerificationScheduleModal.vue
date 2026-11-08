@@ -13,7 +13,7 @@
 
 			<b-field class="mb-3">
 				<b-switch v-model="draft.enabled" size="is-small">
-					{{ $t(draft.enabled ? 'Enabled' : 'Disabled') }}
+					{{ $t('Verify on a schedule') }}
 				</b-switch>
 			</b-field>
 
@@ -32,6 +32,7 @@
 			</div>
 			<p v-if="error" id="verification-error" class="help is-danger mb-3" role="alert">{{ error }}</p>
 			<p v-else class="is-size-7 mb-3">{{ everyWords }}</p>
+			<p class="is-size-7 mb-3">{{ $t('The time is the local time of each box.') }}</p>
 
 			<b-message class="mb-3" size="is-small" type="is-warning">
 				{{ $t('A verification re-reads data from the destination: it uses bandwidth and quota.') }}
