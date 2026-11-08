@@ -16,7 +16,7 @@ export const SUPPORT_WORDS = { supported: ['Supported', 'is-success'], ending_so
 export const BACKUP_WORDS = { ok: 'Backed up', failed: 'Failed', late: 'Late', never: 'Never run', unknown: 'Unknown', suspended: 'Suspended', none: 'No backup' }
 
 // the verification of a couple (restore test)
-export const VERIFY_WORDS = { none: 'Not verified', passed: 'Verified', failed: 'Verification failed', not_verifiable: 'Cannot be verified', running: 'Verifying…', unknown: 'Unknown' }
+export const VERIFY_WORDS = { none: 'Not verified', passed: 'Verified', failed: 'Verification failed', not_verifiable: 'Not verifiable', running: 'Verifying…', unknown: 'Unknown' }
 
 export const FLEET_WORDS = [
 	...Object.values(STATE_WORDS),

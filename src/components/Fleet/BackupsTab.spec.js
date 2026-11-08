@@ -7,7 +7,7 @@ import { fleetApi } from '@/service/fleet'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ fleetApi: { backups: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { backups: vi.fn(), relay: vi.fn() } }))
 
 const MIN = 60000
 const ago = ms => new Date(Date.now() - ms).toISOString()
@@ -25,12 +25,21 @@ const rows = () => wrapper.findAll('tbody > tr:not(.detail)').filter(r => !r.ele
 const rowOf = text => rows().find(r => r.text().includes(text))
 const toggle = () => rowOf('Home').find('button.fleet-backups-toggle')
 const summary = () => wrapper.find('.fleet-backups-summary')
+const check = row => row.find('label.b-checkbox').trigger('click')
+const bar = () => wrapper.find('.fleet-backups-bar')
+const barButton = label => bar().findAll('button').find(b => b.text().includes(label))
+const coupleLine = app => wrapper.findAll('.fleet-backups-couples tbody tr').find(l => l.text().includes(app))
+const lineButton = (app, label) => coupleLine(app).findAll('button').find(b => b.text() === label)
+const relayCalls = boxId => fleetApi.relay.mock.calls.filter(c => c[0] === boxId)
+const failure = (status, body) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: body } })
+const accepted = (started, refused = []) => Promise.resolve({ status: 202, data: { message: 'ok', data: { started, refused } } })
 
 describe('the Backups tab', () => {
 	beforeEach(() => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		fleetApi.backups.mockResolvedValue(answer([box()]))
+		fleetApi.relay.mockImplementation(() => accepted([]))
 	})
 	afterEach(() => {
 		vi.useRealTimers()
@@ -187,5 +196,191 @@ describe('the Backups tab', () => {
 		await mountTab()
 		expect(wrapper.text()).toContain('No box in the fleet yet')
 		expect(wrapper.text()).not.toContain('Everything is green')
+	})
+
+	it('stops reading, and drops its listener, when the tab goes away', async () => {
+		vi.useFakeTimers()
+		const remove = vi.spyOn(document, 'removeEventListener')
+		wrapper = mount(BackupsTab, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		await flushPromises()
+		wrapper.unmount()
+		wrapper = null
+		expect(remove).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+		await vi.advanceTimersByTimeAsync(120000)
+		document.dispatchEvent(new Event('visibilitychange'))
+		await vi.advanceTimersByTimeAsync(0)
+		expect(fleetApi.backups).toHaveBeenCalledTimes(1)
+		remove.mockRestore()
+	})
+
+	describe('without couples', () => {
+		it('says no backup is scheduled only for a box that was read', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(wrapper.text()).toContain('No backup is scheduled on this box')
+		})
+
+		it('does not say it for a box that was never read', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [], polled_at: '', state: 'unknown', green: false })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(wrapper.text()).not.toContain('No backup is scheduled on this box')
+			expect(wrapper.find('.fleet-backups-unread').text()).toContain('Not read yet')
+		})
+
+		it('does not say it for a box whose read failed', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [], error: 'timeout on the box', state: 'unknown', green: false })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(wrapper.text()).toContain('timeout on the box')
+			expect(wrapper.text()).not.toContain('No backup is scheduled on this box')
+			expect(wrapper.find('.fleet-backups-unread').text()).toContain('could not be read')
+		})
+	})
+
+	describe('backing up now', () => {
+		const two = () => answer([box(), box({ box_id: 'b', name: 'Shop', couples: [couple({ app: 'plex' })] })])
+
+		it('offers nothing to do until a box is ticked, and counts the ticked ones', async () => {
+			fleetApi.backups.mockResolvedValue(two())
+			await mountTab()
+			expect(bar().text()).toContain('0 selected')
+			expect(barButton('Back up now').attributes('disabled')).toBeDefined()
+			expect(barButton('Schedule verification').attributes('disabled')).toBeDefined()
+			await check(rowOf('Home'))
+			expect(bar().text()).toContain('1 selected')
+			expect(barButton('Back up now').attributes('disabled')).toBeUndefined()
+			await check(rowOf('Shop'))
+			expect(bar().text()).toContain('2 selected')
+		})
+
+		it('gives each ticked box its own result: one done, one offline', async () => {
+			fleetApi.backups.mockResolvedValue(two())
+			fleetApi.relay.mockImplementation(id => (id === 'b' ? Promise.reject(failure(503, { message: 'box offline' })) : accepted([{ app: 'immich', destination: 'nas' }])))
+			await mountTab()
+			await check(rowOf('Home'))
+			await check(rowOf('Shop'))
+			await barButton('Back up now').trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toEqual([['a', 'post', '/v2/app_management/backup/schedules/run', { data: {} }]])
+			expect(relayCalls('b')).toEqual([['b', 'post', '/v2/app_management/backup/schedules/run', { data: {} }]])
+			expect(rowOf('Home').find('.fleet-result').text()).toBe('Done')
+			expect(rowOf('Shop').find('.fleet-result').text()).toBe('Box offline')
+		})
+
+		it('says what a box refused inside a 202, never a bare Done', async () => {
+			fleetApi.relay.mockImplementation(() => accepted([{ app: 'plex', destination: 'nas' }], [{ app: 'immich', destination: 'nas', reason: 'busy' }]))
+			await mountTab()
+			await check(rowOf('Home'))
+			await barButton('Back up now').trigger('click')
+			await flushPromises()
+			const text = rowOf('Home').find('.fleet-result').text()
+			expect(text).not.toBe('Done')
+			expect(text).toContain('immich')
+			expect(text).toContain('busy')
+		})
+
+		it('shows a refusal (409) and an old box (404) each on its own line, with its reason', async () => {
+			fleetApi.backups.mockResolvedValue(two())
+			fleetApi.relay.mockImplementation(id => Promise.reject(id === 'a' ? failure(409, { message: 'an operating system upgrade is open' }) : failure(404, { message: 'no schedule matches' })))
+			await mountTab()
+			await check(rowOf('Home'))
+			await check(rowOf('Shop'))
+			await barButton('Back up now').trigger('click')
+			await flushPromises()
+			expect(rowOf('Home').find('.fleet-result').text()).toBe('Refused: an operating system upgrade is open')
+			expect(rowOf('Shop').find('.fleet-result').text()).toContain('no schedule matches')
+		})
+
+		it('reads again about three seconds after an action', async () => {
+			await mountTab()
+			vi.useFakeTimers()
+			await check(rowOf('Home'))
+			await barButton('Back up now').trigger('click')
+			await vi.advanceTimersByTimeAsync(0)
+			expect(fleetApi.backups).toHaveBeenCalledTimes(1)
+			await vi.advanceTimersByTimeAsync(2500)
+			expect(fleetApi.backups).toHaveBeenCalledTimes(1)
+			await vi.advanceTimersByTimeAsync(1000)
+			expect(fleetApi.backups).toHaveBeenCalledTimes(2)
+		})
+	})
+
+	describe('on one couple', () => {
+		it('backs up one couple', async () => {
+			await mountTab()
+			await toggle().trigger('click')
+			await lineButton('immich', 'Back up').trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toEqual([['a', 'post', '/v2/app_management/backup/schedules/run', { data: { app: 'immich', destination: 'nas' } }]])
+			expect(coupleLine('immich').find('.fleet-result').text()).toBe('Done')
+		})
+
+		it('verifies a couple with its last good stamp', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '20261108T0300' })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(lineButton('immich', 'Check repository')).toBeUndefined()
+			await lineButton('immich', 'Verify').trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toEqual([['a', 'post', '/v2/app_management/backup/verifications', { data: { destination: 'nas', app: 'immich', stamp: '20261108T0300' } }]])
+		})
+
+		it('cannot verify a couple that has no good backup yet', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, last_ok_stamp: '', state: 'never' })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(lineButton('immich', 'Verify').attributes('disabled')).toBeDefined()
+			await lineButton('immich', 'Verify').trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toEqual([])
+		})
+
+		it('checks the repository of a restic couple instead of verifying it, the name encoded', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ destination: 'my nas/1', restic: true })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			expect(lineButton('immich', 'Verify')).toBeUndefined()
+			await lineButton('immich', 'Check repository').trigger('click')
+			await flushPromises()
+			expect(relayCalls('a')).toEqual([['a', 'post', '/v2/app_management/backup/destinations/my%20nas%2F1/restic/check']])
+		})
+
+		it('shows the refusal of the box on the couple\'s own line', async () => {
+			fleetApi.relay.mockRejectedValue(failure(409, { message: 'already running' }))
+			await mountTab()
+			await toggle().trigger('click')
+			await lineButton('immich', 'Back up').trigger('click')
+			await flushPromises()
+			expect(coupleLine('immich').find('.fleet-result').text()).toBe('Refused: already running')
+		})
+
+		it('shows a couple that cannot be verified grey, in words', async () => {
+			fleetApi.backups.mockResolvedValue(answer([box({ couples: [couple({ restic: false, verify: { state: 'not_verifiable', error: '' } })] })]))
+			await mountTab()
+			await toggle().trigger('click')
+			const mark = coupleLine('immich').find('.fleet-backups-verify [role="img"]')
+			expect(mark.classes()).toContain('is-none')
+			expect(mark.classes()).not.toContain('is-ok')
+			expect(coupleLine('immich').find('.fleet-backups-verify').text()).toContain('Not verifiable')
+		})
+	})
+
+	describe('scheduling the verification', () => {
+		it('opens the dialog for the ticked boxes, starting from the schedule they carry', async () => {
+			const schedule = { enabled: true, every_days: 14, at: '04:30' }
+			fleetApi.backups.mockResolvedValue(answer([box({ verification_schedule: schedule }), box({ box_id: 'b', name: 'Shop' })]))
+			await mountTab()
+			await check(rowOf('Home'))
+			const open = vi.spyOn(wrapper.vm.$buefy.modal, 'open').mockReturnValue({})
+			await barButton('Schedule verification').trigger('click')
+			expect(open).toHaveBeenCalledTimes(1)
+			const { component, props } = open.mock.calls[0][0]
+			expect(component.name).toBe('VerificationScheduleModal')
+			expect(props.rows).toEqual([{ key: 'a', id: 'a', name: 'Home' }])
+			expect(props.current).toEqual(schedule)
+			expect(typeof props.afterApply).toBe('function')
+		})
 	})
 })

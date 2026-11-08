@@ -3116,7 +3116,7 @@
   "Not verified": "Not verified",
   "Verified": "Verified",
   "Verification failed": "Verification failed",
-  "Cannot be verified": "Cannot be verified",
+  "Not verifiable": "Not verifiable",
   "Verifying…": "Verifying…",
   "Verification": "Verification",
   "Last success": "Last success",
@@ -3126,5 +3126,16 @@
   "Integrity check": "Integrity check",
   "Last read {age}": "Last read {age}",
   "Never read": "Never read",
-  "No backup is scheduled on this box": "No backup is scheduled on this box"
+  "No backup is scheduled on this box": "No backup is scheduled on this box",
+  "Not read yet": "Not read yet",
+  "The backups of this box could not be read": "The backups of this box could not be read",
+  "{n} selected": "{n} selected",
+  "Schedule verification…": "Schedule verification…",
+  "Nothing to verify yet: no backup has succeeded": "Nothing to verify yet: no backup has succeeded",
+  "Done, but refused: {message}": "Done, but refused: {message}",
+  "Verification schedule": "Verification schedule",
+  "Every": "Every",
+  "days": "days",
+  "A verification re-reads data from the destination: it uses bandwidth and quota.": "A verification re-reads data from the destination: it uses bandwidth and quota.",
+  "A restic destination is checked every week by itself: this schedule leaves it out.": "A restic destination is checked every week by itself: this schedule leaves it out."
 }

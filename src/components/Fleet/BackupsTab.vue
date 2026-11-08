@@ -20,17 +20,27 @@
 					<span class="has-text-weight-semibold">{{ summaryText }}</span>
 				</div>
 
-				<b-table :data="sorted"
+				<div class="fleet-backups-bar">
+					<span class="has-text-weight-semibold">{{ $t('{n} selected', { n: selectedRows.length }) }}</span>
+					<span class="fleet-backups-bar-gap"></span>
+					<b-button :disabled="!selectedRows.length" rounded size="is-small" type="is-primary" @click="backupNow">{{ $t('Back up now') }}</b-button>
+					<b-button :disabled="!selectedRows.length" rounded size="is-small" @click="openSchedule">{{ $t('Schedule verification…') }}</b-button>
+				</div>
+
+				<b-table :checked-rows="checkedRows"
+					:custom-is-checked="sameBox"
+					:data="sorted"
 					:loading="loading"
 					:mobile-cards="false"
 					:opened-detailed="open"
 					:show-detail-icon="false"
+					checkable
 					class="is-size-7"
 					custom-row-key="box_id"
 					detail-key="box_id"
-					detailed>
+					detailed
+					@update:checked-rows="checkedRows = $event">
 					<b-table-column v-slot="{ row }" :label="$t('Box')" field="name">
-						<!-- Task 3 adds a leading checkbox cell before this one -->
 						<button :aria-expanded="isOpen(row)" class="fleet-backups-toggle" type="button" @click="toggle(row)">
 							<span aria-hidden="true">{{ isOpen(row) ? '▾' : '▸' }}</span>
 							<span class="has-text-weight-medium">{{ row.name }}</span>
@@ -60,9 +70,16 @@
 						<span v-else class="has-text-full-03">—</span>
 					</b-table-column>
 
+					<b-table-column v-slot="{ row }" :label="$t('Result')" field="result">
+						<result-cell :result="results[row.box_id] || null" class="fleet-backups-result" />
+					</b-table-column>
+
 					<template #detail="{ row }">
 						<p v-if="row.error" class="fleet-backups-box-error">{{ row.error }}</p>
-						<p v-if="!couples(row).length" class="has-text-full-03">{{ $t('No backup is scheduled on this box') }}</p>
+						<!-- no couples because nothing could be read is not "nothing is scheduled" -->
+						<p v-if="!couples(row).length && neverRead(row)" class="fleet-backups-unread has-text-full-03">{{ $t('Not read yet') }}</p>
+						<p v-else-if="!couples(row).length && row.error" class="fleet-backups-unread has-text-full-03">{{ $t('The backups of this box could not be read') }}</p>
+						<p v-else-if="!couples(row).length" class="has-text-full-03">{{ $t('No backup is scheduled on this box') }}</p>
 						<table v-else class="table is-narrow fleet-backups-couples">
 							<thead>
 								<tr>
@@ -72,6 +89,7 @@
 									<th>{{ $t('Last run') }}</th>
 									<th>{{ $t('Next backup') }}</th>
 									<th>{{ $t('Verification') }}</th>
+									<th>{{ $t('Actions') }}</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -108,7 +126,19 @@
 										</div>
 										<div v-if="c.restic_check && c.restic_check.error" class="fleet-backups-error">{{ c.restic_check.error }}</div>
 									</td>
-									<!-- Task 3: the per-couple actions and the result of the last one come here -->
+									<td class="fleet-backups-actions">
+										<div class="fleet-backups-buttons">
+											<b-button rounded size="is-small" @click="backupOne(row, c)">{{ $t('Back up') }}</b-button>
+											<b-button v-if="c.restic" rounded size="is-small" @click="resticCheck(row, c)">{{ $t('Check repository') }}</b-button>
+											<b-button v-else
+												:disabled="!c.last_ok_stamp"
+												:title="c.last_ok_stamp ? '' : $t('Nothing to verify yet: no backup has succeeded')"
+												rounded
+												size="is-small"
+												@click="verifyCouple(row, c)">{{ $t('Verify') }}</b-button>
+										</div>
+										<result-cell :result="coupleResults[coupleKey(row, c)] || null" />
+									</td>
 								</tr>
 							</tbody>
 						</table>
@@ -121,6 +151,9 @@
 
 <script>
 import BackupMark from './BackupMark.vue'
+import ResultCell from './ResultCell.vue'
+import VerificationScheduleModal from './VerificationScheduleModal.vue'
+import { actions, runBulk } from './bulk'
 import { ageText, boxLevel, couplesOf, lastOkOf, lastVerifyOf, nextOf, stateLevel, summaryOf } from './backupsData'
 import { BACKUP_WORDS, VERIFY_WORDS } from './fleetWords'
 import { fleetApi } from '@/service/fleet'
@@ -130,7 +163,7 @@ const WORST_FIRST = { danger: 0, warning: 1, none: 2, ok: 3 }
 
 export default {
 	name: 'BackupsTab',
-	components: { BackupMark },
+	components: { BackupMark, ResultCell },
 	data() {
 		return {
 			data: null,
@@ -141,6 +174,11 @@ export default {
 			now: new Date(),
 			// the newest read: an older answer never replaces a newer one
 			ticket: 0,
+			checkedRows: [],
+			// box id → { state, message }, the last grouped action's
+			results: {},
+			// "box/app/destination" → { state, message }, the last action on that couple
+			coupleResults: {},
 		}
 	},
 	computed: {
@@ -168,6 +206,11 @@ export default {
 				unknown && this.$t('{n} unknown', { n: unknown }),
 			].filter(Boolean).join(', ')
 		},
+		// the ticked boxes as the list has them now, as the rows a grouped action takes
+		selectedRows() {
+			const ids = new Set(this.checkedRows.map(r => r.box_id))
+			return (this.data?.boxes ?? []).filter(b => ids.has(b.box_id)).map(b => ({ key: b.box_id, id: b.box_id, name: b.name }))
+		},
 		// the boxes in trouble first
 		sorted() {
 			return [...(this.data?.boxes ?? [])].sort((a, b) => WORST_FIRST[boxLevel(a)] - WORST_FIRST[boxLevel(b)] || a.name.localeCompare(b.name))
@@ -183,6 +226,7 @@ export default {
 	beforeUnmount() {
 		document.removeEventListener('visibilitychange', this.onVisibility)
 		this.poller.stop()
+		clearTimeout(this.refreshTimer)
 	},
 	methods: {
 		stateLevel,
@@ -211,6 +255,55 @@ export default {
 			if (ticket === this.ticket) {
 				this.loading = false
 			}
+		},
+		sameBox(a, b) {
+			return a.box_id === b.box_id
+		},
+		coupleKey: (box, c) => `${box.box_id}/${c.app}/${c.destination}`,
+		// the box answers at once and runs on: read again a moment later
+		refreshSoon() {
+			clearTimeout(this.refreshTimer)
+			this.refreshTimer = setTimeout(() => this.poller.now(), 3000)
+		},
+		// One call per row, a result per row, kept in `store` under the row's key.
+		async act(call, rows, store, keep = false) {
+			const running = Object.fromEntries(rows.map(r => [r.key, { state: 'running', message: '' }]))
+			this[store] = keep ? { ...this[store], ...running } : running
+			const done = await runBulk(rows, call)
+			this[store] = { ...this[store], ...Object.fromEntries(done) }
+			this.refreshSoon()
+		},
+		backupNow() {
+			return this.act(actions.box.backupNow, this.selectedRows, 'results')
+		},
+		couple(box, c, call) {
+			return this.act(call, [{ key: this.coupleKey(box, c), id: box.box_id }], 'coupleResults', true)
+		},
+		backupOne(box, c) {
+			return this.couple(box, c, row => actions.box.backupOne(row, { app: c.app, destination: c.destination }))
+		},
+		verifyCouple(box, c) {
+			return this.couple(box, c, row => actions.box.verifyCouple(row, { app: c.app, destination: c.destination, stamp: c.last_ok_stamp }))
+		},
+		resticCheck(box, c) {
+			return this.couple(box, c, row => actions.box.resticCheck(row, { destination: c.destination }))
+		},
+		openSchedule() {
+			const rows = this.selectedRows
+			const carried = (this.data?.boxes ?? []).find(b => b.verification_schedule && rows.some(r => r.id === b.box_id))
+			this.$buefy.modal.open({
+				component: VerificationScheduleModal,
+				props: { rows, current: carried?.verification_schedule ?? null, afterApply: () => this.refreshSoon() },
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+		// the box has never been read: no couples because there was nothing to read from
+		neverRead(box) {
+			return !box.polled_at || new Date(box.polled_at).getFullYear() < 2000
 		},
 		retry() {
 			this.loading = true
@@ -304,6 +397,30 @@ export default {
 
 .fleet-backups-notify-text {
 	flex: 1 1 14rem;
+}
+
+.fleet-backups-bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 0.5rem;
+}
+
+.fleet-backups-bar-gap {
+	flex: 1 1 auto;
+}
+
+.fleet-backups-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+}
+
+// a refusal names an app and a reason: let it wrap
+.fleet-backups-actions :deep(.fleet-result),
+.fleet-backups-result :deep(.fleet-result) {
+	white-space: normal;
 }
 
 .fleet-backups-summary {

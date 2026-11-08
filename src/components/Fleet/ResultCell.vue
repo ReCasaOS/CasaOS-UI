@@ -14,7 +14,8 @@ export default {
 			const { state, message } = this.result
 			switch (state) {
 				case 'done':
-					return this.$t('Done')
+					// a done row with a message: the box did part of it and refused the rest
+					return message ? this.$t('Done, but refused: {message}', { message }) : this.$t('Done')
 				case 'refused':
 					return this.$t('Refused: {reason}', { reason: message })
 				case 'offline':
