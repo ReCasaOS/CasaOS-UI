@@ -28,77 +28,111 @@
 
 		<div class="beta-body">
 			<aside class="beta-aside">
-				<div ref="attentionPanel" class="widget has-text-grey-100 panel attention" tabindex="-1">
+				<!-- the four cards share one anatomy: a head with an icon tile, the title and a chip that says the essential; rows; a foot with the action -->
+				<section ref="attentionPanel" :class="`is-${attentionChip.level}`" class="widget has-text-grey-100 panel attention" tabindex="-1">
 					<div class="blur-background"></div>
 					<div class="widget-content">
-						<div class="tile-label">{{ $t('Needs attention') }}</div>
-						<ul v-if="attention.length > 0">
+						<div class="panel-head">
+							<span class="panel-tile"><b-icon icon="bell-outline" /></span>
+							<span class="panel-title">{{ $t('Needs attention') }}</span>
+							<span :class="`is-${attentionChip.level}`" class="panel-chip">{{ attentionChip.text }}</span>
+						</div>
+						<ul v-if="attention.length > 0" class="panel-body">
 							<li v-for="item in attention" :key="item.key" :class="`is-${item.level}`">
-								<button class="attention-item" type="button" @click="openAttention(item)">{{ item.text }}</button>
+								<button class="attention-item panel-row" type="button" @click="openAttention(item)">
+									<span :class="`is-${item.level}`" class="panel-dot"></span>
+									<span class="panel-grow">{{ item.text }}</span>
+									<b-icon icon="chevron-right" size="is-small" />
+								</button>
 							</li>
 						</ul>
-						<p v-else class="panel-empty">{{ $t('All good') }}</p>
 					</div>
-				</div>
+				</section>
 
-				<div class="widget has-text-grey-100 panel storage">
+				<section class="widget has-text-grey-100 panel storage">
 					<div class="blur-background"></div>
 					<div class="widget-content">
-						<div class="tile-label">{{ $t('Storage') }}</div>
-						<div v-for="drive in drives" :key="drive.key" class="drive">
-							<div class="drive-head">
-								<span class="drive-name">{{ drive.name }}</span>
-								<span v-if="drive.health" :class="`is-${drive.health}`" class="drive-health">{{ driveHealthLabel(drive.health) }}</span>
-							</div>
-							<div class="tile-bar">
-								<div :class="drive.level" :style="{ width: `${drive.percent}%` }"></div>
-							</div>
-							<div class="tile-detail">{{ driveDetail(drive) }}</div>
+						<div class="panel-head">
+							<span class="panel-tile"><b-icon icon="harddisk" /></span>
+							<span class="panel-title">{{ $t('Storage') }}</span>
+							<span :class="`is-${storageChip.level}`" class="panel-chip">{{ storageChip.text }}</span>
 						</div>
-						<button class="panel-action" type="button" @click="openStorage">{{ $t('Manage storage') }}</button>
+						<div class="panel-body">
+							<div v-for="drive in drives" :key="drive.key" class="drive">
+								<div class="panel-row">
+									<span :class="`is-${drive.health || 'none'}`" class="panel-dot"></span>
+									<span class="panel-grow">{{ drive.name }}</span>
+									<!-- the colour of the dot, in words, read out always and shown when it is bad news -->
+									<span v-if="drive.health" :class="[`is-${drive.health}`, { 'is-sr-only': drive.health !== 'failed' }]" class="drive-health">{{ driveHealthLabel(drive.health) }}</span>
+									<span v-if="roleLabel(drive.role)" class="panel-role">{{ roleLabel(drive.role) }}</span>
+									<span class="panel-value">{{ drive.percent }} %</span>
+								</div>
+								<div class="tile-bar">
+									<div :class="drive.level" :style="{ width: `${drive.percent}%` }"></div>
+								</div>
+								<div class="tile-detail">{{ driveDetail(drive) }}</div>
+							</div>
+						</div>
+						<div class="panel-foot">
+							<button class="panel-action" type="button" @click="openStorage">
+								<span class="panel-grow">{{ $t('Manage storage') }}</span>
+								<b-icon icon="chevron-right" size="is-small" />
+							</button>
+						</div>
 					</div>
-				</div>
+				</section>
 
-				<div class="widget has-text-grey-100 panel backups">
+				<section class="widget has-text-grey-100 panel backups">
 					<div class="blur-background"></div>
 					<div class="widget-content">
-						<div class="tile-label">{{ $t('Backups') }}</div>
-						<template v-if="backup.status === 'none'">
-							<p class="panel-empty">{{ $t('No backup yet') }}</p>
-						</template>
-						<dl v-else>
-							<div>
-								<dt>{{ $t('Last backup') }}</dt>
-								<dd>{{ new Date(backup.at).toLocaleString() }}</dd>
+						<div class="panel-head">
+							<span class="panel-tile"><b-icon icon="backup-restore" /></span>
+							<span class="panel-title">{{ $t('Backups') }}</span>
+							<span v-if="backupChip" :class="`is-${backupChip.level}`" class="panel-chip">{{ backupChip.text }}</span>
+						</div>
+						<div class="panel-body">
+							<p v-if="backup.status === 'none'" class="panel-empty">{{ $t('No backup yet') }}</p>
+							<div v-else>
+								<div>{{ $t('Last: {when}', { when: whenOf(new Date(backup.at)) }) }}</div>
+								<div class="tile-detail">{{ lastBackupDetail }}</div>
 							</div>
-							<div v-if="backup.destination">
-								<dt>{{ $t('Destination') }}</dt>
-								<dd>{{ backup.destination }}</dd>
-							</div>
-						</dl>
-						<p v-if="backup.status === 'failed'" class="is-danger panel-error">{{ $t('The last backup failed') }}</p>
-						<button v-if="backupDestination" class="panel-action" type="button" @click="backupNow">{{ $t('Back up now') }}</button>
-						<button class="panel-action" type="button" @click="openBackups">{{ $t('Backups and restore') }}</button>
+							<p v-if="backup.status === 'failed'" class="panel-error">{{ backup.error }}</p>
+							<p v-if="nextBackup" class="tile-detail">{{ $t('Next: {when}', { when: nextBackup }) }}</p>
+						</div>
+						<div class="panel-foot">
+							<button v-if="backupDestination" class="panel-action is-primary" type="button" @click="backupNow">{{ $t('Back up') }}</button>
+							<button class="panel-action" type="button" @click="openBackups">
+								<span class="panel-grow">{{ $t('Backups and restore') }}</span>
+								<b-icon icon="chevron-right" size="is-small" />
+							</button>
+						</div>
 					</div>
-				</div>
+				</section>
 
-				<div v-if="fleet && fleet.total" class="widget has-text-grey-100 panel fleet">
+				<section v-if="fleet && fleet.total" class="widget has-text-grey-100 panel fleet">
 					<div class="blur-background"></div>
 					<div class="widget-content">
-						<div class="tile-label">{{ $t('Fleet') }}</div>
-						<p class="fleet-count">{{ $t('{online} of {total} boxes online', { online: fleet.online, total: fleet.total }) }}</p>
-						<ul>
-							<li v-for="box in fleet.boxes" :key="box.key" :class="`is-${box.state}`">
-								<span class="fleet-name">{{ box.name }}</span>
+						<div class="panel-head">
+							<span class="panel-tile"><b-icon icon="server-network" /></span>
+							<span class="panel-title">{{ $t('Fleet') }}</span>
+							<span class="panel-chip">{{ $t('{online} of {total} boxes online', { online: fleet.online, total: fleet.total }) }}</span>
+						</div>
+						<ul class="panel-body">
+							<li v-for="box in fleet.boxes" :key="box.key" :class="`is-${box.state}`" class="panel-row">
+								<span :class="`is-${box.state}`" class="panel-dot"></span>
+								<span class="panel-grow">{{ box.name }}</span>
 								<span class="fleet-state">{{ fleetStateLabel(box.state) }}</span>
 							</li>
 						</ul>
-						<button class="fleet-open" type="button" @click="openFleetPage">
-							<span class="tag is-dark is-rounded">{{ $t('Beta') }}</span>
-							<span>{{ $t('Open the Fleet page') }}</span>
-						</button>
+						<div class="panel-foot">
+							<button class="fleet-open panel-action" type="button" @click="openFleetPage">
+								<span class="tag is-dark is-rounded">{{ $t('Beta') }}</span>
+								<span class="panel-grow">{{ $t('Open the Fleet page') }}</span>
+								<b-icon icon="chevron-right" size="is-small" />
+							</button>
+						</div>
 					</div>
-				</div>
+				</section>
 			</aside>
 
 			<div class="beta-main">
@@ -114,6 +148,7 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
+import { durationText, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -137,6 +172,8 @@ export default {
 			speed: null,
 			watts: null,
 			runs: [],
+			// the schedules, for the next run to come; none on an older box
+			schedules: [],
 			// the names of the backup destinations; none on a box that has not set one up
 			destinations: [],
 			snapraidState: null,
@@ -164,6 +201,61 @@ export default {
 		},
 		attention() {
 			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState }, this.translate)
+		},
+		// the chips of the heads: what each card says before it is read. The attention list is worst first.
+		attentionChip() {
+			const items = this.attention
+
+			return items.length ? { level: items[0].level, text: String(items.length) } : { level: 'ok', text: this.$t('All good') }
+		},
+		storageChip() {
+			const failed = this.drives.filter(drive => drive.health === 'failed').length
+			if (failed) {
+				return { level: 'danger', text: this.$t('{count} failing', { count: failed }) }
+			}
+			const count = this.drives.length
+			if (count && this.drives.every(drive => drive.health === 'passed')) {
+				return { level: 'ok', text: count === 1 ? this.$t('Healthy') : this.$t('{count} healthy', { count }) }
+			}
+
+			// no SMART word for them all: the count alone
+			return { level: 'none', text: String(count) }
+		},
+		backupChip() {
+			if (this.backup.status === 'none') {
+				return null
+			}
+
+			return this.backup.status === 'failed' ? { level: 'danger', text: this.$t('Failed') } : { level: 'ok', text: this.$t('Succeeded') }
+		},
+		// how long the last go took, how much it read, where it went; a record too old for a figure says nothing of it
+		lastBackupDetail() {
+			const batch = this.backup.batch || []
+			const parts = []
+			if (batch.length) {
+				const started = Math.min(...batch.map(run => Date.parse(run.started_at)))
+				const finished = Math.max(...batch.map(run => Date.parse(run.finished_at)))
+				if (finished >= started) {
+					parts.push(durationText(finished - started))
+				}
+				const bytes = batch.reduce((sum, run) => sum + (run.bytes || 0), 0)
+				if (bytes) {
+					parts.push(this.renderSize(bytes))
+				}
+			}
+			if (this.backup.destination) {
+				parts.push(this.$t('to {destination}', { destination: this.backup.destination }))
+			}
+
+			return parts.join(' · ')
+		},
+		nextBackup() {
+			const next = nextOfAll(this.schedules)
+			if (!next) {
+				return ''
+			}
+
+			return next.due ? this.$t('at the next check, a slot was missed') : this.whenOf(next.at)
 		},
 		// null unless this box is a master
 		fleet() {
@@ -338,6 +430,14 @@ export default {
 			openFleet(this.$buefy, this.$store.state)
 		},
 
+		whenOf(date) {
+			return whenOf(date, this.translate)
+		},
+
+		roleLabel(role) {
+			return { system: this.$t('System'), data: this.$t('Data disk'), parity: this.$t('Parity disk') }[role] || ''
+		},
+
 		fleetStateLabel(state) {
 			return { online: this.$t('Online'), offline: this.$t('Offline'), never: this.$t('Never connected') }[state]
 		},
@@ -364,10 +464,9 @@ export default {
 			return [system, ...usb]
 		},
 
-		// role, how full, and the temperature when the drive reads one
+		// the figures, and the temperature when the drive reads one
 		driveDetail(drive) {
-			const role = { system: this.$t('System'), data: this.$t('Data disk'), parity: this.$t('Parity disk') }[drive.role]
-			return [role, `${drive.percent} %`, drive.detail, drive.temperature ? `${drive.temperature}°C` : ''].filter(Boolean).join(' · ')
+			return [drive.detail, drive.temperature ? `${drive.temperature}°C` : ''].filter(Boolean).join(' · ')
 		},
 
 		driveHealthLabel(health) {
@@ -413,6 +512,11 @@ export default {
 				this.destinations = (await this.$api.backup.getDestinations()).data.data || []
 			} catch {
 				this.destinations = []
+			}
+			try {
+				this.schedules = (await this.$api.backup.getSchedules()).data.data || []
+			} catch {
+				this.schedules = []
 			}
 			try {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
@@ -541,6 +645,8 @@ export default {
 
 .beta-aside {
 	display: grid;
+	// the track stays the column's width: a long label is cut short, it does not widen the cards
+	grid-template-columns: minmax(0, 1fr);
 	gap: 0.75rem;
 
 	.widget {
@@ -558,157 +664,245 @@ export default {
 	}
 }
 
-.panel-empty {
-	margin-top: 0.25rem;
-	opacity: 0.85;
+// the side panels: one anatomy, head / rows / foot, the foot's line edge to edge
+.panel .widget-content {
+	padding: 0;
 }
 
-.panel-error,
-.drive-health.is-failed {
-	color: #ff9d9d;
-}
-
-.drive {
-	margin-top: 0.75rem;
-}
-
-.drive-head {
-	display: flex;
-	justify-content: space-between;
-	gap: 0.5rem;
-}
-
-.drive-name {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.drive-health {
-	flex-shrink: 0;
-	font-size: 0.75rem;
-	opacity: 0.85;
-
-	&.is-passed {
-		color: #8fd16a;
-	}
-}
-
-.backups dl > div {
-	display: flex;
-	justify-content: space-between;
-	gap: 0.5rem;
-	line-height: 1.75rem;
-
-	dt {
-		opacity: 0.8;
-		white-space: nowrap;
-	}
-
-	dd {
-		text-align: right;
-	}
-}
-
-.fleet {
-	ul {
-		margin-top: 0.25rem;
-	}
-
-	.fleet-name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.fleet-state {
-		flex-shrink: 0;
-	}
-
-	li {
-		display: flex;
-		justify-content: space-between;
-		gap: 0.5rem;
-		line-height: 1.75rem;
-
-		&.is-online .fleet-state {
-			color: #8fd16a;
-		}
-
-		&.is-offline .fleet-state {
-			color: #ff9d9d;
-		}
-	}
-}
-
-.fleet-open,
-.panel-action {
+.panel-head {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
-	width: 100%;
-	margin-top: 0.5rem;
-	padding: 0.375rem 0.5rem;
-	border: 0;
-	border-radius: 0.5rem;
+	gap: 0.625rem;
+	padding: 0.75rem 0.875rem;
+}
+
+.panel-tile {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.625rem;
 	background: rgba(255, 255, 255, 0.1);
-	color: inherit;
-	font: inherit;
-	text-align: left;
-	cursor: pointer;
+}
 
-	&:hover {
-		background: rgba(255, 255, 255, 0.2);
+.panel-title {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+}
+
+.panel-chip {
+	flex-shrink: 0;
+	height: 1.375rem;
+	padding: 0 0.5625rem;
+	border-radius: 0.6875rem;
+	background: rgba(255, 255, 255, 0.1);
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1.375rem;
+	white-space: nowrap;
+
+	&.is-ok {
+		background: rgba(34, 197, 94, 0.16);
+		color: #4ade80;
 	}
 
-	&:focus-visible {
-		outline: 2px solid #fff;
-		outline-offset: 2px;
+	&.is-warning {
+		background: rgba(245, 158, 11, 0.18);
+		color: #fbbf24;
+	}
+
+	&.is-danger {
+		background: rgba(239, 68, 68, 0.18);
+		color: #fca5a5;
 	}
 }
 
-.attention:focus {
-	outline: none;
+.panel-body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.625rem;
+	margin: 0;
+	padding: 0 0.875rem 0.75rem;
+	list-style: none;
 }
 
-.attention-item {
+.panel-row {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	width: 100%;
+	min-height: 1.75rem;
 	padding: 0;
 	border: 0;
 	background: none;
 	color: inherit;
 	font: inherit;
 	text-align: left;
+}
+
+.panel-grow {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.panel-dot {
+	flex-shrink: 0;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.35);
+
+	&.is-ok,
+	&.is-passed,
+	&.is-online {
+		background: #4ade80;
+	}
+
+	&.is-warning {
+		background: #fbbf24;
+	}
+
+	&.is-danger,
+	&.is-failed,
+	&.is-offline {
+		background: #f87171;
+	}
+}
+
+.panel-value {
+	flex-shrink: 0;
+	width: 2.25rem;
+	font-size: 0.75rem;
+	text-align: right;
+	opacity: 0.85;
+}
+
+.panel-role {
+	flex-shrink: 0;
+	height: 1.125rem;
+	padding: 0 0.375rem;
+	border-radius: 0.5625rem;
+	background: rgba(255, 255, 255, 0.1);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	line-height: 1.125rem;
+}
+
+.panel-foot {
+	display: flex;
+	align-items: center;
+	// two actions that do not fit side by side go one under the other, whole
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	padding: 0.625rem 0.875rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.panel-action {
+	display: flex;
+	align-items: center;
+	flex: 1 1 14rem;
+	gap: 0.5rem;
+	min-width: 0;
+	height: 2.25rem;
+	padding: 0 0.75rem;
+	border: 0;
+	border-radius: 0.625rem;
+	background: rgba(255, 255, 255, 0.08);
+	color: inherit;
+	font: inherit;
+	font-weight: 500;
+	text-align: left;
 	cursor: pointer;
 
 	&:hover {
+		background: rgba(255, 255, 255, 0.16);
+	}
+
+	&:focus-visible {
+		outline: 2px solid #fff;
+		outline-offset: 2px;
+	}
+
+	&.is-primary {
+		flex: 0 0 auto;
+		justify-content: center;
+		background: #3b82f6;
+		color: #fff;
+		font-weight: 600;
+
+		&:hover {
+			background: #2563eb;
+		}
+	}
+}
+
+// the worst alert colours the edge of the card; the ring, not a border, so nothing moves
+.attention {
+	&.is-warning {
+		box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.45);
+	}
+
+	&.is-danger {
+		box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.5);
+	}
+
+	&:focus {
+		outline: none;
+	}
+}
+
+.attention-item {
+	cursor: pointer;
+
+	&:hover .panel-grow {
 		text-decoration: underline;
 	}
 }
 
-.attention {
-	ul {
-		margin-top: 0.25rem;
+.drive {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+
+	.tile-bar {
+		margin: 0;
 	}
+}
 
-	li {
-		padding-left: 1rem;
-		position: relative;
-		line-height: 1.75rem;
+.drive-health.is-failed {
+	flex-shrink: 0;
+	color: #ff9d9d;
+	font-size: 0.75rem;
+}
 
-		&::before {
-			content: '';
-			position: absolute;
-			left: 0;
-			top: 0.7rem;
-			width: 0.5rem;
-			height: 0.5rem;
-			border-radius: 50%;
-			background: #ffc107;
-		}
+.panel-empty,
+.panel-error {
+	margin: 0;
+}
 
-		&.is-danger::before {
-			background: #ff6b6b;
-		}
+.panel-empty {
+	opacity: 0.85;
+}
+
+.panel-error {
+	color: #ff9d9d;
+}
+
+.fleet-state {
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	opacity: 0.85;
+
+	.is-offline & {
+		color: #ff9d9d;
+		opacity: 1;
 	}
 }
 </style>

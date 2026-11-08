@@ -97,15 +97,16 @@ describe('health strip', () => {
 
 	it('puts a failed last backup in the attention list, and still dates the last good one', async () => {
 		const wrapper = strip({
+			// long enough ago to be said as a date, whatever today is
 			runs: [
-				{ started_at: '2026-11-03T03:00:00Z', error: 'no route to host' },
-				{ started_at: '2026-11-02T03:00:00Z' },
+				{ started_at: '2026-01-03T03:00:00Z', error: 'no route to host' },
+				{ started_at: '2026-01-02T03:00:00Z' },
 			],
 		})
 		await settle()
 
 		expect(wrapper.find('.attention').text()).toContain('The last backup failed')
-		expect(wrapper.text()).toContain(new Date('2026-11-02T03:00:00Z').toLocaleString())
+		expect(wrapper.text()).toContain(new Date('2026-01-02T03:00:00Z').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }))
 	})
 
 	it('lists the system drive and the USB disks in the storage panel, and the apps go in the main column', () => {
@@ -162,11 +163,43 @@ describe('health strip', () => {
 		expect(drives[0].text()).toContain('System')
 		// the system disk is no drive of the list: its SMART is the utilization's
 		expect(drives[0].text()).toContain('Healthy')
-		expect(drives[1].text()).toContain('Data disk · 25 %')
+		expect(drives[1].text()).toContain('Data disk')
+		expect(drives[1].text()).toContain('25 %')
 		expect(drives[1].text()).toContain('38°C')
 		expect(drives[2].text()).toContain('Parity disk')
 		expect(drives[2].text()).toContain('Damage')
 		expect(drives[2].text()).not.toContain('°C')
+		// the chip of the head: a failing disk comes first
+		expect(wrapper.find('.storage .panel-chip').text()).toContain('failing')
+	})
+
+	it('says how long the last go took, how much it read and where it went, and when the next one comes', async () => {
+		const wrapper = mount(HealthStrip, {
+			global: {
+				mocks: {
+					$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
+					$store: { state: { hardwareInfo } },
+					$EventBus: { $emit: vi.fn() },
+					$api: {
+						backup: {
+							getRuns: () => Promise.resolve({ data: { data: [
+								{ app: 'blog', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:03:00Z', finished_at: '2026-11-02T03:04:00Z', bytes: 1024 ** 2 },
+								{ app: 'casaos-system', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:02:30Z', bytes: 2 * 1024 ** 2 },
+							] } }),
+							// a slot long gone: due at the next check, whatever today is
+							getSchedules: () => Promise.resolve({ data: { data: [{ app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-02T03:00:00Z' }] } }),
+						},
+						disks: { snapraid: () => Promise.reject(new Error('404')) },
+					},
+				},
+			},
+		})
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.find('.panel-chip').text()).toBe('Succeeded')
+		expect(panel.text()).toContain('4 min · 3 MB · to nas')
+		expect(panel.text()).toContain('Next: at the next check, a slot was missed')
 	})
 
 	it('opens the storage manager from the storage tile', async () => {

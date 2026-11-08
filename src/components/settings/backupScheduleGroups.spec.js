@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupSchedules, nextRun, spreadGroups } from './backupScheduleGroups.js'
+import { durationText, groupSchedules, nextOfAll, nextRun, spreadGroups } from './backupScheduleGroups.js'
 
 const nightly = { destination: 'nas', every: 'daily', at: '03:00', weekday: 1, keep: 7, hold_still: true, enabled: true }
 
@@ -50,5 +50,24 @@ describe('the next run of a schedule', () => {
 		const weekly = { ...nightly, every: 'weekly', weekday: 0, last_run: at(1, 3).toISOString() }
 		expect(nextRun(weekly, now)).toEqual({ due: false, at: at(8, 3) })
 		expect(nextRun({ ...weekly, enabled: false }, now)).toBeNull()
+	})
+})
+
+describe('the first run to come over every schedule', () => {
+	const at = (day, hour) => new Date(2026, 10, day, hour)
+	const now = at(7, 10)
+
+	it('is a missed slot before a future one, else the earliest, and null without a schedule enabled', () => {
+		const ran = { ...nightly, last_run: at(7, 3).toISOString() }
+		expect(nextOfAll([ran, { ...nightly, at: '01:00', last_run: at(7, 1).toISOString() }], now)).toEqual({ due: false, at: at(8, 1) })
+		expect(nextOfAll([ran, { ...nightly, at: '05:00', last_run: at(6, 5).toISOString() }], now)).toEqual({ due: true, at: at(7, 5) })
+		expect(nextOfAll([{ ...nightly, enabled: false }], now)).toBeNull()
+		expect(nextOfAll(undefined, now)).toBeNull()
+	})
+
+	it('says a duration in the unit that fits', () => {
+		expect(durationText(12000)).toBe('12 s')
+		expect(durationText(4 * 60000)).toBe('4 min')
+		expect(durationText(5400000)).toBe('1 h 30')
 	})
 })
