@@ -4,7 +4,7 @@
 </template>
 
 <script>
-const SHAPES = { ok: '✓', failed: '✕', attention: '●' }
+const SHAPES = { ok: '✓', failed: '✕', attention: '○' }
 
 export default {
 	name: 'BackupBadge',

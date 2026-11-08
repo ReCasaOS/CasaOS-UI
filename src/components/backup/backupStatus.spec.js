@@ -79,6 +79,15 @@ describe('the state of a scheduled couple (same cases as the master)', () => {
 		expect(coupleStates({ runs: [base, { ...base, started_at: 'not a date' }], schedules }, NOW)[0].state).toBe('late')
 	})
 
+	it('reads a run without a start time as the earliest, so a later valid failed run still wins', () => {
+		const schedules = [sched(a, d, true, 2 * HOUR, 2 * HOUR)]
+		const malformed = { app: a, destination: d, error: '' }
+		const failed = run(a, d, 'disk full', HOUR)
+		expect(coupleStates({ runs: [malformed, failed], schedules }, NOW)[0]).toMatchObject({ state: 'failed', last_error: 'disk full' })
+		expect(coupleStates({ runs: [{ ...malformed, started_at: ZERO }, failed], schedules }, NOW)[0].state).toBe('failed')
+		expect(coupleStates({ runs: [failed, malformed], schedules }, NOW)[0].state).toBe('failed')
+	})
+
 	it('stays late when the schedule has a zero last_run and no run is after the slot', () => {
 		const schedules = [sched(a, d, true, null, 2 * HOUR)]
 		expect(coupleStates({ runs: [run(a, d, '', 25 * HOUR)], schedules }, NOW)[0].state).toBe('late')

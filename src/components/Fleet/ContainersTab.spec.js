@@ -14,7 +14,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString()
 const A = { id: 'a', name: 'Home', self: true, online: true }
 const B = { id: 'b', name: 'Shop', self: false, online: true }
 const app = name => ({ name, app_type: 'v2app', status: 'running', title: { en_us: name } })
-const GRIDS = { a: [app('jellyfin'), app('plex')], b: [app('jellyfin')] }
+let GRIDS
 const couple = (over = {}) => ({ app: 'jellyfin', destination: 'nas', state: 'ok', last_error: '', last_ok_at: ago(10 * MIN), next_slot: ago(-3600000), verify: { state: 'none', error: '' }, ...over })
 const backupBox = (id, over = {}) => ({ box_id: id, name: id, online: true, polled_at: ago(MIN), stale: false, error: '', state: 'ok', green: true, problems: 0, couples: [couple()], ...over })
 const answer = boxes => ({ data: { data: { notify: true, interval_seconds: 300, boxes } } })
@@ -32,6 +32,7 @@ describe('the backup mark on a container row', () => {
 	beforeEach(() => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
+		GRIDS = { a: [app('jellyfin'), app('plex')], b: [app('jellyfin')] }
 		fleetApi.status.mockResolvedValue({ data: { data: { role: 'master', master: { address: 'https://m', boxes: [A, B] } } } })
 		fleetApi.relay.mockImplementation((boxId, method, path) => Promise.resolve({ status: 200, data: { success: 200, data: path === '/v2/app_management/web/appgrid' ? GRIDS[boxId] : {} } }))
 		fleetApi.backups.mockResolvedValue(answer([backupBox('a'), backupBox('b', { couples: [] })]))
@@ -97,6 +98,22 @@ describe('the backup mark on a container row', () => {
 		await mountTab()
 		expect(markOf('Home', 'jellyfin').classes()).toContain('is-none')
 		expect(markOf('Home', 'jellyfin').attributes('aria-label')).toBe('Backup late')
+	})
+
+	it('never repeats a stored late or failed text for a box the master cannot vouch for', async () => {
+		fleetApi.backups.mockResolvedValue(answer([backupBox('a', { stale: true, couples: [couple({ state: 'late' })] }), backupBox('b', { couples: [] })]))
+		await mountTab()
+		expect(markOf('Home', 'jellyfin').attributes('aria-label')).toBe('Backup state unknown')
+		expect(markOf('Home', 'jellyfin').attributes('title')).toBe('Backup state unknown')
+	})
+
+	it('marks compose apps only: a container or a v1 app of the same name gets nothing', async () => {
+		GRIDS.a = [{ name: 'jellyfin', app_type: 'container', status: 'running' }]
+		GRIDS.b = [{ name: 'jellyfin', app_type: 'v1app', status: 'running' }]
+		fleetApi.backups.mockResolvedValue(answer([backupBox('a'), backupBox('b')]))
+		await mountTab()
+		expect(wrapper.findAll('.fleet-row')).toHaveLength(2)
+		expect(wrapper.findAll('.backup-mark')).toHaveLength(0)
 	})
 
 	it('looks each row up in its own box, though two boxes run an app of the same name', async () => {

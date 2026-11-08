@@ -12,6 +12,10 @@ describe('the backup badge', () => {
 		expect(new Set(glyphs).size).toBe(3)
 	})
 
+	it('uses the same grey glyph for attention as the Fleet mark', () => {
+		expect(glyph('attention')).toBe('○')
+	})
+
 	it('is an image named by its title, which is also the tooltip', () => {
 		const badge = mount(BackupBadge, { props: { kind: 'failed', title: 'Backup failed: disk full' } }).find('[role="img"]')
 		expect(badge.exists()).toBe(true)

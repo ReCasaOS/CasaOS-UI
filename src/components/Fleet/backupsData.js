@@ -71,6 +71,9 @@ export const lastOkOf = box => dates(fieldOf(box, 'last_ok_at')).at(-1) ?? ''
 export const nextOf = box => dates(fieldOf(box, 'next_slot'))[0] ?? ''
 export const lastVerifyOf = box => dates((box.couples ?? []).map(c => c.verify?.at)).at(-1) ?? ''
 
+// whether the master can vouch for what it holds of this box: online, fresh, polled at least once, no error
+export const vouchedFor = box => !unreadable(box) && !!box.polled_at && !box.error
+
 // The badge of one app on one box's tile: the worst of its couples, grey when the box cannot be vouched for.
 // null when the app has no schedule there.
 export function badgeFor(box, app) {
@@ -78,7 +81,7 @@ export function badgeFor(box, app) {
 	if (!own.length) {
 		return null
 	}
-	if (unreadable(box) || !box.polled_at || box.error) {
+	if (!vouchedFor(box)) {
 		return 'attention'
 	}
 	if (own.some(c => c.state === 'failed' || verifyFailed(c))) {

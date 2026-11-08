@@ -6,7 +6,8 @@ import { coupleStates } from '@/components/backup/backupStatus.js'
 export const backupStatus = reactive({ states: [], ok: false })
 
 const EVERY = 60000
-// a failed read is tried again sooner: a transient failure must not hide the badges for a minute
+// a failed read is tried again sooner (a transient failure must not hide the badges for a minute), then
+// less and less often: 15 s, 30 s, a minute -- a box without the backup routes is not asked twelve times a minute
 const RETRY = 15000
 let wait = EVERY
 let readAt = Number.NEGATIVE_INFINITY
@@ -30,11 +31,11 @@ async function read() {
 		// never a default green: one unreadable answer and there is no badge
 		backupStatus.states = []
 		backupStatus.ok = false
-		wait = RETRY
+		wait = wait === EVERY ? RETRY : Math.min(wait * 2, EVERY)
 	}
 }
 
-// At most one read a minute (one every 15 s after a failed one), whoever asks.
+// At most one read a minute (sooner after a failed one, see RETRY), whoever asks.
 export function refresh() {
 	if (!inFlight && Date.now() - readAt >= wait) {
 		readAt = Date.now()

@@ -79,6 +79,41 @@ describe('the backup status of this box', () => {
 		expect(backupStatus.ok).toBe(true)
 	})
 
+	it('backs off 15 s, 30 s, then a minute after repeated failures, and starts over after a success', async () => {
+		runs.mockImplementation(() => Promise.reject(new Error('down')))
+		const at = async (ms) => {
+			vi.setSystemTime(NOW + ms)
+			await refresh()
+		}
+		await at(0)
+		expect(runs).toHaveBeenCalledTimes(1)
+		await at(14999)
+		expect(runs).toHaveBeenCalledTimes(1)
+		await at(15000)
+		expect(runs).toHaveBeenCalledTimes(2)
+		// second failure: 30 s
+		await at(15000 + 29999)
+		expect(runs).toHaveBeenCalledTimes(2)
+		await at(15000 + 30000)
+		expect(runs).toHaveBeenCalledTimes(3)
+		// third failure: a minute, and no longer
+		await at(45000 + 59999)
+		expect(runs).toHaveBeenCalledTimes(3)
+		await at(45000 + 60000)
+		expect(runs).toHaveBeenCalledTimes(4)
+		await at(105000 + 60000)
+		expect(runs).toHaveBeenCalledTimes(5)
+		// a success starts over: the next failure is retried after 15 s again
+		runs.mockImplementation(() => answer({ data: [] }))
+		await at(165000 + 60000)
+		expect(backupStatus.ok).toBe(true)
+		runs.mockImplementation(() => Promise.reject(new Error('down')))
+		await at(225000 + 60000)
+		expect(runs).toHaveBeenCalledTimes(7)
+		await at(225000 + 60000 + 15000)
+		expect(runs).toHaveBeenCalledTimes(8)
+	})
+
 	it('still waits a minute after a read that worked', async () => {
 		await refresh()
 		vi.setSystemTime(NOW + 16000)

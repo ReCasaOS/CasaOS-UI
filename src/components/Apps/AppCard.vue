@@ -1501,6 +1501,11 @@ export default {
     p {
       margin: 0 !important;
     }
+
+    // the compact card's text is left-aligned, and so is the title with its badge
+    .title-row {
+      justify-content: flex-start;
+    }
   }
 
   .action-btn {

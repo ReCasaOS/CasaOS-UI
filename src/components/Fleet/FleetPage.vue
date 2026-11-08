@@ -257,6 +257,12 @@ export default {
 		flex: 0 0 12rem;
 	}
 
+	:deep(.fleet-row-backup) {
+		flex: 0 0 1.375rem;
+		display: inline-flex;
+		justify-content: center;
+	}
+
 	:deep(.fleet-row-result) {
 		flex: 0 1 11rem;
 		min-width: 0;

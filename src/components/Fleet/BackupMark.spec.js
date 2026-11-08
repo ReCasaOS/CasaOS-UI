@@ -11,6 +11,10 @@ describe('the backup mark', () => {
 		expect(new Set(glyphs).size).toBe(4)
 	})
 
+	it('uses the glyph the tile badge uses for attention', () => {
+		expect(mount(BackupMark, { props: { level: 'none', label: 'x' } }).text()).toBe('○')
+	})
+
 	it('is an image with the label for a screen reader', () => {
 		// the template starts with a comment: the root is a fragment
 		const mark = mount(BackupMark, { props: { level: 'none', label: 'Offline' } }).find('[role="img"]')

@@ -53,8 +53,9 @@
 							<b-tag v-if="row.status" :type="stateType(row.status)" size="is-small">{{ stateWord(row.status) }}</b-tag>
 							<b-tag v-if="row.updateAvailable" size="is-small" type="is-info">{{ $t('Update ready') }}</b-tag>
 							<b-tag v-if="!row.actionable" :title="$t('Not controllable from the fleet (a v1 app or a container outside an app)')" size="is-small">{{ $t('View only') }}</b-tag>
-							<backup-mark v-if="backupMark(row)" :label="backupMark(row).label" :level="backupMark(row).level" />
 						</span>
+						<!-- its own slot, empty or not, so that the tags never wrap around it and the columns stay aligned -->
+						<span class="fleet-row-backup"><backup-mark v-if="backupMarks[row.key]" v-bind="backupMarks[row.key]" /></span>
 						<span class="fleet-row-result"><result-cell :result="results[row.key] || null" /></span>
 						<span v-if="row.actionable" class="fleet-row-actions">
 							<template v-if="row.status === 'running'">
@@ -78,7 +79,7 @@ import tabMixin from './tabMixin'
 import ResultCell from './ResultCell.vue'
 import FleetIcon from './FleetIcon.vue'
 import BackupMark from './BackupMark.vue'
-import { badgeFor } from './backupsData'
+import { badgeFor, vouchedFor } from './backupsData'
 import { actions } from './bulk'
 import { CONTAINER_FILTERS, containerRows, countRows, failureCode, groupByBox, sortRows } from './fleetData'
 import { STATE_WORDS } from './fleetWords'
@@ -129,6 +130,22 @@ export default {
 		groups() {
 			return groupByBox(this.filtered)
 		},
+		// row key → { level, label } for the compose apps that have a backup schedule; built once for the rows and backups
+		backupMarks() {
+			const marks = {}
+			for (const row of this.rows) {
+				const box = row.error || row.type !== 'v2app' ? null : this.backupBoxes[row.boxId]
+				const kind = box ? badgeFor(box, row.id) : null
+				if (!kind) {
+					continue
+				}
+				// a box the master cannot vouch for says nothing of what it stored last; a failed verification has its own word
+				const own = vouchedFor(box) ? badgeOfApp(box.couples, row.id, this.$t) : null
+				const label = own?.kind === kind ? own.title : this.$t(kind === 'failed' ? 'Verification failed' : 'Backup state unknown')
+				marks[row.key] = { level: { ok: 'ok', failed: 'danger', attention: 'none' }[kind], label }
+			}
+			return marks
+		},
 		updatable() {
 			return this.selected.filter(r => r.updateAvailable)
 		},
@@ -150,18 +167,6 @@ export default {
 			if (ticket === this.backupTicket) {
 				this.backupBoxes = boxes
 			}
-		},
-		// level and words of the mark of an app row; null when the app has no schedule or nothing is known
-		backupMark(row) {
-			const box = row.error ? null : this.backupBoxes[row.boxId]
-			const kind = box ? badgeFor(box, row.id) : null
-			if (!kind) {
-				return null
-			}
-			// the couples' own words when they agree with the mark; a box the master cannot vouch for, or a failed verification, has its own
-			const own = badgeOfApp(box.couples, row.id, this.$t)
-			const label = own.kind === kind ? own.title : this.$t(kind === 'failed' ? 'Verification failed' : 'Backup state unknown')
-			return { level: { ok: 'ok', failed: 'danger', attention: 'none' }[kind], label }
 		},
 		build(box, answers) {
 			if (answers.grid.ok) {

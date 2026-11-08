@@ -16,6 +16,8 @@ function instant(iso) {
 	return ms > Date.parse('0002-01-01T00:00:00Z') ? ms : Number.NaN
 }
 
+const startOf = run => instant(run.started_at) || Number.NEGATIVE_INFINITY
+
 // `now` is the caller's (a Date or milliseconds): no clock is read here.
 export function coupleStates({ runs = [], schedules = [], operations = [], osUpgradeOpen = false }, now) {
 	const backing = new Set(operations.filter(o => o.kind === 'backup').map(o => o.app))
@@ -33,15 +35,16 @@ export function coupleStates({ runs = [], schedules = [], operations = [], osUpg
 			if (r.app !== s.app || r.destination !== s.destination || r.restore) {
 				continue
 			}
-			const at = instant(r.started_at)
+			// a run without a start time is the earliest (Go's zero time): it never wins, nor counts as after the slot
+			const at = startOf(r)
 			// strictly later wins, so that the first of two runs at the same moment stays
-			if (!last || at > instant(last.started_at)) {
+			if (!last || at > startOf(last)) {
 				last = r
 			}
-			if (!r.error && (!lastOk || at > instant(lastOk.started_at))) {
+			if (!r.error && (!lastOk || at > startOf(lastOk))) {
 				lastOk = r
 			}
-			if (!Number.isNaN(slot) && !Number.isNaN(at) && !(at < slot)) {
+			if (!Number.isNaN(slot) && !(at < slot)) {
 				afterSlot = true
 			}
 		}
