@@ -9,9 +9,17 @@ import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
+import BackupBadge from '@/components/backup/BackupBadge.vue'
+import { backupStatus, refresh } from '@/service/backupStatus'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
+
+// the service reads the box's backup routes: the card is given its answers instead
+vi.mock('@/service/backupStatus', async () => {
+	const { reactive } = await import('vue')
+	return { backupStatus: reactive({ states: [], ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
@@ -23,6 +31,8 @@ vi.mock('@/assets/lang', () => ({
 			'Statistics, {count} active alert': 'Statistics, {count} active alert',
 			'Statistics, {count} active alerts': 'Statistics, {count} active alerts',
 			'Updating {name} failed: {reason}': 'Updating {name} failed: {reason}',
+			'Backed up {when} to {destination}': 'Backed up {when} to {destination}',
+			'Backup failed: {reason}': 'Backup failed: {reason}',
 			'{name} now runs the image that was just pulled.': '{name} now runs the image that was just pulled.',
 			'{name} already runs the newest image, so it was left as it is.': '{name} already runs the newest image, so it was left as it is.',
 			'Could not check whether a newer image exists for {name}. It keeps the image it has.': 'Could not check whether a newer image exists for {name}. It keeps the image it has.',
@@ -56,6 +66,9 @@ async function card(item, mocks = {}) {
 // on someone else's markup.
 afterEach(() => {
 	document.body.innerHTML = ''
+	backupStatus.states = []
+	backupStatus.ok = false
+	vi.mocked(refresh).mockClear()
 })
 
 function badges(wrapper) {
@@ -781,5 +794,85 @@ describe('the compact card favorites and subtitle (beta dashboard)', () => {
 		await classic.setData({ newAppIds: ['jellyfin'] })
 		expect(classic.find('.update-chip').exists()).toBe(false)
 		expect(classic.text()).toContain('NEW')
+	})
+})
+
+describe('the backup badge on the tile', () => {
+	const couple = (over = {}) => ({ app: 'syncthing', destination: 'nas', state: 'ok', running: false, last_error: '', last_ok_at: new Date(Date.now() - 3600000).toISOString(), ...over })
+	const badge = wrapper => wrapper.findComponent(BackupBadge)
+
+	it('asks the service for the backup state of this box when it is created', async () => {
+		const wrapper = await card({})
+		expect(refresh).toHaveBeenCalledTimes(1)
+		wrapper.unmount()
+	})
+
+	it('shows ok for an app whose scheduled backups are all fine', async () => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('ok')
+		expect(badge(wrapper).props('title')).toContain('to nas')
+		wrapper.unmount()
+	})
+
+	it('shows a cross with the reason when the last backup failed', async () => {
+		backupStatus.states = [couple({ state: 'failed', last_error: 'disk full' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('failed')
+		expect(badge(wrapper).props('title')).toContain('disk full')
+		wrapper.unmount()
+	})
+
+	it('shows grey attention for a late backup', async () => {
+		backupStatus.states = [couple({ state: 'late' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('attention')
+		wrapper.unmount()
+	})
+
+	it('shows nothing for an app without an enabled schedule', async () => {
+		backupStatus.states = [couple({ app: 'jellyfin', state: 'failed', last_error: 'x' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows nothing while the service is not ok, whatever it last held', async () => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = false
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('appears when the service answers after the card was drawn', async () => {
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		await nextTick()
+		expect(badge(wrapper).props('kind')).toBe('ok')
+		wrapper.unmount()
+	})
+
+	it.each([[false], [true]])('sits by the title, outside the action menu, on the card (compact: %s)', async (compact) => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		const wrapper = mount(AppCard, {
+			props: { compact, item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' } } },
+			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost' } },
+			attachTo: document.body,
+		})
+		await nextTick()
+		expect(badge(wrapper).exists()).toBe(true)
+		expect(badge(wrapper).element.closest('.action-btn')).toBeNull()
+		expect(badge(wrapper).element.closest('.app-text')).not.toBeNull()
+		// the menu trigger is still there
+		expect(wrapper.find('.action-btn').exists()).toBe(true)
+		wrapper.unmount()
 	})
 })

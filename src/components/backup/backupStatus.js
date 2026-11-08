@@ -41,7 +41,7 @@ export function coupleStates({ runs = [], schedules = [], operations = [], osUpg
 			if (!r.error && (!lastOk || at > instant(lastOk.started_at))) {
 				lastOk = r
 			}
-			if (!Number.isNaN(slot) && !(at < slot)) {
+			if (!Number.isNaN(slot) && !Number.isNaN(at) && !(at < slot)) {
 				afterSlot = true
 			}
 		}

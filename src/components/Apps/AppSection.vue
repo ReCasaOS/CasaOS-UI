@@ -178,6 +178,7 @@ import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import { STATS_APP_NAME } from '@/components/Stats/entry'
 import { createPoller } from '@/components/Stats/poller'
+import { refresh as refreshBackupStatus } from '@/service/backupStatus'
 import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
@@ -433,6 +434,8 @@ export default {
 
 		this.ListRefreshTimer = setInterval(() => {
 			this.getList()
+			// the tiles' backup badges: the service reads at most once a minute, whoever asks
+			refreshBackupStatus()
 		}, 5000)
 
 		// the VM tiles' polling: plain fields, not data, as nothing is drawn from them

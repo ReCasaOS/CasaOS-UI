@@ -53,6 +53,7 @@
 							<b-tag v-if="row.status" :type="stateType(row.status)" size="is-small">{{ stateWord(row.status) }}</b-tag>
 							<b-tag v-if="row.updateAvailable" size="is-small" type="is-info">{{ $t('Update ready') }}</b-tag>
 							<b-tag v-if="!row.actionable" :title="$t('Not controllable from the fleet (a v1 app or a container outside an app)')" size="is-small">{{ $t('View only') }}</b-tag>
+							<backup-mark v-if="backupMark(row)" :label="backupMark(row).label" :level="backupMark(row).level" />
 						</span>
 						<span class="fleet-row-result"><result-cell :result="results[row.key] || null" /></span>
 						<span v-if="row.actionable" class="fleet-row-actions">
@@ -76,13 +77,17 @@
 import tabMixin from './tabMixin'
 import ResultCell from './ResultCell.vue'
 import FleetIcon from './FleetIcon.vue'
+import BackupMark from './BackupMark.vue'
+import { badgeFor } from './backupsData'
 import { actions } from './bulk'
 import { CONTAINER_FILTERS, containerRows, countRows, failureCode, groupByBox, sortRows } from './fleetData'
 import { STATE_WORDS } from './fleetWords'
+import { badgeOfApp } from '@/components/backup/backupStatus'
+import { fleetApi } from '@/service/fleet'
 
 export default {
 	name: 'ContainersTab',
-	components: { ResultCell, FleetIcon },
+	components: { ResultCell, FleetIcon, BackupMark },
 	mixins: [tabMixin],
 	data() {
 		return {
@@ -92,6 +97,9 @@ export default {
 			boxFilter: '',
 			stateFilter: 'all',
 			search: '',
+			// box id → that box's backups as the master last read them; empty when they could not be read
+			backupBoxes: {},
+			backupTicket: 0,
 		}
 	},
 	computed: {
@@ -126,6 +134,35 @@ export default {
 		},
 	},
 	methods: {
+		// the backups are read with the containers, once for the pass; a failure leaves the containers and no mark
+		load() {
+			return Promise.all([tabMixin.methods.load.call(this), this.readBackups()])
+		},
+		async readBackups() {
+			const ticket = ++this.backupTicket
+			let boxes = {}
+			try {
+				const list = (await fleetApi.backups())?.data?.data?.boxes
+				if (Array.isArray(list)) {
+					boxes = Object.fromEntries(list.map(b => [b.box_id, b]))
+				}
+			} catch {}
+			if (ticket === this.backupTicket) {
+				this.backupBoxes = boxes
+			}
+		},
+		// level and words of the mark of an app row; null when the app has no schedule or nothing is known
+		backupMark(row) {
+			const box = row.error ? null : this.backupBoxes[row.boxId]
+			const kind = box ? badgeFor(box, row.id) : null
+			if (!kind) {
+				return null
+			}
+			// the couples' own words when they agree with the mark; a box the master cannot vouch for, or a failed verification, has its own
+			const own = badgeOfApp(box.couples, row.id, this.$t)
+			const label = own.kind === kind ? own.title : this.$t(kind === 'failed' ? 'Verification failed' : 'Backup state unknown')
+			return { level: { ok: 'ok', failed: 'danger', attention: 'none' }[kind], label }
+		},
 		build(box, answers) {
 			if (answers.grid.ok) {
 				return containerRows(box, answers.grid.data)

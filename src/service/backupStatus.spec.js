@@ -65,6 +65,37 @@ describe('the backup status of this box', () => {
 		expect(backupStatus).toMatchObject({ states: [], ok: false })
 	})
 
+	it('retries a failed read after 15 seconds, not a minute', async () => {
+		runs.mockImplementation(() => Promise.reject(new Error('down')))
+		await refresh()
+		expect(backupStatus.ok).toBe(false)
+		vi.setSystemTime(NOW + 14000)
+		await refresh()
+		expect(runs).toHaveBeenCalledTimes(1)
+		runs.mockImplementation(() => answer({ data: [] }))
+		vi.setSystemTime(NOW + 16000)
+		await refresh()
+		expect(runs).toHaveBeenCalledTimes(2)
+		expect(backupStatus.ok).toBe(true)
+	})
+
+	it('still waits a minute after a read that worked', async () => {
+		await refresh()
+		vi.setSystemTime(NOW + 16000)
+		await refresh()
+		expect(runs).toHaveBeenCalledTimes(1)
+	})
+
+	it.each([['no operations array', {}], ['null operations', { operations: null }]])('reads a malformed /operations body (%s) as no running backup, never as a green', async (_, body) => {
+		// without the running/suspended information a late couple reads late: not green, which is the safe side
+		runs.mockImplementation(() => answer({ data: [{ app: 'a', destination: 'd', started_at: '2026-11-07T07:00:00Z', finished_at: '2026-11-07T07:01:00Z', error: '' }] }))
+		schedules.mockImplementation(() => answer({ data: [{ ...schedule, last_run: '2026-11-07T07:00:00Z' }] }))
+		operations.mockImplementation(() => answer(body))
+		await refresh()
+		expect(backupStatus.ok).toBe(true)
+		expect(backupStatus.states[0]).toMatchObject({ state: 'late', running: false })
+	})
+
 	it('can be reset', async () => {
 		await refresh()
 		resetBackupStatus()

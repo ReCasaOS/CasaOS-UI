@@ -70,6 +70,31 @@ describe('the state of a scheduled couple (same cases as the master)', () => {
 		expect(coupleStates({ runs: [run(a, d, '', 2 * HOUR)], schedules: [schedule] }, NOW)[0].state).toBe('unknown')
 	})
 
+	it('does not count a run without a start time as after the slot', () => {
+		// a malformed run (no started_at, or Go's zero time) must not turn a late couple green
+		const schedules = [sched(a, d, true, 25 * HOUR, 2 * HOUR)]
+		const base = run(a, d, '', 25 * HOUR)
+		expect(coupleStates({ runs: [base, { ...base, started_at: undefined }], schedules }, NOW)[0].state).toBe('late')
+		expect(coupleStates({ runs: [base, { ...base, started_at: ZERO }], schedules }, NOW)[0].state).toBe('late')
+		expect(coupleStates({ runs: [base, { ...base, started_at: 'not a date' }], schedules }, NOW)[0].state).toBe('late')
+	})
+
+	it('stays late when the schedule has a zero last_run and no run is after the slot', () => {
+		const schedules = [sched(a, d, true, null, 2 * HOUR)]
+		expect(coupleStates({ runs: [run(a, d, '', 25 * HOUR)], schedules }, NOW)[0].state).toBe('late')
+	})
+
+	it('compares instants, not strings, when the box writes an offset', () => {
+		// the slot is 07:00Z, five hours old at NOW
+		const schedules = [{ app: a, destination: d, enabled: true, last_run: ZERO, last_slot: '2026-11-08T08:00:00+01:00' }]
+		const at = started => ({ app: a, destination: d, started_at: started, finished_at: started, error: '' })
+		// 07:30Z is after the slot
+		expect(coupleStates({ runs: [at('2026-11-08T07:30:00Z')], schedules }, NOW)[0].state).toBe('ok')
+		// 07:30+01:00 is 06:30Z, before it
+		expect(coupleStates({ runs: [at('2026-11-08T07:30:00+01:00')], schedules }, NOW)[0].state).toBe('late')
+		expect(coupleStates({ runs: [at('2026-11-08T08:00:00+01:00')], schedules }, NOW)[0].state).toBe('ok')
+	})
+
 	it('has no couple for a disabled schedule or an app with runs but no schedule', () => {
 		const input = { runs: [run('a', d, '', HOUR), run('b', d, '', HOUR)], schedules: [sched('a', d, false, HOUR, HOUR)] }
 		expect(coupleStates(input, NOW)).toEqual([])
