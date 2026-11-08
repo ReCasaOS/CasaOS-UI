@@ -332,12 +332,12 @@ export const READINESS_CHECKS = {
 	ssh_dsa_hostkey: {
 		label: 'SSH server keys',
 		refuse: [
-			'Every key the SSH server uses to identify the machine is a DSA key ({names}), which the OpenSSH of Debian 13 no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
-			'Every key the SSH server uses to identify the machine is a DSA key, which the OpenSSH of Debian 13 no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
+			'Every key the SSH server uses to identify the machine is a DSA key ({names}), which the OpenSSH of the next release (OpenSSH 10) no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
+			'Every key the SSH server uses to identify the machine is a DSA key, which the OpenSSH of the next release (OpenSSH 10) no longer loads: after the restart the SSH server would have no key, and a machine reached over SSH would be lost. Make an Ed25519 key, name it with HostKey in sshd_config, restart ssh, then check again.',
 		],
 		text: [
-			'The SSH server uses a DSA key ({names}), which the OpenSSH of Debian 13 no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
-			'The SSH server uses a DSA key, which the OpenSSH of Debian 13 no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
+			'The SSH server uses a DSA key ({names}), which the OpenSSH of the next release (OpenSSH 10) no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
+			'The SSH server uses a DSA key, which the OpenSSH of the next release (OpenSSH 10) no longer loads. It will start with its other keys and log an error for this one: remove its HostKey line.',
 		],
 	},
 	host_services: {
