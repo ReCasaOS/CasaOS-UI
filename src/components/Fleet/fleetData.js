@@ -2,7 +2,12 @@
 // `{ ok: true, data }` (the payload the route wraps under `data`) or `{ ok: false, status, error }`,
 // status 0 for a network error. Nothing here does I/O, and nothing a box sends is trusted to be a string.
 
+import { netSpeed } from '@/components/dashboard/healthTiles'
+
 const DOWN = new Set(['exited', 'dead', 'restarting', 'unknown'])
+
+// A box stamps its network counters in whole seconds: two reads closer than this give a rate too coarse to show.
+const MIN_NET_GAP = 10
 
 const text = v => (typeof v === 'string' ? v : '')
 const number = v => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -29,12 +34,31 @@ function versionOf(answer) {
 	return v ? { current: text(v.current_version) || null, latest: text(v.version?.version) || null, available: v.need_update === true } : null
 }
 
-export function overviewRow(box, answers) {
+// The traffic of a box in bytes per second: its interfaces' counters (utilization `net`) only grow, so the rate is
+// the change since `prev`, the row of the previous read, summed over the interfaces both reads have. `sample` is
+// what the next read is measured against; it stays the older one when this read is too close to it.
+function netOf(util, prev) {
+	if (!Array.isArray(util?.net)) {
+		return { sample: null, rate: null }
+	}
+	const sample = util.net.filter(i => text(i?.name))
+	const before = new Map(list(prev?.netSample).map(i => [i.name, i]))
+	const pairs = sample.map(i => [before.get(i.name), i]).filter(([p]) => p)
+	if (pairs.some(([p, c]) => c.time - p.time >= 0 && c.time - p.time < MIN_NET_GAP)) {
+		return { sample: prev.netSample, rate: prev.netRate }
+	}
+	const speeds = pairs.map(([p, c]) => netSpeed(p, c)).filter(s => s && Number.isFinite(s.up) && Number.isFinite(s.down))
+	return { sample, rate: speeds.length ? { up: speeds.reduce((n, s) => n + s.up, 0), down: speeds.reduce((n, s) => n + s.down, 0) } : null }
+}
+
+// `prev` is this box's row from the previous read, if any: the network rate needs two reads.
+export function overviewRow(box, answers, prev) {
 	const os = payload(answers.os)
 	const util = payload(answers.utilization)
 	const grid = payload(answers.grid)
 	const vms = payload(answers.vms)
 	const disk = util?.sys_disk
+	const net = netOf(util, prev)
 	return {
 		key: box.id,
 		id: box.id,
@@ -63,6 +87,8 @@ export function overviewRow(box, answers) {
 		cpuInfo: util?.cpu ? { cores: positive(util.cpu.num), freq: positive(util.cpu.freq), temperature: positive(util.cpu.temperature) } : null,
 		memInfo: positive(util?.mem?.total) ? { used: number(util.mem.used) ?? 0, total: util.mem.total } : null,
 		diskInfo: number(disk?.size) > 0 ? { used: number(disk.used) ?? 0, total: disk.size } : null,
+		netSample: net.sample,
+		netRate: net.rate,
 		errors: errorsOf(answers),
 	}
 }
