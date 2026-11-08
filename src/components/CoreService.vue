@@ -25,6 +25,7 @@ import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation, Pagination } from 'swiper/modules'
 import sortBy from 'lodash/sortBy'
 import { failuresToAnnounce, rememberBackupFailures, seenBackupFailures } from '@/components/settings/backupFailures'
+import { backupSubject } from '@/components/settings/backupScheduleGroups'
 import noticeBlock from '@/components/noticBlock/noticeBlock'
 import { mixin } from '@/mixins/mixin'
 import SyncBlock from '@/components/syncthing/SyncBlock.vue'
@@ -608,10 +609,16 @@ export default {
 			return `${res.Properties['backup:kind'] || 'backup'}:${res.Properties['app:name']}`
 		},
 
+		// the box's own backup goes under a name nobody reads as the box
+		// (capitalised where it starts the sentence)
+		backupTitle(res, box = 'this box') {
+			return backupSubject(res.Properties, (...args) => this.$t(...args), box)
+		},
+
 		backupCardTitle(res) {
 			return res.Properties['backup:kind'] === 'restore'
-				? this.$t('Restoring {title}', { title: this.appTitle(res) })
-				: this.$t('Backing up {title}', { title: this.appTitle(res) })
+				? this.$t('Restoring {title}', { title: this.backupTitle(res) })
+				: this.$t('Backing up {title}', { title: this.backupTitle(res) })
 		},
 
 		transformAppInstallationProgress(res) {
@@ -653,8 +660,10 @@ export default {
 				return
 			}
 
+			// a backup's title comes already worded: "Installing" before it said the wrong thing
+			const isBackup = String(res.name).startsWith('backup:') || String(res.name).startsWith('restore:')
 			const data = {
-				title: this.$t('Installing {title}', { title: res.title }),
+				title: isBackup ? res.title : this.$t('Installing {title}', { title: res.title }),
 				icon: res.icon,
 				content: {
 					text: res?.message,
@@ -834,8 +843,8 @@ export default {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
 				message: res.Properties['backup:kind'] === 'restore'
-					? this.$t('{title} restored from {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] })
-					: this.$t('{title} backed up to {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] }),
+					? this.$t('{title} restored from {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] })
+					: this.$t('{title} backed up to {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] }),
 				type: 'is-success',
 				duration: 5000,
 			})
@@ -844,8 +853,8 @@ export default {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
 				message: res.Properties['backup:kind'] === 'restore'
-					? this.$t('Restoring {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message })
-					: this.$t('Backing up {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message }),
+					? this.$t('Restoring {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message })
+					: this.$t('Backing up {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message }),
 				type: 'is-danger',
 				duration: 8000,
 			})
