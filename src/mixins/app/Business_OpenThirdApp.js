@@ -9,6 +9,7 @@
 
 import events from '@/events/events'
 import { shouldOpenInNewWindow } from '@/mixins/app/appLaunchPreference'
+import { frameRefused } from '@/mixins/app/frameCheck'
 
 export default {
 	methods: {
@@ -54,7 +55,8 @@ export default {
 				const index = appInfo.index || ''
 				const url = `${scheme}://${hostIp}${port}${index}`
 
-				if (this.shouldOpenInNewWindow(appInfo)) {
+				// an app the box already found refusing a frame goes to a tab (frameCheck.js)
+				if (this.shouldOpenInNewWindow(appInfo) || frameRefused(url)) {
 					window.open(url, '_blank')
 					this.$EventBus.$emit(events.CLOSE_APP_IFRAME)
 					return

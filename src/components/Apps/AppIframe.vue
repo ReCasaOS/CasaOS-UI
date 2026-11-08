@@ -18,7 +18,17 @@
 					</button>
 				</header>
 				<div class="app-iframe-content">
-					<iframe :src="url"
+					<div v-if="refusal"
+						class="app-iframe-refused is-flex is-flex-direction-column is-align-items-center is-justify-content-center has-text-centered">
+						<p class="mb-4">
+							{{ refusal }}
+						</p>
+						<b-button rounded type="is-primary" @click="openInTab">
+							{{ $t('Open in a new tab') }}
+						</b-button>
+					</div>
+					<iframe v-else
+						:src="url"
 						:title="appName"
 						allow="autoplay; fullscreen"
 						allowfullscreen
@@ -30,6 +40,16 @@
 </template>
 
 <script>
+import { rememberFrameRefused } from '@/mixins/app/frameCheck'
+
+// What the user is told, by the reason the box gives (AppManagement /web/frame-check).
+const REFUSALS = {
+	'x-frame-options': '{name} does not allow being shown inside another page.',
+	'frame-ancestors': '{name} does not allow being shown inside another page.',
+	'untrusted-certificate': '{name} uses an HTTPS certificate the browser does not trust, and inside the dashboard there is no way to accept it.',
+	'mixed-content': '{name} is served over plain HTTP, which the browser does not show inside a dashboard opened over HTTPS.',
+}
+
 export default {
 	name: 'AppIframe',
 	props: {
@@ -40,6 +60,49 @@ export default {
 		url: {
 			type: String,
 			required: true,
+		},
+	},
+	emits: ['close'],
+	data() {
+		return {
+			reason: null,
+		}
+	},
+	computed: {
+		refusal() {
+			const message = this.reason && REFUSALS[this.reason]
+			return message ? this.$t(message, { name: this.appName }) : ''
+		},
+	},
+	watch: {
+		url: {
+			immediate: true,
+			handler(url) {
+				this.reason = null
+				this.check(url)
+			},
+		},
+	},
+	methods: {
+		// A browser that refuses the frame leaves it empty and tells this page nothing,
+		// so the box asks the app the way the browser does. Anything short of a "no" --
+		// no answer, an AppManagement without the endpoint -- leaves the frame as it is.
+		async check(url) {
+			try {
+				const res = await this.$api.webFrame.check(url, window.location.origin)
+				const answer = res.data && res.data.data
+				if (url !== this.url || !answer || answer.embeddable !== false) {
+					return
+				}
+				this.reason = answer.reason
+				rememberFrameRefused(url)
+			} catch {
+				// not an answer either way
+			}
+		},
+		openInTab() {
+			window.open(this.url, '_blank')
+			this.$emit('close')
 		},
 	},
 }
@@ -119,6 +182,14 @@ export default {
   flex: 1 1 auto;
   min-height: 0;
   background: var(--casa-surface);
+}
+
+.app-iframe-refused {
+  height: 100%;
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 2rem;
+  color: var(--casa-text-emphasis);
 }
 
 .app-iframe {
