@@ -3147,6 +3147,7 @@
   "Enter a time as HH:MM": "Enter a time as HH:MM",
   "The selected boxes have different schedules; applying will replace them all.": "The selected boxes have different schedules; applying will replace them all.",
   "Backed up {when} to {destination}": "Backed up {when} to {destination}",
+  "Backed up to {destination}": "Backed up to {destination}",
   "Backup failed: {reason}": "Backup failed: {reason}",
   "Backup late": "Backup late",
   "Backup state unknown": "Backup state unknown",

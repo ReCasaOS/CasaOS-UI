@@ -28,6 +28,17 @@ export function coupleStates({ runs = [], schedules = [], operations = [], osUpg
 		}
 		const slot = instant(s.last_slot)
 		const running = backing.has(s.app)
+		// The slot judged: the last one, or while it is in its grace hour the one before it (a stopped scheduler
+		// is otherwise ok for that hour every day), found one interval back. A run from up to an hour earlier
+		// (half an interval for short ones) still covers it, for the day that daylight saving makes 23 or 25 hours long.
+		let due = slot
+		let floor = slot
+		const interval = instant(s.next_slot) - slot
+		if (!Number.isNaN(slot) && +now - slot <= LATE_AFTER && interval > 0) {
+			due = slot - interval
+			floor = due - Math.min(LATE_AFTER, interval / 2)
+		}
+		const lastRun = instant(s.last_run)
 		let last = null
 		let lastOk = null
 		let afterSlot = false
@@ -44,7 +55,7 @@ export function coupleStates({ runs = [], schedules = [], operations = [], osUpg
 			if (!r.error && (!lastOk || at > startOf(lastOk))) {
 				lastOk = r
 			}
-			if (!Number.isNaN(slot) && !(at < slot)) {
+			if (!Number.isNaN(slot) && !(at < floor)) {
 				afterSlot = true
 			}
 		}
@@ -52,11 +63,12 @@ export function coupleStates({ runs = [], schedules = [], operations = [], osUpg
 		let state
 		if (last?.error) {
 			state = 'failed'
-		} else if (!last) {
+		} else if (!last && Number.isNaN(lastRun)) {
+			// a schedule that ran has only lost its records (AM keeps 200)
 			state = 'never'
 		} else if (Number.isNaN(slot)) {
 			state = 'unknown'
-		} else if (+now - slot > LATE_AFTER && !(instant(s.last_run) >= slot) && !afterSlot && !running) {
+		} else if (+now - due > LATE_AFTER && !(lastRun >= floor) && !afterSlot && !running) {
 			state = osUpgradeOpen ? 'suspended' : 'late'
 		} else {
 			state = 'ok'
@@ -104,6 +116,11 @@ export function badgeOfApp(states, app, t = plain) {
 	const worst = ATTENTION_ORDER.find(state => mine.some(c => c.state === state))
 	if (worst) {
 		return { kind: 'attention', title: t(ATTENTION_TITLES[worst]) }
+	}
+	// ok with no date: the schedule ran, but its run records rolled off
+	const undated = mine.find(c => Number.isNaN(instant(c.last_ok_at)))
+	if (undated) {
+		return { kind: 'ok', title: t('Backed up to {destination}', { destination: undated.destination }) }
 	}
 	// the weakest guarantee of the app: its oldest last success
 	const oldest = mine.reduce((a, b) => (instant(b.last_ok_at) < instant(a.last_ok_at) ? b : a))

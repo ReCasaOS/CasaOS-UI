@@ -21,6 +21,14 @@ function run(app, dest, error, startedAgo) {
 		error,
 	}
 }
+// The current slot in its grace hour: the slot before it, one interval (next_slot - last_slot) earlier,
+// decides; a daylight-saving hour either way is tolerated. Same helper as `within` in the Go table.
+function within(lastRunAgo, interval, ...runs) {
+	const s = sched(a, d, true, lastRunAgo, 30 * MIN)
+	s.next_slot = new Date(Date.parse(s.last_slot) + interval).toISOString()
+
+	return { runs, schedules: [s] }
+}
 function sched(app, dest, enabled, lastRunAgo, slotAgo) {
 	return {
 		app,
@@ -57,6 +65,17 @@ describe('the state of a scheduled couple (same cases as the master)', () => {
 		['slot unknown but failed', { runs: [run(a, d, 'disk full', 2 * HOUR)], schedules: [sched(a, d, true, 2 * HOUR, null)] }, 'failed', false],
 		['slot unknown but never', { schedules: [sched(a, d, true, null, null)] }, 'never', false],
 		['runs of another destination are not mine', { runs: [run(a, 'other', '', HOUR)], schedules: [sched(a, d, true, null, 5 * HOUR)] }, 'never', false],
+		['scheduler stopped, current slot in its grace hour', within(48.5 * HOUR, 24 * HOUR, run(a, d, '', 48.5 * HOUR)), 'late', false],
+		['healthy, current slot in its grace hour', within(24.5 * HOUR, 24 * HOUR, run(a, d, '', 24.5 * HOUR)), 'ok', false],
+		['healthy across a 23 h day', within(24.5 * HOUR, 23 * HOUR, run(a, d, '', 24.5 * HOUR)), 'ok', false],
+		['healthy across a 25 h day', within(24.5 * HOUR, 25 * HOUR, run(a, d, '', 24.5 * HOUR)), 'ok', false],
+		['scheduler stopped across a 23 h day', within(48.5 * HOUR, 23 * HOUR, run(a, d, '', 48.5 * HOUR)), 'late', false],
+		['scheduler stopped in the grace hour, upgrade open', { ...within(48.5 * HOUR, 24 * HOUR, run(a, d, '', 48.5 * HOUR)), osUpgradeOpen: true }, 'suspended', false],
+		['scheduler stopped in the grace hour, backup running', { ...within(48.5 * HOUR, 24 * HOUR, run(a, d, '', 48.5 * HOUR)), operations: [{ app: a, kind: 'backup' }] }, 'ok', true],
+		// AM keeps the last 200 runs: a couple whose records rolled off is not "never"
+		['no run record but the schedule ran, slot covered', { schedules: [sched(a, d, true, 2 * HOUR, 2 * HOUR)] }, 'ok', false],
+		['no run record but the schedule ran, slot missed', { schedules: [sched(a, d, true, 26 * HOUR, 2 * HOUR)] }, 'late', false],
+		['no run record but the schedule ran, slot unknown', { schedules: [sched(a, d, true, 2 * HOUR, null)] }, 'unknown', false],
 	]
 
 	it.each(cases)('%s', (_, input, state, running) => {
@@ -144,6 +163,12 @@ describe('the badge of an app', () => {
 		expect(badge.title).toMatch(/^Backed up .+ to GDrive$/)
 	})
 
+	it('says no date when a couple is ok but its run records rolled off, never "Invalid Date"', () => {
+		// the master's rolled-off case: the schedule ran, AM no longer lists the run
+		const badge = badgeOfApp([couple({ last_ok_at: '' }), couple({ destination: 'other' })], a, t)
+		expect(badge).toEqual({ kind: 'ok', title: 'Backed up to GDrive' })
+	})
+
 	it('says the oldest success of the app when it has several couples', () => {
 		const badge = badgeOfApp([couple({ destination: 'recent' }), couple({ destination: 'old', last_ok_at: ago(30 * HOUR) })], a, t)
 		expect(badge.title).toMatch(/to old$/)
@@ -179,7 +204,7 @@ describe('the words of the badge', () => {
 
 	it.each([['en_US.json'], ['fr_FR.json']])('are all in %s', (file) => {
 		const words = lang(file)
-		const used = ['Backed up {when} to {destination}', 'Backup failed: {reason}', 'Backup late', 'No backup yet', 'Backup state unknown', 'Backups paused by a system upgrade']
+		const used = ['Backed up {when} to {destination}', 'Backed up to {destination}', 'Backup failed: {reason}', 'Backup late', 'No backup yet', 'Backup state unknown', 'Backups paused by a system upgrade']
 		expect(used.filter(key => !words[key])).toEqual([])
 	})
 })
