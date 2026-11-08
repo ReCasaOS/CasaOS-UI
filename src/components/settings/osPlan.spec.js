@@ -48,7 +48,7 @@ import fr from '@/assets/lang/fr_FR.json'
 // The codes of the core (pkg/osplan: plan.go ProblemCodes, failure.go ErrorCodes, seam.go Phases), pinned here: a code added to the
 // core without a sentence here, or dropped from it, is noticed.
 const PROBLEM_CODES = ['removal_protected', 'removal_essential', 'removal_manual', 'dist_kept_back', 'disk_short', 'downgrade', 'docker_held']
-const ERROR_CODES = ['not_root', 'hop_not_planned', 'identity_unsupported', 'busy', 'no_room', 'sources_format', 'sources_alias', 'sources_target', 'sources_mixed_file', 'sources_cdrom', 'sandbox_update_failed', 'sandbox_solver_failed', 'plan_unparsed', 'timeout', 'canceled', 'internal']
+const ERROR_CODES = ['not_root', 'hop_not_planned', 'identity_unsupported', 'busy', 'no_room', 'sources_format', 'sources_alias', 'sources_target', 'sources_mixed_file', 'sources_cdrom', 'not_offered', 'sandbox_update_failed', 'sandbox_solver_failed', 'plan_unparsed', 'timeout', 'canceled', 'internal']
 const PHASES = ['sources', 'update', 'upgrade', 'dist-upgrade', 'estimate', 'parse']
 const UPDATE_KINDS = ['no_pubkey', 'not_found', 'network', 'release_change', 'other']
 // why a file of apt's configuration is left out of the plan (pkg/osplan/aptconf.go)
@@ -747,6 +747,8 @@ describe('the answers of GET plan, in each state and for each way a job ends', (
 		['status_failed_sources_target', 'sources_target', 'File sources.list, line 1', null],
 		['status_failed_sources_cdrom', 'sources_cdrom', 'File sources.list, line 1', null],
 		['status_failed_sources_mixed_file', 'sources_mixed_file', null, null],
+		// a hop of Ubuntu that Canonical does not offer yet: no place, no reason of a source
+		['status_failed_not_offered', 'not_offered', null, null],
 	])('says %s by its code, where the source is and why, and none of what the core wrote of it', (name, code, place, reason) => {
 		const { error } = readStatus(core[name])
 
@@ -854,7 +856,7 @@ describe('a reason that the window has a sentence for, and one that it says by t
 		expect(isKnown(view.sentence.key)).toBe(true)
 	})
 
-	it.each(['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled'])('says a source that is refused for %s with a reason of its own, and not the one of a reason it does not know', (reason) => {
+	it.each(['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled', 'other_distro', 'ubuntu_pro'])('says a source that is refused for %s with a reason of its own, and not the one of a reason it does not know', (reason) => {
 		const { reason: said } = errorView({ code: 'sources_format', data: { file: 'x.list', reason } })
 
 		expect(said).toBe(PLAN_SOURCE_REASONS[reason])
@@ -1040,6 +1042,10 @@ describe('why a plan could not be made', () => {
 		['sources_mixed_file', { file: 'mixed.list' }, 'A file of package sources mixes the distribution\'s own lines with others: mixed.list. Split it in two, then try again.'],
 		['sources_mixed_file', {}, 'A file of package sources mixes the distribution\'s own lines with others. Split it in two, then try again.'],
 		['sources_cdrom', { file: 'sources.list', line: 2, reason: 'cdrom' }, 'A package source is a disc or a local folder, which cannot be upgraded from.'],
+		// a hop of Ubuntu that Canonical does not offer, or whose list could not be read
+		['not_offered', { target: 'resolute', reason: 'absent', read_at: '2026-11-08T10:13:43Z' }, 'Canonical does not offer this upgrade yet: it opens it with the first update of the new release, and can hold it back for a while. Try again later.'],
+		['not_offered', { target: 'resolute', reason: 'unsupported' }, 'Canonical\'s list of upgrades says this upgrade is not supported, so no plan was made.'],
+		['not_offered', { target: 'resolute', unknown: true }, 'Canonical\'s list of the upgrades it offers could not be read, so no plan was made. Check the network of the machine, then try again.'],
 		['sandbox_solver_failed', { exit: 100 }, 'apt could not work out the upgrade.'],
 		['plan_unparsed', { reason: 'removal_unknown', name: 'x' }, 'ReCasaOS could not understand what apt said, so it makes no partial plan.'],
 		['plan_unparsed', {}, 'ReCasaOS could not understand what apt said, so it makes no partial plan.'],
@@ -1102,7 +1108,7 @@ describe('why a plan could not be made', () => {
 	})
 
 	it('says every reason a source is refused for, which the core has', () => {
-		const reasons = ['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled']
+		const reasons = ['encoding', 'chars', 'control', 'crlf', 'nul', 'long_line', 'type', 'options', 'fields', 'too_many', 'uri', 'suite', 'component', 'trusted', 'undecided', 'deb822', 'unreadable', 'no_distribution_line', 'deb822_form', 'field', 'field_twice', 'enabled', 'other_distro', 'ubuntu_pro']
 		expect(Object.keys(PLAN_SOURCE_REASONS).sort()).toEqual([...reasons, 'other'].sort())
 	})
 

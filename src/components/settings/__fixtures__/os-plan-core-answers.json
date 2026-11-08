@@ -5224,6 +5224,23 @@
       }
     }
   },
+  "status_failed_not_offered": {
+    "plannable": true,
+    "state": "failed",
+    "phase": "sources",
+    "started_at": "2026-10-12T10:00:00Z",
+    "finished_at": "2026-10-12T10:00:01Z",
+    "error": {
+      "code": "not_offered",
+      "phase": "sources",
+      "detail": "Canonical does not offer the upgrade to Ubuntu 26.04 yet",
+      "data": {
+        "read_at": "2026-10-12T10:00:01Z",
+        "reason": "absent",
+        "target": "resolute"
+      }
+    }
+  },
   "status_failed_timeout_solver": {
     "plannable": true,
     "state": "failed",
