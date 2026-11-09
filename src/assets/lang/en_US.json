@@ -3235,5 +3235,15 @@
   "No snapshots.": "No snapshots.",
   "size {size}, written {written}": "size {size}, written {written}",
   "Only the newest {count} are shown.": "Only the newest {count} are shown.",
-  "ZFS": "ZFS"
+  "ZFS": "ZFS",
+  "Labels": "Labels",
+  "No labels now, click “+” to add one.": "Click “+” to add one.",
+  "A label needs a name.": "A label needs a name.",
+  "The name {key} is longer than {max} characters.": "The name {key} is longer than {max} characters.",
+  "The name {key} may only have letters, digits and . _ - /, and starts with a letter or a digit.": "The name {key} may only have letters, digits and . _ - /, and starts with a letter or a digit.",
+  "The name {key} is set by the system and cannot be used.": "The name {key} is set by the system and cannot be used.",
+  "The value of {key} is longer than {max} bytes.": "The value of {key} is longer than {max} bytes.",
+  "The value of {key} has a control character.": "The value of {key} has a control character.",
+  "The name {key} is used twice.": "The name {key} is used twice.",
+  "At most {max} labels can be added or changed.": "At most {max} labels can be added or changed."
 }
