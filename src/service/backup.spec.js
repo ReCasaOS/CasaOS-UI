@@ -65,3 +65,21 @@ describe('looking inside a backup, and putting some of it back', () => {
 		expect(body()).toEqual({ destination: 'nas', app: 'blog', stamp: 'stamp', paths: ['volumes/data/a.txt'] })
 	})
 })
+
+describe('the backups that run', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads them from GET /backup/running', async () => {
+		await backup.getRunning()
+		const config = adapter.mock.calls[0][0]
+		expect(config.method).toBe('get')
+		expect(config.url).toBe('/v2/app_management/backup/running')
+	})
+
+	it('stops one by its id', async () => {
+		await backup.stopRunning('b 7')
+		const config = adapter.mock.calls[0][0]
+		expect(config.method).toBe('post')
+		expect(config.url).toBe('/v2/app_management/backup/running/b%207/stop')
+	})
+})
