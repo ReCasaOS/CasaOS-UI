@@ -941,6 +941,8 @@
   "Could not start the system package update.": "Impossibile avviare l'aggiornamento dei pacchetti di sistema.",
   "Could not load the system package update status.": "Impossibile caricare lo stato dell'aggiornamento dei pacchetti di sistema.",
   "Port range is 80-65535": "Le porte vanno da 80 a 65535",
+  "HTTPS port": "Porta HTTPS",
+  "This page was opened over HTTPS and will stop answering on this port. The plain HTTP port stays, and you will be taken to it after saving.": "Questa pagina è stata aperta in HTTPS e non risponderà più su questa porta. La porta HTTP semplice resta attiva e verrai reindirizzato lì dopo il salvataggio.",
   "App updates": "Aggiornamenti delle app",
   "ReCasaOS update": "Aggiornamento di ReCasaOS",
   "Share on {network}": "Condividi su {network}",

@@ -67,7 +67,13 @@ describe('the stub of the shell', () => {
 		expect(ask('GET', '/v1/sys/utilization').body.data).toMatchObject({ cpu: { num: 4 }, mem: { total: expect.any(Number) } })
 		expect(ask('GET', '/v1/sys/telemetry').body.data).toEqual({ enabled: false })
 		expect(ask('GET', '/v1/gateway/port').body.data).toBe('80')
+		expect(ask('GET', '/v1/gateway/httpsport').body.data).toBe('443')
 		expect(ask('GET', '/v1/usb/usb-auto-mount').body.data).toBe('False')
+	})
+
+	it('accepts an https port and refuses the plain one', () => {
+		expect(ask('PUT', '/v1/gateway/httpsport', { port: '0' }).body).toMatchObject({ success: 200, data: '0' })
+		expect(ask('PUT', '/v1/gateway/httpsport', { port: '80' }).body).toMatchObject({ success: 400, message: expect.any(String) })
 	})
 
 	it('leaves every other path to the caller', () => {

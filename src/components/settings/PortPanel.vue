@@ -13,6 +13,12 @@
 			<b-field :message="errors" :type="errorType" class="has-text-light mb-0" expanded>
 				<b-input ref="finput" v-model="port" type="number" @keyup.enter="savePort" @update:model-value="checkPort"></b-input>
 			</b-field>
+			<template v-if="httpsInit !== null">
+				<b-field :label="$t('HTTPS port')" :message="httpsErrors || (httpsLockout ? $t('This page was opened over HTTPS and will stop answering on this port. The plain HTTP port stays, and you will be taken to it after saving.') : '')" :type="httpsErrors ? 'is-danger' : httpsLockout ? 'is-warning' : ''" class="has-text-light mt-4 mb-0" expanded>
+					<b-input v-model="httpsPort" :disabled="httpsOff" type="number" @keyup.enter="savePort"></b-input>
+				</b-field>
+				<b-checkbox v-model="httpsOff" class="mt-2">{{ $t('Off') }}</b-checkbox>
+			</template>
 		</section>
 		<!-- Modal-Card Body End -->
 		<!-- Modal-Card Footer Start -->
@@ -38,6 +44,11 @@ export default {
 			port: this.initPort,
 			errorType: '',
 			errors: '',
+			// null until the gateway answers GET /gateway/httpsport; an older one answers 404 and the field stays hidden
+			httpsInit: null,
+			httpsPort: '443',
+			httpsOff: false,
+			httpsErrors: '',
 		}
 	},
 	props: {
@@ -47,7 +58,28 @@ export default {
 		},
 	},
 
+	computed: {
+		// '0' = off, as the gateway reads it
+		httpsWanted() {
+			return this.httpsOff ? '0' : String(this.httpsPort)
+		},
+		httpsChanged() {
+			return this.httpsInit !== null && this.httpsWanted !== this.httpsInit
+		},
+		// this page came over https and its listener is about to move or stop
+		httpsLockout() {
+			return this.httpsChanged && this.$protocol === 'https:'
+		},
+	},
+
 	mounted() {
+		this.$api.sys.getHttpsPort().then((res) => {
+			if (res.data.success == 200) {
+				this.httpsInit = res.data.data || '443'
+				this.httpsOff = this.httpsInit === '0'
+				this.httpsPort = this.httpsOff ? '443' : this.httpsInit
+			}
+		}).catch(() => {})
 		this.$nextTick(() => {
 			this.$refs.finput.getElement().select()
 		})
@@ -64,30 +96,67 @@ export default {
 			this.errors = ''
 			return true
 		},
-		savePort() {
+		checkHttps() {
+			if (this.httpsOff || (this.httpsPort >= 80 && this.httpsPort <= 65535)) {
+				this.httpsErrors = ''
+				return true
+			}
+			this.httpsErrors = this.$t('Port range is 80-65535')
+			return false
+		},
+		async savePort() {
 			this.isLoading = true
-			if (!this.checkPort()) {
+			if (!this.checkPort() || !this.checkHttps()) {
 				this.isLoading = false
 				return
 			}
-			this.$messageBus('dashboardsetting_webuiport', this.port.toString())
-			// a number input gives a number, and the gateway reads the port as text
-			this.$api.sys.editServerPort({ port: String(this.port) }).then((res) => {
-				if (res.data.success == 200) {
-					this.errorType = ''
-					this.errors = ''
-					// this.$api.sys.stopCasaOS();
-					this.checkUpdate()
-				} else {
-					this.isLoading = false
-					this.errorType = 'is-danger'
-					this.errors = res.data.message || this.$t('The setting could not be saved.')
+			const httpChanged = !this.httpsChanged || String(this.port) !== String(this.initPort)
+			const steps = []
+			if (httpChanged) {
+				steps.push(['http', () => {
+					this.$messageBus('dashboardsetting_webuiport', this.port.toString())
+					// a number input gives a number, and the gateway reads the port as text
+					return this.$api.sys.editServerPort({ port: String(this.port) })
+				}])
+			}
+			if (this.httpsChanged) {
+				steps.push(['https', () => this.$api.sys.editHttpsPort({ port: this.httpsWanted })])
+			}
+			// from an https page the https call ends the connection, so the plain port goes first
+			if (this.httpsLockout) {
+				steps.reverse()
+			}
+			this.errorType = this.errors = this.httpsErrors = ''
+			for (const [field, run] of steps) {
+				let message
+				try {
+					const res = await run()
+					if (res.data.success == 200) {
+						continue
+					}
+					message = res.data.message
+				} catch (err) {
+					message = err.response?.data?.message
 				}
-			}).catch((err) => {
 				this.isLoading = false
-				this.errorType = 'is-danger'
-				this.errors = err.response?.data?.message || this.$t('The setting could not be saved.')
-			})
+				message ||= this.$t('The setting could not be saved.')
+				if (field === 'https') {
+					this.httpsErrors = message
+				} else {
+					this.errorType = 'is-danger'
+					this.errors = message
+				}
+				return
+			}
+			if (this.httpsLockout) {
+				// the page is no longer served here, and fetching the plain port from an https page is blocked as mixed content
+				// moving the plain port restarts its listener: give it a moment, as it cannot be probed from here
+				this.timer = setTimeout(() => window.open(`http://${this.$baseIp}:${this.port}`, '_self'), httpChanged ? 3000 : 0)
+			} else if (httpChanged) {
+				this.checkUpdate()
+			} else {
+				this.$emit('close')
+			}
 		},
 		checkUpdate() {
 			this.timer = setInterval(() => {
