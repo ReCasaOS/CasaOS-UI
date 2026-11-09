@@ -38,12 +38,14 @@
 					<b-tabs v-model="activeTab" :animated="false">
 						<b-tab-item :label="$t('Storage')" class="scrollbars-light-auto tab-item">
 							<!-- the way to a merged storage that survives a drive failing: nobody looks for it under Merged Storage -->
-							<div v-if="canCreateSnapRaid" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item is-flex is-align-items-center">
-								<p class="is-flex-grow-1 mr-3 has-text-full-04">{{ $t('Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.') }}</p>
+							<div v-if="canCreateSnapRaid" class="settings-card _hint mb-4 is-flex is-align-items-center is-flex-wrap-wrap is-gap-2">
+								<span class="_tile"><b-icon icon="shield-outline" /></span>
+								<p class="is-flex-grow-1 is-size-7 _has-text-gray">{{ $t('Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.') }}</p>
 								<b-button rounded size="is-small" type="is-link" @click="showCreateSnapRaid">{{ $t('Create SnapRAID') }}</b-button>
 							</div>
 							<!-- an array with no storage mounted on it (stopped, or never formatted) is still shown -->
-							<div v-for="array in unmountedArrays" :key="array.path" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item">
+							<div v-for="array in unmountedArrays" :key="array.path" class="settings-card mb-4">
+								<p class="is-size-7 _has-text-gray mb-2">{{ $t('No storage is mounted on this array.') }}</p>
 								<raid-status :array="array" @changed="getDiskList"></raid-status>
 							</div>
 							<template v-if="storageData.length">
@@ -75,7 +77,18 @@
 							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates" :pool="mergeMountPoint"></snap-raid-panel>
 						</b-tab-item>
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
-							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
+							<p class="settings-intro mb-3">{{ $t('The physical drives of this box, their SMART health and temperature, and what they carry.') }}</p>
+							<!-- the head of the drives table; each drive-item is a row of the same columns -->
+							<div class="settings-card p-0 _drives">
+								<div class="_drives-head is-size-7" aria-hidden="true">
+									<span></span>
+									<span>{{ $t('Drive') }}</span>
+									<span class="_carries">{{ $t('Carries') }}</span>
+									<span>{{ $t('Health') }}</span>
+									<span>{{ $t('Temp') }}</span>
+								</div>
+								<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
+							</div>
 						</b-tab-item>
 						<!-- last, so that the places of the others do not move; only on a box that has a ZFS pool -->
 						<b-tab-item v-if="hasZfs" :label="$t('ZFS')" class="scrollbars-light-auto tab-item">
@@ -92,7 +105,7 @@
 						<VeeField v-slot="{ errors, meta }" :model-value="createStorageName" name="StorageName" rules="required">
 							<b-field :label="$t('Storage Name')" :message="errors"
 								:type="{ 'is-danger': errors[0], 'is-success': meta.valid }">
-								<b-input v-model="createStorageName" ref="inputs"
+								<b-input ref="inputs" v-model="createStorageName"
 									@keyup="createStorageName = createStorageName.replace(/[^\w]/g, '')"
 									@paste="createStorageName = createStorageName.replace(/[^\w]/g, '')"></b-input>
 							</b-field>
@@ -694,6 +707,24 @@ export default {
 }
 </script>
 
+<style lang="scss">
+// Not scoped: `storage-modal` is the class Home.vue gives the modal, and Buefy's
+// default card is ~640px. The ZFS datasets are a table of six columns, and a
+// storage with its drives and its RAID is a row of its own: both want the width
+// the backups window already has.
+@media screen and (min-width: 769px) {
+  .storage-modal {
+    .animation-content {
+      max-width: 94% !important;
+    }
+
+    .modal-card {
+      width: min(94vw, 60rem) !important;
+    }
+  }
+}
+</style>
+
 <style lang="scss" scoped>
 .modal-card .b-tabs {
 	display: flex;
@@ -749,6 +780,39 @@ export default {
 
 	&::before {
 		border-bottom-color: #505459 !important;
+	}
+}
+</style>
+
+<style lang="scss" scoped>
+// the cards of the Storage tab that are not a component of their own
+._hint ._tile {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 0.75rem;
+	background: var(--casa-hover-tint);
+	color: var(--casa-text-hint);
+}
+
+._drives-head {
+	display: grid;
+	grid-template-columns: 2.5rem minmax(0, 1.6fr) minmax(0, 1.2fr) 8rem 7rem;
+	gap: 0.875rem;
+	padding: 0.625rem 1rem 0.25rem;
+	color: var(--casa-text-hint);
+	font-weight: 600;
+
+	@media (max-width: 768px) {
+		grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+
+		._carries,
+		> :nth-child(4) {
+			display: none;
+		}
 	}
 }
 </style>
