@@ -195,7 +195,8 @@ describe('the check of a restic repository', () => {
 
 describe('a destination kept with restic', () => {
 	const state = states => name => Promise.resolve({ data: { data: states[name] } })
-	const buttons = wrapper => wrapper.findAll('.destination .button').map(button => button.text())
+	// the usual two are buttons, the rest sit in the menu of the card
+	const buttons = wrapper => wrapper.findAll('.destination .button, .destination .dropdown-item').map(button => button.text())
 
 	it('offers the switch only where this box has restic and the destination is not switched', async () => {
 		const wrapper = await open(BackupDestinations, {
@@ -303,7 +304,7 @@ describe('a destination kept with restic', () => {
 			const alert = vi.fn()
 			wrapper.vm.$buefy.dialog.alert = alert
 
-			await wrapper.findAll('.destination .button').find(button => button.text() === 'Resume restic').trigger('click')
+			await wrapper.findAll('.destination .dropdown-item').find(item => item.text() === 'Resume restic').trigger('click')
 			await flushPromises()
 			expect(enableRestic).toHaveBeenCalledWith('nas', '')
 			// the password is not new: there is nothing to write down

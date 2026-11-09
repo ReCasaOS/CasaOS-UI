@@ -27,12 +27,17 @@
 						{{ $t('No destination yet. Add one below.') }}
 					</p>
 
-					<!-- the check result sits under the name: an rclone error is a paragraph,
-						and beside the buttons it pushed them off a phone -->
-					<div v-for="name in destinations" :key="name"
-						class="destination settings-card is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
-						<div class="_text mr-3">
-							<p class="_name">{{ name }}</p>
+					<!-- One card per destination: a tile, the name with a chip that says where it
+						stands, what is known of it under, the two usual actions and a menu for the
+						rest. The rclone error of a check is a paragraph: under the name, not beside
+						the buttons, where it pushed them off a phone. -->
+					<section v-for="name in destinations" :key="name" class="destination settings-card">
+						<span class="_tile"><b-icon icon="cloud-upload-outline" /></span>
+						<div class="_text">
+							<div class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1">
+								<p class="_name">{{ name }}</p>
+								<span :class="`is-${stateOf(name).level}`" class="_chip">{{ stateOf(name).text }}</span>
+							</div>
 							<p v-if="checked[name]" class="_has-text-gray is-size-7">{{ checked[name] }}</p>
 							<p v-if="restic[name] && restic[name].enabled" class="_has-text-gray is-size-7">{{ $t('Kept with restic') }}</p>
 							<p v-if="restic[name] && restic[name].kept && !restic[name].enabled" class="_has-text-gray is-size-7">
@@ -46,86 +51,100 @@
 
 						<!-- ml-auto: on a line of their own, the buttons stay on the right; they wrap
 							rather than run off a phone -->
-						<div class="is-flex is-flex-wrap-wrap is-gap-1 ml-auto">
-							<b-button :loading="busy === `check:${name}`" rounded size="is-small"
-								@click="check(name)">
+						<div class="_actions is-flex is-flex-wrap-wrap is-gap-1 ml-auto">
+							<b-button :loading="busy === `check:${name}`" rounded size="is-small" @click="check(name)">
 								{{ $t('Check') }}
-							</b-button>
-							<b-button v-if="restic[name] && restic[name].available && !restic[name].kept"
-								:loading="busy === `restic:${name}`" rounded size="is-small" @click="confirmRestic(name)">
-								{{ $t('Keep with restic\u2026') }}
-							</b-button>
-							<b-button v-if="restic[name] && restic[name].available && restic[name].kept && !restic[name].enabled"
-								:loading="busy === `restic:${name}`" rounded size="is-small" @click="enableRestic(name, '')">
-								{{ $t('Resume restic') }}
-							</b-button>
-							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticcheck:${name}`"
-								rounded size="is-small" @click="checkRestic(name)">
-								{{ $t('Check repository') }}
-							</b-button>
-							<b-button v-if="restic[name] && restic[name].kept" :loading="busy === `resticpass:${name}`"
-								rounded size="is-small" @click="readResticPassword(name)">
-								{{ $t('Restic password') }}
-							</b-button>
-							<b-button v-if="restic[name] && restic[name].enabled" :loading="busy === `resticback:${name}`"
-								rounded size="is-small" @click="confirmSwitchBack(name)">
-								{{ $t('Switch back to rclone\u2026') }}
 							</b-button>
 							<b-button rounded size="is-small" @click="browse(name)">
 								{{ $t('Restore\u2026') }}
 							</b-button>
-							<b-button :loading="busy === `delete:${name}`" rounded size="is-small" type="is-danger"
-								@click="confirmForget(name)">
-								{{ $t('Forget') }}
-							</b-button>
+							<!-- the restic choices and Forget: rarer, and six pills in a row said nothing -->
+							<b-dropdown aria-role="list" position="is-bottom-left">
+								<template #trigger>
+									<b-button :aria-label="$t('Other actions')" :loading="busy.endsWith(`:${name}`) && busy !== `check:${name}`"
+										icon-left="dots-horizontal" rounded size="is-small" />
+								</template>
+								<b-dropdown-item v-if="restic[name] && restic[name].available && !restic[name].kept" aria-role="listitem"
+									@click="confirmRestic(name)">
+									{{ $t('Keep with restic\u2026') }}
+								</b-dropdown-item>
+								<b-dropdown-item v-if="restic[name] && restic[name].available && restic[name].kept && !restic[name].enabled" aria-role="listitem"
+									@click="enableRestic(name, '')">
+									{{ $t('Resume restic') }}
+								</b-dropdown-item>
+								<b-dropdown-item v-if="restic[name] && restic[name].kept" aria-role="listitem" @click="checkRestic(name)">
+									{{ $t('Check repository') }}
+								</b-dropdown-item>
+								<b-dropdown-item v-if="restic[name] && restic[name].kept" aria-role="listitem" @click="readResticPassword(name)">
+									{{ $t('Restic password') }}
+								</b-dropdown-item>
+								<b-dropdown-item v-if="restic[name] && restic[name].enabled" aria-role="listitem" @click="confirmSwitchBack(name)">
+									{{ $t('Switch back to rclone\u2026') }}
+								</b-dropdown-item>
+								<b-dropdown-item separator />
+								<b-dropdown-item aria-role="listitem" class="_danger" @click="confirmForget(name)">
+									{{ $t('Forget this destination\u2026') }}
+								</b-dropdown-item>
+							</b-dropdown>
 						</div>
-					</div>
+					</section>
 
 					<!-- The box itself: users, shares and their accounts, schedules, the
 						destinations above. Restored from the destination browser like an app,
 						under "This box". -->
-					<div v-if="destinations.length" class="settings-card is-flex is-flex-wrap-wrap is-row-gap-1 is-align-items-center">
-						<p class="_text settings-intro mr-2">
-							{{ $t('Back up this box itself: its users, its shares and their accounts, its schedules, these destinations.') }}
-						</p>
-						<b-select v-model="systemDestination" class="mr-2" size="is-small">
+					<section v-if="destinations.length" class="settings-card _row">
+						<span class="_tile"><b-icon icon="home-outline" /></span>
+						<div class="_text">
+							<p class="_name">{{ $t('This box') }}</p>
+							<p class="_has-text-gray is-size-7">{{ $t('Its users, its shares and their accounts, its schedules, these destinations.') }}</p>
+							<details class="_what is-size-7">
+								<summary>{{ $t('What is copied') }}</summary>
+								<ul class="mt-1">
+									<li v-for="part in systemParts" :key="part.path"><code>{{ part.path }}</code> {{ $t(part.what) }}</li>
+								</ul>
+								<p class="mt-1">{{ $t('Not copied: the apps and their data, the files in your folders, and the restic passwords (keep each one with its Restic password button). Back the apps up on their own, or schedule them with this box.') }}</p>
+							</details>
+						</div>
+						<b-select v-model="systemDestination" size="is-small">
 							<option v-for="name in destinations" :key="name" :value="name">{{ name }}</option>
 						</b-select>
 						<b-button :disabled="!systemDestination" :loading="busy === 'system'" rounded size="is-small"
 							@click="backupSystem">
-							{{ $t('Back up this box') }}
+							{{ $t('Back up now') }}
 						</b-button>
-						<details class="_what is-size-7 mt-1">
-							<summary>{{ $t('What is copied') }}</summary>
-							<ul class="mt-1">
-								<li v-for="part in systemParts" :key="part.path"><code>{{ part.path }}</code> {{ $t(part.what) }}</li>
-							</ul>
-							<p class="mt-1">{{ $t('Not copied: the apps and their data, the files in your folders, and the restic passwords (keep each one with its Restic password button). Back the apps up on their own, or schedule them with this box.') }}</p>
-						</details>
-					</div>
+					</section>
 
-					<div class="settings-card">
+					<section class="settings-card _form">
+						<div class="_head">
+							<span class="_tile"><b-icon icon="plus" /></span>
+							<div class="_text">
+								<p class="_name">{{ $t('New destination') }}</p>
+								<p class="_has-text-gray is-size-7">{{ $t('A name, a type, and the few options that type asks for.') }}</p>
+							</div>
+						</div>
 
-						<b-field :label="$t('Name')" label-position="on-border">
-							<b-input v-model="draft.name" placeholder="offsite" expanded size="is-small" />
-						</b-field>
+						<div class="_grid">
+							<b-field :label="$t('Name')" label-position="on-border">
+								<b-input v-model="draft.name" placeholder="offsite" expanded size="is-small" />
+							</b-field>
 
-						<b-field :label="$t('Backend')" label-position="on-border">
-							<b-select v-model="draft.backend" expanded size="is-small" @update:model-value="fillSuggestions">
-								<option v-for="backend in backends" :key="backend.id" :value="backend.id">
-									{{ backend.label }}
-								</option>
-							</b-select>
-						</b-field>
+							<b-field :label="$t('Backend')" label-position="on-border">
+								<b-select v-model="draft.backend" expanded size="is-small" @update:model-value="fillSuggestions">
+									<option v-for="backend in backends" :key="backend.id" :value="backend.id">
+										{{ backend.label }}
+									</option>
+								</b-select>
+							</b-field>
+						</div>
 
 						<b-field :label="draft.backend === 's3' ? $t('Bucket') : $t('Folder (optional)')" label-position="on-border">
 							<b-input v-model="draft.root" :placeholder="draft.backend === 's3' ? 'my-box-backups' : ''" expanded size="is-small" />
 						</b-field>
-						<p v-if="draft.backend === 's3'" class="_has-text-gray is-size-7 mb-2">
+						<p v-if="draft.backend === 's3'" class="_has-text-gray is-size-7">
 							{{ $t('The bucket you made at your provider. Without one, each app is put in a bucket named after it, which most providers refuse because bucket names are shared by everyone.') }}
 						</p>
 
-						<div v-if="canSignIn(draft.backend)" class="mb-3">
+						<div v-if="canSignIn(draft.backend)">
 							<b-button :loading="busy === 'signin'" rounded size="is-small" type="is-info" @click="startSignIn">
 								{{ $t('Sign in with {provider}', { provider: backendLabel(draft.backend) }) }}
 							</b-button>
@@ -145,51 +164,61 @@
 							</template>
 						</div>
 
-						<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7 mb-2">
+						<p v-if="backendHelp(draft.backend)" class="_has-text-gray is-size-7">
 							{{ $t(backendHelp(draft.backend)) }}
 						</p>
-						<p class="_has-text-gray is-size-7 mb-2">
-							{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}
-						</p>
 
-						<!-- new-password on anything typed as a password: otherwise the browser
-						fills the dashboard's own login in, and it is sent to rclone -->
-						<div v-for="(row, index) in draft.rows" :key="index" class="is-flex mb-1">
-							<b-input v-model="row.key" :placeholder="$t('Option')" class="mr-1" expanded size="is-small" />
-							<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
-								:placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
-								expanded password-reveal size="is-small" />
-							<b-button :title="$t('Remove')" class="ml-1" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
-								@click="draft.rows.splice(index, 1)" />
+						<div class="_section">
+							<span class="_section-title">{{ $t('rclone options') }}</span>
+							<span class="_has-text-gray is-size-7">{{ $t('These are rclone\'s own option names. Leave blank what you do not need; add a row for anything not listed.') }}</span>
 						</div>
 
-						<b-field class="mt-3">
-							<b-checkbox v-model="draft.encrypt" size="is-small">{{ $t('Encrypt this destination') }}</b-checkbox>
-						</b-field>
-						<template v-if="draft.encrypt">
-							<b-field :label="$t('Encryption password')" label-position="on-border">
-								<b-input v-model="draft.password" autocomplete="new-password" expanded password-reveal size="is-small"
-									type="password" />
-							</b-field>
-							<!-- said here rather than in a dialog later: the password is kept by
-							rclone and never comes back, and a destination without it is a
-							bucket of ciphertext -->
-							<p class="_has-text-gray is-size-7 mb-2">
-								{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}
-							</p>
-						</template>
+						<!-- The options the backend usually wants are fields named after rclone's own
+							keys; a row added by hand takes its key too. new-password on anything typed
+							as a password: otherwise the browser fills the dashboard's own login in, and
+							it is sent to rclone -->
+						<div class="_grid">
+							<template v-for="(row, index) in draft.rows" :key="index">
+								<b-field v-if="isSuggested(row)" :label="row.key" custom-class="_key" label-position="on-border">
+									<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
+										:type="isSecret(row.key) ? 'password' : 'text'" expanded password-reveal size="is-small" />
+								</b-field>
+								<div v-else class="_custom">
+									<b-input v-model="row.key" :placeholder="$t('Option')" class="_key" expanded size="is-small" />
+									<b-input v-model="row.value" :autocomplete="isSecret(row.key) ? 'new-password' : undefined"
+										:placeholder="$t('Value')" :type="isSecret(row.key) ? 'password' : 'text'"
+										expanded password-reveal size="is-small" />
+									<b-button :title="$t('Remove')" icon-left="close-outline" icon-pack="casa" rounded size="is-small"
+										@click="draft.rows.splice(index, 1)" />
+								</div>
+							</template>
+						</div>
+						<b-button class="_add" size="is-small" type="is-text" @click="draft.rows.push({ key: '', value: '' })">
+							{{ $t('Add an option rclone knows') }}
+						</b-button>
 
-						<div class="is-flex is-align-items-center mt-2">
-							<b-button class="mr-2" rounded size="is-small" @click="draft.rows.push({ key: '', value: '' })">
-								{{ $t('Add') }}
-							</b-button>
-							<div class="is-flex-grow-1"></div>
+						<!-- said here rather than in a dialog later: the password is kept by
+						rclone and never comes back, and a destination without it is a
+						bucket of ciphertext -->
+						<b-checkbox v-model="draft.encrypt" class="_choice" size="is-small">
+							<span class="_choice-text">
+								<span>{{ $t('Encrypt this destination') }}</span>
+								<span class="_has-text-gray is-size-7">{{ $t('Names and contents are encrypted before they leave this box. Keep the password somewhere else: it cannot be read back, and without it every backup at this destination is lost.') }}</span>
+							</span>
+						</b-checkbox>
+						<b-field v-if="draft.encrypt" :label="$t('Encryption password')" label-position="on-border">
+							<b-input v-model="draft.password" autocomplete="new-password" expanded password-reveal size="is-small"
+								type="password" />
+						</b-field>
+
+						<div class="_foot">
+							<span class="_has-text-gray is-size-7 is-flex-grow-1">{{ $t('Nothing is sent before Save. Check the destination afterwards to see whether rclone reaches it.') }}</span>
 							<b-button :disabled="!draft.name || !draft.backend || (draft.encrypt && !draft.password)" :loading="busy === 'save'"
 								rounded size="is-small" type="is-primary" @click="save">
 								{{ $t('Save destination') }}
 							</b-button>
 						</div>
-					</div>
+					</section>
 				</b-tab-item>
 
 				<b-tab-item value="schedules" :label="$t('Schedules')">
@@ -394,6 +423,26 @@ export default {
 			return /pass|secret|key|token/i.test(key || '') && !/key_file|public/i.test(key || '')
 		},
 
+		// an option the backend usually wants is a field named after it; one added by hand
+		// has its key typed too
+		isSuggested(row) {
+			return suggestedFields(this.draft.backend).some(field => field.key === row.key)
+		},
+
+		// Two words beside the name: the restic repository's last check when there is
+		// one, else what the last reachability check said, else that none was made.
+		stateOf(name) {
+			const check = this.restic[name] && this.restic[name].last_check
+			if (check) {
+				return check.ok ? { level: 'ok', text: this.$t('Repository checked') } : { level: 'danger', text: this.$t('Check failed') }
+			}
+			if (this.checked[name]) {
+				return this.checked[name].startsWith(this.$t('Reachable')) ? { level: 'ok', text: this.$t('Reachable') } : { level: 'danger', text: this.$t('Unreachable') }
+			}
+
+			return { level: 'none', text: this.$t('Not checked yet') }
+		},
+
 		fillSuggestions(backend) {
 			this.draft.rows = suggestedFields(backend)
 			this.signIn = { url: '', redirected: '' }
@@ -405,6 +454,10 @@ export default {
 			try {
 				const res = await this.$api.backup.getDestinations()
 				this.destinations = res.data.data || []
+				// the box's own backup goes to the first destination unless another was picked
+				if (!this.destinations.includes(this.systemDestination)) {
+					this.systemDestination = this.destinations[0] || ''
+				}
 				await this.loadRestic()
 			} catch (error) {
 				this.error = this.$t('Destinations could not be loaded: {error}', { error: this.messageOf(error) })
@@ -655,27 +708,152 @@ export default {
 
 <style lang="scss" scoped>
 .backup-destinations {
-  .destination {
-    min-height: 2rem;
+  // a destination, the box itself: one row of tile, text, controls; the controls
+  // take a line of their own on a phone
+  .destination,
+  ._row,
+  ._head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  ._tile {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    background: rgba($primary, 0.12);
+    color: $primary;
   }
 
   // a basis rather than flex-grow alone: the text shares its line with the
   // controls on a wide card and takes its own line on a phone
   ._text {
     flex: 1 1 14rem;
-  }
-
-  ._what {
-    flex-basis: 100%;
-
-    summary {
-      cursor: pointer;
-    }
+    min-width: 0;
   }
 
   ._name {
     font-weight: 600;
     color: var(--casa-text-strong);
+  }
+
+  // where the destination stands, in two words, beside its name
+  ._chip {
+    display: inline-flex;
+    align-items: center;
+    height: 1.375rem;
+    padding: 0 0.5625rem;
+    border-radius: 0.6875rem;
+    background: var(--casa-hover-tint);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &.is-ok {
+      background: rgba($success, 0.16);
+      color: $success;
+    }
+
+    &.is-danger {
+      background: rgba($danger, 0.16);
+      color: $danger;
+    }
+  }
+
+  ._what summary {
+    cursor: pointer;
+  }
+
+  // Forget, the one way out of the menu, in red; not Bulma's has-text-danger, which the check line uses
+  :deep(._danger) {
+    color: $danger;
+  }
+
+  ._form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  // two fields a row, one on a phone
+  ._grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+
+    .field {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  // a row added by hand: its key, its value, and the way to drop it
+  ._custom {
+    display: flex;
+    grid-column: 1 / -1;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  ._section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  ._section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--casa-text-hint);
+  }
+
+  // rclone's own names, shown as such
+  :deep(._key),
+  :deep(._key input) {
+    font-family: ui-monospace, sfmono-regular, menlo, consolas, monospace;
+  }
+
+  ._add {
+    align-self: flex-start;
+  }
+
+  ._choice {
+    align-items: flex-start;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.625rem;
+    background: var(--casa-hover-tint);
+
+    :deep(.control-label) {
+      white-space: normal;
+    }
+  }
+
+  ._choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  ._foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--casa-divider-soft);
   }
 }
 </style>

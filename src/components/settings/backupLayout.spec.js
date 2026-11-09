@@ -40,6 +40,8 @@ describe('the backup windows on a phone', () => {
 
 	it('names the button that removes an option row of a destination', async () => {
 		await open(BackupDestinations, { getDestinations: answer(['offsite']) })
+		// the suggested options are fields; only a row added by hand can be removed
+		await wrapper.findAll('button').find(b => b.text() === 'Add an option rclone knows').trigger('click')
 
 		expect(wrapper.findAll('button[title="Remove"]').length).toBeGreaterThan(0)
 		expect(unnamed(wrapper)).toHaveLength(0)
