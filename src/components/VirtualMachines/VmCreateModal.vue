@@ -59,6 +59,7 @@
 			<network-field v-model="form.network" v-model:address="form.address" :host="host" />
 
 			<b-switch v-model="form.start" class="mt-4" size="is-small">{{ $t('Start it once it is created') }}</b-switch>
+			<b-switch v-model="form.autostart" class="mt-3" size="is-small">{{ $t('Start it when this machine starts') }}</b-switch>
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
