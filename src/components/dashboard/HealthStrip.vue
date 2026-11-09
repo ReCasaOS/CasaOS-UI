@@ -108,7 +108,7 @@
 								<div>{{ $t('Last: {when}', { when: whenOf(new Date(backup.at)) }) }}</div>
 								<div class="tile-detail">{{ lastBackupDetail }}</div>
 							</div>
-							<p v-if="backup.status === 'failed'" class="panel-error">{{ backup.error }}</p>
+							<p v-if="backup.status === 'failed'" class="panel-error" :title="backup.error">{{ backup.error }}</p>
 							<p v-if="nextBackup" class="tile-detail">{{ $t('Next: {when}', { when: nextBackup }) }}</p>
 						</div>
 						<div class="panel-foot">
@@ -1025,8 +1025,15 @@ export default {
 	opacity: 0.85;
 }
 
+// restic and rclone errors are one unbroken line of URLs: wrap them and keep four
+// lines, the whole text stays in the tooltip
 .panel-error {
 	color: #ff9d9d;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
 }
 
 .fleet-state {
