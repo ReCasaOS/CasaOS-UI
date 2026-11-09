@@ -3176,5 +3176,6 @@
   "held by a system upgrade": "retenue par une mise à niveau du système",
   "stopped": "arrêtée",
   "Nothing is running any more.": "Plus rien ne tourne.",
-  "See details": "Voir le détail"
+  "See details": "Voir le détail",
+  "Stopped from the interface": "Arrêtée"
 }

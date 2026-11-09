@@ -404,6 +404,17 @@ describe('health strip backup that runs', () => {
 	})
 })
 
+describe('health strip backup somebody stopped', () => {
+	it('wears no failure', async () => {
+		const wrapper = strip({ runs: [{ app: 'happy_rik', destination: 'GDrive', started_at: '2026-11-09T07:00:00Z', error: 'stopped from the interface: copying /DATA/AppData/overseerr/config: context canceled' }] })
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.find('.panel-chip').text()).toBe('Stopped from the interface')
+		expect(panel.find('.panel-error').exists()).toBe(false)
+	})
+})
+
 describe('health strip fleet panel', () => {
 	const answer = data => () => Promise.resolve({ data: { data } })
 	const master = boxes => answer({ role: 'master', master: { address: 'https://home.example', boxes } })

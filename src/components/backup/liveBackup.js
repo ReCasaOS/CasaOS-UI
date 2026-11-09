@@ -20,6 +20,13 @@ export function liveFigures(backup) {
 	}
 }
 
+// what the box writes in the history of a backup somebody stopped (AM's ErrStoppedFromInterface)
+const STOPPED = 'stopped from the interface'
+
+export function wasStopped(error) {
+	return typeof error === 'string' && error.startsWith(STOPPED)
+}
+
 export function liveTitle(app, titleOf, t) {
 	return app === SYSTEM_APP ? t('This box') : titleOf(app)
 }

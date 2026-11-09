@@ -229,3 +229,9 @@ describe('cpuFrequency', () => {
 		expect(cpuFrequency(undefined)).toBeNull()
 	})
 })
+
+describe('a backup somebody stopped', () => {
+	it('is told apart from one that failed', () => {
+		expect(backupTile([{ app: 'happy_rik', started_at: '2026-11-09T07:00:00Z', error: 'stopped from the interface: copying /DATA/AppData/overseerr/config: context canceled' }]).status).toBe('stopped')
+	})
+})

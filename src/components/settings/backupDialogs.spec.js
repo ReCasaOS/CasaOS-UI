@@ -532,3 +532,24 @@ describe('the running tab of the backups dialog', () => {
 		}
 	})
 })
+
+describe('the running tab after a passing error', () => {
+	// the box's own backup stops the gateway for a few seconds: one failed read must not freeze the tab
+	it('keeps asking', async () => {
+		vi.useFakeTimers()
+		try {
+			const running = { backups: [{ id: 'b7', app: 'happy_rik', destination: 'GDrive', origin: 'scheduled', started_at: '2026-11-08T17:55:18+01:00', operation: 1, operations: 2, source: '/DATA/x' }], passes: [] }
+			const ask = vi.fn(() => Promise.resolve({ data: running }))
+			const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: ask })
+
+			ask.mockImplementationOnce(() => Promise.reject(Object.assign(new Error('Bad Gateway'), { response: { status: 502 } })))
+			await vi.advanceTimersByTimeAsync(3000)
+			const asked = ask.mock.calls.length
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+			wrapper.unmount()
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+})

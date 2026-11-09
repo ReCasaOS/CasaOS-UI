@@ -28,6 +28,7 @@
 			<b-table-column v-slot="{ row }" :label="$t('Result')" field="error">
 				<b-tag v-if="row.restore" class="mr-1" type="is-info">{{ $t('Restore') }}</b-tag>
 				<b-tag v-if="!row.error" type="is-success">{{ $t('Done') }}</b-tag>
+				<b-tag v-else-if="wasStopped(row.error)" type="is-warning">{{ $t('Stopped from the interface') }}</b-tag>
 				<b-tooltip v-else :label="row.error" multilined position="is-left" type="is-dark">
 					<b-tag type="is-danger">{{ $t('Failed') }}</b-tag>
 				</b-tooltip>
@@ -63,6 +64,8 @@
 </template>
 
 <script>
+import { wasStopped } from '@/components/backup/liveBackup.js'
+
 export default {
 	name: 'backup-history',
 	data() {
@@ -72,6 +75,7 @@ export default {
 		this.load()
 	},
 	methods: {
+		wasStopped,
 		// Said in full before anything is touched: the app goes down for the copy,
 		// what it has now is replaced, and files added since the backup go with
 		// it. Nothing here can be walked back.

@@ -2,6 +2,7 @@
 // the classic widgets already read (the utilization payload, the backup runs, the
 // SnapRAID state); this only decides the wording and the severity, so it is tested
 // without a component.
+import { wasStopped } from '@/components/backup/liveBackup.js'
 import { snapraidTag, snapraidWhen } from '@/components/Storage/snapraid'
 
 export function percent(used, total) {
@@ -60,7 +61,8 @@ export function backupTile(runs) {
 		return { status: 'none', at: '', destination: '', error: '' }
 	}
 	const lastOk = own.find(run => !run.error) || last
-	return { status: last.error ? 'failed' : 'ok', at: lastOk.started_at, destination: lastOk.destination || '', error: last.error || '', batch: runBatch(own, lastOk) }
+	// a backup somebody stopped did not fail: it wears neither the red chip nor the error
+	return { status: last.error ? (wasStopped(last.error) ? 'stopped' : 'failed') : 'ok', at: lastOk.started_at, destination: lastOk.destination || '', error: last.error || '', batch: runBatch(own, lastOk) }
 }
 
 // The runs one go set off, around `last`: one per app, sequential, to the same destination

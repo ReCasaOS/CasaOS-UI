@@ -3174,5 +3174,6 @@
   "held by a system upgrade": "held by a system upgrade",
   "stopped": "stopped",
   "Nothing is running any more.": "Nothing is running any more.",
-  "See details": "See details"
+  "See details": "See details",
+  "Stopped from the interface": "Stopped from the interface"
 }

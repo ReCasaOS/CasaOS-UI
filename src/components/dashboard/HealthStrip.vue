@@ -280,6 +280,10 @@ export default {
 				return null
 			}
 
+			if (this.backup.status === 'stopped') {
+				return { level: 'none', text: this.$t('Stopped from the interface') }
+			}
+
 			return this.backup.status === 'failed' ? { level: 'danger', text: this.$t('Failed') } : { level: 'ok', text: this.$t('Succeeded') }
 		},
 		// how long the last go took, how much it read, where it went; a record too old for a figure says nothing of it

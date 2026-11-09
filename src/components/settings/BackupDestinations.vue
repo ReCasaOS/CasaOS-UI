@@ -236,6 +236,8 @@ export default {
 			running: { backups: [], passes: [] },
 			showRunning: false,
 			runningTimer: 0,
+			// once the box has answered, a failed read is passing (a restart, a 502), not an old box
+			runningAnswered: false,
 			destinations: [],
 			// name -> what the last check said about it
 			checked: {},
@@ -282,13 +284,16 @@ export default {
 				// no envelope: the body is {backups, passes}
 				const data = (await this.$api.backup.getRunning()).data || {}
 				this.running = { backups: data.backups || [], passes: data.passes || [] }
+				this.runningAnswered = true
 				if (this.running.backups.length || this.running.passes.some(pass => !pass.finished_at)) {
 					this.showRunning = true
 				}
-			} catch {
-				// an older box (404), or none of the routes: no tab, and no more asking
-				clearInterval(this.runningTimer)
-				this.runningTimer = -1
+			} catch (error) {
+				// an older box (404), or one that never answered: no tab, and no more asking
+				if (!this.runningAnswered || (error.response && error.response.status === 404)) {
+					clearInterval(this.runningTimer)
+					this.runningTimer = -1
+				}
 			}
 		},
 
