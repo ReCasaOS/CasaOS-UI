@@ -42,6 +42,10 @@
 							</div>
 						</template>
 					</draggable>
+					<div class="item">
+						<b-button :disabled="isDefaultOrder" class="reset-order" size="is-small" type="is-text"
+							@click="resetOrder">{{ $t('Reset to the default order') }}</b-button>
+					</div>
 					<div class="is-flex is-align-items-center item">
 						<div class="is-flex is-align-items-center is-flex-grow-1">
 							<b-icon icon="show-search-outline" pack="casa" class="mr-2"></b-icon>
@@ -62,13 +66,8 @@
 <script>
 import find from 'lodash/find'
 import draggable from 'vuedraggable'
-import { moveWidget } from './widgetOrder'
-
-const widgetsComponents = require.context(
-	'@/widgets',
-	false,
-	/.vue$/,
-)
+import shippedWidgets from './shippedWidgets'
+import { moveWidget, resetWidgetOrder } from './widgetOrder'
 
 export default {
 	name: 'settings',
@@ -80,12 +79,17 @@ export default {
 	},
 	data() {
 		return {
-			apps: [],
 			settingsData: [],
 			position: 'is-top-left',
 		}
 	},
 	computed: {
+		shippedNames() {
+			return shippedWidgets.map(widget => widget.name)
+		},
+		isDefaultOrder() {
+			return resetWidgetOrder(this.settingsData, this.shippedNames).every((widget, i) => widget.name === this.settingsData[i].name)
+		},
 		searchBarShown() {
 			return this.$store.state.searchEngineSwitch
 		},
@@ -108,10 +112,6 @@ export default {
 	},
 	created() {
 		this.settingsData = JSON.parse(JSON.stringify(this.modelValue))
-		widgetsComponents.keys().forEach((fileName) => {
-			const componentConfig = widgetsComponents(fileName)
-			this.apps.push({ app: componentConfig })
-		})
 	},
 	mounted() {
 		window.addEventListener('resize', this.onRezise)
@@ -121,16 +121,10 @@ export default {
 	},
 	methods: {
 		getIcon(value) {
-			const obj = find(this.apps, (o) => {
-				return o.app.default.name === value
-			})
-			return obj.app.default.icon
+			return find(shippedWidgets, o => o.name === value).icon
 		},
 		getTitle(value) {
-			const obj = find(this.apps, (o) => {
-				return o.app.default.name === value
-			})
-			return obj.app.default.title
+			return find(shippedWidgets, o => o.name === value).title
 		},
 		// The arrow keys on a handle do what dragging it does, for whoever does not
 		// use a mouse. Focus follows the widget that moved.
@@ -143,6 +137,10 @@ export default {
 			this.$nextTick(() => {
 				this.$el.querySelectorAll('.drag-handle')[index + offset]?.focus()
 			})
+		},
+		resetOrder() {
+			this.settingsData = resetWidgetOrder(this.settingsData, this.shippedNames)
+			this.handleInput()
 		},
 		handleInput() {
 			this.$emit('update:modelValue', this.settingsData)
@@ -199,6 +197,17 @@ export default {
 
 	.ghost {
 		opacity: 0.4;
+	}
+
+	.reset-order {
+		padding: 0;
+		height: auto;
+		color: #fff;
+		text-decoration: underline;
+
+		&[disabled] {
+			opacity: 0.4;
+		}
 	}
 
 	.circle-btn {

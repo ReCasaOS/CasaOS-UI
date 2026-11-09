@@ -3192,5 +3192,6 @@
   "stopped": "arrêtée",
   "Nothing is running any more.": "Plus rien ne tourne.",
   "See details": "Voir le détail",
-  "Stopped from the interface": "Arrêtée"
+  "Stopped from the interface": "Arrêtée",
+  "Reset to the default order": "Rétablir l'ordre par défaut"
 }
