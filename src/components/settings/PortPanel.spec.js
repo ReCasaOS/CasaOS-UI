@@ -120,6 +120,7 @@ describe('web UI port, HTTPS field', () => {
 	})
 
 	it('goes to the plain port instead of polling after an https change from an https page', async () => {
+		vi.useFakeTimers()
 		const open_ = vi.spyOn(window, 'open').mockImplementation(() => null)
 		const wrapper = open(ok(), { getHttpsPort: answer('443'), protocol: 'https:' })
 		wrapper.vm.checkUpdate = vi.fn()
@@ -127,9 +128,28 @@ describe('web UI port, HTTPS field', () => {
 		wrapper.vm.httpsOff = true
 		wrapper.vm.savePort()
 		await flushPromises()
+		await vi.advanceTimersByTimeAsync(0)
 
 		expect(open_).toHaveBeenCalledWith('http://box.lan:80', '_self')
 		expect(wrapper.vm.checkUpdate).not.toHaveBeenCalled()
 		open_.mockRestore()
+		vi.useRealTimers()
+	})
+
+	it('waits for the plain port to come back before leaving an https page when it moved too', async () => {
+		vi.useFakeTimers()
+		const open_ = vi.spyOn(window, 'open').mockImplementation(() => null)
+		const wrapper = open(ok(), { getHttpsPort: answer('443'), protocol: 'https:' })
+		await flushPromises()
+		wrapper.vm.port = 8081
+		wrapper.vm.httpsOff = true
+		wrapper.vm.savePort()
+		await flushPromises()
+
+		expect(open_).not.toHaveBeenCalled()
+		await vi.advanceTimersByTimeAsync(3000)
+		expect(open_).toHaveBeenCalledWith('http://box.lan:8081', '_self')
+		open_.mockRestore()
+		vi.useRealTimers()
 	})
 })

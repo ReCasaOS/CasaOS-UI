@@ -150,7 +150,8 @@ export default {
 			}
 			if (this.httpsLockout) {
 				// the page is no longer served here, and fetching the plain port from an https page is blocked as mixed content
-				window.open(`http://${this.$baseIp}:${this.port}`, '_self')
+				// moving the plain port restarts its listener: give it a moment, as it cannot be probed from here
+				this.timer = setTimeout(() => window.open(`http://${this.$baseIp}:${this.port}`, '_self'), httpChanged ? 3000 : 0)
 			} else if (httpChanged) {
 				this.checkUpdate()
 			} else {
