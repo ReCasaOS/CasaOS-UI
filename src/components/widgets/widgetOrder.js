@@ -34,3 +34,11 @@ export function moveWidget(list, index, offset) {
 
 	return moved
 }
+
+// The list in the order the dashboard ships its widgets (`names`), each one keeping
+// its visibility: the reset for an order somebody no longer wants.
+export function resetWidgetOrder(list, names) {
+	const rank = widget => (names.includes(widget.name) ? names.indexOf(widget.name) : names.length)
+
+	return [...list].sort((a, b) => rank(a) - rank(b))
+}
