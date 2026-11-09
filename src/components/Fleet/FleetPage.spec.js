@@ -8,7 +8,7 @@ import i18n from '@/plugins/i18n'
 
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn(), rotateCode: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), backups: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn(), rotateCode: vi.fn() } }))
 
 const A = { id: 'a', name: 'Home', url: 'https://home', online: true, last_seen: '2026-11-02T10:00:00Z' }
 const B = { id: 'b', name: 'Shop', url: '', online: true, last_seen: '2026-11-02T10:00:00Z' }
@@ -185,6 +185,15 @@ describe('the Fleet page', () => {
 		expect(shop.text()).toContain('Box offline')
 		expect(shop.findAll('.fleet-row')).toHaveLength(0)
 		expect(chipOf('All').text()).toContain('2')
+	})
+
+	it('mounts the Backups tab only once it is selected', async () => {
+		fleetApi.backups.mockResolvedValue({ data: { data: { notify: true, interval_seconds: 300, boxes: [] } } })
+		await mountPage()
+		expect(fleetApi.backups).not.toHaveBeenCalled()
+		await openTab('Backups')
+		expect(fleetApi.backups).toHaveBeenCalledTimes(1)
+		expect(wrapper.findComponent({ name: 'BackupsTab' }).exists()).toBe(true)
 	})
 
 	it('says so when the fleet cannot be read', async () => {

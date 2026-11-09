@@ -18,16 +18,24 @@ function failure(e) {
 }
 
 // Runs `call` on every row and resolves to a Map key → { state: 'done'|'refused'|'offline'|'failed', message }.
+// A call that resolves to a string says it of a done row (what a 202 left out): that string is the message.
 export async function runBulk(rows, call) {
 	const results = new Map()
 	await Promise.allSettled(rows.map(row => Promise.resolve()
 		.then(() => call(row))
-		.then(() => results.set(row.key, { state: 'done', message: '' }), e => results.set(row.key, failure(e)))))
+		.then(res => results.set(row.key, { state: 'done', message: typeof res === 'string' ? res : '' }), e => results.set(row.key, failure(e)))))
 	return results
 }
 
 // The compose status route takes the JSON string "start": axios sends a JavaScript string as it is.
 const appStatus = state => row => relay(row.boxId, 'put', `/v2/app_management/compose/${enc(row.id)}/status`, { data: JSON.stringify(state) })
+// "immich — busy, plex — already running": the pairs a 202 left out, '' when it left none out
+const refusals = res => (res?.data?.data?.refused ?? []).map(r => `${r.app} — ${r.reason}`).join(', ')
+// a 404 on this route is "no schedule matches": the box declined, it did not fail
+function noMatch(e) {
+	throw e?.response?.status === 404 ? Object.assign(e, { response: { ...e.response, status: 409 } }) : e
+}
+const forceRun = (row, body) => relay(row.id, 'post', '/v2/app_management/backup/schedules/run', { data: body }).catch(noMatch)
 const vmAction = action => row => relay(row.boxId, 'post', `/v2/virt_management/vms/${enc(row.id)}/${action}`)
 
 export const actions = {
@@ -48,6 +56,12 @@ export const actions = {
 		update: row => relay(row.id, 'post', '/v1/sys/update'),
 		packages: row => relay(row.id, 'post', '/v1/sys/packages/update'),
 		apps: (row, ids) => relay(row.id, 'post', '/v2/app_management/compose/updates', { data: { ids } }),
+		// every enabled schedule of the box now; the box answers 202 with what it started and what it refused
+		backupNow: row => forceRun(row, {}).then(refusals),
+		backupOne: (row, { app, destination }) => forceRun(row, { app, destination }).then(refusals),
+		verifyCouple: (row, { app, destination, stamp }) => relay(row.id, 'post', '/v2/app_management/backup/verifications', { data: { destination, app, stamp } }),
+		resticCheck: (row, { destination }) => relay(row.id, 'post', `/v2/app_management/backup/destinations/${enc(destination)}/restic/check`),
+		setVerificationSchedule: (row, { enabled, every_days, at }) => relay(row.id, 'put', '/v2/app_management/backup/verification-schedule', { data: { enabled, every_days, at } }),
 	},
 }
 

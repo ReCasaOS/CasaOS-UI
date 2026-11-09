@@ -151,7 +151,7 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
-import { backupSubject, durationText, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
+import { DUE_GRACE, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -245,10 +245,9 @@ export default {
 			const batch = this.backup.batch || []
 			const parts = []
 			if (batch.length) {
-				const started = Math.min(...batch.map(run => Date.parse(run.started_at)))
-				const finished = Math.max(...batch.map(run => Date.parse(run.finished_at)))
-				if (finished >= started) {
-					parts.push(durationText(finished - started))
+				const longest = longestRun(batch)
+				if (longest !== null) {
+					parts.push(durationText(longest))
 				}
 				const bytes = batch.reduce((sum, run) => sum + (run.bytes || 0), 0)
 				if (bytes) {
@@ -267,7 +266,12 @@ export default {
 				return ''
 			}
 
-			return next.due ? this.$t('within a minute') : this.whenOf(next.at)
+			if (!next.due) {
+				return this.whenOf(next.at)
+			}
+
+			// a slot due for hours is not about to go off: the scheduler is stopped or held back
+			return next.late < DUE_GRACE ? this.$t('within a minute') : this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
 		},
 		// null unless this box is a master
 		fleet() {

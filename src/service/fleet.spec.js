@@ -37,6 +37,11 @@ describe('the fleet service', () => {
 		expect(isSlow('get', '/v2/app_management/compose/updates', { check: 'true' })).toBe(true)
 	})
 
+	it('reads the backups of every box', async () => {
+		await fleetApi.backups()
+		expect(instance.get).toHaveBeenCalledWith('/v1/fleet/backups')
+	})
+
 	it('builds the role routes', async () => {
 		await fleetApi.status()
 		expect(instance.get).toHaveBeenCalledWith('/v1/fleet')

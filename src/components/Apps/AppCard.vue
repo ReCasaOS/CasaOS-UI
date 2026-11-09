@@ -171,11 +171,13 @@
 					</div>
 
 					<div class="app-text">
-						<p class="mt-3 one-line">
+						<p class="mt-3 title-row">
 							<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
 							<a class="one-line" style="cursor:default">
 								{{ i18n(item.title) || item.name }}
 							</a>
+							<!-- its scheduled backups, by the title; nothing for an app without a schedule or while the box cannot say -->
+							<BackupBadge v-if="backupBadge" :kind="backupBadge.kind" :title="backupBadge.title" />
 						</p>
 
 						<!-- beta dashboard: whether the app is up, under its name -->
@@ -215,6 +217,9 @@ import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import BackupBadge from '@/components/backup/BackupBadge.vue'
+import { badgeOfApp } from '@/components/backup/backupStatus'
+import { backupStatus, refresh as refreshBackupStatus } from '@/service/backupStatus'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
@@ -248,6 +253,7 @@ export default {
 	name: 'AppCard',
 	components: {
 		CTooltip: cTooltip,
+		BackupBadge,
 	},
 	mixins: [business_ShowNewAppTag, business_OpenThirdApp, business_LinkApp, commonI18n],
 	inject: ['homeShowFiles', 'openAppStore'],
@@ -298,6 +304,10 @@ export default {
 	},
 
 	computed: {
+		// the worst state of this app's scheduled backups, from the box's own answers; null without a schedule
+		backupBadge() {
+			return backupStatus.ok ? badgeOfApp(backupStatus.states, this.item.name, this.$t) : null
+		},
 		// The count of active resource alerts, for the Statistics card: its number and the sentence that names it.
 		statsBadge() {
 			// the system app only: an app a person installed may carry the same name
@@ -436,6 +446,8 @@ export default {
 	},
 
 	created() {
+		// shared and at most once a minute: every card may ask
+		refreshBackupStatus()
 		hasLogs().then((available) => {
 			this.logsAvailable = available
 		})
@@ -1422,6 +1434,18 @@ export default {
   left: calc(-100% - 14px);
 }
 
+// the title and, when the app has a backup schedule, its badge
+.app-card .title-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+
+	> a {
+		min-width: 0;
+	}
+}
+
 // beta dashboard: a row, not a square
 .app-card.is-compact {
   // the proposal's chip: the accent of the beta dashboard, over the card's top right corner
@@ -1476,6 +1500,11 @@ export default {
 
     p {
       margin: 0 !important;
+    }
+
+    // the compact card's text is left-aligned, and so is the title with its badge
+    .title-row {
+      justify-content: flex-start;
     }
   }
 

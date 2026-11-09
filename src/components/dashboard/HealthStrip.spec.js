@@ -13,7 +13,7 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
+function strip({ runs = [], getSchedules, snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
@@ -24,6 +24,7 @@ function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {}, destina
 				$api: {
 					backup: {
 						getRuns: () => Promise.resolve({ data: { data: runs } }),
+						...(getSchedules ? { getSchedules } : {}),
 						// absent on a core that predates the call: the button is then left out
 						...(destinations ? { getDestinations: () => Promise.resolve({ data: { data: destinations } }) } : {}),
 						backupSystem,
@@ -173,7 +174,7 @@ describe('health strip', () => {
 		expect(wrapper.find('.storage .panel-chip').text()).toContain('failing')
 	})
 
-	it('says how long the last go took, how much it read and where it went, and when the next one comes', async () => {
+	it('says how long the longest run of the last go took, how much it read and where it went, and when the next one comes', async () => {
 		const wrapper = mount(HealthStrip, {
 			global: {
 				mocks: {
@@ -186,7 +187,7 @@ describe('health strip', () => {
 								{ app: 'blog', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:03:00Z', finished_at: '2026-11-02T03:04:00Z', bytes: 1024 ** 2 },
 								{ app: 'casaos-system', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:02:30Z', bytes: 2 * 1024 ** 2 },
 							] } }),
-							// a slot long gone: due at the next check, whatever today is
+							// a slot long gone, and nothing says the box is about to run it
 							getSchedules: () => Promise.resolve({ data: { data: [{ app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-02T03:00:00Z' }] } }),
 						},
 						disks: { snapraid: () => Promise.reject(new Error('404')) },
@@ -198,8 +199,42 @@ describe('health strip', () => {
 
 		const panel = wrapper.find('.backups')
 		expect(panel.find('.panel-chip').text()).toBe('Succeeded')
-		expect(panel.text()).toContain('4 min · 3 MB · to nas')
-		expect(panel.text()).toContain('Next: within a minute')
+		// 2 min 30 s and 1 min, a wait between them that is not work: the longest one
+		expect(panel.text()).toContain('3 min · 3 MB · to nas')
+		expect(panel.text()).toContain('Next: Overdue since')
+		expect(panel.text()).not.toContain('within a minute')
+	})
+
+	it('does not stretch a go over the hours between its runs', async () => {
+		const wrapper = strip({ runs: [
+			{ app: 'photos', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:04:00Z', bytes: 1024 ** 2 },
+			{ app: 'blog', destination: 'nas', scheduled: true, started_at: '2026-11-01T23:00:00Z', finished_at: '2026-11-01T23:01:00Z', bytes: 1024 ** 2 },
+		] })
+		await settle()
+
+		const text = wrapper.find('.backups').text()
+		expect(text).toContain('4 min · 2 MB')
+		expect(text).not.toContain('4 h 04')
+	})
+
+	// the box's own slots: due for two minutes is the minute the scheduler takes, due for hours is not
+	describe.each([
+		['two minutes', '2026-11-07T02:02:00Z', 'Next: within a minute'],
+		['three hours', '2026-11-07T05:00:00Z', 'Next: Overdue since'],
+	])('a slot due for %s', (_, now, expected) => {
+		it('is told as it is', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			vi.setSystemTime(new Date(now))
+			const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+			const wrapper = strip({ getSchedules: () => Promise.resolve({ data: { data: [schedule] } }) })
+			await settle()
+
+			const text = wrapper.find('.backups').text()
+			expect(text).toContain(expected)
+			if (expected.includes('Overdue')) {
+				expect(text).not.toContain('within a minute')
+			}
+		})
 	})
 
 	// the last finished run said Succeeded while the next app was still being copied
