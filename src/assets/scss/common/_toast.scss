@@ -1,5 +1,17 @@
 // Toast
 
+// A backup error can be several kilobytes of unbroken URLs: wrap it, and let a
+// notice that is still too tall scroll instead of covering the page.
+.toast,
+.notices .notification {
+	overflow-wrap: anywhere;
+}
+
+.notices .notification {
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
 .toast {
 	border: 1px solid var(--casa-border) !important;
 	padding: 0.75rem 1.25rem;
