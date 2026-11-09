@@ -18,6 +18,7 @@ import {
 	formatDate,
 	formatMemory,
 	formatNumber,
+	fstabLine,
 	gbToMib,
 	guessOS,
 	imageKind,
@@ -33,6 +34,9 @@ import {
 	osInfo,
 	portLabel,
 	samePorts,
+	shareProblem,
+	shareTagFor,
+	sharesRequest,
 	stateDot,
 	stateLabel,
 	updateRequest,
@@ -467,5 +471,32 @@ describe('createRequest and the folder', () => {
 		expect(form.storage_path).toBe('/DATA/VM')
 		expect(createRequest(form, host).storage_path).toBeUndefined()
 		expect(createRequest({ ...form, storage_path: '/media/Big/VM' }, host).storage_path).toBe('/media/Big/VM')
+	})
+})
+
+describe('shared folders', () => {
+	const vm = { shares: [{ source: '/media/sda1/data_cam', tag: 'data_cam' }] }
+
+	it('suggests a tag from the folder name', () => {
+		expect(shareTagFor('/media/sda1/data_cam/')).toBe('data_cam')
+		expect(shareTagFor('/DATA/Città vecchia')).toBe('Citt__vecchia')
+		expect(shareTagFor(`/DATA/${'a'.repeat(50)}`)).toHaveLength(36)
+	})
+
+	it('says what is wrong with a new one', () => {
+		expect(shareProblem(vm, { source: '/DATA/x', tag: 'x' })).toBe('')
+		expect(shareProblem(vm, { source: '/DATA/x', tag: 'a b' })).toMatch(/1 to 36/)
+		expect(shareProblem(vm, { source: '/DATA/x', tag: 'data_cam' })).toMatch(/tag/)
+		expect(shareProblem(vm, { source: '/media/sda1/data_cam', tag: 'cam' })).toMatch(/already/)
+	})
+
+	it('sends the whole list, with one added or taken out', () => {
+		expect(sharesRequest(vm, { add: { source: '/DATA/x', tag: 'x' } })).toEqual([...vm.shares, { source: '/DATA/x', tag: 'x' }])
+		expect(sharesRequest(vm, { removeTag: 'data_cam' })).toEqual([])
+		expect(sharesRequest({}, {})).toEqual([])
+	})
+
+	it('writes the fstab line', () => {
+		expect(fstabLine(vm.shares[0])).toBe('data_cam /mnt/data_cam virtiofs defaults,nofail 0 0')
 	})
 })

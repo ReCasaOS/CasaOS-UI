@@ -262,6 +262,50 @@
 				<p v-if="!usbLoading && !usbRows.length" class="is-size-7 has-text-full-03">{{ $t('No USB devices are plugged into this machine.') }}</p>
 			</b-tab-item>
 
+			<!-- Shared folders: host folders over virtiofs, at the next start; absent on a module without them -->
+			<b-tab-item v-if="current.managed && current.shares !== undefined" :label="$t('Shared folders')" value="shares">
+				<p class="is-size-7 has-text-full-03 mb-3">
+					{{ $t('Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine\'s file rights. Changes take effect the next time the VM starts.') }}
+				</p>
+
+				<b-message v-if="!host.virtiofs" class="mb-3" size="is-small" type="is-warning">
+					{{ $t('This machine has no virtiofsd, which sharing folders needs. Install it with:') }}
+					<code class="is-block mt-1">sudo apt install virtiofsd</code>
+				</b-message>
+
+				<div v-for="share in current.shares" :key="share.tag" class="disk-row is-size-7">
+					<div class="is-flex is-align-items-center">
+						<b-icon class="mr-2 has-text-full-03" icon="folder-network-outline" size="is-small" />
+						<div class="is-flex-grow-1 disk-info">
+							<span class="has-text-weight-semibold">{{ share.tag }}</span>
+							<span class="has-text-full-03"> · {{ share.source }}</span>
+							<p class="has-text-full-03">{{ $t('In the VM\'s /etc/fstab:') }} <code>{{ fstabLine(share) }}</code></p>
+						</div>
+						<b-button :disabled="shareBusy" class="ml-1 power-btn is-force" size="is-small"
+							@click="removeShare(share)">{{ $t('Remove') }}</b-button>
+					</div>
+				</div>
+				<p v-if="!(current.shares || []).length && !newShare" class="is-size-7 has-text-full-03">{{ $t('No folders are shared with this VM.') }}</p>
+
+				<div v-if="newShare" class="mt-3">
+					<p class="is-size-7 mb-1">{{ newShare.source }}</p>
+					<b-field :message="newShareProblem ? $t(newShareProblem) : $t('The VM mounts the folder by this name.')"
+						:type="newShareProblem ? 'is-danger' : ''">
+						<b-input v-model="newShare.tag" :placeholder="$t('Tag')" expanded maxlength="36" :has-counter="false"
+							size="is-small" @keyup.enter="addShare"></b-input>
+						<p class="control">
+							<b-button :disabled="!!newShareProblem" :loading="shareBusy" size="is-small" type="is-primary"
+								@click="addShare">{{ $t('Share') }}</b-button>
+						</p>
+						<p class="control">
+							<b-button :disabled="shareBusy" size="is-small" @click="newShare = null">{{ $t('Cancel') }}</b-button>
+						</p>
+					</b-field>
+				</div>
+				<b-button v-else :disabled="!host.virtiofs || shareBusy" class="mt-3" icon-left="folder-plus-outline"
+					size="is-small" @click="pickShareFolder">{{ $t('Share a folder…') }}</b-button>
+			</b-tab-item>
+
 			<!-- Snapshots: taken and restored with the VM off, at once -->
 			<b-tab-item v-if="current.managed" :label="$t('Snapshots')" value="snapshots">
 				<p class="is-size-7 has-text-full-03 mb-3">
@@ -328,6 +372,7 @@ import {
 	formatBytes,
 	formatDate,
 	formatMemory,
+	fstabLine,
 	isUnderData,
 	networkChoice,
 	networkLabel,
@@ -336,6 +381,9 @@ import {
 	portKey,
 	portLabel,
 	samePorts,
+	shareProblem,
+	shareTagFor,
+	sharesRequest,
 	stateDot,
 	stateLabel,
 	updateRequest,
@@ -371,6 +419,9 @@ export default {
 			hostUSB: [],
 			usbLoading: false,
 			usbBusy: false,
+			shareBusy: false,
+			// { source, tag } while a folder is being added
+			newShare: null,
 			error: '',
 			plan: emptyDiskPlan(),
 			editing: '',
@@ -458,6 +509,9 @@ export default {
 			return Object.keys(updateRequest(this.current, this.form)).length > 0 || this.osChanged
 				|| !diskPlanIsEmpty(this.plan) || this.networkChanged || (this.showPorts && this.portsChanged)
 		},
+		newShareProblem() {
+			return this.newShare ? shareProblem(this.current, this.newShare) : ''
+		},
 		isoChoices() {
 			const isos = this.images.filter(img => img.kind === 'iso' && isUnderData(img.path)).map(img => img.path)
 			if (this.current.cdrom && !isos.includes(this.current.cdrom)) {
@@ -509,6 +563,44 @@ export default {
 		formatBytes,
 		formatDate,
 		formatMemory,
+		fstabLine,
+		pickShareFolder() {
+			const modal = this.$buefy.modal.open({
+				component: PathPicker,
+				hasModalCard: true,
+				trapFocus: true,
+				props: { folderOnly: true, start: '/media' },
+				events: {
+					select: (path) => {
+						modal.close()
+						this.newShare = { source: path, tag: shareTagFor(path) }
+					},
+				},
+			})
+		},
+		async addShare() {
+			if (!this.newShare || this.newShareProblem) {
+				return
+			}
+			await this.changeShares({ add: this.newShare })
+			if (!this.error) {
+				this.newShare = null
+			}
+		},
+		removeShare(share) {
+			return this.changeShares({ removeTag: share.tag })
+		},
+		async changeShares(change) {
+			this.shareBusy = true
+			this.error = ''
+			try {
+				await this.send(() => vmApi.setShares(this.current.id, sharesRequest(this.current, change)))
+			} catch (e) {
+				this.error = e.response?.data?.message || e.message
+			} finally {
+				this.shareBusy = false
+			}
+		},
 		diskGiB,
 		diskActions,
 		diskPlanIsEmpty,
