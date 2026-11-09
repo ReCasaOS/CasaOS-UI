@@ -8,7 +8,7 @@ import i18n from '@/plugins/i18n'
 
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
-vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn(), rotateCode: vi.fn() } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), backups: vi.fn(), relay: vi.fn(), renameBox: vi.fn(), removeBox: vi.fn(), rotateCode: vi.fn() } }))
 
 const A = { id: 'a', name: 'Home', url: 'https://home', online: true, last_seen: '2026-11-02T10:00:00Z' }
 const B = { id: 'b', name: 'Shop', url: '', online: true, last_seen: '2026-11-02T10:00:00Z' }
@@ -187,6 +187,15 @@ describe('the Fleet page', () => {
 		expect(chipOf('All').text()).toContain('2')
 	})
 
+	it('mounts the Backups tab only once it is selected', async () => {
+		fleetApi.backups.mockResolvedValue({ data: { data: { notify: true, interval_seconds: 300, boxes: [] } } })
+		await mountPage()
+		expect(fleetApi.backups).not.toHaveBeenCalled()
+		await openTab('Backups')
+		expect(fleetApi.backups).toHaveBeenCalledTimes(1)
+		expect(wrapper.findComponent({ name: 'BackupsTab' }).exists()).toBe(true)
+	})
+
 	it('says so when the fleet cannot be read', async () => {
 		fleetApi.status.mockRejectedValue(new Error('Network Error'))
 		await mountPage()
@@ -305,6 +314,19 @@ describe('the Fleet page', () => {
 		expect(details).toEqual(['8 cores · 3.4 GHz · 52°C', '4 GB / 8 GB', '25 GB / 100 GB'])
 		// a box that sends no cores, no frequency and no totals gets no detail line
 		expect(cardOf('Shop').findAll('.fleet-meter-detail')).toHaveLength(1)
+	})
+
+	it('shows the network rate of a box from its second read on', async () => {
+		const MB = 1024 ** 2
+		const net = (time, sent, recv) => ({ '/v1/sys/utilization': { cpu: { percent: 10 }, mem: { usedPercent: 50 }, sys_disk: { size: 100, used: 25 }, net: [{ name: 'eth0', bytesSent: sent, bytesRecv: recv, time }] } })
+		serve({ a: net(100, 0, 0) })
+		await mountPage()
+		const netText = () => cardOf('Home').find('.fleet-net').text()
+		expect(netText()).toBe('Network—')
+		serve({ a: net(130, 15 * MB, 30 * MB) })
+		wrapper.findComponent({ name: 'OverviewTab' }).vm.poller.now()
+		await flushPromises()
+		expect(netText()).toBe('Network↓ 1 MB/s · ↑ 512 KB/s')
 	})
 
 	it('updates ReCasaOS on a box from its tag, after asking', async () => {

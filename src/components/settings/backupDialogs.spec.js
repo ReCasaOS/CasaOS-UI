@@ -195,7 +195,8 @@ describe('the check of a restic repository', () => {
 
 describe('a destination kept with restic', () => {
 	const state = states => name => Promise.resolve({ data: { data: states[name] } })
-	const buttons = wrapper => wrapper.findAll('.destination .button').map(button => button.text())
+	// the usual two are buttons, the rest sit in the menu of the card
+	const buttons = wrapper => wrapper.findAll('.destination .button, .destination .dropdown-item').map(button => button.text())
 
 	it('offers the switch only where this box has restic and the destination is not switched', async () => {
 		const wrapper = await open(BackupDestinations, {
@@ -303,7 +304,7 @@ describe('a destination kept with restic', () => {
 			const alert = vi.fn()
 			wrapper.vm.$buefy.dialog.alert = alert
 
-			await wrapper.findAll('.destination .button').find(button => button.text() === 'Resume restic').trigger('click')
+			await wrapper.findAll('.destination .dropdown-item').find(item => item.text() === 'Resume restic').trigger('click')
 			await flushPromises()
 			expect(enableRestic).toHaveBeenCalledWith('nas', '')
 			// the password is not new: there is nothing to write down
@@ -493,5 +494,63 @@ describe('the password of a restic repository', () => {
 		expect(click).toHaveBeenCalled()
 		click.mockRestore()
 		wrapper.unmount()
+	})
+})
+
+describe('the running tab of the backups dialog', () => {
+	const running = { backups: [{ id: 'b7', app: 'happy_rik', destination: 'GDrive', origin: 'scheduled', started_at: '2026-11-08T17:55:18+01:00', operation: 1, operations: 2, source: '/DATA/x' }], passes: [] }
+	const getRunning = () => Promise.resolve({ data: running })
+	const activeTab = wrapper => wrapper.find('.tabs li.is-active').text()
+
+	it('opens on what runs when asked to', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning }, { initialTab: 'running' })
+		expect(activeTab(wrapper)).toBe('Running')
+		expect(wrapper.text()).toContain('GDrive')
+		wrapper.unmount()
+	})
+
+	it('has no running tab on a box that cannot say what runs', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: fail }, { initialTab: 'running' })
+		expect(wrapper.findAll('.tabs li').map(tab => tab.text())).not.toContain('Running')
+		expect(activeTab(wrapper)).toBe('Destinations')
+		wrapper.unmount()
+	})
+
+	it('stops asking once closed', async () => {
+		vi.useFakeTimers()
+		try {
+			const ask = vi.fn(getRunning)
+			const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: ask })
+			const asked = ask.mock.calls.length
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+
+			wrapper.unmount()
+			await vi.advanceTimersByTimeAsync(9000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+})
+
+describe('the running tab after a passing error', () => {
+	// the box's own backup stops the gateway for a few seconds: one failed read must not freeze the tab
+	it('keeps asking', async () => {
+		vi.useFakeTimers()
+		try {
+			const running = { backups: [{ id: 'b7', app: 'happy_rik', destination: 'GDrive', origin: 'scheduled', started_at: '2026-11-08T17:55:18+01:00', operation: 1, operations: 2, source: '/DATA/x' }], passes: [] }
+			const ask = vi.fn(() => Promise.resolve({ data: running }))
+			const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: ask })
+
+			ask.mockImplementationOnce(() => Promise.reject(Object.assign(new Error('Bad Gateway'), { response: { status: 502 } })))
+			await vi.advanceTimersByTimeAsync(3000)
+			const asked = ask.mock.calls.length
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+			wrapper.unmount()
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 })

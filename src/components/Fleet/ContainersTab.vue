@@ -54,6 +54,8 @@
 							<b-tag v-if="row.updateAvailable" size="is-small" type="is-info">{{ $t('Update ready') }}</b-tag>
 							<b-tag v-if="!row.actionable" :title="$t('Not controllable from the fleet (a v1 app or a container outside an app)')" size="is-small">{{ $t('View only') }}</b-tag>
 						</span>
+						<!-- its own slot, empty or not, so that the tags never wrap around it and the columns stay aligned -->
+						<span class="fleet-row-backup"><backup-mark v-if="backupMarks[row.key]" v-bind="backupMarks[row.key]" /></span>
 						<span class="fleet-row-result"><result-cell :result="results[row.key] || null" /></span>
 						<span v-if="row.actionable" class="fleet-row-actions">
 							<template v-if="row.status === 'running'">
@@ -76,13 +78,17 @@
 import tabMixin from './tabMixin'
 import ResultCell from './ResultCell.vue'
 import FleetIcon from './FleetIcon.vue'
+import BackupMark from './BackupMark.vue'
+import { badgeFor, vouchedFor } from './backupsData'
 import { actions } from './bulk'
 import { CONTAINER_FILTERS, containerRows, countRows, failureCode, groupByBox, sortRows } from './fleetData'
 import { STATE_WORDS } from './fleetWords'
+import { badgeOfApp } from '@/components/backup/backupStatus'
+import { fleetApi } from '@/service/fleet'
 
 export default {
 	name: 'ContainersTab',
-	components: { ResultCell, FleetIcon },
+	components: { ResultCell, FleetIcon, BackupMark },
 	mixins: [tabMixin],
 	data() {
 		return {
@@ -92,6 +98,9 @@ export default {
 			boxFilter: '',
 			stateFilter: 'all',
 			search: '',
+			// box id → that box's backups as the master last read them; empty when they could not be read
+			backupBoxes: {},
+			backupTicket: 0,
 		}
 	},
 	computed: {
@@ -121,11 +130,44 @@ export default {
 		groups() {
 			return groupByBox(this.filtered)
 		},
+		// row key → { level, label } for the compose apps that have a backup schedule; built once for the rows and backups
+		backupMarks() {
+			const marks = {}
+			for (const row of this.rows) {
+				const box = row.error || row.type !== 'v2app' ? null : this.backupBoxes[row.boxId]
+				const kind = box ? badgeFor(box, row.id) : null
+				if (!kind) {
+					continue
+				}
+				// a box the master cannot vouch for says nothing of what it stored last; a failed verification has its own word
+				const own = vouchedFor(box) ? badgeOfApp(box.couples, row.id, this.$t) : null
+				const label = own?.kind === kind ? own.title : this.$t(kind === 'failed' ? 'Verification failed' : 'Backup state unknown')
+				marks[row.key] = { level: { ok: 'ok', failed: 'danger', attention: 'none' }[kind], label }
+			}
+			return marks
+		},
 		updatable() {
 			return this.selected.filter(r => r.updateAvailable)
 		},
 	},
 	methods: {
+		// the backups are read with the containers, once for the pass; a failure leaves the containers and no mark
+		load() {
+			return Promise.all([tabMixin.methods.load.call(this), this.readBackups()])
+		},
+		async readBackups() {
+			const ticket = ++this.backupTicket
+			let boxes = {}
+			try {
+				const list = (await fleetApi.backups())?.data?.data?.boxes
+				if (Array.isArray(list)) {
+					boxes = Object.fromEntries(list.map(b => [b.box_id, b]))
+				}
+			} catch {}
+			if (ticket === this.backupTicket) {
+				this.backupBoxes = boxes
+			}
+		},
 		build(box, answers) {
 			if (answers.grid.ok) {
 				return containerRows(box, answers.grid.data)

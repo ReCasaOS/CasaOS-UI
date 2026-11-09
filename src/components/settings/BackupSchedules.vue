@@ -119,7 +119,7 @@
 </template>
 
 <script>
-import { SYSTEM_APP, durationText, groupSchedules, nextRun, spreadGroups, whenOf } from './backupScheduleGroups.js'
+import { DUE_GRACE, SYSTEM_APP, backupRunning, durationText, groupSchedules, longestRun, nextRun, spreadGroups, whenOf } from './backupScheduleGroups.js'
 import { renderSize } from '@/mixins/file_utils'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
@@ -133,6 +133,8 @@ export default {
 			destinations: [],
 			// the run log, newest first: what the last run of a schedule took and gave
 			runs: [],
+			// what runs on the apps now (GET /operations): a slot overdue while a backup runs waits behind it
+			operations: [],
 			// { name, title, icon } of the installed compose apps
 			apps: [],
 			// an icon URL that would not load shows the initial, not a broken image
@@ -177,6 +179,13 @@ export default {
 			} finally {
 				this.isLoading = false
 			}
+			// apart: an older box without /operations still shows its schedules
+			try {
+				// no envelope: the body is {operations, os_upgrade_open}
+				this.operations = (await this.$api.backup.getOperations()).data.operations || []
+			} catch {
+				this.operations = []
+			}
 		},
 
 		// The installed apps, then any app a schedule names that is not installed any
@@ -217,6 +226,11 @@ export default {
 				// and a schedule that never ran has every slot not run yet
 				if (!next.due) {
 					when = this.whenOf(next.at)
+				} else if (schedule.last_run && next.late >= DUE_GRACE && backupRunning(this.operations)) {
+					const app = backupRunning(this.operations)
+					when = this.$t('after the backup of {title}, running now', { title: app === SYSTEM_APP ? this.$t('this box') : this.titleOf(app) })
+				} else if (schedule.last_run && next.late >= DUE_GRACE) {
+					when = this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
 				} else if (schedule.last_run) {
 					when = this.$t('within a minute, to catch up the missed slot ({when})', { when: this.whenOf(next.at) })
 				} else {
@@ -232,7 +246,7 @@ export default {
 		},
 
 		// The runs the last slot set off: one per app, sequential, so the batch
-		// took from the first start to the last finish. shortcut: a run is in the
+		// is as long as its longest run. shortcut: a run is in the
 		// batch when it is scheduled, for these apps at this destination, and started
 		// within six hours before the schedule's last run; a slot is a day apart at least.
 		lastBatch(schedule) {
@@ -253,9 +267,10 @@ export default {
 			const parts = [this.whenOf(new Date(schedule.last_run))]
 			const batch = this.lastBatch(schedule)
 			if (batch.length) {
-				const started = Math.min(...batch.map(run => new Date(run.started_at).getTime()))
-				const finished = Math.max(...batch.map(run => new Date(run.finished_at).getTime()))
-				parts.push(this.durationText(finished - started))
+				const longest = longestRun(batch)
+				if (longest !== null) {
+					parts.push(this.durationText(longest))
+				}
 				// what the copy read, added up over the apps; older boxes report nothing
 				const bytes = batch.reduce((sum, run) => sum + (run.bytes || 0), 0)
 				if (bytes) {

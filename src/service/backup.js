@@ -67,6 +67,23 @@ const backup = {
 		return api.get(`${PREFIX}/backup/runs`)
 	},
 
+	// The backups that run now with their engine's figures, and the scheduler's pass.
+	// The body is {backups, passes}, with no envelope; an older box answers 404.
+	getRunning() {
+		return api.get(`${PREFIX}/backup/running`)
+	},
+
+	// Stops that backup alone; what it copied stays at the destination.
+	stopRunning(id) {
+		return api.post(`${PREFIX}/backup/running/${encodeURIComponent(id)}/stop`)
+	},
+
+	// What runs on the apps now, and whether an OS upgrade holds scheduled backups back.
+	// The body is {operations, os_upgrade_open}, with no envelope.
+	getOperations() {
+		return api.get(`${PREFIX}/operations`)
+	},
+
 	// Returns as soon as the copy has started; it takes as long as it takes.
 	// `holdStill` stops the app for the length of the copy -- leaving it running
 	// takes a copy that may not restore.

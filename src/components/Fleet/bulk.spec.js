@@ -162,3 +162,70 @@ describe('following a box action', () => {
 		expect(await followAppUpdates('a', vi.fn())).toEqual({ state: 'offline', error: 'Network Error' })
 	})
 })
+
+describe('the backup actions of a box', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+	const boxRows = ['a', 'b', 'c'].map(id => ({ key: id, id }))
+	const run = (started, refused = []) => Promise.resolve({ status: 202, data: { message: 'ok', data: { started, refused } } })
+
+	it('back up now: one result per box, a refusal or an offline box stops no other', async () => {
+		const calls = {
+			a: () => run([{ app: 'immich', destination: 'nas' }]),
+			b: () => failure(409, { success: 409, message: 'an operating system upgrade is open' }),
+			c: () => failure(503, { message: 'box offline' }),
+		}
+		fleetApi.relay.mockImplementation(id => calls[id]())
+		const results = await runBulk(boxRows, actions.box.backupNow)
+		expect(results.get('a')).toEqual({ state: 'done', message: '' })
+		expect(results.get('b')).toEqual({ state: 'refused', message: 'an operating system upgrade is open' })
+		expect(results.get('c')).toEqual({ state: 'offline', message: 'box offline' })
+		expect(fleetApi.relay.mock.calls.map(c => c.slice(0, 3))).toEqual(boxRows.map(r => [r.id, 'post', '/v2/app_management/backup/schedules/run']))
+		expect(fleetApi.relay.mock.calls[0][3]).toEqual({ data: {} })
+	})
+
+	it('back up now: a 202 with refusals is done but says which app was refused and why', async () => {
+		fleetApi.relay.mockReturnValue(run([{ app: 'plex', destination: 'nas' }], [{ app: 'immich', destination: 'nas', reason: 'busy' }, { app: 'sonarr', destination: 'cloud', reason: 'already running' }]))
+		const result = (await runBulk([boxRows[0]], actions.box.backupNow)).get('a')
+		expect(result.state).toBe('done')
+		expect(result.message).toContain('immich')
+		expect(result.message).toContain('busy')
+		expect(result.message).toContain('sonarr')
+		expect(result.message).toContain('already running')
+	})
+
+	it('back up one couple posts the app and the destination', () => {
+		fleetApi.relay.mockReturnValue(answer({}))
+		actions.box.backupOne({ id: 'a' }, { app: 'immich', destination: 'nas' })
+		expect(fleetApi.relay).toHaveBeenCalledWith('a', 'post', '/v2/app_management/backup/schedules/run', { data: { app: 'immich', destination: 'nas' } })
+	})
+
+	it('verify posts exactly the destination, the app and the stamp', () => {
+		fleetApi.relay.mockReturnValue(answer({}))
+		actions.box.verifyCouple({ id: 'a' }, { app: 'immich', destination: 'nas', stamp: '2026-11-08T03:00', extra: 'x' })
+		expect(fleetApi.relay).toHaveBeenCalledWith('a', 'post', '/v2/app_management/backup/verifications', { data: { destination: 'nas', app: 'immich', stamp: '2026-11-08T03:00' } })
+	})
+
+	it('check repository encodes the destination name', () => {
+		fleetApi.relay.mockReturnValue(answer({}))
+		actions.box.resticCheck({ id: 'a' }, { destination: 'my nas/1' })
+		expect(fleetApi.relay).toHaveBeenCalledWith('a', 'post', '/v2/app_management/backup/destinations/my%20nas%2F1/restic/check')
+	})
+
+	it('the verification schedule puts exactly the three fields, never last_run', () => {
+		fleetApi.relay.mockReturnValue(answer({}))
+		actions.box.setVerificationSchedule({ id: 'a' }, { enabled: true, every_days: 7, at: '03:30', last_run: 'x' })
+		expect(fleetApi.relay).toHaveBeenCalledWith('a', 'put', '/v2/app_management/backup/verification-schedule', { data: { enabled: true, every_days: 7, at: '03:30' } })
+	})
+})
+
+describe('a backup request that no schedule matches', () => {
+	it('is refused, not failed, with the box\'s reason', async () => {
+		fleetApi.relay.mockImplementation(() => failure(404, { message: 'no schedule matches' }))
+		const results = await runBulk([{ key: 'a', id: 'a' }], actions.box.backupNow)
+		expect(results.get('a')).toEqual({ state: 'refused', message: 'no schedule matches' })
+		const one = await runBulk([{ key: 'a', id: 'a' }], row => actions.box.backupOne(row, { app: 'x', destination: 'y' }))
+		expect(one.get('a')).toEqual({ state: 'refused', message: 'no schedule matches' })
+	})
+})

@@ -37,11 +37,11 @@ describe('suggested fields', () => {
 		expect(backendHelp('swift')).toBe('')
 	})
 
-	it('signs in for the person only where rclone authorize hands over the whole token', () => {
+	it('signs in for the person to the cloud drives', () => {
 		expect(canSignIn('drive')).toBe(true)
 		expect(canSignIn('dropbox')).toBe(true)
-		// OneDrive also needs a drive_id and a drive_type that only rclone config finds
-		expect(canSignIn('onedrive')).toBe(false)
+		// the box also finds OneDrive's drive_id and drive_type
+		expect(canSignIn('onedrive')).toBe(true)
 		expect(canSignIn('s3')).toBe(false)
 		expect(canSignIn('swift')).toBe(false)
 	})

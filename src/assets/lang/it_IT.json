@@ -869,7 +869,7 @@
   "newest": "più recente",
   "in history": "nella cronologia",
   "This is an older version than the one deployed; automatic rebuild is paused until you turn it on again or deploy by hand.": "Questa versione è più vecchia di quella distribuita; la ricostruzione automatica resta in pausa finché non la riattivi o distribuisci a mano.",
-  "A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.": "Un box non ha un browser con cui accedere. Su un computer che ce l'ha, aggiungi un remote OneDrive con rclone config, poi esegui rclone config show con il suo nome e copia qui token, drive_id e drive_type.",
+  "Or, on a computer that has a browser, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.": "Oppure, su un computer con un browser, aggiungi un remote OneDrive con rclone config, poi esegui rclone config show con il suo nome e copia qui token, drive_id e drive_type.",
   "Or, on a computer that has a browser, run rclone authorize \"drive\", sign in, and paste the token it prints.": "Oppure, su un computer con un browser, esegui rclone authorize \"drive\", accedi e incolla qui il token mostrato.",
   "Or, on a computer that has a browser, run rclone authorize \"dropbox\", sign in, and paste the token it prints.": "Oppure, su un computer con un browser, esegui rclone authorize \"dropbox\", accedi e incolla qui il token mostrato.",
   "Sign in with {provider}": "Accedi con {provider}",

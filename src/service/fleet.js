@@ -25,6 +25,8 @@ export function isSlow(method, path, params) {
 
 export const fleetApi = {
 	status: () => instance.get('/v1/fleet'),
+	// every box's backups as the master last read them: { notify, interval_seconds, boxes } (409: not a master)
+	backups: () => instance.get('/v1/fleet/backups'),
 	// { enabled, relay } or { enabled, address } (advanced mode, no relay); { enabled } alone takes the official relay
 	setMaster: fields => instance.put('/v1/fleet/master', fields, { timeout: RELAY_MS }),
 	// another relay, or the same one again when it lost the fleet: every box then needs a new code

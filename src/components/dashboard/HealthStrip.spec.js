@@ -13,7 +13,7 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
+function strip({ runs = [], getRuns, getSchedules, getRunning, operations, snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
@@ -23,7 +23,12 @@ function strip({ runs = [], snapraid, fleet, emit = vi.fn(), buefy = {}, destina
 				$EventBus: { $emit: emit },
 				$api: {
 					backup: {
-						getRuns: () => Promise.resolve({ data: { data: runs } }),
+						getRuns: getRuns || (() => Promise.resolve({ data: { data: runs } })),
+						...(getSchedules ? { getSchedules } : {}),
+						// absent on an AM that predates it: the card is then as it was
+						...(getRunning ? { getRunning } : {}),
+						// /operations has no envelope
+						...(operations ? { getOperations: () => Promise.resolve({ data: { operations, os_upgrade_open: false } }) } : {}),
 						// absent on a core that predates the call: the button is then left out
 						...(destinations ? { getDestinations: () => Promise.resolve({ data: { data: destinations } }) } : {}),
 						backupSystem,
@@ -173,7 +178,7 @@ describe('health strip', () => {
 		expect(wrapper.find('.storage .panel-chip').text()).toContain('failing')
 	})
 
-	it('says how long the last go took, how much it read and where it went, and when the next one comes', async () => {
+	it('says how long the longest run of the last go took, how much it read and where it went, and when the next one comes', async () => {
 		const wrapper = mount(HealthStrip, {
 			global: {
 				mocks: {
@@ -186,7 +191,7 @@ describe('health strip', () => {
 								{ app: 'blog', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:03:00Z', finished_at: '2026-11-02T03:04:00Z', bytes: 1024 ** 2 },
 								{ app: 'casaos-system', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:02:30Z', bytes: 2 * 1024 ** 2 },
 							] } }),
-							// a slot long gone: due at the next check, whatever today is
+							// a slot long gone, and nothing says the box is about to run it
 							getSchedules: () => Promise.resolve({ data: { data: [{ app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-02T03:00:00Z' }] } }),
 						},
 						disks: { snapraid: () => Promise.reject(new Error('404')) },
@@ -198,8 +203,71 @@ describe('health strip', () => {
 
 		const panel = wrapper.find('.backups')
 		expect(panel.find('.panel-chip').text()).toBe('Succeeded')
-		expect(panel.text()).toContain('4 min · 3 MB · to nas')
-		expect(panel.text()).toContain('Next: within a minute')
+		// 2 min 30 s and 1 min, a wait between them that is not work: the longest one
+		expect(panel.text()).toContain('3 min · 3 MB · to nas')
+		expect(panel.text()).toContain('Next: Overdue since')
+		expect(panel.text()).not.toContain('within a minute')
+	})
+
+	it('does not stretch a go over the hours between its runs', async () => {
+		const wrapper = strip({ runs: [
+			{ app: 'photos', destination: 'nas', scheduled: true, started_at: '2026-11-02T03:00:00Z', finished_at: '2026-11-02T03:04:00Z', bytes: 1024 ** 2 },
+			{ app: 'blog', destination: 'nas', scheduled: true, started_at: '2026-11-01T23:00:00Z', finished_at: '2026-11-01T23:01:00Z', bytes: 1024 ** 2 },
+		] })
+		await settle()
+
+		const text = wrapper.find('.backups').text()
+		expect(text).toContain('4 min · 2 MB')
+		expect(text).not.toContain('4 h 04')
+	})
+
+	// the box's own slots: due for two minutes is the minute the scheduler takes, due for hours is not
+	describe.each([
+		['two minutes', '2026-11-07T02:02:00Z', 'Next: within a minute'],
+		['three hours', '2026-11-07T05:00:00Z', 'Next: Overdue since'],
+	])('a slot due for %s', (_, now, expected) => {
+		it('is told as it is', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			vi.setSystemTime(new Date(now))
+			const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+			const wrapper = strip({ getSchedules: () => Promise.resolve({ data: { data: [schedule] } }) })
+			await settle()
+
+			const text = wrapper.find('.backups').text()
+			expect(text).toContain(expected)
+			if (expected.includes('Overdue')) {
+				expect(text).not.toContain('within a minute')
+			}
+		})
+	})
+
+	// a box copying one app for hours: its other slots wait behind it, they are neither overdue nor about to go off,
+	// and a page opened mid-copy has had no socket event to say it runs
+	it('says a slot due for hours waits behind the backup that runs', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date('2026-11-07T05:00:00Z'))
+		const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+		const wrapper = strip({
+			runs: [{ app: 'blog', destination: 'nas', started_at: '2026-11-06T02:00:00Z', finished_at: '2026-11-06T02:01:00Z' }],
+			getSchedules: () => Promise.resolve({ data: { data: [schedule] } }),
+			operations: [{ app: 'seerr', kind: 'backup' }],
+		})
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.text()).toContain('Next: after the backup running now')
+		expect(panel.text()).not.toContain('Overdue')
+		expect(panel.find('.panel-chip').text()).toBe('Running')
+	})
+
+	it('does not take another kind of operation for a backup that runs', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date('2026-11-07T05:00:00Z'))
+		const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+		const wrapper = strip({ getSchedules: () => Promise.resolve({ data: { data: [schedule] } }), operations: [{ app: 'seerr', kind: 'restore' }] })
+		await settle()
+
+		expect(wrapper.find('.backups').text()).toContain('Next: Overdue since')
 	})
 
 	// the last finished run said Succeeded while the next app was still being copied
@@ -268,6 +336,82 @@ describe('health strip', () => {
 		wrapper.unmount()
 		vi.advanceTimersByTime(5 * 60 * 1000)
 		expect(getRuns).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('health strip backup that runs', () => {
+	// what the owner's box said of seerr on 2026-11-09
+	const seerr = {
+		id: 'b7',
+		app: 'happy_rik',
+		destination: 'GDrive',
+		origin: 'scheduled',
+		started_at: '2026-11-08T17:55:18+01:00',
+		operation: 1,
+		operations: 2,
+		source: '/DATA/AppData/overseerr/config',
+		stats: { bytes: 1182844747, total_bytes: 1926565931, files: 9812, total_files: 25488, speed: 219371, eta: 3390 },
+	}
+	const runs = list => () => Promise.resolve({ data: { backups: list, passes: [] } })
+
+	it('says what is copied and how far it has got, with a way to the details', async () => {
+		const open = vi.fn()
+		const wrapper = strip({ getRunning: runs([seerr]), buefy: { modal: { open } } })
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.find('.panel-chip').text()).toBe('Running')
+		expect(panel.text()).toContain('happy_rik → GDrive · 61 %')
+		expect(panel.text()).toContain('See details')
+
+		await panel.find('.live-details').trigger('click')
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(open.mock.calls[0][0].props).toEqual({ initialTab: 'running' })
+	})
+
+	it('reads it every five seconds while it runs, then reads the log once it ended', async () => {
+		vi.useFakeTimers()
+		try {
+			const getRunning = vi.fn(runs([seerr]))
+			const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+			const wrapper = strip({ getRunning, getRuns })
+			await vi.advanceTimersByTimeAsync(0)
+			const asked = getRunning.mock.calls.length
+			const read = getRuns.mock.calls.length
+
+			await vi.advanceTimersByTimeAsync(5000)
+			expect(getRunning.mock.calls.length).toBe(asked + 1)
+
+			getRunning.mockImplementation(runs([]))
+			await vi.advanceTimersByTimeAsync(5000)
+			expect(getRuns.mock.calls.length).toBeGreaterThan(read)
+			const after = getRunning.mock.calls.length
+
+			await vi.advanceTimersByTimeAsync(20000)
+			expect(getRunning.mock.calls.length).toBe(after)
+			wrapper.unmount()
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('stays as it was on an AM that cannot say what runs', async () => {
+		const wrapper = strip({ getRunning: () => Promise.reject(new Error('404')) })
+		await settle()
+
+		expect(wrapper.find('.backups').text()).not.toContain('See details')
+		expect(wrapper.find('.live-details').exists()).toBe(false)
+	})
+})
+
+describe('health strip backup somebody stopped', () => {
+	it('wears no failure', async () => {
+		const wrapper = strip({ runs: [{ app: 'happy_rik', destination: 'GDrive', started_at: '2026-11-09T07:00:00Z', error: 'stopped from the interface: copying /DATA/AppData/overseerr/config: context canceled' }] })
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.find('.panel-chip').text()).toBe('Stopped from the interface')
+		expect(panel.find('.panel-error').exists()).toBe(false)
 	})
 })
 

@@ -34,14 +34,16 @@ export const BACKUP_BACKENDS = [
 		label: 'WebDAV',
 		fields: ['url', 'vendor', 'user', 'pass'],
 	},
-	// Signing in to these three takes a browser, which a box does not have: rclone
-	// does it on a computer that has one, with its own app registration, and the
-	// token it gives is pasted here. `help` says how, and is a language-file key.
+	// Signing in to these three takes a browser, which a box does not have: the box
+	// runs rclone authorize and the person pastes back the page it redirects to.
+	// `help` is the way without it, rclone on a computer, and is a language-file key.
 	{
 		id: 'onedrive',
 		label: 'OneDrive',
 		fields: ['token', 'drive_id', 'drive_type'],
-		help: 'A box has no browser to sign in with. On a computer that has one, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.',
+		// the box also asks Microsoft for drive_id and drive_type once signed in
+		signIn: true,
+		help: 'Or, on a computer that has a browser, add a OneDrive remote with rclone config, then run rclone config show with its name and copy its token, drive_id and drive_type here.',
 	},
 	{
 		id: 'drive',

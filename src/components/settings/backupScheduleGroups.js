@@ -36,6 +36,11 @@ export function groupSchedules(schedules) {
 			groups.set(key, { ...settings, apps: [], last_run: '' })
 		}
 		const group = groups.get(key)
+		// the box's own slots: the same for every app of a group
+		if (schedule.last_slot && schedule.next_slot && !group.last_slot) {
+			group.last_slot = schedule.last_slot
+			group.next_slot = schedule.next_slot
+		}
 		if (!group.apps.includes(schedule.app)) {
 			group.apps.push(schedule.app)
 		}
@@ -56,12 +61,49 @@ export function spreadGroups(groups) {
 	})))
 }
 
+// A slot the box gives, "2026-11-07T03:00:00+01:00": `at` is a date whose local fields
+// are the box's wall clock, so it reads as the box says it whatever zone the browser is in;
+// `instant` is the moment itself.
+function boxSlot(iso) {
+	const [, year, month, day, hour, minute] = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(iso || '') || []
+	const instant = Date.parse(iso)
+	if (!year || Number.isNaN(instant)) {
+		return null
+	}
+
+	return { at: new Date(Number(year), month - 1, day, hour, minute), instant }
+}
+
+// A due slot older than this is overdue, not "within a minute": the box checks every minute.
+export const DUE_GRACE = 5 * 60000
+
+// The app whose backup runs now, from GET /operations; null when none (or an older box).
+// The scheduler backs up one app at a time, so a slot overdue while one runs waits behind it.
+// shortcut: a backup somebody clicked is listed too and holds nothing back; /operations does not
+// tell the two apart, which matters only for a slot overdue during a click.
+export function backupRunning(operations) {
+	const running = (Array.isArray(operations) ? operations : []).find(operation => operation.kind === 'backup')
+
+	return running ? running.app : null
+}
+
 // When a schedule goes off next, by the server's own rule: the most recent slot
 // at or before now is run if the last run is before it (a missed slot catches
-// up at the next check), otherwise the slot after it. null when disabled.
+// up at the next check), otherwise the slot after it. null when disabled. `late` is
+// how long a due slot has been due, in ms. The box gives its slots (`last_slot`, `next_slot`);
+// an older box does not, and they are worked out from `at` in the browser's zone.
 export function nextRun(schedule, now = new Date()) {
 	if (!schedule.enabled) {
 		return null
+	}
+	const last = boxSlot(schedule.last_slot)
+	const next = boxSlot(schedule.next_slot)
+	if (last && next) {
+		if (!schedule.last_run || new Date(schedule.last_run) < last.instant) {
+			return { due: true, at: last.at, late: Math.max(0, now - last.instant) }
+		}
+
+		return { due: false, at: next.at }
 	}
 	const [hour, minute] = String(schedule.at).split(':').map(Number)
 	if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
@@ -77,7 +119,7 @@ export function nextRun(schedule, now = new Date()) {
 		slot.setDate(slot.getDate() - step)
 	}
 	if (!schedule.last_run || new Date(schedule.last_run) < slot) {
-		return { due: true, at: slot }
+		return { due: true, at: slot, late: Math.max(0, now - slot) }
 	}
 	slot.setDate(slot.getDate() + step)
 
@@ -91,6 +133,14 @@ export function nextOfAll(schedules, now = new Date()) {
 		.map(schedule => nextRun(schedule, now))
 		.filter(Boolean)
 		.sort((a, b) => (b.due - a.due) || (a.at - b.at))[0] || null
+}
+
+// How long a go took: the longest run of the batch taken alone. Not first start to last
+// finish, which counts the wait between runs and one stray record as work.
+export function longestRun(batch) {
+	const spans = batch.map(run => Date.parse(run.finished_at) - Date.parse(run.started_at)).filter(span => span >= 0)
+
+	return spans.length ? Math.max(...spans) : null
 }
 
 // "4 min", "1 h 30", "12 s"

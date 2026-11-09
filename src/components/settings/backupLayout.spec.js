@@ -40,6 +40,8 @@ describe('the backup windows on a phone', () => {
 
 	it('names the button that removes an option row of a destination', async () => {
 		await open(BackupDestinations, { getDestinations: answer(['offsite']) })
+		// the suggested options are fields; only a row added by hand can be removed
+		await wrapper.findAll('button').find(b => b.text() === 'Add an option rclone knows').trigger('click')
 
 		expect(wrapper.findAll('button[title="Remove"]').length).toBeGreaterThan(0)
 		expect(unnamed(wrapper)).toHaveLength(0)
@@ -102,5 +104,18 @@ describe('the backup windows on a phone', () => {
 		expect(headers.find(h => h.text() === 'App').classes()).not.toContain('is-hidden-mobile')
 		expect(wrapper.find('td span.is-hidden-tablet').text()).toBe('offsite')
 		expect(wrapper.findAll('button').some(b => b.text() === 'Restore')).toBe(true)
+	})
+})
+
+describe('a backup somebody stopped, in the history', () => {
+	afterEach(() => wrapper?.unmount())
+
+	it('says it was stopped, not that it failed', async () => {
+		await open(BackupHistory, {
+			getRuns: answer([{ app: 'happy_rik', destination: 'GDrive', started_at: '2026-11-09T07:00:00Z', stamp: 'x', error: 'stopped from the interface: copying /DATA/AppData/overseerr/config: context canceled' }]),
+		})
+
+		expect(wrapper.text()).toContain('Stopped from the interface')
+		expect(wrapper.text()).not.toContain('Failed')
 	})
 })
