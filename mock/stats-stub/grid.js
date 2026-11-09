@@ -110,6 +110,7 @@ const CORE_GETS = {
 	'/v1/sys/utilization': () => core(UTILIZATION),
 	'/v1/sys/telemetry': () => core({ enabled: false }),
 	'/v1/gateway/port': () => core('80'),
+	'/v1/gateway/httpsport': () => core('443'),
 	'/v1/usb/usb-auto-mount': () => core('False'),
 }
 
@@ -200,6 +201,10 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 			refresh_token: 'mock-refresh',
 			expires_at: 2000000000,
 		})
+	}
+	// the gateway refuses the plain port, as it does a taken one
+	if (verb === 'PUT' && path === '/v1/gateway/httpsport') {
+		return body?.port === '80' ? { status: 200, body: { success: 400, message: 'port 80 is the web UI port' } } : core(body?.port ?? '')
 	}
 	if (verb !== 'GET') {
 		return null

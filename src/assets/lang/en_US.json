@@ -1004,6 +1004,8 @@
   "Could not start the system package update.": "Could not start the system package update.",
   "Could not load the system package update status.": "Could not load the system package update status.",
   "Port range is 80-65535": "Port range is 80-65535",
+  "HTTPS port": "HTTPS port",
+  "This page was opened over HTTPS and will stop answering on this port. The plain HTTP port stays, and you will be taken to it after saving.": "This page was opened over HTTPS and will stop answering on this port. The plain HTTP port stays, and you will be taken to it after saving.",
   "App updates": "App updates",
   "ReCasaOS update": "ReCasaOS update",
   "Share on {network}": "Share on {network}",
