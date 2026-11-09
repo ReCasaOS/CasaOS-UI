@@ -77,6 +77,16 @@ function boxSlot(iso) {
 // A due slot older than this is overdue, not "within a minute": the box checks every minute.
 export const DUE_GRACE = 5 * 60000
 
+// The app whose backup runs now, from GET /operations; null when none (or an older box).
+// The scheduler backs up one app at a time, so a slot overdue while one runs waits behind it.
+// shortcut: a backup somebody clicked is listed too and holds nothing back; /operations does not
+// tell the two apart, which matters only for a slot overdue during a click.
+export function backupRunning(operations) {
+	const running = (Array.isArray(operations) ? operations : []).find(operation => operation.kind === 'backup')
+
+	return running ? running.app : null
+}
+
 // When a schedule goes off next, by the server's own rule: the most recent slot
 // at or before now is run if the last run is before it (a missed slot catches
 // up at the next check), otherwise the slot after it. null when disabled. `late` is

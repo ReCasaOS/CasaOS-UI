@@ -91,10 +91,19 @@
 							<span v-if="backupChip" :class="`is-${backupChip.level}`" class="panel-chip">{{ backupChip.text }}</span>
 						</div>
 						<div class="panel-body">
-							<p v-if="runningBackup" class="tile-detail">
+							<template v-if="liveBackup">
+								<p class="tile-detail live-title">
+									{{ liveBackupTitle }} → {{ liveBackup.destination }} · {{ liveFigures.percent !== null ? `${liveFigures.percent} %` : $t('Taking stock') }}
+								</p>
+								<progress v-if="liveFigures.percent !== null" class="progress is-small is-primary my-1" :value="liveFigures.percent" max="100"></progress>
+								<progress v-else class="progress is-small is-primary my-1" max="100"></progress>
+								<p class="tile-detail">{{ liveBackupDetail }}</p>
+								<button class="live-details tile-detail is-underlined" type="button" @click="openBackups('running')">{{ $t('See details') }}</button>
+							</template>
+							<p v-else-if="runningBackup" class="tile-detail">
 								{{ $t(runningBackup.restore ? 'Restoring {title}' : 'Backing up {title}', { title: runningBackup.title }) }} · {{ $t('{percent}% done', { percent: runningBackup.percent }) }}
 							</p>
-							<p v-if="backup.status === 'none' && !runningBackup" class="panel-empty">{{ $t('No backup yet') }}</p>
+							<p v-if="backup.status === 'none' && !runningBackup && !liveBackup" class="panel-empty">{{ $t('No backup yet') }}</p>
 							<div v-else>
 								<div>{{ $t('Last: {when}', { when: whenOf(new Date(backup.at)) }) }}</div>
 								<div class="tile-detail">{{ lastBackupDetail }}</div>
@@ -151,11 +160,14 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
-import { DUE_GRACE, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
+import { DUE_GRACE, backupRunning, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
+import { liveFigures, liveTitle } from '@/components/backup/liveBackup.js'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
 const SLOW_REFRESH = 60 * 1000
+// how often a backup that runs is read again for its figures
+const LIVE_REFRESH = 5 * 1000
 
 export default {
 	name: 'HealthStrip',
@@ -178,6 +190,11 @@ export default {
 			// the backups and restores going on now, by kind and app, from the socket:
 			// the run log only has the ones that finished
 			running: {},
+			// what runs on the apps now (GET /operations), which knows of a backup begun before this page opened
+			operations: [],
+			// GET /backup/running: the backups that run, with their engine's figures; empty on an older AM
+			live: { backups: [], passes: [] },
+			liveTimer: 0,
 			// the schedules, for the next run to come; none on an older box
 			schedules: [],
 			// the names of the backup destinations; none on a box that has not set one up
@@ -227,15 +244,44 @@ export default {
 			// no SMART word for them all: the count alone
 			return { level: 'none', text: String(count) }
 		},
+		liveBackup() {
+			return this.live.backups[0] || null
+		},
+		liveFigures() {
+			return liveFigures(this.liveBackup)
+		},
+		// the title the socket gave, else the app's name
+		liveBackupTitle() {
+			const app = this.liveBackup.app
+			const heard = this.running[`backup:${app}`]
+
+			return liveTitle(app, name => (heard ? heard.title : name), this.$t)
+		},
+		liveBackupDetail() {
+			const f = this.liveFigures
+			const parts = [f.totalBytes ? this.$t('{done} of {total}', { done: this.renderSize(f.bytes), total: this.renderSize(f.totalBytes) }) : this.renderSize(f.bytes)]
+			if (f.speed) {
+				parts.push(`${this.renderSize(f.speed)}/s`)
+			}
+			if (f.eta !== null) {
+				parts.push(this.$t('about {duration} left', { duration: durationText(f.eta * 1000) }))
+			}
+
+			return parts.join(' · ')
+		},
 		runningBackup() {
 			return Object.values(this.running)[0] || null
 		},
 		backupChip() {
-			if (this.runningBackup) {
+			if (this.liveBackup || this.runningBackup || backupRunning(this.operations)) {
 				return { level: 'info', text: this.$t('Running') }
 			}
 			if (this.backup.status === 'none') {
 				return null
+			}
+
+			if (this.backup.status === 'stopped') {
+				return { level: 'none', text: this.$t('Stopped from the interface') }
 			}
 
 			return this.backup.status === 'failed' ? { level: 'danger', text: this.$t('Failed') } : { level: 'ok', text: this.$t('Succeeded') }
@@ -270,8 +316,12 @@ export default {
 				return this.whenOf(next.at)
 			}
 
-			// a slot due for hours is not about to go off: the scheduler is stopped or held back
-			return next.late < DUE_GRACE ? this.$t('within a minute') : this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
+			if (next.late < DUE_GRACE) {
+				return this.$t('within a minute')
+			}
+
+			// a slot due for hours is not about to go off: it waits behind a backup, or the scheduler is stopped or held back
+			return backupRunning(this.operations) ? this.$t('after the backup running now') : this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
 		},
 		// null unless this box is a master
 		fleet() {
@@ -376,6 +426,7 @@ export default {
 	},
 	beforeUnmount() {
 		clearInterval(this.timer)
+		clearTimeout(this.liveTimer)
 	},
 	methods: {
 		barLevel(value) {
@@ -412,9 +463,11 @@ export default {
 		},
 
 		// the same dialog as the settings menu's Backups entry
-		openBackups() {
+		// `tab` opens the dialog on that tab; a click hands its event here, which opens it as usual
+		openBackups(tab) {
 			this.$buefy.modal.open({
 				component: defineAsyncComponent(() => import('@/components/settings/BackupDestinations.vue')),
+				...(typeof tab === 'string' ? { props: { initialTab: tab } } : {}),
 				hasModalCard: true,
 				customClass: 'backup-modal',
 				trapFocus: true,
@@ -530,6 +583,33 @@ export default {
 			}
 		},
 
+		// Reads what runs; says whether a backup that ran has just ended. While one runs it is read
+		// again every few seconds, on a timer of its own that stops when nothing runs.
+		async readLive() {
+			const had = this.live.backups.length > 0
+			try {
+				// no envelope: the body is {backups, passes}
+				const data = (await this.$api.backup.getRunning()).data || {}
+				this.live = { backups: data.backups || [], passes: data.passes || [] }
+			} catch {
+				// an older AM (404): the card is as it was
+				this.live = { backups: [], passes: [] }
+			}
+			clearTimeout(this.liveTimer)
+			if (this.live.backups.length) {
+				this.liveTimer = setTimeout(this.liveTick, LIVE_REFRESH)
+			}
+
+			return had && !this.live.backups.length
+		},
+
+		// a backup that ended is in the log now: read it rather than wait a minute
+		async liveTick() {
+			if (await this.readLive()) {
+				this.refreshSlow()
+			}
+		},
+
 		async refreshSlow() {
 			// an older box answers 404 to either: its tile is then left out
 			try {
@@ -546,6 +626,13 @@ export default {
 				this.schedules = (await this.$api.backup.getSchedules()).data.data || []
 			} catch {
 				this.schedules = []
+			}
+			await this.readLive()
+			try {
+				// no envelope: the body is {operations, os_upgrade_open}
+				this.operations = (await this.$api.backup.getOperations()).data.operations || []
+			} catch {
+				this.operations = []
 			}
 			try {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
@@ -571,6 +658,7 @@ export default {
 	sockets: {
 		'backup:begin': function (res) {
 			this.followBackup(res.Properties, 0)
+			this.readLive()
 		},
 		'backup:progress': function (res) {
 			this.followBackup(res.Properties, Math.max(0, Number(res.Properties['app:progress']) || 0))

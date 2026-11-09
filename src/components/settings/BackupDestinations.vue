@@ -5,7 +5,11 @@
 		</header>
 		<section class="modal-card-body">
 			<b-tabs v-model="tab">
-				<b-tab-item :label="$t('Destinations')">
+				<b-tab-item v-if="showRunning" value="running" :label="$t('Running')">
+					<BackupRunning :running="running" @refresh="readRunning" />
+				</b-tab-item>
+
+				<b-tab-item value="destinations" :label="$t('Destinations')">
 					<div class="is-flex is-align-items-center mb-2">
 						<p class="settings-intro is-flex-grow-1 mr-2">
 							{{ $t('Where backups are sent. Credentials are kept by rclone, alongside the cloud drives this box already mounts.') }}
@@ -188,12 +192,12 @@
 					</div>
 				</b-tab-item>
 
-				<b-tab-item :label="$t('Schedules')">
-					<BackupSchedules v-if="tab === 1" />
+				<b-tab-item value="schedules" :label="$t('Schedules')">
+					<BackupSchedules v-if="tab === 'schedules'" />
 				</b-tab-item>
 
-				<b-tab-item :label="$t('History')">
-					<BackupHistory v-if="tab === 2" />
+				<b-tab-item value="history" :label="$t('History')">
+					<BackupHistory v-if="tab === 'history'" />
 				</b-tab-item>
 			</b-tabs>
 		</section>
@@ -205,6 +209,7 @@
 
 <script>
 import BackupHistory from './BackupHistory.vue'
+import BackupRunning from './BackupRunning.vue'
 import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
 import BackupSchedules from './BackupSchedules.vue'
 import { BACKUP_BACKENDS, backendHelp, canSignIn, parametersFrom, suggestedFields } from './backupBackends'
@@ -212,14 +217,27 @@ import { renderSize } from '@/mixins/file_utils'
 
 const CHECK_POLL_MS = 3000
 const CHECK_WAIT_MS = 120000
+// how often the Running tab is read while the dialog is open
+const RUNNING_POLL_MS = 3000
 
 export default {
 	name: 'backup-destinations',
-	components: { BackupSchedules, BackupHistory },
+	components: { BackupSchedules, BackupHistory, BackupRunning },
+	props: {
+		// 'running', 'destinations', 'schedules' or 'history'; the dashboard opens it on what runs
+		initialTab: { type: String, default: 'destinations' },
+	},
 	emits: ['close'],
 	data() {
 		return {
-			tab: 0,
+			tab: 'destinations',
+			// GET /backup/running; the tab shows once something runs, and stays until the dialog
+			// closes so it does not vanish under the reader's eyes when the backup ends
+			running: { backups: [], passes: [] },
+			showRunning: false,
+			runningTimer: 0,
+			// once the box has answered, a failed read is passing (a restart, a 502), not an old box
+			runningAnswered: false,
 			destinations: [],
 			// name -> what the last check said about it
 			checked: {},
@@ -246,10 +264,39 @@ export default {
 			signIn: { url: '', redirected: '' },
 		}
 	},
-	mounted() {
+	async mounted() {
 		this.load()
+		await this.readRunning()
+		if (this.initialTab !== 'running' || this.showRunning) {
+			this.tab = this.initialTab
+		}
+		// a box that cannot say what runs is not asked again
+		if (this.runningTimer !== -1) {
+			this.runningTimer = setInterval(this.readRunning, RUNNING_POLL_MS)
+		}
+	},
+	beforeUnmount() {
+		clearInterval(this.runningTimer)
 	},
 	methods: {
+		async readRunning() {
+			try {
+				// no envelope: the body is {backups, passes}
+				const data = (await this.$api.backup.getRunning()).data || {}
+				this.running = { backups: data.backups || [], passes: data.passes || [] }
+				this.runningAnswered = true
+				if (this.running.backups.length || this.running.passes.some(pass => !pass.finished_at)) {
+					this.showRunning = true
+				}
+			} catch (error) {
+				// an older box (404), or one that never answered: no tab, and no more asking
+				if (!this.runningAnswered || (error.response && error.response.status === 404)) {
+					clearInterval(this.runningTimer)
+					this.runningTimer = -1
+				}
+			}
+		},
+
 		// The dashboard goes away for a few seconds: the core is among the services
 		// stopped for the copy, and that is said before the button is pressed.
 		backupSystem() {

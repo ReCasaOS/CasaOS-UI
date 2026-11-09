@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { durationText, groupSchedules, longestRun, nextOfAll, nextRun, spreadGroups } from './backupScheduleGroups.js'
+import { backupRunning, durationText, groupSchedules, longestRun, nextOfAll, nextRun, spreadGroups } from './backupScheduleGroups.js'
 
 const nightly = { destination: 'nas', every: 'daily', at: '03:00', weekday: 1, keep: 7, hold_still: true, enabled: true }
 
@@ -109,5 +109,14 @@ describe('the first run to come over every schedule', () => {
 		expect(durationText(12000)).toBe('12 s')
 		expect(durationText(4 * 60000)).toBe('4 min')
 		expect(durationText(5400000)).toBe('1 h 30')
+	})
+})
+
+describe('the backup that runs now', () => {
+	it('is the first backup GET /operations lists, and nothing else holds a slot back', () => {
+		expect(backupRunning([{ app: 'jarvis', kind: 'deploy' }, { app: 'happy_rik', kind: 'backup' }])).toBe('happy_rik')
+		expect(backupRunning([{ app: 'jarvis', kind: 'restore' }])).toBe(null)
+		// an older box has no /operations
+		expect(backupRunning(undefined)).toBe(null)
 	})
 })

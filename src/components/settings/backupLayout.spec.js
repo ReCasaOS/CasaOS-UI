@@ -104,3 +104,16 @@ describe('the backup windows on a phone', () => {
 		expect(wrapper.findAll('button').some(b => b.text() === 'Restore')).toBe(true)
 	})
 })
+
+describe('a backup somebody stopped, in the history', () => {
+	afterEach(() => wrapper?.unmount())
+
+	it('says it was stopped, not that it failed', async () => {
+		await open(BackupHistory, {
+			getRuns: answer([{ app: 'happy_rik', destination: 'GDrive', started_at: '2026-11-09T07:00:00Z', stamp: 'x', error: 'stopped from the interface: copying /DATA/AppData/overseerr/config: context canceled' }]),
+		})
+
+		expect(wrapper.text()).toContain('Stopped from the interface')
+		expect(wrapper.text()).not.toContain('Failed')
+	})
+})
