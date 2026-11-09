@@ -1180,5 +1180,8 @@
   "To put Docker's data in another folder, move it back to the default place first.": "Per mettere i dati di Docker in un'altra cartella, riportali prima nella posizione predefinita.",
   "Open in a new tab": "Apri in una nuova scheda",
   "Subtitles": "Sottotitoli",
-  "No subtitles": "Senza sottotitoli"
+  "No subtitles": "Senza sottotitoli",
+  "{name} does not allow being shown inside another page.": "{name} non permette di essere mostrata dentro un'altra pagina.",
+  "{name} uses an HTTPS certificate the browser does not trust, and inside the dashboard there is no way to accept it.": "{name} usa un certificato HTTPS di cui il browser non si fida, e dentro la dashboard non c'è modo di accettarlo.",
+  "{name} is served over plain HTTP, which the browser does not show inside a dashboard opened over HTTPS.": "{name} è servita in HTTP semplice, che il browser non mostra dentro una dashboard aperta in HTTPS."
 }

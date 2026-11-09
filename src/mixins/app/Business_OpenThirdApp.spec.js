@@ -72,3 +72,19 @@ describe('opening an app that has no web interface', () => {
 		expect(calls.launcher[0][1].url).toBe('https://apps.example.org/web')
 	})
 })
+
+describe('opening an app the box found refusing a frame', () => {
+	it('goes to a tab, inside the click', async () => {
+		const { rememberFrameRefused, forgetFrameChecks } = await import('./frameCheck')
+		rememberFrameRefused('https://192.168.1.50:8443/nifi/')
+		const { ctx, calls } = harness()
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		ctx.openAppToNewWindow({ name: 'nifi', status: 'running', hostname: '192.168.1.50', scheme: 'https', port: '8443', index: '/nifi/' })
+
+		expect(open).toHaveBeenCalledWith('https://192.168.1.50:8443/nifi/', '_blank')
+		expect(calls.launcher.map(([event]) => event)).not.toContain('openAppIframe')
+		open.mockRestore()
+		forgetFrameChecks()
+	})
+})
