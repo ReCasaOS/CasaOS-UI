@@ -495,3 +495,40 @@ describe('the password of a restic repository', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('the running tab of the backups dialog', () => {
+	const running = { backups: [{ id: 'b7', app: 'happy_rik', destination: 'GDrive', origin: 'scheduled', started_at: '2026-11-08T17:55:18+01:00', operation: 1, operations: 2, source: '/DATA/x' }], passes: [] }
+	const getRunning = () => Promise.resolve({ data: running })
+	const activeTab = wrapper => wrapper.find('.tabs li.is-active').text()
+
+	it('opens on what runs when asked to', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning }, { initialTab: 'running' })
+		expect(activeTab(wrapper)).toBe('Running')
+		expect(wrapper.text()).toContain('GDrive')
+		wrapper.unmount()
+	})
+
+	it('has no running tab on a box that cannot say what runs', async () => {
+		const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: fail }, { initialTab: 'running' })
+		expect(wrapper.findAll('.tabs li').map(tab => tab.text())).not.toContain('Running')
+		expect(activeTab(wrapper)).toBe('Destinations')
+		wrapper.unmount()
+	})
+
+	it('stops asking once closed', async () => {
+		vi.useFakeTimers()
+		try {
+			const ask = vi.fn(getRunning)
+			const wrapper = await open(BackupDestinations, { getDestinations: answer([]), getRunning: ask })
+			const asked = ask.mock.calls.length
+			await vi.advanceTimersByTimeAsync(3000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+
+			wrapper.unmount()
+			await vi.advanceTimersByTimeAsync(9000)
+			expect(ask.mock.calls.length).toBe(asked + 1)
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+})
