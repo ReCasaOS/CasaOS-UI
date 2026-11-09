@@ -3237,5 +3237,15 @@
   "No snapshots.": "Aucun snapshot.",
   "size {size}, written {written}": "taille {size}, écrit {written}",
   "Only the newest {count} are shown.": "Seuls les {count} plus récents sont affichés.",
-  "ZFS": "ZFS"
+  "ZFS": "ZFS",
+  "Labels": "Étiquettes",
+  "No labels now, click “+” to add one.": "Cliquez sur « + » pour en ajouter une.",
+  "A label needs a name.": "Une étiquette a besoin d'un nom.",
+  "The name {key} is longer than {max} characters.": "Le nom {key} dépasse {max} caractères.",
+  "The name {key} may only have letters, digits and . _ - /, and starts with a letter or a digit.": "Le nom {key} ne peut contenir que des lettres, des chiffres et . _ - / et commence par une lettre ou un chiffre.",
+  "The name {key} is set by the system and cannot be used.": "Le nom {key} est posé par le système et ne peut pas être utilisé.",
+  "The value of {key} is longer than {max} bytes.": "La valeur de {key} dépasse {max} octets.",
+  "The value of {key} has a control character.": "La valeur de {key} contient un caractère de contrôle.",
+  "The name {key} is used twice.": "Le nom {key} est utilisé deux fois.",
+  "At most {max} labels can be added or changed.": "Au plus {max} étiquettes peuvent être ajoutées ou modifiées."
 }

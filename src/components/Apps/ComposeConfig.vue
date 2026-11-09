@@ -106,6 +106,12 @@
 
 					<VolumesInputGroup v-model="service.volumes" :label="$t('Volumes')" :message="$t('No volumes now, click “+” to add one.')" type="volume" />
 					<EnvInputGroup v-model="service.environment" :label="$t('Environment Variables')" :message="$t('No environment variables now, click “+” to add one.')" />
+					<template v-if="labelsSupported && service.labels">
+						<EnvInputGroup v-model="service.labels" :label="$t('Labels')" :message="$t('No labels now, click “+” to add one.')" />
+						<p v-for="(problem, index) in labelProblemsOf(key, service)" :key="index" class="help is-danger mb-2">
+							{{ $t(problem.text, problem.params || {}) }}
+						</p>
+					</template>
 					<InputGroup :devices="service.devices" :label="$t('Devices')" :message="$t('No devices now, click “+” to add one.')" type="device" />
 					<CommandsInput v-model="service.command" :label="$t('Container Command')" :message="$t('No commands now, click “+” to add one.')" />
 
@@ -198,7 +204,9 @@ import InputGroup from '../forms/InputGroup.vue'
 import EnvInputGroup from '../forms/EnvInputGroup.vue'
 import CommandsInput from '../forms/CommandsInput.vue'
 import Ports from '../forms/Ports.vue'
+import { joinLabels, labelProblems, splitLabels } from './composeLabels'
 import { normalizeVolume } from './composeVolumes'
+import appInfo from '@/service/appInfo'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 import VolumesInputGroup from '@/components/forms/VolumesInputGroup.vue'
 
@@ -315,6 +323,11 @@ export default {
 	data() {
 		return {
 			current_service: '',
+			// whether this AppManagement checks labels (GET /info); without it the form has no
+			// Labels field and leaves the labels of the file alone
+			labelsSupported: false,
+			// key -> value of the labels each service had when the form was opened, for the checks
+			knownLabels: {},
 			baseUrl: '',
 			portSelected: null,
 			serviceStableVersion: '',
@@ -464,6 +477,15 @@ export default {
 		this.baseUrl = `${document.domain}`
 		// update Service Name.
 		this.$emit('updateDockerComposeServiceName', this.firstAppName)
+		// Ask whether this AppManagement checks labels. The form was parsed without them by
+		// then, so it is read again, from the text it holds now, once the answer is yes.
+		appInfo.supports('labels').then((supported) => {
+			if (supported && !this.labelsSupported) {
+				this.labelsSupported = true
+				if (this.dockerComposeCommands != null)
+					this.parseComposeYaml(this.dockerComposeCommands)
+			}
+		})
 	},
 
 	methods: {
@@ -543,7 +565,15 @@ export default {
 			}
 			// Same defensive shape, per entry: the callers in AppPanel test
 			// `valid.every(v => v === true)`, which no vee-validate 4 object satisfies.
-			return (await Promise.all(promises)).map(result => result?.valid ?? result)
+			const results = (await Promise.all(promises)).map(result => result?.valid ?? result)
+			if (this.labelsSupported)
+				results.push(Object.keys(this.configData.services).every(key => this.labelProblemsOf(key, this.configData.services[key]).length === 0))
+			return results
+		},
+
+		// what is wrong with the labels of a service as the form holds them
+		labelProblemsOf(key, service) {
+			return labelProblems(service.labels || [], this.knownLabels[key])
 		},
 
 		/**
@@ -552,6 +582,7 @@ export default {
 		 */
 		async parseComposeYaml(val) {
 			try {
+				this.knownLabels = {}
 				// merge keys too: a stack that shares its settings through an anchor (`<<: *php`)
 				// otherwise reached the form with no image, environment or volumes
 				const yaml = YAML.parse(val, { merge: true })
@@ -584,6 +615,8 @@ export default {
 
 				for (const serviceKey in yaml.services) {
 					this.configData.services[serviceKey] = this.parseComposeItem(yaml.services[serviceKey])
+					if (this.labelsSupported)
+						this.knownLabels[serviceKey] = Object.fromEntries(this.configData.services[serviceKey].labels.map(row => [row.container, row.host]))
 				}
 			} catch (error) {
 				console.error(error)
@@ -609,6 +642,14 @@ export default {
 				composeServicesItem.environment = envArray.map(parseEnvItem)
 			} else {
 				composeServicesItem.environment = []
+			}
+
+			// Labels: only when this AppManagement checks them; otherwise the file's own stay
+			// untouched (the merge in outputConfigDataCommands keeps them)
+			if (this.labelsSupported) {
+				const { rows, hidden } = splitLabels(composeServicesItemInput.labels)
+				composeServicesItem.labels = rows
+				composeServicesItem.hiddenLabels = hidden
 			}
 
 			// Ports
@@ -850,6 +891,14 @@ export default {
 					.map((env) => {
 						return `${env.container}=${env.host}`
 					})
+				if (Array.isArray(service.labels)) {
+					const labels = joinLabels(service.labels, service.hiddenLabels)
+					if (labels.length)
+						outputService.labels = labels
+					else
+						delete outputService.labels
+					delete outputService.hiddenLabels
+				}
 			}
 			if (this.dockerComposeCommands) {
 				const yaml = YAML.parse(this.dockerComposeCommands, { merge: true })
@@ -859,6 +908,9 @@ export default {
 					yaml.services[key].devices = []
 					yaml.services[key].cap_add = []
 					yaml.services[key].command = []
+					// the form holds the labels now: the file's would come back through the merge
+					if (Array.isArray(val.services[key]?.labels))
+						delete yaml.services[key].labels
 					delete yaml.services[key]?.network_mode
 					delete yaml.services[key]?.networks
 					// merge would otherwise resurrect a cpus limit the user just cleared,
