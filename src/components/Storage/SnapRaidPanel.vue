@@ -1,59 +1,77 @@
 <template>
-	<div v-if="state" class="snapraid mb-4 pb-3 pt-3 pl-3 pr-3 background-item has-text-full-04">
-		<p class="is-flex is-align-items-center is-flex-wrap-wrap">
-			<b-tag v-if="state.configured" :type="tag.type" class="mr-2">{{ tag.text }}</b-tag>
-			<span class="has-text-weight-medium">{{ $t('Disk failure protection (SnapRAID)') }}</span>
-		</p>
-
-		<!-- not set up -->
-		<template v-if="!state.configured">
-			<p class="has-text-grey-light mt-1">
-				{{ $t('One or two parity disks can rebuild a merged disk that dies, while every disk stays an ordinary disk. Files written after the last daily sync are not protected until the next one.') }}
-			</p>
-			<div v-if="candidates.length" class="mt-2 is-flex is-flex-wrap-wrap">
-				<b-checkbox v-for="candidate in candidates" :key="candidate.mount_point" v-model="parity" class="mr-3"
-					:disabled="parity.length >= 2 && !parity.includes(candidate.mount_point)" :native-value="candidate.mount_point">
-					{{ candidate.name }} ({{ size(candidate.size) }})
-				</b-checkbox>
+	<div v-if="state" class="snapraid settings-card p-0 mb-4">
+		<div class="_head">
+			<span :class="state.configured ? tag.type : ''" class="_tile"><b-icon icon="shield-check-outline" /></span>
+			<div class="_text">
+				<p class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1">
+					<span class="_name">{{ $t('Disk failure protection (SnapRAID)') }}</span>
+					<b-tag v-if="state.configured" :type="tag.type" rounded>{{ tag.text }}</b-tag>
+				</p>
+				<p v-if="state.configured && parityDisks" class="is-size-7 _has-text-gray">{{ $t('Parity: {disks}', { disks: parityDisks }) }}</p>
 			</div>
-			<p v-else class="mt-2 has-text-grey-light">
-				{{ $t('A storage of its own is needed for the parity: plug a drive and create a storage on it.') }}
-			</p>
-			<p v-if="candidates.length" class="mt-1 has-text-grey-light">
-				{{ $t('The parity takes as much room as the fullest merged disk. Pick one disk, or two to survive the loss of two.') }}
-			</p>
-			<b-button v-if="candidates.length" :disabled="!parity.length" :loading="isWorking" class="mt-2" rounded size="is-small" type="is-link" @click="setUp">
-				{{ $t('Protect the merged storage') }}
-			</b-button>
-		</template>
+			<template v-if="state.configured">
+				<b-button v-if="state.job" rounded size="is-small" @click="stop">{{ $t('Stop') }}</b-button>
+				<b-button v-else rounded size="is-small" type="is-link" @click="run('sync')">{{ $t('Sync now') }}</b-button>
+			</template>
+		</div>
 
-		<!-- set up -->
-		<template v-else>
-			<p v-if="missing" class="mt-1 has-text-danger">{{ $t('Not mounted where they were set up: {disks}. Nothing is synced until they are back.', { disks: missing }) }}</p>
-			<p v-if="syncedAt" class="mt-1">{{ $t('Last sync: {when}', { when: syncedAt }) }}</p>
-			<p v-if="scrubbedAt" class="mt-1">{{ $t('Last check of the disks: {when}', { when: scrubbedAt }) }}</p>
-			<p v-if="changes" class="mt-1">{{ changes }}</p>
+		<div class="_body">
+			<!-- not set up -->
+			<template v-if="!state.configured">
+				<p class="_has-text-gray is-size-7">
+					{{ $t('One or two parity disks can rebuild a merged disk that dies, while every disk stays an ordinary disk. Files written after the last daily sync are not protected until the next one.') }}
+				</p>
+				<div v-if="candidates.length" class="is-flex is-flex-wrap-wrap is-gap-2">
+					<b-checkbox v-for="candidate in candidates" :key="candidate.mount_point" v-model="parity"
+						:disabled="parity.length >= 2 && !parity.includes(candidate.mount_point)" :native-value="candidate.mount_point">
+						{{ candidate.name }} ({{ size(candidate.size) }})
+					</b-checkbox>
+				</div>
+				<p v-else class="_has-text-gray is-size-7">
+					{{ $t('A storage of its own is needed for the parity: plug a drive and create a storage on it.') }}
+				</p>
+				<p v-if="candidates.length" class="_has-text-gray is-size-7">
+					{{ $t('The parity takes as much room as the fullest merged disk. Pick one disk, or two to survive the loss of two.') }}
+				</p>
+				<b-button v-if="candidates.length" :disabled="!parity.length" :loading="isWorking" class="_setup" rounded size="is-small" type="is-link" @click="setUp">
+					{{ $t('Protect the merged storage') }}
+				</b-button>
+			</template>
 
-			<b-message v-if="failure" :type="failure.blocked ? 'is-warning' : 'is-danger'" class="mt-2 failure" size="is-small">
-				{{ failure.message }}
-				<b-button v-if="failure.blocked" class="mt-2" rounded size="is-small" @click="run('sync', { force: true })">{{ $t('Sync anyway') }}</b-button>
-			</b-message>
+			<!-- set up -->
+			<template v-else>
+				<p v-if="missing" class="has-text-danger is-size-7">{{ $t('Not mounted where they were set up: {disks}. Nothing is synced until they are back.', { disks: missing }) }}</p>
+				<div class="_facts is-size-7">
+					<div>
+						<span class="_has-text-gray">{{ $t('Last sync') }}</span>
+						<span>{{ syncedAt || $t('Not synced yet') }}</span>
+					</div>
+					<div>
+						<span class="_has-text-gray">{{ $t('Last check of the disks') }}</span>
+						<span>{{ scrubbedAt || '—' }}</span>
+					</div>
+					<div v-if="changes">
+						<span class="_has-text-gray">{{ $t('Changes') }}</span>
+						<span>{{ changes }}</span>
+					</div>
+				</div>
 
-			<b-progress v-if="state.job" :value="state.job.percent" class="mt-2" size="is-small" type="is-info" />
+				<b-message v-if="failure" :type="failure.blocked ? 'is-warning' : 'is-danger'" class="failure mb-0" size="is-small">
+					{{ failure.message }}
+					<b-button v-if="failure.blocked" class="mt-2" rounded size="is-small" @click="run('sync', { force: true })">{{ $t('Sync anyway') }}</b-button>
+				</b-message>
 
-			<p class="mt-2 is-flex is-flex-wrap-wrap is-align-items-center">
-				<template v-if="state.job">
-					<b-button class="mr-2" rounded size="is-small" @click="stop">{{ $t('Stop') }}</b-button>
-				</template>
-				<template v-else>
-					<b-button class="mr-2 mt-1" rounded size="is-small" type="is-link" @click="run('sync')">{{ $t('Sync now') }}</b-button>
-					<b-button class="mr-2 mt-1" rounded size="is-small" @click="run('diff')">{{ $t('Look for changes') }}</b-button>
-					<b-button class="mr-2 mt-1" rounded size="is-small" @click="run('scrub', { full: true })">{{ $t('Check the disks') }}</b-button>
-					<b-button class="mr-2 mt-1" rounded size="is-small" @click="askRepair">{{ $t('Repair…') }}</b-button>
-					<b-button class="mt-1" rounded size="is-small" type="is-danger is-light" @click="confirmRemove">{{ $t('Remove protection') }}</b-button>
-				</template>
-			</p>
-		</template>
+				<b-progress v-if="state.job" :value="state.job.percent" class="mb-0" size="is-small" type="is-info" />
+
+				<p v-if="!state.job" class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
+					<b-button rounded size="is-small" @click="run('diff')">{{ $t('Look for changes') }}</b-button>
+					<b-button rounded size="is-small" @click="run('scrub', { full: true })">{{ $t('Check the disks') }}</b-button>
+					<b-button rounded size="is-small" @click="askRepair">{{ $t('Repair\u2026') }}</b-button>
+					<b-button class="ml-auto" rounded size="is-small" type="is-danger is-light" @click="confirmRemove">{{ $t('Remove protection') }}</b-button>
+				</p>
+				<p class="_has-text-gray is-size-7">{{ $t('Files written after the last sync are not protected until the next one.') }}</p>
+			</template>
+		</div>
 	</div>
 </template>
 
@@ -88,6 +106,10 @@ export default {
 		},
 		missing() {
 			return (this.state.missing || []).join(', ')
+		},
+		// where the parity lives
+		parityDisks() {
+			return ((this.state.config && this.state.config.parity) || []).join(', ')
 		},
 		syncedAt() {
 			return snapraidWhen(this.last.sync && this.last.sync.at)
@@ -209,7 +231,84 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.failure {
-	white-space: pre-wrap;
+.snapraid {
+	._head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+	}
+
+	._tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.75rem;
+		background: rgba($primary, 0.12);
+		color: $primary;
+	}
+
+	._text {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
+
+	._name {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--casa-text-strong);
+	}
+
+	._body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0 1rem 0.875rem;
+	}
+
+	._tile.is-success {
+		background: rgba($success, 0.16);
+		color: $success;
+	}
+
+	._tile.is-warning {
+		background: rgba($warning, 0.18);
+		color: $warning;
+	}
+
+	._tile.is-danger {
+		background: rgba($danger, 0.16);
+		color: $danger;
+	}
+
+	._tile.is-info {
+		background: rgba($info, 0.16);
+		color: $info;
+	}
+
+	._setup {
+		align-self: flex-start;
+	}
+
+	// when it last synced, last checked, what changed: three facts side by side
+	._facts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+		gap: 0.75rem;
+
+		> div {
+			display: flex;
+			flex-direction: column;
+			gap: 0.125rem;
+		}
+	}
+
+	.failure {
+		white-space: pre-wrap;
+	}
 }
 </style>
