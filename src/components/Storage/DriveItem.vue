@@ -22,7 +22,7 @@
 			<span :class="`is-${health}`" class="_dot"></span>
 			<b v-if="health === 'passed'" class="has-text-success">{{ $t('Healthy') }}</b>
 			<b v-else-if="health === 'failed'" class="has-text-danger">{{ $t('Damage') }}</b>
-			<span v-else class="_has-text-gray">{{ $t('No SMART data') }}</span>
+			<b v-else class="_has-text-gray has-text-weight-normal">{{ $t('N/A') }}</b>
 		</p>
 		<p class="_temp is-size-7">
 			<template v-if="item.temperature > 0">{{ item.temperature }}°C <span class="_has-text-gray">/ {{ toFahrenheit(item.temperature) }}°F</span></template>
