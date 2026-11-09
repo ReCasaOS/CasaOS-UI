@@ -77,6 +77,10 @@
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
 							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
 						</b-tab-item>
+						<!-- last, so that the places of the others do not move; only on a box that has a ZFS pool -->
+						<b-tab-item v-if="hasZfs" :label="$t('ZFS')" class="scrollbars-light-auto tab-item">
+							<zfs-panel :active="activeTab === 3"></zfs-panel>
+						</b-tab-item>
 					</b-tabs>
 
 				</div>
@@ -199,6 +203,7 @@ import RaidStatus from './RaidStatus.vue'
 import RaidCreate from './RaidCreate.vue'
 import SnapRaidPanel from './SnapRaidPanel.vue'
 import SnapRaidCreate from './SnapRaidCreate.vue'
+import ZfsPanel from './ZfsPanel.vue'
 import { POOL, poolDisks, snapraidHeld } from './snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
@@ -216,6 +221,7 @@ export default {
 		StorageCombination,
 		RaidStatus,
 		SnapRaidPanel,
+		ZfsPanel,
 		CToolTip: cToolTip,
 	},
 	mixins: [smoothReflow, mixin],
@@ -235,6 +241,7 @@ export default {
 			unDiskData: [],
 			storageData: [],
 			raidArrays: [],
+			hasZfs: false,
 			mergeConbinationsStorageData: [],
 			// the folder the merged storage appears in, read with the merge
 			mergeMountPoint: POOL,
@@ -392,6 +399,19 @@ export default {
 				})
 			} catch {
 				this.raidArrays = []
+			}
+
+			// the ZFS tab only shows on a box that has ZFS with a pool; silent when LocalStorage is older or ZFS is not there. A reading that is not ready keeps what we had
+			try {
+				const zfs = (await this.$api.disks.zfs()).data.data
+				if (!zfs?.busy) {
+					this.hasZfs = !!(zfs?.available && zfs.pools?.length)
+				}
+			} catch {
+				this.hasZfs = false
+			}
+			if (!this.hasZfs && this.activeTab === 3) {
+				this.activeTab = 0
 			}
 
 			try {

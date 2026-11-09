@@ -96,5 +96,20 @@ const disks = {
 	deleteRaid(name, confirm) {
 		return api.delete(`${PREFIX}/raid/${encodeURIComponent(name)}`, { confirm })
 	},
+
+	// ZFS, read only (LocalStorage): the pools and datasets, or { available: false } on a box without ZFS
+	zfs() {
+		return api.get(`${PREFIX}/zfs`)
+	},
+
+	// the snapshots of one dataset, newest first
+	zfsSnapshots(dataset) {
+		return api.get(`${PREFIX}/zfs/snapshots`, { params: { dataset } })
+	},
+
+	// the I/O counters of each pool since it was imported; the rate is the difference between two readings
+	zfsIo() {
+		return api.get(`${PREFIX}/zfs/io`)
+	},
 }
 export default disks
