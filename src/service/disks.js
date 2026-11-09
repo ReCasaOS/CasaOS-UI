@@ -104,7 +104,7 @@ const disks = {
 
 	// the snapshots of one dataset, newest first
 	zfsSnapshots(dataset) {
-		return api.get(`${PREFIX}/zfs/snapshots`, { params: { dataset } })
+		return api.get(`${PREFIX}/zfs/snapshots`, { dataset })
 	},
 
 	// the I/O counters of each pool since it was imported; the rate is the difference between two readings

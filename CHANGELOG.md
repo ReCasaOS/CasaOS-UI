@@ -14,6 +14,7 @@ All notable changes to CasaOS UI are documented here.
 
 ### Fixed
 
+- **The snapshots of a ZFS dataset open.** The ZFS tab asked for them as `?params[dataset]=…`, so the box saw no dataset and answered "no such ZFS dataset" for every one. Reported by se3 in ReCasaOS/CasaOS discussion 66.
 - Leaving mock mode clears leftover `mock-access` / `mock-refresh` tokens so a real Gateway is not sent a stub session.
 - Locations does not overlay an error when rclone is absent: the cloud list becomes empty.
 - Files waits at most three seconds for `GET /v1/file/roots` and then opens `/DATA`, so a slow or silent core does not leave the panel empty. Only the first `[file] ManagementRoots` entry is used; later roots are not in the sidebar.
