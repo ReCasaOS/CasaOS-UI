@@ -151,7 +151,7 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
-import { DUE_GRACE, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
+import { DUE_GRACE, backupRunning, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 
 // The classic widgets read these once and then follow the socket; the backup runs and
 // SnapRAID have no event, so they are read again now and then.
@@ -178,6 +178,8 @@ export default {
 			// the backups and restores going on now, by kind and app, from the socket:
 			// the run log only has the ones that finished
 			running: {},
+			// what runs on the apps now (GET /operations), which knows of a backup begun before this page opened
+			operations: [],
 			// the schedules, for the next run to come; none on an older box
 			schedules: [],
 			// the names of the backup destinations; none on a box that has not set one up
@@ -231,7 +233,7 @@ export default {
 			return Object.values(this.running)[0] || null
 		},
 		backupChip() {
-			if (this.runningBackup) {
+			if (this.runningBackup || backupRunning(this.operations)) {
 				return { level: 'info', text: this.$t('Running') }
 			}
 			if (this.backup.status === 'none') {
@@ -270,8 +272,12 @@ export default {
 				return this.whenOf(next.at)
 			}
 
-			// a slot due for hours is not about to go off: the scheduler is stopped or held back
-			return next.late < DUE_GRACE ? this.$t('within a minute') : this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
+			if (next.late < DUE_GRACE) {
+				return this.$t('within a minute')
+			}
+
+			// a slot due for hours is not about to go off: it waits behind a backup, or the scheduler is stopped or held back
+			return backupRunning(this.operations) ? this.$t('after the backup running now') : this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
 		},
 		// null unless this box is a master
 		fleet() {
@@ -546,6 +552,12 @@ export default {
 				this.schedules = (await this.$api.backup.getSchedules()).data.data || []
 			} catch {
 				this.schedules = []
+			}
+			try {
+				// no envelope: the body is {operations, os_upgrade_open}
+				this.operations = (await this.$api.backup.getOperations()).data.operations || []
+			} catch {
+				this.operations = []
 			}
 			try {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data

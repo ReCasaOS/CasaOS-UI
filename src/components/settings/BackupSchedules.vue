@@ -119,7 +119,7 @@
 </template>
 
 <script>
-import { DUE_GRACE, SYSTEM_APP, durationText, groupSchedules, longestRun, nextRun, spreadGroups, whenOf } from './backupScheduleGroups.js'
+import { DUE_GRACE, SYSTEM_APP, backupRunning, durationText, groupSchedules, longestRun, nextRun, spreadGroups, whenOf } from './backupScheduleGroups.js'
 import { renderSize } from '@/mixins/file_utils'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
@@ -133,6 +133,8 @@ export default {
 			destinations: [],
 			// the run log, newest first: what the last run of a schedule took and gave
 			runs: [],
+			// what runs on the apps now (GET /operations): a slot overdue while a backup runs waits behind it
+			operations: [],
 			// { name, title, icon } of the installed compose apps
 			apps: [],
 			// an icon URL that would not load shows the initial, not a broken image
@@ -177,6 +179,13 @@ export default {
 			} finally {
 				this.isLoading = false
 			}
+			// apart: an older box without /operations still shows its schedules
+			try {
+				// no envelope: the body is {operations, os_upgrade_open}
+				this.operations = (await this.$api.backup.getOperations()).data.operations || []
+			} catch {
+				this.operations = []
+			}
 		},
 
 		// The installed apps, then any app a schedule names that is not installed any
@@ -217,6 +226,9 @@ export default {
 				// and a schedule that never ran has every slot not run yet
 				if (!next.due) {
 					when = this.whenOf(next.at)
+				} else if (schedule.last_run && next.late >= DUE_GRACE && backupRunning(this.operations)) {
+					const app = backupRunning(this.operations)
+					when = this.$t('after the backup of {title}, running now', { title: app === SYSTEM_APP ? this.$t('this box') : this.titleOf(app) })
 				} else if (schedule.last_run && next.late >= DUE_GRACE) {
 					when = this.$t('Overdue since {when}', { when: this.whenOf(next.at) })
 				} else if (schedule.last_run) {

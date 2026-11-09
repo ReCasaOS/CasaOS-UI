@@ -13,7 +13,7 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], getSchedules, snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
+function strip({ runs = [], getSchedules, operations, snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
@@ -25,6 +25,8 @@ function strip({ runs = [], getSchedules, snapraid, fleet, emit = vi.fn(), buefy
 					backup: {
 						getRuns: () => Promise.resolve({ data: { data: runs } }),
 						...(getSchedules ? { getSchedules } : {}),
+						// /operations has no envelope
+						...(operations ? { getOperations: () => Promise.resolve({ data: { operations, os_upgrade_open: false } }) } : {}),
 						// absent on a core that predates the call: the button is then left out
 						...(destinations ? { getDestinations: () => Promise.resolve({ data: { data: destinations } }) } : {}),
 						backupSystem,
@@ -235,6 +237,35 @@ describe('health strip', () => {
 				expect(text).not.toContain('within a minute')
 			}
 		})
+	})
+
+	// a box copying one app for hours: its other slots wait behind it, they are neither overdue nor about to go off,
+	// and a page opened mid-copy has had no socket event to say it runs
+	it('says a slot due for hours waits behind the backup that runs', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date('2026-11-07T05:00:00Z'))
+		const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+		const wrapper = strip({
+			runs: [{ app: 'blog', destination: 'nas', started_at: '2026-11-06T02:00:00Z', finished_at: '2026-11-06T02:01:00Z' }],
+			getSchedules: () => Promise.resolve({ data: { data: [schedule] } }),
+			operations: [{ app: 'seerr', kind: 'backup' }],
+		})
+		await settle()
+
+		const panel = wrapper.find('.backups')
+		expect(panel.text()).toContain('Next: after the backup running now')
+		expect(panel.text()).not.toContain('Overdue')
+		expect(panel.find('.panel-chip').text()).toBe('Running')
+	})
+
+	it('does not take another kind of operation for a backup that runs', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date('2026-11-07T05:00:00Z'))
+		const schedule = { app: 'blog', destination: 'nas', every: 'daily', at: '03:00', enabled: true, last_run: '2026-11-06T02:00:00Z', last_slot: '2026-11-07T03:00:00+01:00', next_slot: '2026-11-08T03:00:00+01:00' }
+		const wrapper = strip({ getSchedules: () => Promise.resolve({ data: { data: [schedule] } }), operations: [{ app: 'seerr', kind: 'restore' }] })
+		await settle()
+
+		expect(wrapper.find('.backups').text()).toContain('Next: Overdue since')
 	})
 
 	// the last finished run said Succeeded while the next app was still being copied
