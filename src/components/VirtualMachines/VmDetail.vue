@@ -268,10 +268,10 @@
 				<p v-if="!usbLoading && !usbRows.length" class="is-size-7 has-text-full-03">{{ $t('No USB devices are plugged into this machine.') }}</p>
 			</b-tab-item>
 
-			<!-- Snapshots: taken and restored with the VM off, at once -->
+			<!-- Snapshots: taken with the VM on or off, restored and deleted with it off -->
 			<b-tab-item v-if="current.managed" :label="$t('Snapshots')" value="snapshots">
 				<p class="is-size-7 has-text-full-03 mb-3">
-					{{ $t('A snapshot keeps the disks and the firmware settings as they are, to go back to later. It is taken and restored with the VM off, and does not keep what was in memory.') }}
+					{{ $t('A snapshot keeps the disks and the firmware settings as they are, to go back to later. It can be taken with the VM on, and does not keep what was in memory. Going back to it or deleting it needs the VM off.') }}
 				</p>
 
 				<div v-for="snap in snapshotsNewestFirst" :key="snap.id" class="disk-row is-size-7">
@@ -290,11 +290,11 @@
 				</div>
 				<p v-if="!(current.snapshots || []).length" class="is-size-7 has-text-full-03">{{ $t('No snapshots yet.') }}</p>
 
-				<b-field :message="off ? '' : $t('Shut the VM down to take a snapshot.')" class="mt-3">
-					<b-input v-model="snapName" :disabled="!off || snapBusy" :placeholder="$t('Snapshot name')" expanded
+				<b-field :message="off ? '' : $t('The VM pauses for an instant while the snapshot is taken.')" class="mt-3">
+					<b-input v-model="snapName" :disabled="!snapshotReady || snapBusy" :placeholder="$t('Snapshot name')" expanded
 						maxlength="128" :has-counter="false" size="is-small" @keyup.enter="takeSnapshot"></b-input>
 					<p class="control">
-						<b-button :disabled="!off || !snapName.trim()" :loading="snapBusy" icon-left="camera-outline"
+						<b-button :disabled="!snapshotReady || !snapName.trim()" :loading="snapBusy" icon-left="camera-outline"
 							size="is-small" type="is-primary" @click="takeSnapshot">{{ $t('Take snapshot') }}</b-button>
 					</p>
 				</b-field>
@@ -412,6 +412,10 @@ export default {
 		},
 		off() {
 			return !this.running
+		},
+		// the service takes a snapshot with the VM on, paused or off, not while it is created or stops
+		snapshotReady() {
+			return ['running', 'paused', 'shut-off', 'crashed'].includes(this.current.state)
 		},
 		hasSnapshots() {
 			return (this.current.snapshots || []).length > 0
@@ -685,7 +689,7 @@ export default {
 		},
 		async takeSnapshot() {
 			const name = this.snapName.trim()
-			if (!name || !this.off) {
+			if (!name || !this.snapshotReady) {
 				return
 			}
 			if (await this.snapshotCall(() => vmApi.createSnapshot(this.current.id, name))) {

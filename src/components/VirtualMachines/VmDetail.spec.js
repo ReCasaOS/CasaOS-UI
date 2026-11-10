@@ -51,4 +51,20 @@ describe('the detail of a virtual machine', () => {
 
 		expect(wrapper.findAll('option').map(option => option.element.value)).toContain('/media/usb/VM/iso/debian.iso')
 	})
+
+	it('takes a snapshot of a running VM, and goes back to one or deletes it only with the VM off', async () => {
+		const snapshots = [{ id: 's1', name: 'before the update', created_at: '2026-11-10T08:00:00Z' }]
+		open({ vm: aVm({ state: 'running', snapshots }) })
+		await wrapper.setData({ tab: 'snapshots', snapName: 'now' })
+
+		const button = text => wrapper.findAll('button').find(b => b.text() === text)
+		expect(wrapper.find('input[placeholder="Snapshot name"]').attributes('disabled')).toBeUndefined()
+		expect(button('Take snapshot').attributes('disabled')).toBeUndefined()
+		expect(button('Go back').attributes('disabled')).toBeDefined()
+		expect(button('Delete').attributes('disabled')).toBeDefined()
+		expect(wrapper.text()).toContain('The VM pauses for an instant while the snapshot is taken.')
+
+		await wrapper.setProps({ vm: aVm({ state: 'creating', snapshots }) })
+		expect(button('Take snapshot').attributes('disabled')).toBeDefined()
+	})
 })
