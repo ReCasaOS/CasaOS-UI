@@ -65,6 +65,34 @@ describe('the public sharing of this box', () => {
 		expect(publicShare).toMatchObject({ ok: true, status: data })
 	})
 
+	it('a read that started before a write does not bring an older status back', async () => {
+		let settle
+		instance.get.mockImplementationOnce(() => new Promise((resolve) => {
+			settle = resolve
+		}))
+		const reading = refresh({ force: true })
+		await vi.waitFor(() => expect(instance.get).toHaveBeenCalled())
+		const data = { name: 'mybox', apps: [{ name: 'jellyfin', shared: true }] }
+		await apply(body(data))
+		settle({ data: { data: { name: 'mybox', apps: [] } } })
+		await reading
+		expect(publicShare.status).toEqual(data)
+	})
+
+	it('a failed read that started before a write does not empty the store', async () => {
+		let fail
+		instance.get.mockImplementationOnce(() => new Promise((resolve, reject) => {
+			fail = reject
+		}))
+		const reading = refresh({ force: true })
+		await vi.waitFor(() => expect(instance.get).toHaveBeenCalled())
+		const data = { name: 'mybox', apps: [] }
+		await apply(body(data))
+		fail(new Error('offline'))
+		await reading
+		expect(publicShare).toMatchObject({ ok: true, status: data })
+	})
+
 	it('a failed write keeps the status', async () => {
 		const data = { name: 'mybox', apps: [] }
 		await apply(body(data))

@@ -83,7 +83,7 @@ export function shareErrorText(e, t) {
 	if (status === 502) {
 		return t('Relay unreachable')
 	}
-	if (status === 503 && e.response.data.data?.reason) {
+	if (status === 503 && e.response.data?.data?.reason) {
 		return reasonText(e.response.data.data.reason, t)
 	}
 	for (const [re, say] of KNOWN) {

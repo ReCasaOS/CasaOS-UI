@@ -29,7 +29,7 @@
 						</p>
 					</template>
 					<p v-if="entry?.error && !shared" class="mb-2 share-error">{{ entryError }}</p>
-					<b-switch :disabled="!ready || busy || (!!entry?.error && !shared)" :model-value="on" @update:model-value="toggle">{{ $t('Share on the Internet') }}</b-switch>
+					<b-switch :disabled="!ready || busy || !entry || (!!entry.error && !shared)" :model-value="on" @update:model-value="toggle">{{ $t('Share on the Internet') }}</b-switch>
 					<template v-if="shared">
 						<p class="mt-3 share-url">
 							<a :href="entry.url" rel="noopener noreferrer" target="_blank">{{ entry.url }}</a>
@@ -138,6 +138,7 @@ export default {
 		async copyValue(text) {
 			try {
 				await copy(text)
+				this.error = ''
 				this.copied = true
 				clearTimeout(this.copyTimer)
 				this.copyTimer = setTimeout(() => (this.copied = false), 2000)

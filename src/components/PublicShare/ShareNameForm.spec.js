@@ -43,12 +43,22 @@ describe('the name form', () => {
 		await tick()
 		expect(button().attributes('disabled')).toBeUndefined()
 		const link = wrapper.find('a[href="https://le.test/tos"]')
+		expect(link.text()).toBe('Read the terms')
 		expect(link.attributes('target')).toBe('_blank')
 		expect(link.attributes('rel')).toBe('noopener noreferrer')
 		await button().trigger('click')
 		await flushPromises()
 		expect(publicShareApi.setName).toHaveBeenCalledWith('mybox')
 		expect(wrapper.emitted('claimed')).toHaveLength(1)
+	})
+
+	it('ticks the box when the sentence is clicked, the link being apart', async () => {
+		const label = wrapper.find('label.checkbox')
+		expect(label.find('a').exists()).toBe(false)
+		expect(label.text()).toBe('By turning it on, you accept the terms of service of Let\'s Encrypt.')
+		await label.trigger('click')
+		expect(wrapper.find('input[type=checkbox]').element.checked).toBe(true)
+		expect(wrapper.find('.counter').exists()).toBe(false)
 	})
 
 	it('refuses a name the relay would refuse', async () => {

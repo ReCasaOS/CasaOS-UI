@@ -70,6 +70,17 @@ describe('the wording of the public sharing', () => {
 		expect(shareErrorText(refusal(503, 'unavailable', { reason: 'relay' }), t)).toBe('This relay does not support public sharing yet.')
 		expect(shareErrorText(refusal(409, 'something new'), t)).toBe('something new')
 		expect(shareErrorText(new Error('Network Error'), t)).toBe('Network Error')
+		expect(shareErrorText({ response: { status: 503, data: null } }, t)).toBe('')
+		for (const [message, sentence] of [
+			['waiting for the master to register this box at the relay', 'Waiting for the master to register this box at the relay. Update the master if this lasts.'],
+			['this relay does not support public sharing', 'This relay does not support public sharing yet.'],
+			['remote access is off: public sharing goes through its relay', 'Public sharing goes through remote access: turn it on first.'],
+			['this box already has a public name', 'This box already has a public name'],
+			['this name was released recently and is not available yet', 'This name was released recently and is not available yet'],
+			['the app\'s name cannot be made into a DNS label', 'The app\'s name cannot be made into a DNS label'],
+		]) {
+			expect(shareErrorText(refusal(409, message), t)).toBe(sentence)
+		}
 	})
 
 	it('warns before the name goes', () => {

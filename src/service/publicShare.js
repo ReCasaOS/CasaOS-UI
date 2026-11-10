@@ -36,13 +36,23 @@ const RETRY = 15000
 let wait = EVERY
 let readAt = Number.NEGATIVE_INFINITY
 let inFlight = null
+// counts the writes: a read that started before one is older than the store, and is dropped
+let writes = 0
 
 async function read() {
+	const seen = writes
 	try {
-		publicShare.status = (await publicShareApi.status()).data.data
+		const data = (await publicShareApi.status()).data.data
+		if (seen !== writes) {
+			return
+		}
+		publicShare.status = data
 		publicShare.ok = true
 		wait = EVERY
 	} catch (e) {
+		if (seen !== writes) {
+			return
+		}
 		publicShare.status = null
 		publicShare.ok = false
 		// no route: an old core, asked again in a minute only
@@ -65,6 +75,7 @@ export function refresh({ force = false } = {}) {
 // A write answers with the new status: it goes straight to the store. A refusal rethrows and leaves the store as it was.
 export async function apply(promise) {
 	const data = (await promise).data.data
+	writes++
 	publicShare.status = data
 	publicShare.ok = true
 	return data

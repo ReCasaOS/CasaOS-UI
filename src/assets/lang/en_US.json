@@ -3313,6 +3313,7 @@
   "This app will be reachable by anyone who knows the address. Only its own login page protects it.": "This app will be reachable by anyone who knows the address. Only its own login page protects it.",
   "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.": "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.",
   "By turning it on, you accept the terms of service of Let's Encrypt.": "By turning it on, you accept the terms of service of Let's Encrypt.",
+  "Read the terms": "Read the terms",
   "Public sharing": "Public sharing",
   "Choose this name": "Choose this name",
   "Your apps will answer at https://<app>.<name>.{domain}": "Your apps will answer at https://<app>.<name>.{domain}",

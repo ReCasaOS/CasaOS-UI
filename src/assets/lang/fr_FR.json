@@ -3315,6 +3315,7 @@
   "This app will be reachable by anyone who knows the address. Only its own login page protects it.": "Cette app sera accessible à toute personne qui connaît l'adresse. Seule sa propre page de connexion la protège.",
   "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.": "Certaines apps doivent connaître leur adresse publique (Nextcloud : trusted_domains) ; voir leur documentation.",
   "By turning it on, you accept the terms of service of Let's Encrypt.": "En activant, vous acceptez les conditions d'utilisation de Let's Encrypt.",
+  "Read the terms": "Lire les conditions",
   "Public sharing": "Partage public",
   "Choose this name": "Choisir ce nom",
   "Your apps will answer at https://<app>.<name>.{domain}": "Vos apps répondront à https://<app>.<nom>.{domain}",

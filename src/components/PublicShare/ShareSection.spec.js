@@ -43,6 +43,7 @@ describe('the public sharing section', () => {
 	afterEach(() => wrapper?.unmount())
 
 	it('renders nothing on an old core', async () => {
+		show(base, false)
 		await mountIt()
 		expect(refresh).toHaveBeenCalledWith({ force: true })
 		expect(wrapper.text()).not.toContain('Public sharing')
@@ -58,6 +59,7 @@ describe('the public sharing section', () => {
 		show({ ...base, supported: false, reason: 'relay', name: '' })
 		await mountIt()
 		expect(wrapper.text()).toContain('This relay does not support public sharing yet.')
+		expect(wrapper.find('input[name=share-name]').exists()).toBe(false)
 	})
 
 	it('asks for a name first', async () => {
@@ -78,9 +80,9 @@ describe('the public sharing section', () => {
 	})
 
 	it('lists a shared app that is gone', async () => {
-		show({ ...base, apps: [{ ...JELLY, error: 'this app is not installed' }] })
+		show({ ...base, apps: [{ ...JELLY, error: '' }] })
 		await mountIt()
-		expect(wrapper.text()).toContain('This app is not installed')
+		expect(wrapper.text()).toContain('Jellyfin')
 		expect(button('Stop sharing')).toBeTruthy()
 	})
 

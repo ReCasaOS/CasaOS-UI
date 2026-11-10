@@ -1256,7 +1256,7 @@ export default {
   margin-left: 0.35rem;
   padding: 0 0.45rem;
   border-radius: 999px;
-  background: #2d7ff9;
+  background: #1f6fe5;
   color: #fff;
   font-size: 0.65rem;
   font-weight: 600;

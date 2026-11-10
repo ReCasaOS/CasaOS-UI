@@ -2,6 +2,7 @@
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import copy from 'clipboard-copy'
 import ShareAppModal from './ShareAppModal.vue'
 import i18n from '@/plugins/i18n'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
@@ -127,6 +128,25 @@ describe('the share window of an app', () => {
 		await mountIt()
 		expect(sw().attributes('disabled')).toBeDefined()
 		expect(wrapper.text()).toContain('nextcloud is already shared at the same address')
+	})
+
+	it('keeps the switch off for an app the core does not list', async () => {
+		show({ ...base, apps: [] })
+		await mountIt()
+		expect(sw().attributes('disabled')).toBeDefined()
+	})
+
+	it('forgets a copy failure after a copy that works', async () => {
+		show(withApp({ ...JELLY, shared: true, url: 'https://jellyfin.mybox.relay.test' }))
+		await mountIt()
+		const copyButton = () => wrapper.findAll('button').find(b => b.text() === 'Copy')
+		copy.mockRejectedValueOnce(new Error('denied'))
+		await copyButton().trigger('click')
+		await flushPromises()
+		expect(wrapper.text()).toContain('This could not be copied')
+		await copyButton().trigger('click')
+		await flushPromises()
+		expect(wrapper.text()).not.toContain('This could not be copied')
 	})
 
 	it('a refused share leaves the switch off', async () => {

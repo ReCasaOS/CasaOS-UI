@@ -3,12 +3,12 @@
 		<p class="has-text-weight-medium mb-2">{{ $t('Public sharing') }}</p>
 		<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
 		<p v-if="!status.supported" class="mb-2">{{ reason }}</p>
-		<template v-if="!status.name">
+		<template v-if="!status.name && status.supported">
 			<p class="mb-1">{{ $t('Choose the name of this box') }}</p>
 			<p class="is-size-7 mb-2">{{ $t('Your apps will answer at https://<app>.<name>.{domain}', { domain: status.domain }) }}</p>
 			<share-name-form />
 		</template>
-		<template v-else>
+		<template v-else-if="status.name">
 			<p class="mb-1">{{ $t('Public name: {name}', { name: status.name }) }}</p>
 			<p class="mb-1">{{ certLine }}</p>
 			<p v-if="tunnelLine" class="mb-2">{{ tunnelLine }}</p>
