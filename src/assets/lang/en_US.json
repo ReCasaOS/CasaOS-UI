@@ -3275,5 +3275,7 @@
   "The value of {key} is longer than {max} bytes.": "The value of {key} is longer than {max} bytes.",
   "The value of {key} has a control character.": "The value of {key} has a control character.",
   "The name {key} is used twice.": "The name {key} is used twice.",
-  "At most {max} labels can be added or changed.": "At most {max} labels can be added or changed."
+  "At most {max} labels can be added or changed.": "At most {max} labels can be added or changed.",
+  "Start it when this machine starts": "Start it when this machine starts",
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it."
 }

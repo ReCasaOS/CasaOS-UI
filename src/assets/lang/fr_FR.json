@@ -3277,5 +3277,7 @@
   "The value of {key} is longer than {max} bytes.": "La valeur de {key} dépasse {max} octets.",
   "The value of {key} has a control character.": "La valeur de {key} contient un caractère de contrôle.",
   "The name {key} is used twice.": "Le nom {key} est utilisé deux fois.",
-  "At most {max} labels can be added or changed.": "Au plus {max} étiquettes peuvent être ajoutées ou modifiées."
+  "At most {max} labels can be added or changed.": "Au plus {max} étiquettes peuvent être ajoutées ou modifiées.",
+  "Start it when this machine starts": "La démarrer au démarrage de cette machine",
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Sans cela, après une coupure de courant ou un redémarrage de cette machine, la VM reste éteinte jusqu'à ce que quelqu'un la démarre."
 }
