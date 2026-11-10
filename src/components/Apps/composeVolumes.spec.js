@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isNamedVolumeSource, normalizeVolume } from './composeVolumes'
+import { isNamedVolumeSource, normalizeVolume, resolveAppID } from './composeVolumes'
 
 // stands in for volumeAutoCheck, which invents a host path for a bind the compose
 // file leaves open
@@ -85,5 +85,20 @@ describe('telling a volume name from a host path', () => {
 	it('is not fooled by nothing', () => {
 		expect(isNamedVolumeSource('')).toBe(false)
 		expect(isNamedVolumeSource(undefined)).toBe(false)
+	})
+})
+
+describe('resolveAppID', () => {
+	it('writes the app name where the App Store left $AppID', () => {
+		expect(resolveAppID('/DATA/AppData/$AppID/data', 'filebrowser')).toBe('/DATA/AppData/filebrowser/data')
+		// eslint-disable-next-line no-template-curly-in-string -- the literal IS the input
+		expect(resolveAppID('/DATA/AppData/${AppID}/config', 'filebrowser')).toBe('/DATA/AppData/filebrowser/config')
+	})
+
+	it('leaves other variables, escapes and an unknown name alone', () => {
+		expect(resolveAppID('/DATA/$AppIDX', 'app')).toBe('/DATA/$AppIDX')
+		expect(resolveAppID('/DATA/$$AppID', 'app')).toBe('/DATA/$$AppID')
+		expect(resolveAppID('/DATA/AppData/$AppID', '')).toBe('/DATA/AppData/$AppID')
+		expect(resolveAppID(undefined, 'app')).toBeUndefined()
 	})
 })

@@ -1623,22 +1623,6 @@ export default {
 		},
 
 		/**
-		 * @description: change uuid to var
-		 * @param {*} function
-		 * @return {data} Object
-		 */
-
-		uuid2var(data) {
-			data.volumes.forEach((item) => {
-				item.host = item.host.replace(this.id, '$AppID')
-			})
-			data.devices.forEach((item) => {
-				item.host = item.host.replace(this.id, '$AppID')
-			})
-			return data
-		},
-
-		/**
 		 * @description: Get Network name from network list
 		 * @param {*}
 		 * @return {*} String

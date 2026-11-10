@@ -205,7 +205,7 @@ import EnvInputGroup from '../forms/EnvInputGroup.vue'
 import CommandsInput from '../forms/CommandsInput.vue'
 import Ports from '../forms/Ports.vue'
 import { joinLabels, labelProblems, splitLabels } from './composeLabels'
-import { normalizeVolume } from './composeVolumes'
+import { normalizeVolume, resolveAppID } from './composeVolumes'
 import appInfo from '@/service/appInfo'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 import VolumesInputGroup from '@/components/forms/VolumesInputGroup.vue'
@@ -713,6 +713,16 @@ export default {
 			// Devices
 			composeServicesItem.devices = this.makeArray(composeServicesItemInput.devices).map(parseDeviceItem)
 			isNil(composeServicesItem.devices) && (composeServicesItem.devices = [])
+
+			// The settings of an installed app show the folders it really uses rather than
+			// `/DATA/AppData/$AppID/...`. The runtime sets AppID to the compose project name,
+			// which is configData.name and cannot be changed here, so saving the written-out
+			// path keeps the same folder.
+			if (this.state === 'update' && this.configData.name) {
+				composeServicesItem.volumes.filter(volume => volume?.type === 'bind')
+					.forEach(volume => (volume.source = resolveAppID(volume.source, this.configData.name)))
+				composeServicesItem.devices.forEach(device => (device.host = resolveAppID(device.host, this.configData.name)))
+			}
 
 			// Network_mode
 			const network_mode = composeServicesItemInput?.network_mode
