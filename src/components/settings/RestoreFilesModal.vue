@@ -52,6 +52,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { renderSize } from '@/mixins/file_utils'
 
 export default {
@@ -128,7 +129,7 @@ export default {
 		confirmRestore() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Put these back in {app}?', { app: this.app }),
-				message: this.$t('{count} chosen from the backup taken on {when} go back to where {app} keeps them now, over the files that are there. Nothing else is deleted. The app is stopped while they are copied. This cannot be undone.', { count: this.chosen.length, when: this.when, app: this.app }),
+				message: escape(this.$t('{count} chosen from the backup taken on {when} go back to where {app} keeps them now, over the files that are there. Nothing else is deleted. The app is stopped while they are copied. This cannot be undone.', { count: this.chosen.length, when: this.when, app: this.app })),
 				confirmText: this.$t('Put back'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',

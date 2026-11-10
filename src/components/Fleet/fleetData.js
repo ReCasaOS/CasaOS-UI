@@ -63,7 +63,8 @@ export function overviewRow(box, answers, prev) {
 		key: box.id,
 		id: box.id,
 		name: text(box.name),
-		url: text(box.url),
+		// the card puts it in a link: only an http or https address is one
+		url: /^https?:\/\//i.test(box.url) ? box.url : '',
 		self: box.self === true,
 		online: box.online === true,
 		lastSeen: box.last_seen ?? null,

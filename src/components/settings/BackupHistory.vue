@@ -64,6 +64,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { wasStopped } from '@/components/backup/liveBackup.js'
 
 export default {
@@ -82,9 +83,9 @@ export default {
 		confirmRestore(row) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Restore {app} from this backup?', { app: row.app }),
-				message: this.$t('The app will be stopped and its data replaced by the backup taken on {when}. Files added since then are removed. This cannot be undone.', {
+				message: escape(this.$t('The app will be stopped and its data replaced by the backup taken on {when}. Files added since then are removed. This cannot be undone.', {
 					when: new Date(row.started_at).toLocaleString(),
-				}),
+				})),
 				confirmText: this.$t('Restore'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -104,7 +105,7 @@ export default {
 				})
 			} catch (error) {
 				const data = error.response && error.response.data
-				this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+				this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 			} finally {
 				this.restoring = ''
 			}

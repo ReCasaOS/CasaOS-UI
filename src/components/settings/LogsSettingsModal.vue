@@ -49,6 +49,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { logsApi } from '@/service/logs'
 
 const DAY_MS = 86400000
@@ -96,7 +97,7 @@ export default {
 			const res = await logsApi.setSettings({ ...this.draft })
 			this.saving = false
 			if (!res.ok) {
-				this.$buefy.toast.open({ message: res.error, type: 'is-danger' })
+				this.$buefy.toast.open({ message: escape(res.error), type: 'is-danger' })
 				return
 			}
 			this.$buefy.toast.open({ message: this.$t('Saved'), type: 'is-success' })

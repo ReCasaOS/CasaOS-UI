@@ -56,6 +56,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import TreeListItem from './TreeListItem.vue'
 import { apiErrorMessage, emptyCloudOnError } from './apiError.js'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
@@ -435,7 +436,7 @@ export default {
 					break
 			}
 			this.$buefy.toast.open({
-				message: this.$t(data.message.replace(reg, '$1')),
+				message: escape(this.$t(data.message.replace(reg, '$1'))),
 				duration: 5000,
 				type: toastType,
 			})

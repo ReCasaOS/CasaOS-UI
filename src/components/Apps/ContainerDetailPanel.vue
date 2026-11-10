@@ -82,6 +82,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { renderSize } from '@/mixins/file_utils'
 
 export default {
@@ -133,13 +134,10 @@ export default {
 		// image; a volume does not.
 		confirmRemove() {
 			const removable = this.volumes.filter(volume => volume.removable)
-			const lines = removable.map(volume =>
-				`${volume.name}${volume.size >= 0 ? ` (${renderSize(volume.size)})` : ''}`)
-
 			this.$buefy.dialog.confirm({
 				title: this.$t('Remove this container?'),
 				message: removable.length
-					? `${this.$t('The container goes. It also uses these volumes, which nothing else is using:')}<br><br><b>${lines.join('<br>')}</b><br><br>${this.$t('Delete those too? Cancel removes nothing.')}`
+					? `${this.$t('The container goes. It also uses these volumes, which nothing else is using:')}<br><br><b>${removable.map(volume => escape(`${volume.name}${volume.size >= 0 ? ` (${renderSize(volume.size)})` : ''}`)).join('<br>')}</b><br><br>${this.$t('Delete those too? Cancel removes nothing.')}`
 					: this.$t('The container goes. None of its volumes can be deleted with it, so nothing else is touched.'),
 				confirmText: removable.length ? this.$t('Remove container and volumes') : this.$t('Remove container'),
 				cancelText: this.$t('Cancel'),
@@ -158,9 +156,9 @@ export default {
 
 				this.$buefy.toast.open({
 					// A green tick over a disk that did not shrink is a lie.
-					message: names.length
+					message: escape(names.length
 						? this.$t('Container removed. These volumes were kept: {names}', { names: names.join(', ') })
-						: res.data.message,
+						: res.data.message),
 					type: names.length ? 'is-warning' : 'is-success',
 					duration: 6000,
 				})

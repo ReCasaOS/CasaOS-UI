@@ -48,6 +48,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { durationText, whenOf } from './backupScheduleGroups.js'
 import { liveFigures, liveTitle } from '@/components/backup/liveBackup.js'
 import { renderSize } from '@/mixins/file_utils'
@@ -134,7 +135,7 @@ export default {
 		stop(backup) {
 			const title = this.titleOf(backup.app)
 			this.$buefy.dialog.confirm({
-				message: this.$t('Stop the backup of {title}? What is already copied stays at the destination, incomplete.', { title }),
+				message: escape(this.$t('Stop the backup of {title}? What is already copied stays at the destination, incomplete.', { title })),
 				confirmText: this.$t('Stop'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -144,7 +145,7 @@ export default {
 						this.$buefy.toast.open({ message: this.$t('Stop requested'), type: 'is-success' })
 					} catch (error) {
 						const reason = (error.response && error.response.data && error.response.data.message) || error.message
-						this.$buefy.toast.open({ message: reason, type: 'is-danger' })
+						this.$buefy.toast.open({ message: escape(reason), type: 'is-danger' })
 					}
 					this.$emit('refresh')
 				},

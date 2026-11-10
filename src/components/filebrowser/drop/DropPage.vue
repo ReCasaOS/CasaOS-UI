@@ -45,6 +45,7 @@
 <script>
 import { defineAsyncComponent } from 'vue'
 import { saveAs } from 'file-saver'
+import escape from 'lodash/escape'
 import { PeersManager, ServerConnection } from './Network.js'
 import VueBreakpointMixin from '@/mixins/breakpoint'
 // import { v4 as uuidv4 } from "uuid";
@@ -211,11 +212,11 @@ export default {
 		displayFile(file) {
 			this.$buefy.snackbar.open({
 				indefinite: true,
-				message: this.$t('Save {name} {size} from {device}.', {
+				message: escape(this.$t('Save {name} {size} from {device}.', {
 					name: file.file.name,
 					size: this.renderSize(file.file.size),
 					device: this.getDeviceNameFromPeerList(file.from),
-				}),
+				})),
 				type: 'is-file',
 				cancelText: this.$t('Ignore'),
 				actionText: this.$t('Save'),
@@ -242,7 +243,7 @@ export default {
 			const type = e.includes('lost') ? 'is-danger' : 'is-success'
 			this.$buefy.toast.open({
 				duration: 2000,
-				message: this.$t(e),
+				message: escape(this.$t(e)),
 				type,
 				container: '#drop-page',
 			})

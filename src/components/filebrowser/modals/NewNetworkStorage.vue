@@ -74,6 +74,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import smoothReflow from '@/mixins/smoothReflow'
 import events from '@/events/events'
 
@@ -162,7 +163,7 @@ export default {
 					}).catch((err) => {
 						this.isConnecting = false
 						this.$buefy.toast.open({
-							message: this.$t(err.response.data.data || err.response.data.message),
+							message: escape(this.$t(err.response.data.data || err.response.data.message)),
 							type: 'is-danger',
 						})
 					})

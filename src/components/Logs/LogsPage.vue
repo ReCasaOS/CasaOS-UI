@@ -112,6 +112,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import LogStream from './LogStream.vue'
 import { rangeBounds } from './logsModel'
 import { listBoxes } from '@/components/Fleet/fleetLoader'
@@ -242,7 +243,7 @@ export default {
 			this.apps = []
 			this.appsState = res.status === 404 ? 'outdated' : 'error'
 			if (res.status !== 404) {
-				this.$buefy.toast.open({ message: res.error, type: 'is-danger' })
+				this.$buefy.toast.open({ message: escape(res.error), type: 'is-danger' })
 			}
 		},
 		titleOf(app) {
@@ -285,9 +286,9 @@ export default {
 				} else {
 					await this.$openAPI.appManagement.compose.setComposeAppStatus(id, status)
 				}
-				this.$buefy.toast.open({ message: this.$t(status === 'restart' ? '{app} is restarting' : '{app} is stopping', { app: this.titleOf(this.selectedApp) }), type: 'is-success' })
+				this.$buefy.toast.open({ message: escape(this.$t(status === 'restart' ? '{app} is restarting' : '{app} is stopping', { app: this.titleOf(this.selectedApp) })), type: 'is-success' })
 			} catch (e) {
-				this.$buefy.toast.open({ message: e?.response?.data?.message || e?.message || this.$t('Error'), type: 'is-danger' })
+				this.$buefy.toast.open({ message: escape(e?.response?.data?.message || e?.message || this.$t('Error')), type: 'is-danger' })
 			} finally {
 				this.acting = ''
 			}

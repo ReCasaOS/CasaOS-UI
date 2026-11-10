@@ -18,3 +18,13 @@ describe('the built-in pages\' addresses', () => {
 		expect(open).toHaveBeenCalledWith(`${window.location.pathname}#/vms?vm=abc`, '_blank')
 	})
 })
+
+// The launcher is opened by the dashboard, with the app it was asked for. It used to
+// have a page of its own, open without a session, that took the app (its address
+// with it) from the link: a link could put any site in the frame of the dashboard.
+describe('the pages of the dashboard', () => {
+	it('have none that takes the app to open from its link', async () => {
+		const { default: routes } = await import('./route')
+		expect(routes.map(route => route.path)).not.toContain('/launch')
+	})
+})

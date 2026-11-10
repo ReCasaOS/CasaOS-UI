@@ -14,6 +14,7 @@
 
 <script>
 import Uploader from 'simple-uploader.js'
+import escape from 'lodash/escape'
 import { kebabCase } from '../common/utils'
 import UploaderBtn from './btn.vue'
 import UploaderDrop from './drop.vue'
@@ -100,7 +101,7 @@ export default {
 		fileErrorHandle(rootFile, file, message) {
 			this.uploader.pause(file)
 			this.$buefy.toast.open({
-				message: JSON.parse(message).message,
+				message: escape(JSON.parse(message).message),
 				type: 'is-danger',
 				position: 'is-top',
 				duration: 5000,

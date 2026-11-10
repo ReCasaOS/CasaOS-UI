@@ -64,10 +64,9 @@ export default {
 	},
 
 	async created() {
+		// the app is the one the dashboard hands over, never one read from the address of the page
 		if (this.appDetail) {
 			this.appDetailData = this.appDetail
-		} else if (this.$route.query.appDetailData) {
-			this.appDetailData = JSON.parse(this.$route.query.appDetailData)
 		}
 		await this.startContainer()
 		if (this.isCancelled)

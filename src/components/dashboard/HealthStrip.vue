@@ -156,6 +156,7 @@
 
 <script>
 import { defineAsyncComponent } from 'vue'
+import escape from 'lodash/escape'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
@@ -456,7 +457,7 @@ export default {
 						this.$buefy.toast.open({ message: this.$t('Backup of this box started.'), type: 'is-success', duration: 5000 })
 					} catch (error) {
 						const data = error.response && error.response.data
-						this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+						this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 					}
 				},
 			})
@@ -467,7 +468,7 @@ export default {
 		openBackups(tab) {
 			this.$buefy.modal.open({
 				component: defineAsyncComponent(() => import('@/components/settings/BackupDestinations.vue')),
-				...(typeof tab === 'string' ? { props: { initialTab: tab } } : {}),
+				props: typeof tab === 'string' ? { initialTab: tab } : {},
 				hasModalCard: true,
 				customClass: 'backup-modal',
 				trapFocus: true,

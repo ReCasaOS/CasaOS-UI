@@ -68,6 +68,7 @@
 <script>
 // Mirrors the pattern the backend validates against, so a bad name is refused
 // here with an explanation rather than by the API with a generic error.
+import escape from 'lodash/escape'
 import MemberFoldersModal from './MemberFoldersModal.vue'
 import { shareMembers } from './shareMembers'
 
@@ -171,7 +172,7 @@ export default {
 
 		changePassword(username) {
 			this.$buefy.dialog.prompt({
-				message: this.$t('New password for {name}', { name: username }),
+				message: escape(this.$t('New password for {name}', { name: username })),
 				inputAttrs: { type: 'password', required: true },
 				confirmText: this.$t('Save'),
 				cancelText: this.$t('Cancel'),
@@ -181,7 +182,7 @@ export default {
 						await this.$api.samba.setUserPassword(username, password)
 						this.$buefy.toast.open({ message: this.$t('Password changed.'), type: 'is-success' })
 					} catch (e) {
-						this.$buefy.toast.open({ message: this.messageOf(e), type: 'is-danger' })
+						this.$buefy.toast.open({ message: escape(this.messageOf(e)), type: 'is-danger' })
 					}
 				},
 			})
@@ -191,7 +192,7 @@ export default {
 			this.$buefy.dialog.confirm({
 				// The API takes the account out of its shares, and refuses while it is
 				// the only one a share lets in, so this only warns about the account.
-				message: this.$t('Delete the account {name}? Anyone using it will lose access.', { name: username }),
+				message: escape(this.$t('Delete the account {name}? Anyone using it will lose access.', { name: username })),
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -200,7 +201,7 @@ export default {
 						await this.$api.samba.deleteUser(username)
 						await this.load()
 					} catch (e) {
-						this.$buefy.toast.open({ message: this.messageOf(e), type: 'is-danger' })
+						this.$buefy.toast.open({ message: escape(this.messageOf(e)), type: 'is-danger' })
 					}
 				},
 			})

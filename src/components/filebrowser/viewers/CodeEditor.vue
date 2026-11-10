@@ -122,6 +122,7 @@ import { CSSLint } from 'csslint'
 import { JSHINT } from 'jshint'
 import jsonlint from 'jsonlint-mod'
 import jsyaml from 'js-yaml'
+import escape from 'lodash/escape'
 import codemirror from '@/components/basicComponents/CodeMirror.vue'
 import { mixin } from '@/mixins/mixin'
 
@@ -246,7 +247,7 @@ export default {
 					}
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-danger',
 					})
 				}

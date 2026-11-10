@@ -73,6 +73,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { dockerLocationApi } from './dockerLocation'
 import { PHASES, copyPercent, locationLabel, moving } from './dockerLocationState'
 import PathPicker from '@/components/VirtualMachines/PathPicker.vue'
@@ -210,7 +211,7 @@ export default {
 				// ask, and follow it if it runs
 				await this.refresh()
 				if (!this.isMoving) {
-					this.$buefy.toast.open({ message: e.response?.data?.message || e.message, type: 'is-danger' })
+					this.$buefy.toast.open({ message: escape(e.response?.data?.message || e.message), type: 'is-danger' })
 				}
 			} finally {
 				this.busy = false
@@ -236,7 +237,7 @@ export default {
 							return
 						}
 						this.state = e.response.data?.data || this.state
-						this.$buefy.toast.open({ message: e.response.data?.message || e.message, type: 'is-danger' })
+						this.$buefy.toast.open({ message: escape(e.response.data?.message || e.message), type: 'is-danger' })
 					} finally {
 						this.deleting = false
 					}

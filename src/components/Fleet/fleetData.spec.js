@@ -212,3 +212,18 @@ describe('the chips and the groups of the Containers and Virtual Machines tabs',
 		expect(groups.map(g => [g.name, g.rows.length, g.error])).toEqual([['Home', 2, ''], ['Shop', 0, 'offline']])
 	})
 })
+
+// The address of a box is what the fleet says of it, and the card puts it in a link:
+// anything but an http or https address would be run by the click, so it is no address.
+describe('the address of a box in its row', () => {
+	it('is kept when it is an http or https address', () => {
+		expect(overviewRow({ ...box, url: 'http://192.168.1.20:8080' }, all()).url).toBe('http://192.168.1.20:8080')
+		expect(overviewRow({ ...box, url: 'HTTPS://home' }, all()).url).toBe('HTTPS://home')
+	})
+
+	it('is dropped when it is anything else', () => {
+		for (const url of ['javascript:alert(document.domain)', 'data:text/html,<script>alert(1)</script>', ' javascript:alert(1)', 'home.example', 7, null]) {
+			expect(overviewRow({ ...box, url }, all()).url, String(url)).toBe('')
+		}
+	})
+})

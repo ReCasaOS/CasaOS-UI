@@ -485,7 +485,7 @@ describe('the password of a restic repository', () => {
 		await wrapper.vm.readResticPassword('old')
 		expect(getResticPassword).toHaveBeenCalledWith('old')
 		const dialog = confirm.mock.calls[0][0]
-		expect(dialog.message).toContain('<code>s3cr&#60;et</code>')
+		expect(dialog.message).toContain('<code>s3cr&lt;et</code>')
 
 		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
 			expect(this.download).toBe('restic-password-old.txt')

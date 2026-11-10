@@ -1,3 +1,5 @@
+import { webScheme } from '@/mixins/app/webScheme'
+
 // Finds Syncthing among the apps of the app grid (GET /v2/app_management/web/appgrid).
 // The widget used to ask /v1/container, which the backend no longer has: the
 // 404 left it offering Install forever.
@@ -36,5 +38,5 @@ function webUIURL(app, baseIp) {
 		return ''
 	}
 	const port = app.port ? `:${app.port}` : ''
-	return `${app.scheme || 'http'}://${app.hostname || baseIp}${port}${app.index || ''}`
+	return `${webScheme(app.scheme)}://${app.hostname || baseIp}${port}${app.index || ''}`
 }

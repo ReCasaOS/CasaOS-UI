@@ -4,10 +4,11 @@ import { babelParse, parse } from '@vue/compiler-sfc'
 import { describe, expect, it } from 'vitest'
 
 // Buefy shows the message of a toast, a snackbar, a notification and a dialog,
-// and the content of a modal, as HTML. The title of a VM, an error from the
-// service or a file name must not reach one as it is. This reads the sources
-// of the folder, so that any new call has to be written in a way that is safe:
-// the message is the text of ours, or escaped as a whole.
+// and the content of a modal, as HTML. The name of an app from a store, an
+// error from a service or a file name must not reach one as it is. This reads
+// every source of the dashboard, so that any new call has to be written in a
+// way that is safe: the message is text and markup of ours, and whatever else
+// goes in it goes through lodash's escape.
 
 // what Buefy shows as HTML, by the call that gives it
 const SINKS = {
@@ -26,7 +27,7 @@ const COMPONENTS = ['bnotification', 'bmodal', 'bdialog', 'bsnackbar']
 const PROPS = ['message', 'content']
 // the file that hands on the options its callers wrote, which are checked as
 // calls of modal.open
-const HANDS_ON = ['modalStack.js']
+const HANDS_ON = ['components/VirtualMachines/modalStack.js', 'modalStack.js']
 
 function walk(node, visit) {
 	if (Array.isArray(node)) {
@@ -37,22 +38,62 @@ function walk(node, visit) {
 	}
 }
 
-// What a message may be: a translation of a fixed key, with no parameters to
-// put in, or a call of escape on the whole of it. Escaping a part, or adding
-// something to what is escaped, is not enough.
-function isSafe(node, escape) {
-	if (node.type === 'ConditionalExpression') {
-		return isSafe(node.consequent, escape) && isSafe(node.alternate, escape)
+// a key of ours: a text written out, or one of two
+function isFixedKey(node) {
+	if (node?.type === 'ConditionalExpression') {
+		return isFixedKey(node.consequent) && isFixedKey(node.alternate)
 	}
-	if (node.type !== 'CallExpression') {
+	return node?.type === 'StringLiteral' || (node?.type === 'TemplateLiteral' && node.expressions.length === 0)
+}
+
+// What a message may be made of: text and markup written out here, a
+// translation of a fixed key, and a call of lodash's escape; put together with
+// a template, a `+`, a choice between two, or a list mapped and joined. A
+// translation takes its parameters under the same rule. Anything else (a
+// variable, a field of an answer, another function) is not known to be text.
+function isSafe(node, escape) {
+	switch (node?.type) {
+		case 'StringLiteral':
+		case 'NumericLiteral':
+			return true
+		case 'TemplateLiteral':
+			return node.expressions.every(part => isSafe(part, escape))
+		case 'BinaryExpression':
+			return node.operator === '+' && isSafe(node.left, escape) && isSafe(node.right, escape)
+		case 'ConditionalExpression':
+			return isSafe(node.consequent, escape) && isSafe(node.alternate, escape)
+		case 'LogicalExpression':
+			return isSafe(node.left, escape) && isSafe(node.right, escape)
+		case 'ArrayExpression':
+		// a VNode array (what a notification takes): h(...) calls only, so that no service text becomes HTML
+			return node.elements.every(el => el?.type === 'CallExpression' && el.callee.type === 'Identifier' && el.callee.name === 'h')
+		case 'CallExpression':
+			return isSafeCall(node, escape)
+		default:
+			return false
+	}
+}
+
+function isSafeCall(node, escape) {
+	const { callee } = node
+	if (callee.type === 'Identifier') {
+		return callee.name === escape
+	}
+	if (callee.type !== 'MemberExpression' || callee.computed) {
 		return false
 	}
-	const { callee } = node
-	if (callee.type === 'Identifier' && callee.name === escape) {
-		return true
+	if (callee.property.name === '$t') {
+		const [key, params] = node.arguments
+		return node.arguments.length <= 2 && isFixedKey(key)
+			&& (!params || (params.type === 'ObjectExpression' && params.properties.every(p => p.type === 'ObjectProperty' && !p.computed && isSafe(p.value, escape))))
 	}
-	const name = callee.type === 'MemberExpression' && !callee.computed ? callee.property.name : callee.name
-	return name === '$t' && node.arguments.length === 1 && node.arguments[0].type === 'StringLiteral'
+	// lines.map(line => <safe>).join('<br>'): a list whose every line is safe
+	if (callee.property.name === 'join' && node.arguments.every(arg => arg.type === 'StringLiteral')) {
+		const list = callee.object
+		const each = list.type === 'CallExpression' && list.callee.type === 'MemberExpression' && list.callee.property.name === 'map' && list.arguments.length === 1 ? list.arguments[0] : null
+		return each?.type === 'ArrowFunctionExpression' && each.body.type !== 'BlockStatement' && isSafe(each.body, escape)
+	}
+	return false
 }
 
 function scanScript(code, file, found) {
@@ -140,12 +181,26 @@ function scan(file, source) {
 	return found
 }
 
-describe('the messages Buefy shows as HTML', () => {
-	const folder = import.meta.dirname
-	const files = readdirSync(folder).filter(f => /\.(?:vue|js)$/.test(f) && !f.endsWith('.spec.js'))
-	const sources = Object.fromEntries(files.map(f => [f, readFileSync(join(folder, f), 'utf8')]))
+// every .vue and .js under src, by its path from there; not the tests, nor the generated API clients
+function sourcesUnder(folder, prefix = '') {
+	const sources = {}
+	for (const entry of readdirSync(folder, { withFileTypes: true })) {
+		const path = prefix + entry.name
+		if (entry.isDirectory()) {
+			if (entry.name !== 'openapi' && entry.name !== 'assets') {
+				Object.assign(sources, sourcesUnder(join(folder, entry.name), `${path}/`))
+			}
+		} else if (/\.(?:vue|js)$/.test(entry.name) && !entry.name.endsWith('.spec.js')) {
+			sources[path] = readFileSync(join(folder, entry.name), 'utf8')
+		}
+	}
+	return sources
+}
 
-	it('are escaped as a whole, or a fixed text', () => {
+describe('the messages Buefy shows as HTML', () => {
+	const sources = sourcesUnder(import.meta.dirname)
+
+	it('are text of ours, with whatever else goes in them escaped', () => {
 		const sinks = []
 		const problems = []
 		for (const [file, source] of Object.entries(sources)) {
@@ -154,17 +209,21 @@ describe('the messages Buefy shows as HTML', () => {
 			problems.push(...found.problems)
 		}
 		expect(problems).toEqual([])
-		// the toasts of the page and the console, the dialogs of the snapshots, the modals
-		expect(sinks.length).toBeGreaterThanOrEqual(20)
+		// the window opened by an entry, and the messages of the whole dashboard
+		expect(sinks).toContain('components/Stats/entry.js: openWithEscape')
+		expect(sinks.length).toBeGreaterThanOrEqual(250)
 	})
 
-	it('are never written with v-html or innerHTML in the VM files', () => {
+	it('are never written with v-html or innerHTML in the VM and the Statistics files', () => {
 		for (const [file, source] of Object.entries(sources)) {
-			expect(source, file).not.toMatch(/v-html|v-dompurify-html|innerHTML/)
+			if (/^components\/(?:VirtualMachines|Stats)\/|^service\/stats\.js$/.test(file)) {
+				expect(source, file).not.toMatch(/v-html|v-dompurify-html|innerHTML/)
+			}
 		}
 	})
 })
 
+/* eslint-disable no-template-curly-in-string -- the probes below are source text, read by the scanner */
 describe('the guard of the messages', () => {
 	const imports = 'import escape from \'lodash/escape\'\n'
 	const call = (body, file = 'probe.js') => scan(file, imports + body).problems
@@ -179,8 +238,14 @@ describe('the guard of the messages', () => {
 		'the message as a shorthand': 'this.$buefy.toast.open({ message })',
 		'the brace on the next line': 'this.$buefy.toast.open(\n\t{\n\t\tmessage: title,\n\t},\n)',
 		'a message with a part escaped': 'this.$buefy.toast.open({ message: escape(title) + e.message })',
-		'a message with a part before the escape': `this.$buefy.toast.open({ message: 'Error: ' + escape(title) })`,
 		'a translation with parameters': 'this.$buefy.toast.open({ message: this.$t(\'{name} is gone\', { name: title }) })',
+		'a translation with one parameter of two escaped': 'this.$buefy.toast.open({ message: this.$t(\'{name}: {why}\', { name: escape(title), why: e.message }) })',
+		'a template with a value put in as it is': 'this.$buefy.toast.open({ message: `<b>${title}</b>` })',
+		'a template with a field of an answer': 'this.$buefy.dialog.alert({ message: `${this.$t(\'Failed\')}<br>${res.data.message}` })',
+		'an escaped text or a field of an answer': 'this.$buefy.toast.open({ message: escape(title) || e.message })',
+		'a list joined whose lines are not escaped': 'this.$buefy.dialog.confirm({ message: names.map(n => `<li>${n}</li>`).join(\'\') })',
+		'a list joined that was built elsewhere': 'this.$buefy.dialog.confirm({ message: lines.join(\'<br>\') })',
+		'a list joined with a separator that is not written out': 'this.$buefy.dialog.confirm({ message: names.map(n => escape(n)).join(sep) })',
 		'a translation of a key that is not fixed': 'this.$buefy.toast.open({ message: this.$t(key) })',
 		'a ternary with one side not safe': 'this.$buefy.toast.open({ message: ok ? this.$t(\'Done\') : e.message })',
 		'a notification': 'this.$buefy.notification.open({ message: title })',
@@ -192,6 +257,8 @@ describe('the guard of the messages', () => {
 		'a spread': 'this.$buefy.toast.open({ ...options })',
 		'a computed name': 'this.$buefy.toast.open({ [name]: title })',
 		'a call that does not say it is escape': 'this.$buefy.toast.open({ message: other(title) })',
+		'a notification with a string and a tag': 'this.$buefy.notification.open({ message: \'<b>\' + name + \'</b>\' })',
+		'a notification with an array that holds a string': 'this.$buefy.notification.open({ message: [h("p", name), name] })',
 	}
 
 	it.each(Object.entries(unsafe))('catches %s', (_, body) => {
@@ -215,9 +282,16 @@ describe('the guard of the messages', () => {
 		'a fixed text': 'this.$buefy.toast.open({ message: this.$t(\'Copied to clipboard\'), type: \'is-success\' })',
 		'an escaped translation with parameters': 'this.$buefy.toast.open({ message: escape(this.$t(\'{name} is gone\', { name: title })) })',
 		'one of two fixed texts': 'this.$buefy.dialog.confirm({ message: off ? this.$t(\'Off\') : this.$t(\'Reset\') })',
+		'a translation of one of two fixed keys': 'this.$buefy.toast.open({ message: this.$t(off ? \'Off\' : \'Reset\') })',
+		'a translation whose parameters are escaped or written out': 'this.$buefy.toast.open({ message: this.$t(\'{name} is kept {days} days\', { name: escape(title), days: 30 }) })',
+		'a text of ours before an escaped one': `this.$buefy.toast.open({ message: 'Error: ' + escape(title) })`,
+		'markup of ours around translations and escaped values': 'this.$buefy.dialog.alert({ message: `${this.$t(\'Kept\')}<br><code>${escape(password)}</code>` })',
+		'an escaped text, or a fixed one when there is none': 'this.$buefy.toast.open({ message: escape(e.message) || this.$t(\'Error\') })',
+		'a list of escaped lines, mapped and joined': 'this.$buefy.dialog.confirm({ message: `<ul>${names.map(n => `<li>${escape(n)}</li>`).join(\'\')}</ul>` })',
 		'the brace on the next line, and the message safe': 'this.$buefy.toast.open(\n\t{\n\t\tmessage: escape(title),\n\t},\n)',
 		'a modal with a component': 'this.$buefy.modal.open({ component: Form, props: { host }, canCancel: [] })',
 		'a modal opened by the helper': 'openWithEscape(this.$buefy, { component: Form, props: { host } })',
+		'a notification with a VNode array': 'this.$buefy.notification.open({ message: [h("p", text), h("button", { onClick: go }, label)] })',
 		'a dialog with no message': 'this.$buefy.dialog.confirm({ title: title, onConfirm: go })',
 	}
 
