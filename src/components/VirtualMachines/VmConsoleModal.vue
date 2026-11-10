@@ -355,7 +355,7 @@ export default {
 	// the paste dialog, a modal inside this one, inherits the full-screen width
 	// rules; it is an ordinary dialog
 	.vm-paste-modal > .animation-content {
-		width: 40rem;
+		width: 66rem;
 		max-width: calc(100vw - 2rem) !important;
 		margin: 0 auto;
 	}
