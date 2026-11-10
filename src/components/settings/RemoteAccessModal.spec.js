@@ -8,6 +8,7 @@ import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn(), addDevice: vi.fn() } }))
+vi.mock('@/service/publicShare', async () => ({ publicShare: (await import('vue')).reactive({ status: null, ok: false }), publicShareApi: {}, refresh: vi.fn(() => Promise.resolve()), apply: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })

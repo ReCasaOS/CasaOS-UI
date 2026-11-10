@@ -1222,5 +1222,13 @@
   "Choose the name of this box": "Scegli il nome di questo box",
   "This app will be reachable by anyone who knows the address. Only its own login page protects it.": "Questa app sarà raggiungibile da chiunque conosca l'indirizzo. Solo la sua pagina di accesso la protegge.",
   "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.": "Alcune app devono conoscere il proprio indirizzo pubblico (Nextcloud: trusted_domains); vedi la loro documentazione.",
-  "By turning it on, you accept the terms of service of Let's Encrypt.": "Attivandolo, accetti i termini di servizio di Let's Encrypt."
+  "By turning it on, you accept the terms of service of Let's Encrypt.": "Attivandolo, accetti i termini di servizio di Let's Encrypt.",
+  "Public sharing": "Condivisione pubblica",
+  "Choose this name": "Scegli questo nome",
+  "Your apps will answer at https://<app>.<name>.{domain}": "Le tue app risponderanno a https://<app>.<nome>.{domain}",
+  "Public name: {name}": "Nome pubblico: {name}",
+  "Stop sharing": "Interrompi la condivisione",
+  "No app is shared. Share one from its card on the home page.": "Nessuna app è condivisa. Condividine una dalla sua scheda nella pagina iniziale.",
+  "Stop sharing every app?": "Interrompere la condivisione di tutte le app?",
+  "Their public addresses stop answering. The name {name} stays this box's.": "I loro indirizzi pubblici smetteranno di rispondere. Il nome {name} resta di questa box."
 }

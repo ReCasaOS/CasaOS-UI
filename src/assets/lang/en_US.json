@@ -3312,5 +3312,13 @@
   "Choose the name of this box": "Choose the name of this box",
   "This app will be reachable by anyone who knows the address. Only its own login page protects it.": "This app will be reachable by anyone who knows the address. Only its own login page protects it.",
   "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.": "Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.",
-  "By turning it on, you accept the terms of service of Let's Encrypt.": "By turning it on, you accept the terms of service of Let's Encrypt."
+  "By turning it on, you accept the terms of service of Let's Encrypt.": "By turning it on, you accept the terms of service of Let's Encrypt.",
+  "Public sharing": "Public sharing",
+  "Choose this name": "Choose this name",
+  "Your apps will answer at https://<app>.<name>.{domain}": "Your apps will answer at https://<app>.<name>.{domain}",
+  "Public name: {name}": "Public name: {name}",
+  "Stop sharing": "Stop sharing",
+  "No app is shared. Share one from its card on the home page.": "No app is shared. Share one from its card on the home page.",
+  "Stop sharing every app?": "Stop sharing every app?",
+  "Their public addresses stop answering. The name {name} stays this box's.": "Their public addresses stop answering. The name {name} stays this box's."
 }

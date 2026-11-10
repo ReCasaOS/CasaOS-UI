@@ -97,6 +97,8 @@
 					<p class="is-size-7 mb-3">{{ $t('The relay sees which devices connect and when, never what they exchange.') }}</p>
 					<b-button :disabled="busy" :loading="busy" rounded size="is-small" type="is-primary" @click="enable">{{ $t('Turn remote access on') }}</b-button>
 				</template>
+
+				<share-section />
 			</template>
 			<b-loading v-else :active="!error" :is-full-page="false" />
 		</section>
@@ -110,12 +112,14 @@
 <script>
 import copy from 'clipboard-copy'
 import escape from 'lodash/escape'
+import ShareSection from '@/components/PublicShare/ShareSection.vue'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
 
 const HTTPS = /^https:\/\/.+/i
 
 export default {
 	name: 'RemoteAccessModal',
+	components: { ShareSection },
 	emits: ['close'],
 	data() {
 		return {
