@@ -112,6 +112,9 @@ const CORE_GETS = {
 	'/v1/gateway/port': () => core('80'),
 	'/v1/gateway/httpsport': () => core('443'),
 	'/v1/usb/usb-auto-mount': () => core('False'),
+	// a box alone with remote access on, which the public sharing goes through
+	'/v1/fleet': () => core({ role: 'none', default_relay: 'https://relay.recasaos.org', remote: { relay: 'https://relay.recasaos.org', addr: '100.64.0.1', connected: true, error: '', alone: true } }),
+	'/v1/fleet/remote': () => core({ devices: [], boxes: [] }),
 }
 
 const CUSTOM = /^\/v1\/users\/current\/custom\/([^/]+)$/
@@ -121,7 +124,75 @@ export function newGridState() {
 	return {
 		custom: new Map(),
 		images: [{ path: `${ISO_FOLDER}/alpine-virt-3.20.iso`, name: 'alpine-virt-3.20.iso', kind: 'iso', size_bytes: 64 * 1048576 }],
+		share: { name: '', apps: new Set() },
 	}
+}
+
+// /v1/share as the core answers it, on a box whose relay supports sharing: the tunnel is up once an app is shared
+const SHARE_DOMAIN = 'box.recasaos.org'
+const SHARE_APP = /^\/v1\/share\/apps\/([^/]+)$/
+
+function shareStatus({ name, apps }) {
+	const host = name ? `${name}.${SHARE_DOMAIN}` : ''
+	return core({
+		supported: true,
+		reason: '',
+		name,
+		host,
+		domain: SHARE_DOMAIN,
+		tos_url: 'https://letsencrypt.org/repository/',
+		apps: APPS.map(app => ({
+			name: app.name,
+			label: app.name,
+			shared: apps.has(app.name),
+			url: apps.has(app.name) ? `https://${app.name}.${host}` : '',
+			port: app.port,
+			scheme: app.scheme,
+			error: '',
+		})),
+		cert: apps.size ? { not_after: new Date(Date.now() + 89 * 86400000).toISOString(), pending: false, error: '' } : { not_after: null, pending: false, error: '' },
+		tunnel: { connected: apps.size > 0, error: '' },
+	})
+}
+
+const shareRefused = message => ({ status: 400, body: { success: 400, message } })
+
+function share(verb, path, body, state) {
+	const box = state.share
+	if (path === '/v1/share') {
+		return verb === 'GET' ? shareStatus(box) : null
+	}
+	if (path === '/v1/share/name' && verb === 'PUT') {
+		if (box.name) {
+			return shareRefused('this box already has a public name')
+		}
+		if (!body?.accept_tos) {
+			return shareRefused('the terms of service of Let\'s Encrypt must be accepted')
+		}
+		if (!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(body?.name || '')) {
+			return shareRefused('a box name is 3 to 32 lowercase letters, digits or dashes, with no dash at either end')
+		}
+		box.name = body.name
+		return shareStatus(box)
+	}
+	if (path === '/v1/share/apps' && verb === 'DELETE') {
+		box.apps.clear()
+		return shareStatus(box)
+	}
+	const one = path.match(SHARE_APP)
+	if (one && (verb === 'PUT' || verb === 'DELETE')) {
+		const name = decodeURIComponent(one[1])
+		if (verb === 'PUT') {
+			if (!box.name) {
+				return shareRefused('choose the box\'s public name first')
+			}
+			box.apps.add(name)
+		} else {
+			box.apps.delete(name)
+		}
+		return shareStatus(box)
+	}
+	return null
 }
 
 const uploadFails = code => ({ status: UPLOAD_CODES[code], body: { message: code } })
@@ -167,6 +238,9 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	const verb = method.toUpperCase()
 	if (path === '/v2/virt_management/images/upload') {
 		return verb === 'PUT' ? upload(query, body, state) : null
+	}
+	if (path.startsWith('/v1/share')) {
+		return share(verb, path, body, state)
 	}
 	const custom = path.match(CUSTOM)
 	if (custom) {
