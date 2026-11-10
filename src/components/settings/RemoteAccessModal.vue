@@ -114,6 +114,8 @@ import copy from 'clipboard-copy'
 import escape from 'lodash/escape'
 import ShareSection from '@/components/PublicShare/ShareSection.vue'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
+import { publicShareApi } from '@/service/publicShare'
+import { leaveWarning } from '@/components/PublicShare/shareWords'
 
 const HTTPS = /^https:\/\/.+/i
 
@@ -318,10 +320,20 @@ export default {
 			}
 			this.run(() => fleetApi.setRemote({ enabled: true, relay }))
 		},
-		confirmOff() {
+		// what turning this off does to the public sharing; '' on any failure (an old core has nothing to release)
+		async shareWarning() {
+			try {
+				const res = await publicShareApi.status()
+				return leaveWarning(res.data.data, this.$t)
+			} catch {
+				return ''
+			}
+		},
+		async confirmOff() {
+			const warning = await this.shareWarning()
 			this.$buefy.dialog.confirm({
 				title: this.$t('Turn remote access off?'),
-				message: this.$t('Your phones and PCs lose access to this box. To come back, you will have to add them again.'),
+				message: this.$t('Your phones and PCs lose access to this box. To come back, you will have to add them again.') + (warning ? ` ${escape(warning)}` : ''),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Turn off'),

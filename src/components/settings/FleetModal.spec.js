@@ -8,10 +8,12 @@ import AddBoxDialog from '@/components/Fleet/AddBoxDialog.vue'
 import { forgetFleet, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
 import { fleetApi } from '@/service/fleet'
+import { publicShareApi } from '@/service/publicShare'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setMaster: vi.fn(), setRelay: vi.fn(), join: vi.fn(), leave: vi.fn(), addBox: vi.fn(), rotateCode: vi.fn() } }))
+vi.mock('@/service/publicShare', () => ({ publicShareApi: { status: vi.fn() } }))
 vi.mock('@/components/Fleet/entry', () => ({ forgetFleet: vi.fn(), openFleet: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
@@ -43,6 +45,7 @@ describe('the Fleet settings', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		fleetApi.status.mockReturnValue(answer(NONE))
+		publicShareApi.status.mockImplementation(() => refusal(404, 'not found'))
 		fleetApi.addBox.mockReturnValue(answer({ box: { id: 's', self: true }, code: 'ENROL-self' }))
 	})
 	afterEach(() => {
@@ -144,6 +147,55 @@ describe('the Fleet settings', () => {
 		await open()
 		await pick('master')
 		expect(field('relay').element.value).toBe('https://relay.remote.example')
+	})
+
+	it('warns before leaving the fleet when apps are shared', async () => {
+		fleetApi.status.mockReturnValue(answer(member()))
+		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		await open()
+		await button('Leave the fleet').trigger('click')
+		await flushPromises()
+		expect(document.querySelector('.dialog').textContent).toContain('The public addresses of your shared apps stop answering, and the name mybox is released.')
+	})
+
+	it('warns before disabling the master', async () => {
+		fleetApi.status.mockReturnValue(answer(MASTER))
+		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [] }))
+		await open()
+		await button('Disable the master role').trigger('click')
+		await flushPromises()
+		expect(document.querySelector('.dialog').textContent).toContain('The public name mybox is released.')
+	})
+
+	it('warns before changing the relay', async () => {
+		fleetApi.status.mockReturnValue(answer(RELAY_MASTER))
+		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		await open()
+		await button('Change the relay').trigger('click')
+		await flushPromises()
+		expect(document.querySelector('.dialog').textContent).toContain('the name mybox is released.')
+	})
+
+	it('warns before joining a fleet and turning remote access off', async () => {
+		fleetApi.status.mockReturnValue(answer(NONE))
+		fleetApi.join.mockImplementation(() => refusal(409, 'this box has remote access: turn it off first'))
+		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		await button('Join').trigger('click')
+		await flushPromises()
+		await flushPromises()
+		expect(document.querySelector('.dialog').textContent).toContain('the name mybox is released.')
+	})
+
+	it('asks as before when the share status cannot be read', async () => {
+		fleetApi.status.mockReturnValue(answer(member()))
+		await open()
+		await button('Leave the fleet').trigger('click')
+		await flushPromises()
+		expect(document.querySelector('.dialog').textContent).toContain('This box forgets its master and stops answering it.')
+		expect(document.querySelector('.dialog').textContent).not.toContain('released')
 	})
 
 	it('leaves after confirming', async () => {
