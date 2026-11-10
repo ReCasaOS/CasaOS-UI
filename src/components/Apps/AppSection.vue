@@ -10,8 +10,9 @@
 				</app-section-title-tip>
 			</div>
 			<div :class="{ 'is-compact': compact, 'is-tiles': compact }" class="app-list contextmenu-canvas mb-5">
-				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" class="handle">
-					<app-card :compact="compact" :item="item" :subtitle="systemSubtitle(item)"
+				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
+					<vm-tile v-if="item.vmTile" :compact="compact" :vm="item.vm"></vm-tile>
+					<app-card v-else :compact="compact" :item="item" :subtitle="systemSubtitle(item)"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -232,6 +233,16 @@ const builtInApplications = [
 
 const isSystemApp = app => app.app_type === 'system'
 
+// a tile per VM right after the Virtual Machines card, in whichever list has that card
+function withVmTiles(apps, vms) {
+	const at = apps.findIndex(app => app.name === VM_APP_NAME)
+	if (at < 0 || !vms.length) {
+		return apps
+	}
+	const tiles = vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
+	return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
+}
+
 // the compact grid's filters; a link app has no state to be running or stopped in
 const FILTERS = {
 	all: () => true,
@@ -349,19 +360,15 @@ export default {
 		// without them, so the saved order never has them, and they go back after
 		// their card.
 		// With the System row (beta dashboard) the built-ins leave the grid the same
-		// way: appList, and so the saved order, keeps them first.
+		// way: appList, and so the saved order, keeps them first. The tiles follow
+		// their card into that row (systemApps).
 		gridList: {
 			get() {
 				const apps = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
 				if (this.filter !== 'all') {
 					return apps.filter(FILTERS[this.filter])
 				}
-				const at = apps.findIndex(app => app.name === VM_APP_NAME)
-				if (at < 0 || !this.vms.length) {
-					return apps
-				}
-				const tiles = this.vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
-				return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
+				return withVmTiles(apps, this.vms)
 			},
 			set(list) {
 				if (this.filter !== 'all') {
@@ -371,8 +378,9 @@ export default {
 				this.appList = concat(system, list.filter(item => !item.vmTile))
 			},
 		},
+		// the System row as drawn: the Virtual Machines card is there, so its tiles are too
 		systemApps() {
-			return this.systemFirst ? this.appList.filter(isSystemApp) : []
+			return this.systemFirst ? withVmTiles(this.appList.filter(isSystemApp), this.vms) : []
 		},
 		// a pinned app that is gone (uninstalled) is skipped, and forgotten at the next pin
 		favoriteApps() {
