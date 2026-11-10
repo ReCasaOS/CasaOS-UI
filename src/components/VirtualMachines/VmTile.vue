@@ -1,7 +1,8 @@
 <template>
 	<!-- A VM in the app grid. A button of its own, so Enter and Space open it;
 		no menu: a VM is not an app, and has none of an app's actions. -->
-	<button :aria-label="label" :title="label" class="common-card app-card vm-tile is-flex is-align-items-center is-justify-content-center"
+	<!-- compact (beta dashboard): the row of AppCard's .is-compact, whose rules are not scoped and so reach this button -->
+	<button :aria-label="label" :class="{ 'is-compact': compact }" :title="label" class="common-card app-card vm-tile is-flex is-align-items-center is-justify-content-center"
 		type="button" @click="open">
 		<div class="blur-background"></div>
 		<div class="cards-content">
@@ -20,7 +21,11 @@
 						<span class="vm-tile-chip">VM</span>
 					</span>
 				</div>
-				<p class="mt-3 one-line vm-tile-name">{{ name }}</p>
+				<div class="app-text">
+					<p class="mt-3 one-line vm-tile-name">{{ name }}</p>
+					<!-- beta dashboard: the state in words under the name, as an app's card has it -->
+					<p v-if="compact" class="one-line app-state">{{ stateText }}</p>
+				</div>
 			</div>
 		</div>
 	</button>
@@ -53,6 +58,8 @@ export default {
 	name: 'VmTile',
 	props: {
 		vm: { type: Object, required: true },
+		// beta dashboard: a row (mark, name, state) instead of a square
+		compact: { type: Boolean, default: false },
 	},
 	computed: {
 		name() {
@@ -168,6 +175,31 @@ export default {
 
 .img-c:hover .vm-tile-screen {
 	transform: scale3d(1.1, 1.1, 1.1);
+}
+
+// beta dashboard: the mark the size of an app's icon there (2.75rem)
+.vm-tile.is-compact {
+	.vm-tile-screen {
+		width: 2.75rem;
+		height: 2.75rem;
+		border-radius: 0.625rem;
+
+		svg {
+			width: 1.5rem;
+			height: 1.5rem;
+		}
+	}
+
+	.vm-tile-os {
+		font-size: 1.5rem;
+	}
+
+	.vm-tile-dot {
+		top: 0.15rem;
+		right: 0.15rem;
+		width: 0.5rem;
+		height: 0.5rem;
+	}
 }
 
 // the chip: the same pair, inverted (12.71:1 and 13.37:1)

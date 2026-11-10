@@ -723,6 +723,15 @@ describe('app section with the system row (beta dashboard)', () => {
 		expect(get.call(vm)).toEqual([jellyfin, nextcloud])
 	})
 
+	it('draws a tile per VM after the Virtual Machines card of the System row, and none in the grid', () => {
+		const vms = { name: 'Virtual Machines', app_type: 'system' }
+		const alpha = { id: 'a', title: 'Alpha' }
+		const vm = { systemFirst: true, filter: 'all', vms: [alpha], appList: [store, vms, files, jellyfin] }
+
+		expect(systemApps.call(vm)).toEqual([store, vms, { name: 'vm-tile:a', vmTile: true, vm: alpha }, files])
+		expect(get.call(vm)).toEqual([jellyfin])
+	})
+
 	it('puts the built-ins back first after a drag, so the saved order keeps them', () => {
 		const vm = { systemFirst: true, filter: 'all', vms: [], appList: [store, jellyfin, files, nextcloud] }
 

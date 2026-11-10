@@ -1540,6 +1540,8 @@ export default {
 
   .app-text {
     min-width: 0;
+    // here and not on .img-c, whose has-text-centered is !important: a short second line stays under the start of the name
+    text-align: left;
 
     p {
       margin: 0 !important;
