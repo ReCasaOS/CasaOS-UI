@@ -62,6 +62,16 @@ const backup = {
 		return api.put(`${PREFIX}/backup/schedules`, schedules)
 	},
 
+	// The folders no backup of an app copies, whichever app mounts them: one list for the box.
+	// The body and the answer are {paths}; an older box answers 404.
+	getExclusions() {
+		return api.get(`${PREFIX}/backup/exclusions`)
+	},
+
+	saveExclusions(paths) {
+		return api.put(`${PREFIX}/backup/exclusions`, { paths })
+	},
+
 	// What happened, newest first, failures included.
 	getRuns() {
 		return api.get(`${PREFIX}/backup/runs`)

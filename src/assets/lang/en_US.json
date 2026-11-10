@@ -3277,5 +3277,10 @@
   "The name {key} is used twice.": "The name {key} is used twice.",
   "At most {max} labels can be added or changed.": "At most {max} labels can be added or changed.",
   "Start it when this machine starts": "Start it when this machine starts",
-  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it."
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.",
+  "Left out": "Left out",
+  "Folders no backup of an app copies, whichever app mounts them: a share on a NAS, a media library kept somewhere else.": "Folders no backup of an app copies, whichever app mounts them: a share on a NAS, a media library kept somewhere else.",
+  "Folders left out, one per line": "Folders left out, one per line",
+  "Write the full path as the app mounts it. Everything inside is left out too, and a restore does not write to it. Backups already taken keep what they copied.": "Write the full path as the app mounts it. Everything inside is left out too, and a restore does not write to it. Backups already taken keep what they copied.",
+  "The folders left out could not be loaded: {error}": "The folders left out could not be loaded: {error}"
 }
