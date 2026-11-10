@@ -156,3 +156,19 @@ describe('the stub of the image upload', () => {
 		}
 	})
 })
+
+describe('the stub of public sharing', () => {
+	it('claims a name, shares and stops an app, and refuses a name without the terms', () => {
+		const state = newGridState()
+		expect(ask('GET', '/v1/share', null, state).body.data).toMatchObject({ supported: true, name: '', tunnel: { connected: false } })
+		expect(ask('PUT', '/v1/share/apps/jellyfin', null, state).status).toBe(400)
+		expect(ask('PUT', '/v1/share/name', { name: 'mybox' }, state).status).toBe(400)
+		expect(ask('PUT', '/v1/share/name', { name: 'mybox', accept_tos: true }, state).body.data.host).toBe('mybox.box.recasaos.org')
+
+		const shared = ask('PUT', '/v1/share/apps/jellyfin', null, state).body.data
+		expect(shared.apps.find(a => a.name === 'jellyfin')).toMatchObject({ shared: true, url: 'https://jellyfin.mybox.box.recasaos.org' })
+		expect(shared.tunnel.connected).toBe(true)
+
+		expect(ask('DELETE', '/v1/share/apps', null, state).body.data.apps.some(a => a.shared)).toBe(false)
+	})
+})

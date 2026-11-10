@@ -86,9 +86,11 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { forgetFleet, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
+import { readLeaveWarning } from '@/service/publicShare'
 
 const HTTPS = /^https:\/\/.+/i
 
@@ -238,11 +240,18 @@ export default {
 				this.error = this.$t('This box could not add itself to its fleet: {error}', { error: this.readable(e) })
 			}
 		},
-		confirmDisable() {
+		async confirmDisable() {
+			if (this.busy) {
+				return
+			}
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Disable the master role?'),
 				message: (this.view?.relay ? this.$t('Disabling the master also deletes the fleet at the relay') : this.$t('The list of boxes is erased.'))
-					+ (this.view?.remote ? ` ${this.$t('Your phones and PCs lose remote access too.')}` : ''),
+					+ (this.view?.remote ? ` ${this.$t('Your phones and PCs lose remote access too.')}` : '')
+					+ (warning ? ` ${escape(warning)}` : ''),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Disable'),
@@ -251,16 +260,22 @@ export default {
 				onConfirm: () => this.run(() => fleetApi.setMaster({ enabled: false, address: this.address })),
 			})
 		},
-		confirmRelay() {
+		async confirmRelay() {
+			if (this.busy) {
+				return
+			}
 			const relay = this.relay.trim()
 			if (!HTTPS.test(relay)) {
 				this.error = this.$t('The relay must start with https://')
 				return
 			}
 			this.error = ''
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Change the relay?'),
-				message: this.$t('The codes already given stop working: every box needs a new code.'),
+				message: this.$t('The codes already given stop working: every box needs a new code.') + (warning ? ` ${escape(warning)}` : ''),
 				type: 'is-warning',
 				hasIcon: true,
 				confirmText: this.$t('Change the relay'),
@@ -270,6 +285,9 @@ export default {
 			})
 		},
 		async join() {
+			if (this.busy) {
+				return
+			}
 			const code = this.code.trim()
 			this.busy = true
 			this.error = ''
@@ -280,7 +298,7 @@ export default {
 			} catch (e) {
 				// the core refuses once while remote access is on: the owner decides, the code stays in the field
 				if (e?.response?.status === 409 && /has remote access/i.test(e.response.data?.message)) {
-					this.confirmJoinLeavingRemote(code)
+					await this.confirmJoinLeavingRemote(code)
 				} else {
 					this.error = this.readable(e)
 				}
@@ -288,10 +306,11 @@ export default {
 				this.busy = false
 			}
 		},
-		confirmJoinLeavingRemote(code) {
+		async confirmJoinLeavingRemote(code) {
+			const warning = await readLeaveWarning(this.$t)
 			this.$buefy.dialog.confirm({
 				title: this.$t('Join this fleet and turn remote access off?'),
-				message: this.$t('Your phones and PCs lose access to this box. Add them again on the master afterwards.'),
+				message: this.$t('Your phones and PCs lose access to this box. Add them again on the master afterwards.') + (warning ? ` ${escape(warning)}` : ''),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Join'),
@@ -300,10 +319,16 @@ export default {
 				onConfirm: () => this.run(() => fleetApi.join(code, { leaveRemote: true }), true),
 			})
 		},
-		confirmLeave() {
+		async confirmLeave() {
+			if (this.busy) {
+				return
+			}
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Leave the fleet?'),
-				message: this.$t('This box forgets its master and stops answering it.'),
+				message: this.$t('This box forgets its master and stops answering it.') + (warning ? ` ${escape(warning)}` : ''),
 				type: 'is-danger',
 				hasIcon: true,
 				confirmText: this.$t('Leave'),
