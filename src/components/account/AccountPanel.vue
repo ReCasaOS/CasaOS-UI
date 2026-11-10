@@ -317,10 +317,20 @@ export default {
 		async savePassword() {
 			this.isLoading = true
 			try {
-				await this.$api.users.changePassword({
+				const res = await this.$api.users.changePassword({
 					old_password: this.oriPassword,
 					password: this.password,
 				})
+				// The change ends every session of the account, this one too, and answers with the
+				// tokens this one goes on with. An older user service answers with the user alone.
+				const token = res?.data?.data?.token
+				if (token) {
+					localStorage.setItem('access_token', token.access_token)
+					localStorage.setItem('refresh_token', token.refresh_token)
+					localStorage.setItem('expires_at', token.expires_at)
+					this.$store.commit('SET_ACCESS_TOKEN', token.access_token)
+					this.$store.commit('SET_REFRESH_TOKEN', token.refresh_token)
+				}
 				this.oriPassword = ''
 				this.password = ''
 				this.confirmation = ''
