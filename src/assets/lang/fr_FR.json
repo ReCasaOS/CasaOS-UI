@@ -3279,5 +3279,11 @@
   "The name {key} is used twice.": "Le nom {key} est utilisé deux fois.",
   "At most {max} labels can be added or changed.": "Au plus {max} étiquettes peuvent être ajoutées ou modifiées.",
   "Start it when this machine starts": "La démarrer au démarrage de cette machine",
-  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Sans cela, après une coupure de courant ou un redémarrage de cette machine, la VM reste éteinte jusqu'à ce que quelqu'un la démarre."
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Sans cela, après une coupure de courant ou un redémarrage de cette machine, la VM reste éteinte jusqu'à ce que quelqu'un la démarre.",
+  "Left out": "Exclus",
+  "Folders no backup of an app copies, whichever app mounts them: a share on a NAS, a media library kept somewhere else.": "Les dossiers qu'aucune sauvegarde d'app ne copie, quelle que soit l'app qui les monte : un partage sur un NAS, une médiathèque conservée ailleurs.",
+  "Folders left out, one per line": "Dossiers exclus, un par ligne",
+  "The full path of the folder on this box, not the one inside the app. Everything in it is left out, and a restore does not write to it. A larger folder that contains it is left out whole when an app mounts it. Backups already taken keep what they copied.": "Le chemin complet du dossier sur cette machine, pas celui vu dans l'app. Tout ce qu'il contient est exclu, et une restauration n'y écrit pas. Un dossier plus grand qui le contient est exclu en entier quand une app le monte. Les sauvegardes déjà faites gardent ce qu'elles ont copié.",
+  "The folders left out could not be loaded: {error}": "Les dossiers exclus n'ont pas pu être chargés : {error}",
+  "This box did not answer with a list.": "Cette machine n'a pas répondu par une liste."
 }

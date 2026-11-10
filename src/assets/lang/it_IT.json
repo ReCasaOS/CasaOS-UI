@@ -1187,5 +1187,11 @@
   "{name} uses an HTTPS certificate the browser does not trust, and inside the dashboard there is no way to accept it.": "{name} usa un certificato HTTPS di cui il browser non si fida, e dentro la dashboard non c'è modo di accettarlo.",
   "{name} is served over plain HTTP, which the browser does not show inside a dashboard opened over HTTPS.": "{name} è servita in HTTP semplice, che il browser non mostra dentro una dashboard aperta in HTTPS.",
   "Start it when this machine starts": "Avviala all'accensione di questa macchina",
-  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Senza, dopo un blackout o un riavvio di questa macchina la VM resta spenta finché qualcuno non la avvia."
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Senza, dopo un blackout o un riavvio di questa macchina la VM resta spenta finché qualcuno non la avvia.",
+  "Left out": "Esclusi",
+  "Folders no backup of an app copies, whichever app mounts them: a share on a NAS, a media library kept somewhere else.": "Le cartelle che nessun backup di un'app copia, qualunque app le monti: una condivisione su un NAS, una libreria multimediale conservata altrove.",
+  "Folders left out, one per line": "Cartelle escluse, una per riga",
+  "The full path of the folder on this box, not the one inside the app. Everything in it is left out, and a restore does not write to it. A larger folder that contains it is left out whole when an app mounts it. Backups already taken keep what they copied.": "Il percorso completo della cartella su questo box, non quello dentro l'app. Tutto il suo contenuto è escluso, e un ripristino non ci scrive. Una cartella più grande che la contiene viene esclusa per intero quando un'app la monta. I backup già eseguiti conservano ciò che hanno copiato.",
+  "The folders left out could not be loaded: {error}": "Impossibile caricare le cartelle escluse: {error}",
+  "This box did not answer with a list.": "Questo box non ha risposto con un elenco."
 }

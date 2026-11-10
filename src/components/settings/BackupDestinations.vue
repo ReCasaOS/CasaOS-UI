@@ -225,6 +225,10 @@
 					<BackupSchedules v-if="tab === 'schedules'" />
 				</b-tab-item>
 
+				<b-tab-item value="exclusions" :label="$t('Left out')">
+					<BackupExclusions v-if="tab === 'exclusions'" />
+				</b-tab-item>
+
 				<b-tab-item value="history" :label="$t('History')">
 					<BackupHistory v-if="tab === 'history'" />
 				</b-tab-item>
@@ -237,6 +241,7 @@
 </template>
 
 <script>
+import BackupExclusions from './BackupExclusions.vue'
 import BackupHistory from './BackupHistory.vue'
 import BackupRunning from './BackupRunning.vue'
 import RestoreFromDestinationModal from './RestoreFromDestinationModal.vue'
@@ -251,7 +256,7 @@ const RUNNING_POLL_MS = 3000
 
 export default {
 	name: 'backup-destinations',
-	components: { BackupSchedules, BackupHistory, BackupRunning },
+	components: { BackupSchedules, BackupExclusions, BackupHistory, BackupRunning },
 	props: {
 		// 'running', 'destinations', 'schedules' or 'history'; the dashboard opens it on what runs
 		initialTab: { type: String, default: 'destinations' },
