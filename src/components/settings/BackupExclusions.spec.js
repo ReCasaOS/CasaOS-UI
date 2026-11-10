@@ -58,6 +58,13 @@ describe('the folders left out of backups', () => {
 		expect(wrapper.find('textarea').element.value).toBe('/')
 	})
 
+	it('does not take an answer with no list in it for an empty list', async () => {
+		await open({ getExclusions: () => Promise.resolve({ data: { data: null } }) })
+
+		expect(wrapper.text()).toContain('The folders left out could not be loaded')
+		expect(saveButton(wrapper).element.disabled).toBe(true)
+	})
+
 	it('cannot save over a list that did not load', async () => {
 		await open({ getExclusions: () => Promise.reject(new Error('Network Error')) })
 

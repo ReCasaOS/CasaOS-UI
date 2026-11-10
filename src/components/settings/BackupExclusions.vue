@@ -8,11 +8,12 @@
 
 		<b-field :label="$t('Folders left out, one per line')" label-position="on-border">
 			<!-- nothing can be typed until the list has loaded: saving over a list that
-				failed to load would empty it, and the next backup would copy it all -->
-			<b-input v-model="text" :aria-label="$t('Folders left out, one per line')" :disabled="!loaded" placeholder="/mnt/nas" size="is-small" type="textarea"></b-input>
+				failed to load would empty it, and the next backup would copy it all. Nor
+				while it is saved: the answer replaces what is in the field -->
+			<b-input v-model="text" :aria-label="$t('Folders left out, one per line')" :disabled="!loaded || busy" placeholder="/mnt/nas" size="is-small" type="textarea"></b-input>
 		</b-field>
 		<p class="_has-text-gray is-size-7">
-			{{ $t('Write the full path as the app mounts it. Everything inside is left out too, and a restore does not write to it. Backups already taken keep what they copied.') }}
+			{{ $t('The full path of the folder on this box, not the one inside the app. Everything in it is left out, and a restore does not write to it. A larger folder that contains it is left out whole when an app mounts it. Backups already taken keep what they copied.') }}
 		</p>
 
 		<div class="is-flex is-justify-content-flex-end mt-4">
@@ -57,9 +58,13 @@ export default {
 			}
 		},
 
+		// an answer with no list in it is not an empty list
 		show(res) {
-			const data = res.data.data
-			this.text = ((data && data.paths) || []).join('\n')
+			const paths = res.data && res.data.data && res.data.data.paths
+			if (!Array.isArray(paths)) {
+				throw new TypeError(this.$t('This box did not answer with a list.'))
+			}
+			this.text = paths.join('\n')
 		},
 
 		messageOf(error) {
