@@ -241,6 +241,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import BackupExclusions from './BackupExclusions.vue'
 import BackupHistory from './BackupHistory.vue'
 import BackupRunning from './BackupRunning.vue'
@@ -346,7 +347,7 @@ export default {
 						this.$buefy.toast.open({ message: this.$t('Backup of this box started.'), type: 'is-success', duration: 5000 })
 					} catch (error) {
 						const data = error.response && error.response.data
-						this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+						this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 					} finally {
 						this.busy = ''
 					}
@@ -421,7 +422,7 @@ export default {
 
 		toastError(error) {
 			const data = error.response && error.response.data
-			this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+			this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 		},
 
 		isSecret(key) {
@@ -509,7 +510,7 @@ export default {
 				await this.loadRestic()
 				const made = res.data.data && res.data.data.password
 				if (password || !made) {
-					this.$buefy.toast.open({ message: this.$t('Backups to {name} are now kept with restic.', { name }), type: 'is-success', duration: 5000 })
+					this.$buefy.toast.open({ message: escape(this.$t('Backups to {name} are now kept with restic.', { name })), type: 'is-success', duration: 5000 })
 				} else {
 					this.showResticPassword(name, made)
 				}
@@ -538,7 +539,7 @@ export default {
 		showResticPassword(name, password) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Write this password down'),
-				message: `${this.$t('This is the password of the restic repository at {name}. Without it the backups there cannot be read, and the backup of this box does not hold it: keep a copy away from this box.', { name: this.htmlEscape(name) })}<br><br><code>${this.htmlEscape(password)}</code>`,
+				message: `${this.$t('This is the password of the restic repository at {name}. Without it the backups there cannot be read, and the backup of this box does not hold it: keep a copy away from this box.', { name: escape(name) })}<br><br><code>${escape(password)}</code>`,
 				confirmText: this.$t('Download'),
 				cancelText: this.$t('Close'),
 				onConfirm: () => {
@@ -569,7 +570,7 @@ export default {
 			try {
 				await this.$api.backup.disableRestic(name)
 				await this.loadRestic()
-				this.$buefy.toast.open({ message: this.$t('Backups to {name} are stamped copies again. The restic repository is kept.', { name }), type: 'is-success', duration: 5000 })
+				this.$buefy.toast.open({ message: escape(this.$t('Backups to {name} are stamped copies again. The restic repository is kept.', { name })), type: 'is-success', duration: 5000 })
 			} catch (error) {
 				this.error = this.messageOf(error)
 			} finally {
@@ -605,10 +606,6 @@ export default {
 			} finally {
 				this.busy = ''
 			}
-		},
-
-		htmlEscape(text) {
-			return String(text).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 		},
 
 		async save() {
@@ -654,7 +651,7 @@ export default {
 		confirmForget(name) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Forget this destination?'),
-				message: this.$t('{name} will be removed from this box, along with the credentials for it. Backups already sent there are not touched.', { name }),
+				message: escape(this.$t('{name} will be removed from this box, along with the credentials for it. Backups already sent there are not touched.', { name })),
 				confirmText: this.$t('Forget'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',

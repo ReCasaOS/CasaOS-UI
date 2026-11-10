@@ -167,6 +167,7 @@ import xor from 'lodash/xor'
 import concat from 'lodash/concat'
 import last from 'lodash/last'
 import isEqual from 'lodash/isEqual'
+import escape from 'lodash/escape'
 import { groupLegacyApps } from './legacyApps'
 import AppCard from './AppCard.vue'
 import AppCardSkeleton from './AppCardSkeleton.vue'
@@ -571,10 +572,10 @@ export default {
 
 				for (const toast of imageUpdateSummary(result)) {
 					this.$buefy.toast.open({
-						message: this.$t(toast.message, toast.params),
+						message: escape(this.$t(toast.message, toast.params)),
 						type: toast.type,
 						// a toast that names apps and reasons needs longer than an acknowledgement
-						...(toast.duration ? { duration: toast.duration } : {}),
+						duration: toast.duration || undefined, // undefined is Buefy's own length
 					})
 				}
 			} catch (error) {
@@ -1084,7 +1085,7 @@ export default {
 		messageBusToast(message, type) {
 			const duration = 5000
 			this.$buefy.toast.open({
-				message,
+				message: escape(message),
 				duration,
 				type,
 			})
@@ -1144,10 +1145,10 @@ export default {
 				this.addIdToSessionStorage(data.Properties['app:name'])
 
 				this.$buefy.toast.open({
-					message: this.$t(`{name} has been updated to the latest version!`, {
+					message: escape(this.$t(`{name} has been updated to the latest version!`, {
 						// the publisher sends app:name; there has never been a `name`
 						name: data.Properties['app:name'],
-					}),
+					})),
 					type: 'is-success',
 				})
 				this.getList().then(() => {

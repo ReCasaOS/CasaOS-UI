@@ -56,6 +56,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import RestoreFilesModal from './RestoreFilesModal.vue'
 
 export default {
@@ -101,9 +102,9 @@ export default {
 			const stamp = this.chosen[entry.app]
 			this.$buefy.dialog.confirm({
 				title: this.$t('Restore {app} from this backup?', { app: entry.app }),
-				message: entry.installed
+				message: escape(entry.installed
 					? this.$t('The app will be stopped and its data replaced by the backup taken on {when}. Files added since then are removed. This cannot be undone.', { when: this.when(stamp) })
-					: this.$t('{app} is not installed here. It will be installed from the compose file the backup kept, then its data put back from the backup taken on {when}.', { app: entry.app, when: this.when(stamp) }),
+					: this.$t('{app} is not installed here. It will be installed from the compose file the backup kept, then its data put back from the backup taken on {when}.', { app: entry.app, when: this.when(stamp) })),
 				confirmText: this.$t('Restore'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -130,7 +131,7 @@ export default {
 			const stamp = this.chosen[entry.app]
 			this.$buefy.dialog.confirm({
 				title: this.$t('Delete this backup of {app}?', { app: entry.app }),
-				message: this.$t('The backup taken on {when} is removed from {name}. This cannot be undone.', { when: this.when(stamp), name: this.destination }),
+				message: escape(this.$t('The backup taken on {when} is removed from {name}. This cannot be undone.', { when: this.when(stamp), name: this.destination })),
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -146,7 +147,7 @@ export default {
 				await this.load()
 			} catch (error) {
 				const data = error.response && error.response.data
-				this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+				this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 			} finally {
 				this.deleting = ''
 			}
@@ -163,7 +164,7 @@ export default {
 				})
 			} catch (error) {
 				const data = error.response && error.response.data
-				this.$buefy.toast.open({ message: (data && data.message) || error.message, type: 'is-danger', duration: 6000 })
+				this.$buefy.toast.open({ message: escape((data && data.message) || error.message), type: 'is-danger', duration: 6000 })
 			} finally {
 				this.restoring = ''
 			}

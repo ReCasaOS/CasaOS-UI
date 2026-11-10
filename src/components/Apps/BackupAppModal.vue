@@ -50,6 +50,8 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
+
 export default {
 	name: 'backup-app-modal',
 	props: {
@@ -102,7 +104,7 @@ export default {
 			this.busy = true
 			try {
 				const res = await this.$api.backup.backupApp(this.appId, this.destination, this.holdStill, Number(this.keep) || 0)
-				this.$buefy.toast.open({ message: res.data.message, type: 'is-success', duration: 5000 })
+				this.$buefy.toast.open({ message: escape(res.data.message), type: 'is-success', duration: 5000 })
 				this.$emit('close')
 			} catch (error) {
 				this.error = this.messageOf(error)

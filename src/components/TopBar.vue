@@ -677,6 +677,7 @@
 
 <script>
 import { defineAsyncComponent } from 'vue'
+import escape from 'lodash/escape'
 import AccountPanel from './account/AccountPanel.vue'
 import TerminalPanel from './logsAndTerminal/TerminalPanel.vue'
 import BackupDestinations from './settings/BackupDestinations.vue'
@@ -1529,7 +1530,7 @@ export default {
 				// the operating system that works on the machine, or a restart that would not come back, has its own
 				const refusal = powerRefusal(error)
 				this.$buefy.toast.open({
-					message: refusal ? this.$t(refusal.key, refusal.params) : this.$t('Failed to perform power operation.'),
+					message: escape(refusal ? this.$t(refusal.key, refusal.params) : this.$t('Failed to perform power operation.')),
 					type: 'is-danger',
 				})
 			})

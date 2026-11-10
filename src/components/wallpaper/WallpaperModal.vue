@@ -69,6 +69,7 @@
 
 <script>
 import Uploader from 'simple-uploader.js'
+import escape from 'lodash/escape'
 import { LOGIN_WALLPAPER_KEY, LOGIN_WALLPAPER_NAME, LOGIN_WALLPAPER_USER, findLoginWallpaper, loginWallpaperPath, toJPEG } from './loginWallpaper'
 
 const wallpaperConfig = 'wallpaper'
@@ -163,7 +164,7 @@ export default {
 				this.from = 'Upload'
 			} else {
 				this.$buefy.toast.open({
-					message: res.message,
+					message: escape(res.message),
 					type: 'is-danger',
 				})
 			}

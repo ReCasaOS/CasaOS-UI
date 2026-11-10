@@ -134,6 +134,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { ALERT_KINDS, blankValues, channelURL } from './alertChannels'
 
 // The core names a channel's service by its URL's scheme: the two the forms build read as the forms name them.
@@ -232,7 +233,7 @@ export default {
 
 		rename(channel) {
 			this.$buefy.dialog.prompt({
-				message: this.$t('New name for {name}', { name: channel.name }),
+				message: escape(this.$t('New name for {name}', { name: channel.name })),
 				inputAttrs: { value: channel.name, required: true },
 				confirmText: this.$t('Save'),
 				cancelText: this.$t('Cancel'),
@@ -245,7 +246,7 @@ export default {
 
 		remove(channel) {
 			this.$buefy.dialog.confirm({
-				message: this.$t('Remove {name}? Alerts are no longer sent there.', { name: channel.name }),
+				message: escape(this.$t('Remove {name}? Alerts are no longer sent there.', { name: channel.name })),
 				confirmText: this.$t('Remove'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',

@@ -24,6 +24,7 @@ import { h } from 'vue'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation, Pagination } from 'swiper/modules'
 import sortBy from 'lodash/sortBy'
+import escape from 'lodash/escape'
 import { failuresToAnnounce, rememberBackupFailures, seenBackupFailures } from '@/components/settings/backupFailures'
 import { backupSubject } from '@/components/settings/backupScheduleGroups'
 import noticeBlock from '@/components/noticBlock/noticeBlock'
@@ -152,11 +153,11 @@ export default {
 					position: 'is-top',
 					indefinite: true,
 					queue: false,
-					message: this.$t('Scheduled backup of {app} to {destination} failed: {error}', {
+					message: escape(this.$t('Scheduled backup of {app} to {destination} failed: {error}', {
 						app: run.app,
 						destination: run.destination,
 						error: run.error,
-					}),
+					})),
 				})
 				seen.push(run.stamp)
 			}
@@ -701,7 +702,7 @@ export default {
 		},
 		'app:apply-changes-end': function (res) {
 			this.$buefy.toast.open({
-				message: `The setting of ${res.Properties['app:name']} is complete`,
+				message: escape(`The setting of ${res.Properties['app:name']} is complete`),
 				duration: 5000,
 				type: 'is-success',
 			})
@@ -715,7 +716,7 @@ export default {
 		},
 		'app:apply-changes-error': function (res) {
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -799,7 +800,7 @@ export default {
 		// it died on, saying nothing, until the page was reloaded.
 		'app:update-error': function (res) {
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -842,9 +843,9 @@ export default {
 		'backup:end': function (res) {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
-				message: res.Properties['backup:kind'] === 'restore'
+				message: escape(res.Properties['backup:kind'] === 'restore'
 					? this.$t('{title} restored from {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] })
-					: this.$t('{title} backed up to {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] }),
+					: this.$t('{title} backed up to {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] })),
 				type: 'is-success',
 				duration: 5000,
 			})
@@ -852,9 +853,9 @@ export default {
 		'backup:error': function (res) {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
-				message: res.Properties['backup:kind'] === 'restore'
+				message: escape(res.Properties['backup:kind'] === 'restore'
 					? this.$t('Restoring {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message })
-					: this.$t('Backing up {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message }),
+					: this.$t('Backing up {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message })),
 				type: 'is-danger',
 				duration: 8000,
 			})

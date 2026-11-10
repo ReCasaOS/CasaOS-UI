@@ -28,6 +28,7 @@
 
 <script>
 import { marked } from 'marked'
+import escape from 'lodash/escape'
 
 export default {
 	props: {
@@ -105,7 +106,7 @@ export default {
 				this.isUpdating = false
 				const detail = error?.response?.data?.message
 				this.$buefy.toast.open({
-					message: this.$t('The update could not be started.') + (typeof detail === 'string' && detail ? ` ${detail}` : ''),
+					message: escape(this.$t('The update could not be started.') + (typeof detail === 'string' && detail ? ` ${detail}` : '')),
 					type: 'is-danger',
 				})
 				return

@@ -76,6 +76,7 @@
 
 <script>
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
+import escape from 'lodash/escape'
 import smoothReflow from '@/mixins/smoothReflow'
 import Business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import Business_LinkApp from '@/mixins/app/Business_LinkApp'
@@ -186,14 +187,14 @@ export default {
 					this.icon = require('@/assets/img/app/default.svg')
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-warning',
 					})
 				}
 			}).catch((err) => {
 				this.isLoading = false
 				this.$buefy.toast.open({
-					message: err.response.data.message || 'NOT FOUND',
+					message: escape(err.response.data.message || 'NOT FOUND'),
 					type: 'is-danger',
 				})
 			})
@@ -212,14 +213,14 @@ export default {
 					this.$emit('close')
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-warning',
 					})
 				}
 			}).catch((err) => {
 				this.isLoading = false
 				this.$buefy.toast.open({
-					message: err.response.data.message || 'NOT FOUND',
+					message: escape(err.response.data.message || 'NOT FOUND'),
 					type: 'is-danger',
 				})
 			})

@@ -209,6 +209,7 @@ import delay from 'lodash/delay'
 import max from 'lodash/max'
 import orderBy from 'lodash/orderBy'
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
+import escape from 'lodash/escape'
 import DriveItem from './DriveItem.vue'
 import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
@@ -649,7 +650,7 @@ export default {
 				this.isValiding = false
 				this.$buefy.toast.open({
 					duration: 3000,
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-danger',
 				})
 				console.error(err)
@@ -691,7 +692,7 @@ export default {
 			}).catch((err) => {
 				this.$buefy.toast.open({
 					duration: 3000,
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-danger',
 				})
 				console.error(err)

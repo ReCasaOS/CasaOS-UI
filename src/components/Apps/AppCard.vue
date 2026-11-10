@@ -213,6 +213,7 @@
 import isNull from 'lodash/isNull'
 import YAML from 'yaml'
 import FileSaver from 'file-saver'
+import escape from 'lodash/escape'
 import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
@@ -604,7 +605,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -619,7 +620,7 @@ export default {
 				this.updateState()
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -656,7 +657,7 @@ export default {
 			this.$refs.dro.isActive = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
-				message: this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName }),
+				message: escape(this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName })),
 				type: 'is-dark',
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
@@ -674,7 +675,7 @@ export default {
 			} catch (err) {
 				this.isUninstalling = false
 				this.$buefy.toast.open({
-					message: err.response?.data?.message || err.message,
+					message: escape(err.response?.data?.message || err.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -702,7 +703,7 @@ export default {
 					}
 				}).catch((err) => {
 					this.$buefy.toast.open({
-						message: err.response.data.data,
+						message: escape(err.response.data.data),
 						type: 'is-danger',
 						position: 'is-top',
 						duration: 5000,
@@ -716,7 +717,7 @@ export default {
 					}
 				}).catch((err) => {
 					this.$buefy.toast.open({
-						message: err.response.data.data,
+						message: escape(err.response.data.data),
 						type: 'is-danger',
 						position: 'is-top',
 						duration: 5000,
@@ -733,7 +734,7 @@ export default {
 			this.$refs.dro.isActive = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
-				message: this.$t('{name} will be stopped and replaced by a new container running the newest image. Its volumes and bind mounts are carried over with the data in them; anything written elsewhere inside the container is lost with it. Its settings are copied from the container as it runs now, and CasaOS keeps no copy of them: this container was imported, not installed by CasaOS. If no newer image is published, nothing is touched.', { name: this.containerName }),
+				message: escape(this.$t('{name} will be stopped and replaced by a new container running the newest image. Its volumes and bind mounts are carried over with the data in them; anything written elsewhere inside the container is lost with it. Its settings are copied from the container as it runs now, and CasaOS keeps no copy of them: this container was imported, not installed by CasaOS. If no newer image is published, nothing is touched.', { name: this.containerName })),
 				type: 'is-dark',
 				confirmText: this.$t('Recreate container'),
 				cancelText: this.$t('Cancel'),
@@ -754,7 +755,7 @@ export default {
 			this.$openAPI.appManagement.container.recreateContainerByID(this.item.name, true, undefined, { params }).catch((err) => {
 				this.isRecreating = false
 				this.$buefy.toast.open({
-					message: err.response?.data?.message || this.$t('Unable to update at the moment!'),
+					message: escape(err.response?.data?.message || this.$t('Unable to update at the moment!')),
 					type: 'is-danger',
 					duration: 5000,
 				})
@@ -876,7 +877,7 @@ export default {
 				} else {
 					this.$buefy.dialog.alert({
 						title: 'Error',
-						message: res.data.data || res.data.message,
+						message: escape(res.data.data || res.data.message),
 						type: 'is-danger',
 						ariaRole: 'alertdialog',
 						ariaModal: true,
@@ -884,7 +885,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 3000,
@@ -901,7 +902,7 @@ export default {
 			}).catch((err) => {
 				this.$buefy.dialog.alert({
 					title: 'Error',
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					ariaRole: 'alertdialog',
 					ariaModal: true,
@@ -944,7 +945,7 @@ export default {
 
 					this.$api.container.install(initData).catch((err) => {
 						this.$buefy.toast.open({
-							message: err.response.data.message,
+							message: escape(err.response.data.message),
 							type: 'is-warning',
 						})
 					}).then(() => {
@@ -966,7 +967,7 @@ export default {
 				FileSaver.saveAs(blob, `${item.image}.yaml`)
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-warning',
 				})
 			})
@@ -1005,7 +1006,7 @@ export default {
 					this.$messageBus('apps_checkupdate', this.item.name.toString())
 					this.$buefy.toast.open({
 						// value is `In the process of asynchronous updating.` or `compose app `app Name` is up to date`
-						message: resp.data.message,
+						message: escape(resp.data.message),
 						type: 'is-success',
 					})
 				} else {
@@ -1050,7 +1051,7 @@ export default {
 		'app:start-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1064,7 +1065,7 @@ export default {
 		'app:stop-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1078,7 +1079,7 @@ export default {
 		'app:restart-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1097,7 +1098,7 @@ export default {
 		'app:apply-changes-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1146,7 +1147,7 @@ export default {
 				this.updateState()
 				const outcome = this.recreateOutcome(data.Properties)
 				if (outcome)
-					this.$buefy.toast.open({ ...outcome, duration: 5000 })
+					this.$buefy.toast.open({ message: escape(outcome.message), type: outcome.type, duration: 5000 })
 				return
 			}
 			if (data.Properties['app:name'] !== this.item.name)
@@ -1162,7 +1163,7 @@ export default {
 			// comes from the v1 recreate path alone.
 			if (data.Properties['docker:image:updated'] === 'false') {
 				this.$buefy.toast.open({
-					message: this.$t(`{appName} is the latest version!`, { appName: this.item.name }),
+					message: escape(this.$t(`{appName} is the latest version!`, { appName: this.item.name })),
 					type: 'is-success',
 					duration: 5000,
 				})
@@ -1174,7 +1175,7 @@ export default {
 				this.isRebuilding = false
 				// 5.message toast
 				this.$buefy.toast.open({
-					message: this.$t(`{title} rebulid completed`, { title: ice_i18n(this.item.title) }),
+					message: escape(this.$t(`{title} rebulid completed`, { title: ice_i18n(this.item.title) })),
 					type: 'is-success',
 				})
 			}
@@ -1185,7 +1186,7 @@ export default {
 				this.isRebuilding = false
 				// 5.message toast
 				this.$buefy.toast.open({
-					message: res.Properties.message,
+					message: escape(res.Properties.message),
 					type: 'is-warning',
 				})
 			}
@@ -1200,10 +1201,10 @@ export default {
 			this.isRecreating = false
 			this.isUpdating = false
 			this.$buefy.toast.open({
-				message: this.$t('Updating {name} failed: {reason}', {
+				message: escape(this.$t('Updating {name} failed: {reason}', {
 					name: this.containerName,
 					reason: data.Properties.message,
-				}),
+				})),
 				type: 'is-danger',
 				duration: 5000,
 			})

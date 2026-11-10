@@ -81,6 +81,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import StorageManagerPanel from '@/components/Storage/StorageManagerPanel.vue'
 import { raidNeedsAttention, raidTag } from '@/components/Storage/raid'
 import { mixin } from '@/mixins/mixin'
@@ -170,7 +171,7 @@ export default {
 		confirmReclaim() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Free up {size}', { size: this.renderSize(this.reclaimable.size) }),
-				message: this.$t('Updating an app leaves the version it replaced on the disk. Deleting those frees the space. No installed app is affected, and nothing has to be downloaded again. Old versions to delete: {count}', { count: this.reclaimable.count }),
+				message: escape(this.$t('Updating an app leaves the version it replaced on the disk. Deleting those frees the space. No installed app is affected, and nothing has to be downloaded again. Old versions to delete: {count}', { count: this.reclaimable.count })),
 				type: 'is-dark',
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
@@ -184,7 +185,7 @@ export default {
 			this.isReclaiming = true
 			this.$openAPI.appManagement.image.pruneDanglingImages().then((res) => {
 				this.$buefy.toast.open({
-					message: this.$t('Freed {size}', { size: this.renderSize(res.data.data?.size ?? 0) }),
+					message: escape(this.$t('Freed {size}', { size: this.renderSize(res.data.data?.size ?? 0) })),
 					// Without a type Buefy paints it is-dark, under the theme's dark toast text.
 					type: 'is-success',
 					position: 'is-top',
@@ -192,7 +193,7 @@ export default {
 				})
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response?.data?.message || err.message,
+					message: escape(err.response?.data?.message || err.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,

@@ -41,6 +41,7 @@
 import YAML from 'yaml'
 import merge from 'lodash/merge'
 import { marked } from 'marked'
+import escape from 'lodash/escape'
 import { ice_i18n } from '@/mixins/base/common-i18n'
 
 export default {
@@ -117,7 +118,7 @@ export default {
 			this.$openAPI.appManagement.compose.applyComposeAppSettings(this.name, YAML.stringify(realComposeData)).then((res) => {
 				if (res.status === 200) {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-success',
 						position: 'is-top',
 						duration: 5000,
@@ -126,7 +127,7 @@ export default {
 			}).catch((e) => {
 				console.log('Error in saving tips:', e)
 				this.$buefy.toast.open({
-					message: e.response.data.data,
+					message: escape(e.response.data.data),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,

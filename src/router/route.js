@@ -112,16 +112,6 @@ export default [
 		},
 	},
 	{
-		path: '/launch',
-		name: 'AppLauncherCheck',
-		hidden: true,
-		component: () => import('@/views/AppLauncherCheck.vue'),
-		meta: {
-			requireAuth: false,
-			showBackground: false,
-		},
-	},
-	{
 		path: '/developmentElement',
 		name: 'DevelopmentElement',
 		hidden: true,

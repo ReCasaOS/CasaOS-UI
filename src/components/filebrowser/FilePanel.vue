@@ -240,6 +240,7 @@
 import { defineAsyncComponent } from 'vue'
 import orderBy from 'lodash/orderBy'
 import dropRight from 'lodash/dropRight'
+import escape from 'lodash/escape'
 
 import TreeList from './sidebar/TreeList.vue'
 import MountList from './sidebar/MountList.vue'
@@ -788,7 +789,7 @@ export default {
 					this.$store.commit('SET_OPERATE_OBJECT', null)
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-danger',
 					})
 				}

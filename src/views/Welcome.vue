@@ -89,6 +89,7 @@
 <script>
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
 import LottieAnimation from 'lottie-web-vue'
+import escape from 'lodash/escape'
 import smoothReflow from '@/mixins/smoothReflow'
 
 export default {
@@ -163,7 +164,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,

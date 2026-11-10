@@ -107,7 +107,7 @@ export default {
 							this.isRenaming = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							return
@@ -121,7 +121,7 @@ export default {
 						this.isRenaming = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response?.data?.message || e.message,
+							message: escape(e.response?.data?.message || e.message),
 							type: 'is-danger',
 						})
 						console.error(e)
@@ -156,7 +156,7 @@ export default {
 							this.isRemoving = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							console.error(res)
@@ -172,7 +172,7 @@ export default {
 						this.isRemoving = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response.data.message,
+							message: escape(e.response.data.message),
 							type: 'is-danger',
 						})
 						console.error(e)
@@ -243,7 +243,7 @@ export default {
 							this.isFormating = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							console.error(res)
@@ -258,7 +258,7 @@ export default {
 						this.isFormating = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response.data.message,
+							message: escape(e.response.data.message),
 							type: 'is-danger',
 						})
 						console.error(e)

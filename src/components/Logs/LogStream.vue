@@ -49,6 +49,7 @@
 <script>
 import { shallowRef } from 'vue'
 import FileSaver from 'file-saver'
+import escape from 'lodash/escape'
 import { MAX_LINES, colorOf, cursorAt, insertRows, skippedMarker, toRow } from './logsModel'
 import { createLocalStream, createRelayPoller } from './sources'
 import { visibleRange } from './virtualList'
@@ -287,7 +288,7 @@ export default {
 			this.state = 'error'
 			if (!this.toasted) {
 				this.toasted = true
-				this.$buefy?.toast.open({ message: res.error || this.$t('Error'), type: 'is-danger' })
+				this.$buefy?.toast.open({ message: escape(res.error || this.$t('Error')), type: 'is-danger' })
 			}
 		},
 		startSource(base) {
@@ -563,10 +564,10 @@ export default {
 				const name = `recasaos-logs-${this.apps?.length === 1 ? this.apps[0] : 'all'}-${this.range?.since ? stamp(this.range.since) : 'start'}-${p.until ? stamp(p.until) : 'now'}.log`
 				FileSaver.saveAs(new Blob(out, { type: 'text/plain' }), name)
 				if (more) {
-					this.$buefy?.toast.open({ message: this.$t('Download stopped at {n} lines', { n: out.length }), type: 'is-warning' })
+					this.$buefy?.toast.open({ message: escape(this.$t('Download stopped at {n} lines', { n: out.length })), type: 'is-warning' })
 				}
 			} catch (e) {
-				this.$buefy?.toast.open({ message: (await messageOf(e)) || this.$t('Error'), type: 'is-danger' })
+				this.$buefy?.toast.open({ message: escape((await messageOf(e)) || this.$t('Error')), type: 'is-danger' })
 			}
 		},
 

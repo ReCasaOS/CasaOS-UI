@@ -180,6 +180,7 @@
 
 <script>
 import filter from 'lodash/filter'
+import escape from 'lodash/escape'
 import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -431,7 +432,7 @@ export default {
 				this.$emit('close')
 			} catch (e) {
 				this.$buefy.toast.open({
-					message: e.response?.data?.data || e.response?.data?.message || e.message,
+					message: escape(e.response?.data?.data || e.response?.data?.message || e.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -469,7 +470,7 @@ export default {
 				return res.data.data
 			}).catch((e) => {
 				this.$buefy.toast.open({
-					message: e.response?.data?.data || e.response?.data?.message || e.message,
+					message: escape(e.response?.data?.data || e.response?.data?.message || e.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -557,7 +558,7 @@ export default {
 			} catch (e) {
 				this.isConnecting = false
 				this.$buefy.toast.open({
-					message: e.response?.data?.data || e.response?.data?.message || e.message,
+					message: escape(e.response?.data?.data || e.response?.data?.message || e.message),
 					position: 'is-top',
 					type: 'is-danger',
 					duration: 5000,

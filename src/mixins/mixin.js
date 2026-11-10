@@ -287,10 +287,9 @@ export const mixin = {
 
 			// a disk that is read-only, or a trash folder that is not ours: say which, and offer the permanent delete of those only
 			const offerPermanentDelete = (refused) => {
-				const list = refused.map(r => `<li><b>${escape(r.path)}</b><br><span class="is-size-7">${escape(r.reason)}</span></li>`).join('')
 				this.$buefy.dialog.confirm({
 					title: this.$t('Cannot move to the trash'),
-					message: `${this.$t('These items cannot go to the trash:')}<ul class="my-3">${list}</ul>${this.$t('Delete them permanently? This cannot be undone.')}`,
+					message: `${this.$t('These items cannot go to the trash:')}<ul class="my-3">${refused.map(r => `<li><b>${escape(r.path)}</b><br><span class="is-size-7">${escape(r.reason)}</span></li>`).join('')}</ul>${this.$t('Delete them permanently? This cannot be undone.')}`,
 					confirmText: this.$t('Delete permanently'),
 					type: 'is-danger',
 					hasIcon: true,

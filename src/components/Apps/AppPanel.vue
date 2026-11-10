@@ -1264,7 +1264,7 @@ export default {
 				})
 				.catch((e) => {
 					this.$buefy.toast.open({
-						message: e.response.data.message,
+						message: escape(e.response.data.message),
 						// message: this.$t(`There was an error loading the data, please try again!`),
 						type: 'is-danger',
 					})
@@ -1330,7 +1330,7 @@ export default {
 				})
 				.catch((e) => {
 					this.$buefy.toast.open({
-						message: e.response.data.message,
+						message: escape(e.response.data.message),
 						type: 'is-danger',
 					})
 				})
@@ -1497,7 +1497,7 @@ export default {
 								this.errInfo = err.response.data
 							}
 							this.$buefy.toast.open({
-								message: err.response.data.message,
+								message: escape(err.response.data.message),
 								duration: 5000,
 								type: 'is-warning',
 							})
@@ -1527,7 +1527,7 @@ export default {
 								this.$emit('updateState')
 							} else {
 								this.$buefy.toast.open({
-									message: res.data.message.data,
+									message: escape(res.data.message.data),
 									type: 'is-warning',
 								})
 							}
@@ -1536,7 +1536,7 @@ export default {
 						.catch((err) => {
 							this.isLoading = false
 							this.$buefy.toast.open({
-								message: err.response.data.message,
+								message: escape(err.response.data.message),
 								type: 'is-warning',
 							})
 						})
@@ -1762,7 +1762,7 @@ export default {
 					this.isLoading = false
 					console.log(`${err} in submitInstallationLocation`)
 					this.$buefy.toast.open({
-						message: err.message,
+						message: escape(err.message),
 						type: 'is-danger',
 					})
 				})

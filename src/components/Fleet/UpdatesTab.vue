@@ -68,6 +68,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import tabMixin from './tabMixin'
 import ResultCell from './ResultCell.vue'
 import { actions, followAppUpdates, followPackages } from './bulk'
@@ -172,7 +173,7 @@ export default {
 			return run.finished_at ? text : `${text} …`
 		},
 		confirm(title, message, confirmText, onConfirm) {
-			this.$buefy.dialog.confirm({ title, message, confirmText, cancelText: this.$t('Cancel'), type: 'is-warning', hasIcon: true, onConfirm })
+			this.$buefy.dialog.confirm({ title, message: escape(message), confirmText, cancelText: this.$t('Cancel'), type: 'is-warning', hasIcon: true, onConfirm })
 		},
 		confirmRelease() {
 			this.confirm(
