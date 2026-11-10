@@ -202,10 +202,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.modal-card {
-	max-width: 34rem;
-}
-
 .app-icon {
 	width: 2rem;
 	height: 2rem;

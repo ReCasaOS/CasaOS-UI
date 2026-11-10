@@ -98,7 +98,7 @@
 			</div>
 		</section>
 
-		<b-modal :model-value="!!shownEvent" width="28rem" @update:model-value="shownEvent = null">
+		<b-modal :model-value="!!shownEvent" width="66rem" @update:model-value="shownEvent = null">
 			<div v-if="shownEvent" class="box">
 				<dl class="logs-event">
 					<template v-for="(value, key) in shownEvent" :key="key">

@@ -386,11 +386,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.modal-card {
-	width: 40rem;
-	max-width: 100%;
-}
-
 // a field's help line is secondary text
 :deep(.help) {
 	color: var(--casa-text-hint);

@@ -164,7 +164,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-download {
-	width: 34rem;
 	max-width: 100%;
 
 	.download-row {

@@ -903,16 +903,17 @@ $stats-narrow: 44rem;
 </style>
 
 <style lang="scss">
-// The modal the page opens in: the same size as the one of the virtual machines.
+// The modal the page opens in: the same size as the one of the logs.
 .stats-modal {
 	.animation-content {
-		width: 66rem;
+		width: 100rem;
 		max-width: calc(100vw - 2rem) !important;
 	}
 
 	.modal-card.stats-page {
 		width: 100%;
-		max-height: calc(100vh - 5rem);
+		height: calc(100vh - 3rem);
+		max-height: calc(100vh - 3rem);
 
 		.modal-card-body {
 			overflow-y: auto;

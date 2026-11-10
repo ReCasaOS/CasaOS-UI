@@ -80,7 +80,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-delete {
-	width: 30rem;
 	max-width: 100%;
 }
 </style>

@@ -160,8 +160,6 @@ export default {
 
 <style lang="scss" scoped>
 .modal-card {
-	/* v0.4.3 */
-	width: 26.5rem;
 
 	.modal-card-head {
 		padding-top: 1.25rem;

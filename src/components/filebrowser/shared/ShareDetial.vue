@@ -94,12 +94,6 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
-.modal-card {
-	max-width: 40rem;
-}
-</style>
-
 <style lang="scss">
 .share-detial-panel {
 	.field-label {

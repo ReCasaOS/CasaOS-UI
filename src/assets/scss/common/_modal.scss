@@ -192,6 +192,20 @@
     }
 }
 
+// Every window opened as a card is as wide as the Statistics and the VM windows
+// (owner's choice). Buefy caps the wrapper at 960px inline, hence !important.
+// :where() keeps both rules at the weight of one class, so a window that sets
+// its own size (Files, App Store, Logs, Fleet) still wins, and Buefy's
+// confirms (.dialog) and the power box (no card) keep theirs.
+// (Bulma registers the variable on .modal itself, so it is set there.)
+.modal {
+    --bulma-modal-content-width: 66rem;
+}
+
+:where(.modal:not(.dialog)) > .animation-content:where(:has(> .modal-card)) {
+    max-width: calc(100vw - 2rem) !important;
+}
+
 .terminal-modal {
     .close-container {
         position: absolute;
@@ -243,14 +257,6 @@
 
 .modal-background {
     background: rgba(0, 0, 0, .8);
-}
-
-@media screen and (min-width: 769px) {
-    .terminal-modal {
-        .modal-card {
-            width: 50rem;
-        }
-    }
 }
 
 /************************************

@@ -202,10 +202,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.modal-card {
-	max-width: 40rem;
-}
-
 .modal-card-body {
 	overflow-y: hidden;
 }
