@@ -3288,5 +3288,7 @@
   "Share a folder…": "Partager un dossier…",
   "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "L'étiquette fait de 1 à 36 lettres, chiffres, points, tirets ou tirets bas.",
   "Another shared folder has this tag.": "Un autre dossier partagé a déjà cette étiquette.",
-  "This folder is shared already.": "Ce dossier est déjà partagé."
+  "This folder is shared already.": "Ce dossier est déjà partagé.",
+  "Start it when this machine starts": "La démarrer au démarrage de cette machine",
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Sans cela, après une coupure de courant ou un redémarrage de cette machine, la VM reste éteinte jusqu'à ce que quelqu'un la démarre."
 }

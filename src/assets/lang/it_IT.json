@@ -1196,5 +1196,7 @@
   "Share a folder…": "Condividi una cartella…",
   "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "Il tag è fatto da 1 a 36 lettere, cifre, punti, trattini o trattini bassi.",
   "Another shared folder has this tag.": "Un'altra cartella condivisa ha già questo tag.",
-  "This folder is shared already.": "Questa cartella è già condivisa."
+  "This folder is shared already.": "Questa cartella è già condivisa.",
+  "Start it when this machine starts": "Avviala all'accensione di questa macchina",
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Senza, dopo un blackout o un riavvio di questa macchina la VM resta spenta finché qualcuno non la avvia."
 }

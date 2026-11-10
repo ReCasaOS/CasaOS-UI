@@ -3286,5 +3286,7 @@
   "Share a folder…": "Share a folder…",
   "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "The tag is 1 to 36 letters, digits, dots, dashes or underscores.",
   "Another shared folder has this tag.": "Another shared folder has this tag.",
-  "This folder is shared already.": "This folder is shared already."
+  "This folder is shared already.": "This folder is shared already.",
+  "Start it when this machine starts": "Start it when this machine starts",
+  "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it."
 }

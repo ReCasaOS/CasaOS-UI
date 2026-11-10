@@ -152,6 +152,7 @@ export function createDefaults(host) {
 		storage_path: host?.storage_path || '',
 		os: '',
 		start: true,
+		autostart: false,
 	}
 }
 
@@ -260,6 +261,9 @@ export function createRequest(form, host) {
 	if (form.os) {
 		body.os = form.os
 	}
+	if (form.autostart) {
+		body.autostart = true
+	}
 	// the default folder needs no saying
 	if (form.storage_path && form.storage_path !== host?.storage_path) {
 		body.storage_path = form.storage_path
@@ -299,6 +303,10 @@ export function updateRequest(vm, form) {
 	}
 	if (form.memory_mib !== vm.memory_mib) {
 		body.memory_mib = form.memory_mib
+	}
+	// a module older than autostart says nothing about it, and is sent nothing
+	if (vm.autostart !== undefined && form.autostart !== undefined && form.autostart !== vm.autostart) {
+		body.autostart = form.autostart
 	}
 	return body
 }

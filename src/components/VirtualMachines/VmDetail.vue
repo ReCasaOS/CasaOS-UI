@@ -67,6 +67,12 @@
 					{{ $t('CPU and memory changes take effect the next time the VM starts.') }}
 				</p>
 
+				<!-- absent on a module older than autostart -->
+				<b-field v-if="current.autostart !== undefined" class="mt-3"
+					:message="$t('Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.')">
+					<b-switch v-model="form.autostart" size="is-small">{{ $t('Start it when this machine starts') }}</b-switch>
+				</b-field>
+
 				<div class="columns is-mobile is-size-7 mt-2 facts">
 					<div class="column">
 						<p class="has-text-full-03">{{ $t('Firmware') }}</p>
@@ -609,7 +615,7 @@ export default {
 		portLabel,
 		portKey,
 		formOf(vm) {
-			return { title: vm.title, vcpus: vm.vcpus, memory_mib: vm.memory_mib, os: vm.os || '' }
+			return { title: vm.title, vcpus: vm.vcpus, memory_mib: vm.memory_mib, os: vm.os || '', autostart: vm.autostart }
 		},
 		// back to the VM as it is: every change noted is dropped
 		reset() {
