@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apply, publicShare, publicShareApi, refresh, resetPublicShare } from './publicShare.js'
+import { apply, publicShare, publicShareApi, readLeaveWarning, refresh, resetPublicShare } from './publicShare.js'
 import { RELAY_MS } from '@/service/fleet.js'
 import { instance } from '@/service/service.js'
 
@@ -87,5 +87,24 @@ describe('the public sharing of this box', () => {
 		expect(instance.delete).toHaveBeenCalledWith('/v1/share/apps')
 		await publicShareApi.status()
 		expect(instance.get).toHaveBeenCalledWith('/v1/share')
+	})
+
+	describe('the leave warning', () => {
+		const t = (key, params) => key.replace('{name}', params.name)
+
+		it('is the sentence when an app is shared, read with a short timeout', async () => {
+			instance.get.mockImplementation(() => body({ name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+			expect(await readLeaveWarning(t)).toBe('The public addresses of your shared apps stop answering, and the name mybox is released.')
+			expect(instance.get).toHaveBeenCalledWith('/v1/share', { timeout: 5000 })
+		})
+
+		it('is empty when the read fails', async () => {
+			instance.get.mockImplementation(() => Promise.reject(Object.assign(new Error('404'), { response: { status: 404 } })))
+			expect(await readLeaveWarning(t)).toBe('')
+		})
+
+		it('is empty when nothing is named', async () => {
+			expect(await readLeaveWarning(t)).toBe('')
+		})
 	})
 })

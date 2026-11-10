@@ -4,12 +4,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RemoteAccessModal from './RemoteAccessModal.vue'
 import { fleetApi } from '@/service/fleet'
-import { publicShareApi } from '@/service/publicShare'
+import { readLeaveWarning } from '@/service/publicShare'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn(), addDevice: vi.fn() } }))
-vi.mock('@/service/publicShare', async () => ({ publicShare: (await import('vue')).reactive({ status: null, ok: false }), publicShareApi: { status: vi.fn() }, refresh: vi.fn(() => Promise.resolve()), apply: vi.fn() }))
+vi.mock('@/service/publicShare', async () => ({ publicShare: (await import('vue')).reactive({ status: null, ok: false }), readLeaveWarning: vi.fn(), refresh: vi.fn(() => Promise.resolve()), apply: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })
@@ -33,7 +33,7 @@ describe('the Remote access window', () => {
 		vi.clearAllMocks()
 		window.happyDOM.setURL('http://localhost:8080/')
 		fleetApi.status.mockReturnValue(answer(NONE))
-		publicShareApi.status.mockImplementation(() => refusal(404, 'not found'))
+		readLeaveWarning.mockResolvedValue('')
 	})
 	afterEach(() => {
 		wrapper?.unmount()
@@ -61,11 +61,21 @@ describe('the Remote access window', () => {
 
 	it('warns that the public name goes when turning off', async () => {
 		fleetApi.status.mockReturnValue(answer(ON))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		readLeaveWarning.mockResolvedValue('The public addresses of your shared apps stop answering, and the name mybox is released.')
 		await open()
 		await button('Turn remote access off').trigger('click')
 		await flushPromises()
 		expect(document.querySelector('.dialog').textContent).toContain('The public addresses of your shared apps stop answering, and the name mybox is released.')
+	})
+
+	it('opens a single dialog on a double click while the warning is read', async () => {
+		fleetApi.status.mockReturnValue(answer(ON))
+		readLeaveWarning.mockReturnValue(new Promise(() => {}))
+		await open()
+		const b = button('Turn remote access off')
+		b.element.click()
+		b.element.click()
+		expect(readLeaveWarning).toHaveBeenCalledTimes(1)
 	})
 
 	it('turns off as before on an old core', async () => {
@@ -79,7 +89,7 @@ describe('the Remote access window', () => {
 
 	it('shows the public name as text, never as HTML', async () => {
 		fleetApi.status.mockReturnValue(answer(ON))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: '<b id="x">m</b>', apps: [] }))
+		readLeaveWarning.mockResolvedValue('The public name <b id="x">m</b> is released.')
 		await open()
 		await button('Turn remote access off').trigger('click')
 		await flushPromises()

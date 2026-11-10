@@ -8,12 +8,12 @@ import AddBoxDialog from '@/components/Fleet/AddBoxDialog.vue'
 import { forgetFleet, openFleet } from '@/components/Fleet/entry'
 import events from '@/events/events'
 import { fleetApi } from '@/service/fleet'
-import { publicShareApi } from '@/service/publicShare'
+import { readLeaveWarning } from '@/service/publicShare'
 import i18n from '@/plugins/i18n'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setMaster: vi.fn(), setRelay: vi.fn(), join: vi.fn(), leave: vi.fn(), addBox: vi.fn(), rotateCode: vi.fn() } }))
-vi.mock('@/service/publicShare', () => ({ publicShareApi: { status: vi.fn() } }))
+vi.mock('@/service/publicShare', () => ({ readLeaveWarning: vi.fn() }))
 vi.mock('@/components/Fleet/entry', () => ({ forgetFleet: vi.fn(), openFleet: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
@@ -45,7 +45,7 @@ describe('the Fleet settings', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		fleetApi.status.mockReturnValue(answer(NONE))
-		publicShareApi.status.mockImplementation(() => refusal(404, 'not found'))
+		readLeaveWarning.mockResolvedValue('')
 		fleetApi.addBox.mockReturnValue(answer({ box: { id: 's', self: true }, code: 'ENROL-self' }))
 	})
 	afterEach(() => {
@@ -151,7 +151,7 @@ describe('the Fleet settings', () => {
 
 	it('warns before leaving the fleet when apps are shared', async () => {
 		fleetApi.status.mockReturnValue(answer(member()))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		readLeaveWarning.mockResolvedValue('The public addresses of your shared apps stop answering, and the name mybox is released.')
 		await open()
 		await button('Leave the fleet').trigger('click')
 		await flushPromises()
@@ -160,7 +160,7 @@ describe('the Fleet settings', () => {
 
 	it('warns before disabling the master', async () => {
 		fleetApi.status.mockReturnValue(answer(MASTER))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [] }))
+		readLeaveWarning.mockResolvedValue('The public name mybox is released.')
 		await open()
 		await button('Disable the master role').trigger('click')
 		await flushPromises()
@@ -169,7 +169,7 @@ describe('the Fleet settings', () => {
 
 	it('warns before changing the relay', async () => {
 		fleetApi.status.mockReturnValue(answer(RELAY_MASTER))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		readLeaveWarning.mockResolvedValue('The public addresses of your shared apps stop answering, and the name mybox is released.')
 		await open()
 		await button('Change the relay').trigger('click')
 		await flushPromises()
@@ -179,7 +179,7 @@ describe('the Fleet settings', () => {
 	it('warns before joining a fleet and turning remote access off', async () => {
 		fleetApi.status.mockReturnValue(answer(NONE))
 		fleetApi.join.mockImplementation(() => refusal(409, 'this box has remote access: turn it off first'))
-		publicShareApi.status.mockReturnValue(answer({ supported: true, name: 'mybox', apps: [{ name: 'cloud', shared: true }] }))
+		readLeaveWarning.mockResolvedValue('The public addresses of your shared apps stop answering, and the name mybox is released.')
 		await open()
 		await pick('member')
 		await wrapper.find('textarea').setValue('ENROL-abc')
@@ -187,6 +187,47 @@ describe('the Fleet settings', () => {
 		await flushPromises()
 		await flushPromises()
 		expect(document.querySelector('.dialog').textContent).toContain('the name mybox is released.')
+	})
+
+	it('opens one dialog when Leave is clicked twice while the warning is read', async () => {
+		fleetApi.status.mockReturnValue(answer(member()))
+		let release
+		readLeaveWarning.mockReturnValue(new Promise((resolve) => { release = resolve }))
+		await open()
+		const b = button('Leave the fleet')
+		b.element.click()
+		b.element.click()
+		release('')
+		await flushPromises()
+		expect(document.querySelectorAll('.dialog')).toHaveLength(1)
+	})
+
+	it('opens one dialog and joins once when Join is clicked twice', async () => {
+		fleetApi.status.mockReturnValue(answer(NONE))
+		fleetApi.join.mockImplementation(() => refusal(409, 'this box has remote access: turn it off first'))
+		let release
+		readLeaveWarning.mockReturnValue(new Promise((resolve) => { release = resolve }))
+		await open()
+		await pick('member')
+		await wrapper.find('textarea').setValue('ENROL-abc')
+		const b = button('Join')
+		b.element.click()
+		await flushPromises()
+		b.element.click()
+		release('')
+		await flushPromises()
+		expect(fleetApi.join).toHaveBeenCalledTimes(1)
+		expect(document.querySelectorAll('.dialog')).toHaveLength(1)
+	})
+
+	it('shows the public name as text, never as HTML, when leaving', async () => {
+		fleetApi.status.mockReturnValue(answer(member()))
+		readLeaveWarning.mockResolvedValue('The public name <b id="x">m</b> is released.')
+		await open()
+		await button('Leave the fleet').trigger('click')
+		await flushPromises()
+		expect(document.querySelector('.dialog #x')).toBeNull()
+		expect(document.querySelector('.dialog').textContent).toContain('<b id="x">m</b>')
 	})
 
 	it('asks as before when the share status cannot be read', async () => {

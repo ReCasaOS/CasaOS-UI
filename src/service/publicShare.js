@@ -1,6 +1,7 @@
 // The public sharing of installed apps through the relay (/v1/share). Called through the axios instance with the
 // explicit /v1 path, like fleet.js; an answer is read as res.data.data.
 import { reactive } from 'vue'
+import { leaveWarning } from '@/components/PublicShare/shareWords'
 
 const app = name => `/v1/share/apps/${encodeURIComponent(name)}`
 
@@ -9,11 +10,21 @@ const client = () => import('@/service/service.js').then(m => m.instance)
 const relayMs = () => import('@/service/fleet.js').then(m => m.RELAY_MS)
 
 export const publicShareApi = {
-	status: async () => (await client()).get('/v1/share'),
+	status: async opts => (await client()).get('/v1/share', ...(opts ? [opts] : [])),
 	setName: async name => (await client()).put('/v1/share/name', { name, accept_tos: true }, { timeout: await relayMs() }),
 	share: async name => (await client()).put(app(name), undefined, { timeout: await relayMs() }),
 	unshare: async name => (await client()).delete(app(name)),
 	stopAll: async () => (await client()).delete('/v1/share/apps'),
+}
+
+// The sentence a dialog adds before an action that releases the public name, '' when there is nothing to release.
+// A short timeout and never a rejection: this extra read must not hold the original action back (an old core has no route).
+export async function readLeaveWarning(t) {
+	try {
+		return leaveWarning((await publicShareApi.status({ timeout: 5000 })).data.data, t)
+	} catch {
+		return ''
+	}
 }
 
 // `ok` is true once a GET answered; `status` is its Data. A core without the route leaves both empty: nothing shows.

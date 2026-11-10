@@ -88,10 +88,9 @@
 <script>
 import escape from 'lodash/escape'
 import { forgetFleet, openFleet } from '@/components/Fleet/entry'
-import { leaveWarning } from '@/components/PublicShare/shareWords'
 import events from '@/events/events'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
-import { publicShareApi } from '@/service/publicShare'
+import { readLeaveWarning } from '@/service/publicShare'
 
 const HTTPS = /^https:\/\/.+/i
 
@@ -241,17 +240,13 @@ export default {
 				this.error = this.$t('This box could not add itself to its fleet: {error}', { error: this.readable(e) })
 			}
 		},
-		// what turning this off does to the public sharing; '' on any failure (an old core has nothing to release)
-		async shareWarning() {
-			try {
-				const res = await publicShareApi.status()
-				return leaveWarning(res.data.data, this.$t)
-			} catch {
-				return ''
-			}
-		},
 		async confirmDisable() {
-			const warning = await this.shareWarning()
+			if (this.busy) {
+				return
+			}
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Disable the master role?'),
 				message: (this.view?.relay ? this.$t('Disabling the master also deletes the fleet at the relay') : this.$t('The list of boxes is erased.'))
@@ -266,13 +261,18 @@ export default {
 			})
 		},
 		async confirmRelay() {
+			if (this.busy) {
+				return
+			}
 			const relay = this.relay.trim()
 			if (!HTTPS.test(relay)) {
 				this.error = this.$t('The relay must start with https://')
 				return
 			}
 			this.error = ''
-			const warning = await this.shareWarning()
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Change the relay?'),
 				message: this.$t('The codes already given stop working: every box needs a new code.') + (warning ? ` ${escape(warning)}` : ''),
@@ -285,6 +285,9 @@ export default {
 			})
 		},
 		async join() {
+			if (this.busy) {
+				return
+			}
 			const code = this.code.trim()
 			this.busy = true
 			this.error = ''
@@ -295,7 +298,7 @@ export default {
 			} catch (e) {
 				// the core refuses once while remote access is on: the owner decides, the code stays in the field
 				if (e?.response?.status === 409 && /has remote access/i.test(e.response.data?.message)) {
-					this.confirmJoinLeavingRemote(code)
+					await this.confirmJoinLeavingRemote(code)
 				} else {
 					this.error = this.readable(e)
 				}
@@ -304,7 +307,7 @@ export default {
 			}
 		},
 		async confirmJoinLeavingRemote(code) {
-			const warning = await this.shareWarning()
+			const warning = await readLeaveWarning(this.$t)
 			this.$buefy.dialog.confirm({
 				title: this.$t('Join this fleet and turn remote access off?'),
 				message: this.$t('Your phones and PCs lose access to this box. Add them again on the master afterwards.') + (warning ? ` ${escape(warning)}` : ''),
@@ -317,7 +320,12 @@ export default {
 			})
 		},
 		async confirmLeave() {
-			const warning = await this.shareWarning()
+			if (this.busy) {
+				return
+			}
+			this.busy = true
+			const warning = await readLeaveWarning(this.$t)
+			this.busy = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Leave the fleet?'),
 				message: this.$t('This box forgets its master and stops answering it.') + (warning ? ` ${escape(warning)}` : ''),
