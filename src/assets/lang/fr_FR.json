@@ -3278,6 +3278,17 @@
   "The value of {key} has a control character.": "La valeur de {key} contient un caractère de contrôle.",
   "The name {key} is used twice.": "Le nom {key} est utilisé deux fois.",
   "At most {max} labels can be added or changed.": "Au plus {max} étiquettes peuvent être ajoutées ou modifiées.",
+  "Shared folders": "Dossiers partagés",
+  "Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine's file rights. Changes take effect the next time the VM starts.": "Dossiers de cette machine que la VM monte par leur étiquette, comme un disque. La VM les lit et les écrit avec les droits des fichiers de cette machine. Les changements prennent effet au prochain démarrage de la VM.",
+  "This machine has no virtiofsd, which sharing folders needs. Install it with:": "Cette machine n'a pas virtiofsd, nécessaire pour partager des dossiers. Installez-le avec :",
+  "In the VM's /etc/fstab:": "Dans le /etc/fstab de la VM :",
+  "No folders are shared with this VM.": "Aucun dossier n'est partagé avec cette VM.",
+  "The VM mounts the folder by this name.": "La VM monte le dossier sous ce nom.",
+  "Tag": "Étiquette",
+  "Share a folder…": "Partager un dossier…",
+  "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "L'étiquette fait de 1 à 36 lettres, chiffres, points, tirets ou tirets bas.",
+  "Another shared folder has this tag.": "Un autre dossier partagé a déjà cette étiquette.",
+  "This folder is shared already.": "Ce dossier est déjà partagé.",
   "Start it when this machine starts": "La démarrer au démarrage de cette machine",
   "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Sans cela, après une coupure de courant ou un redémarrage de cette machine, la VM reste éteinte jusqu'à ce que quelqu'un la démarre."
 }

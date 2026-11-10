@@ -3276,6 +3276,17 @@
   "The value of {key} has a control character.": "The value of {key} has a control character.",
   "The name {key} is used twice.": "The name {key} is used twice.",
   "At most {max} labels can be added or changed.": "At most {max} labels can be added or changed.",
+  "Shared folders": "Shared folders",
+  "Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine's file rights. Changes take effect the next time the VM starts.": "Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine's file rights. Changes take effect the next time the VM starts.",
+  "This machine has no virtiofsd, which sharing folders needs. Install it with:": "This machine has no virtiofsd, which sharing folders needs. Install it with:",
+  "In the VM's /etc/fstab:": "In the VM's /etc/fstab:",
+  "No folders are shared with this VM.": "No folders are shared with this VM.",
+  "The VM mounts the folder by this name.": "The VM mounts the folder by this name.",
+  "Tag": "Tag",
+  "Share a folder…": "Share a folder…",
+  "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "The tag is 1 to 36 letters, digits, dots, dashes or underscores.",
+  "Another shared folder has this tag.": "Another shared folder has this tag.",
+  "This folder is shared already.": "This folder is shared already.",
   "Start it when this machine starts": "Start it when this machine starts",
   "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it."
 }

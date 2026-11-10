@@ -627,6 +627,44 @@ export function usbRequest(vm, row, on) {
 	return on ? [...others, { vendor: row.vendor, product: row.product }] : others
 }
 
+// What virtio-fs takes as a tag, as the service checks it: 1-36 letters,
+// digits, '.', '_' or '-'.
+export const SHARE_TAG = /^[\w.-]{1,36}$/
+
+// A tag for a folder: its name, with what a tag cannot hold turned into '_'.
+export function shareTagFor(path) {
+	const name = (path || '').replace(/\/+$/, '').split('/').pop() || 'share'
+	return name.replace(/[^\w.-]/g, '_').slice(0, 36)
+}
+
+// Why a new share cannot be added, as an i18n key; empty when it can.
+export function shareProblem(vm, share) {
+	if (!SHARE_TAG.test(share.tag || '')) {
+		return 'The tag is 1 to 36 letters, digits, dots, dashes or underscores.'
+	}
+	const shares = vm.shares || []
+	if (shares.some(s => s.tag === share.tag)) {
+		return 'Another shared folder has this tag.'
+	}
+	if (shares.some(s => s.source === share.source)) {
+		return 'This folder is shared already.'
+	}
+	return ''
+}
+
+// The list PUT /vms/{id}/shares takes, with one added or one taken out.
+export function sharesRequest(vm, { add, removeTag } = {}) {
+	const kept = (vm.shares || [])
+		.filter(s => s.tag !== removeTag)
+		.map(s => ({ source: s.source, tag: s.tag }))
+	return add ? [...kept, { source: add.source, tag: add.tag }] : kept
+}
+
+// The line of the guest's /etc/fstab that mounts a share at boot.
+export function fstabLine(share, mountPoint) {
+	return `${share.tag} ${mountPoint || `/mnt/${share.tag}`} virtiofs defaults,nofail 0 0`
+}
+
 // How far a download is: a whole percent, or null when the server gave no
 // size.
 export function downloadProgress(d) {

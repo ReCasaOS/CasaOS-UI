@@ -1186,6 +1186,17 @@
   "{name} does not allow being shown inside another page.": "{name} non permette di essere mostrata dentro un'altra pagina.",
   "{name} uses an HTTPS certificate the browser does not trust, and inside the dashboard there is no way to accept it.": "{name} usa un certificato HTTPS di cui il browser non si fida, e dentro la dashboard non c'è modo di accettarlo.",
   "{name} is served over plain HTTP, which the browser does not show inside a dashboard opened over HTTPS.": "{name} è servita in HTTP semplice, che il browser non mostra dentro una dashboard aperta in HTTPS.",
+  "Shared folders": "Cartelle condivise",
+  "Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine's file rights. Changes take effect the next time the VM starts.": "Cartelle di questa macchina che la VM monta con il loro tag, come un disco. La VM le legge e le scrive con i permessi dei file di questa macchina. Le modifiche valgono dal prossimo avvio della VM.",
+  "This machine has no virtiofsd, which sharing folders needs. Install it with:": "Su questa macchina manca virtiofsd, che serve per condividere le cartelle. Installalo con:",
+  "In the VM's /etc/fstab:": "Nel file /etc/fstab della VM:",
+  "No folders are shared with this VM.": "Nessuna cartella condivisa con questa VM.",
+  "The VM mounts the folder by this name.": "La VM monta la cartella con questo nome.",
+  "Tag": "Tag",
+  "Share a folder…": "Condividi una cartella…",
+  "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "Il tag è fatto da 1 a 36 lettere, cifre, punti, trattini o trattini bassi.",
+  "Another shared folder has this tag.": "Un'altra cartella condivisa ha già questo tag.",
+  "This folder is shared already.": "Questa cartella è già condivisa.",
   "Start it when this machine starts": "Avviala all'accensione di questa macchina",
   "Without it, the VM stays off after a power cut or a restart of this machine until someone starts it.": "Senza, dopo un blackout o un riavvio di questa macchina la VM resta spenta finché qualcuno non la avvia."
 }
