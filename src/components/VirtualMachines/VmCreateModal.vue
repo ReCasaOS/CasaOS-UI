@@ -277,7 +277,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-create {
-	width: 36rem;
 	max-width: 100%;
 
 	// the edit form's tabs, as headings

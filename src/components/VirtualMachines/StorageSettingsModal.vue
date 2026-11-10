@@ -98,7 +98,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-storage-settings {
-	width: 32rem;
 	max-width: 100%;
 }
 </style>

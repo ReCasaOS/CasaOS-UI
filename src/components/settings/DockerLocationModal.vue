@@ -249,7 +249,6 @@ export default {
 
 <style lang="scss" scoped>
 .docker-location {
-	width: 34rem;
 	max-width: 100%;
 
 	._hint {

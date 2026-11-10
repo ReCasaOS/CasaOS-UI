@@ -141,7 +141,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-path-picker {
-	width: 36rem;
 	max-width: 100%;
 
 	.modal-card-body {
