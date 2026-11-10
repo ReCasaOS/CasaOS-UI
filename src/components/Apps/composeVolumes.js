@@ -31,6 +31,21 @@ export function isNamedVolumeSource(source) {
 }
 
 /**
+ * A host path with the App Store's `$AppID` / `${AppID}` written out as the app's
+ * name, which is what the runtime puts there when it starts the app. `$$AppID` is
+ * compose's escape for a literal dollar and stays as it is.
+ *
+ * @param {string} path a host path from the compose file
+ * @param {string} appID the compose project name
+ * @returns {string} the path as it is on disk
+ */
+export function resolveAppID(path, appID) {
+	if (typeof path !== 'string' || !appID)
+		return path
+	return path.replace(/(?<!\$)\$(?:\{AppID\}|AppID\b)/g, () => appID)
+}
+
+/**
  * @param {object|string} entry one item of a service's `volumes:`
  * @param {(containerPath: string, hostPath: string) => string} suggestHostPath
  *   what CasaOS would put on the host side of a bind the compose file leaves open
