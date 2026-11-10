@@ -11,6 +11,7 @@ import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 import BackupBadge from '@/components/backup/BackupBadge.vue'
 import { backupStatus, refresh } from '@/service/backupStatus'
+import { publicShare } from '@/service/publicShare'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
@@ -19,6 +20,12 @@ vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOri
 vi.mock('@/service/backupStatus', async () => {
 	const { reactive } = await import('vue')
 	return { backupStatus: reactive({ states: [], ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
+
+// the service reads the box's /v1/share: the card is given its answer instead
+vi.mock('@/service/publicShare', async () => {
+	const { reactive } = await import('vue')
+	return { publicShare: reactive({ status: null, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
 })
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
@@ -68,6 +75,8 @@ afterEach(() => {
 	document.body.innerHTML = ''
 	backupStatus.states = []
 	backupStatus.ok = false
+	publicShare.status = null
+	publicShare.ok = false
 	vi.mocked(refresh).mockClear()
 })
 
@@ -873,6 +882,36 @@ describe('the backup badge on the tile', () => {
 		expect(badge(wrapper).element.closest('.app-text')).not.toBeNull()
 		// the menu trigger is still there
 		expect(wrapper.find('.action-btn').exists()).toBe(true)
+		wrapper.unmount()
+	})
+})
+
+describe('public sharing on the card', () => {
+	const shared = { supported: true, reason: '', name: 'b', apps: [{ name: 'jellyfin', shared: true, url: 'https://jellyfin.b.box.x' }] }
+	const shareButton = () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Share on the Internet'))
+
+	it('shows Public on a shared app', async () => {
+		publicShare.status = shared
+		publicShare.ok = true
+		const wrapper = await card({ name: 'jellyfin' })
+		expect(wrapper.find('.public-badge').attributes('title')).toBe('https://jellyfin.b.box.x')
+		expect(wrapper.find('.public-badge').text()).toBe('Public')
+		expect(shareButton()).toBeTruthy()
+		wrapper.unmount()
+	})
+
+	it('shows no badge on an app that is not shared', async () => {
+		publicShare.status = shared
+		publicShare.ok = true
+		const wrapper = await card({ name: 'nextcloud' })
+		expect(wrapper.find('.public-badge').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('no share entry on an old core', async () => {
+		const wrapper = await card({ name: 'jellyfin' })
+		expect(wrapper.find('.public-badge').exists()).toBe(false)
+		expect(shareButton()).toBeUndefined()
 		wrapper.unmount()
 	})
 })

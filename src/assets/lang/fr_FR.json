@@ -3322,5 +3322,6 @@
   "Stop sharing": "Arrêter le partage",
   "No app is shared. Share one from its card on the home page.": "Aucune app n'est partagée. Partagez-en une depuis sa carte sur la page d'accueil.",
   "Stop sharing every app?": "Arrêter le partage de toutes les apps ?",
-  "Their public addresses stop answering. The name {name} stays this box's.": "Leurs adresses publiques cesseront de répondre. Le nom {name} reste celui de cette box."
+  "Their public addresses stop answering. The name {name} stays this box's.": "Leurs adresses publiques cesseront de répondre. Le nom {name} reste celui de cette box.",
+  "Open Remote access": "Ouvrir l'accès à distance"
 }

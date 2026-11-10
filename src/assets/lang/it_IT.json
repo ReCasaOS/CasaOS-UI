@@ -1230,5 +1230,6 @@
   "Stop sharing": "Interrompi la condivisione",
   "No app is shared. Share one from its card on the home page.": "Nessuna app è condivisa. Condividine una dalla sua scheda nella pagina iniziale.",
   "Stop sharing every app?": "Interrompere la condivisione di tutte le app?",
-  "Their public addresses stop answering. The name {name} stays this box's.": "I loro indirizzi pubblici smetteranno di rispondere. Il nome {name} resta di questa box."
+  "Their public addresses stop answering. The name {name} stays this box's.": "I loro indirizzi pubblici smetteranno di rispondere. Il nome {name} resta di questa box.",
+  "Open Remote access": "Apri l'accesso remoto"
 }

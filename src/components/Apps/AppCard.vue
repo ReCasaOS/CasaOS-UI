@@ -85,6 +85,12 @@
 						}}
 					</b-button>
 
+					<b-button v-if="isV2App && publicShare.ok" expanded type="is-text" @click="shareApp()">
+						{{
+							$t('Share on the Internet')
+						}}
+					</b-button>
+
 					<b-button v-if="isV1App" expanded type="is-text" @click="exportYAML(item)">
 						{{
 							$t('Export as Compose')
@@ -178,6 +184,8 @@
 							</a>
 							<!-- its scheduled backups, by the title; nothing for an app without a schedule or while the box cannot say -->
 							<BackupBadge v-if="backupBadge" :kind="backupBadge.kind" :title="backupBadge.title" />
+							<!-- the address it answers at on the Internet, as the core sends it -->
+							<span v-if="publicUrl" class="public-badge" :title="publicUrl">{{ $t('Public') }}</span>
 						</p>
 
 						<!-- beta dashboard: whether the app is up, under its name -->
@@ -217,6 +225,9 @@ import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
+import { appEntry } from '@/components/PublicShare/shareWords'
+import { publicShare, refresh as refreshPublicShare } from '@/service/publicShare'
 import BackupBadge from '@/components/backup/BackupBadge.vue'
 import { badgeOfApp } from '@/components/backup/backupStatus'
 import { backupStatus, refresh as refreshBackupStatus } from '@/service/backupStatus'
@@ -283,6 +294,7 @@ export default {
 	},
 	data() {
 		return {
+			publicShare,
 			hover: false,
 			dropState: false,
 			isUninstalling: false,
@@ -304,6 +316,11 @@ export default {
 	},
 
 	computed: {
+		// where this app answers on the Internet, as the core sends it; '' unless shared
+		publicUrl() {
+			const entry = publicShare.ok ? appEntry(publicShare.status, this.item.name) : null
+			return entry?.shared ? entry.url : ''
+		},
 		// the worst state of this app's scheduled backups, from the box's own answers; null without a schedule
 		backupBadge() {
 			return backupStatus.ok ? badgeOfApp(backupStatus.states, this.item.name, this.$t) : null
@@ -448,6 +465,7 @@ export default {
 	created() {
 		// shared and at most once a minute: every card may ask
 		refreshBackupStatus()
+		refreshPublicShare()
 		hasLogs().then((available) => {
 			this.logsAvailable = available
 		})
@@ -533,6 +551,18 @@ export default {
 				canCancel: ['escape'],
 				animation: 'zoom-in',
 				props: { appId: this.item.name, appName: this.i18n(this.item.title) },
+			})
+		},
+
+		shareApp() {
+			this.$refs.dro.isActive = false
+			this.$buefy.modal.open({
+				component: ShareAppModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				animation: 'zoom-in',
+				props: { appName: this.item.name, appTitle: this.i18n(this.item.title) || this.item.name },
 			})
 		},
 
@@ -1221,6 +1251,18 @@ export default {
 </script>
 
 <style lang="scss">
+.public-badge {
+  flex: none;
+  margin-left: 0.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: #2d7ff9;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  vertical-align: middle;
+}
 .pb-3px {
   padding-bottom: 3px;
 }

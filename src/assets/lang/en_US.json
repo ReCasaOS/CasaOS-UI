@@ -3320,5 +3320,6 @@
   "Stop sharing": "Stop sharing",
   "No app is shared. Share one from its card on the home page.": "No app is shared. Share one from its card on the home page.",
   "Stop sharing every app?": "Stop sharing every app?",
-  "Their public addresses stop answering. The name {name} stays this box's.": "Their public addresses stop answering. The name {name} stays this box's."
+  "Their public addresses stop answering. The name {name} stays this box's.": "Their public addresses stop answering. The name {name} stays this box's.",
+  "Open Remote access": "Open Remote access"
 }
