@@ -192,7 +192,7 @@ describe('the Fleet settings', () => {
 	it('opens one dialog when Leave is clicked twice while the warning is read', async () => {
 		fleetApi.status.mockReturnValue(answer(member()))
 		let release
-		readLeaveWarning.mockReturnValue(new Promise((resolve) => { release = resolve }))
+		readLeaveWarning.mockReturnValue(new Promise(resolve => (release = resolve)))
 		await open()
 		const b = button('Leave the fleet')
 		b.element.click()
@@ -206,7 +206,7 @@ describe('the Fleet settings', () => {
 		fleetApi.status.mockReturnValue(answer(NONE))
 		fleetApi.join.mockImplementation(() => refusal(409, 'this box has remote access: turn it off first'))
 		let release
-		readLeaveWarning.mockReturnValue(new Promise((resolve) => { release = resolve }))
+		readLeaveWarning.mockReturnValue(new Promise(resolve => (release = resolve)))
 		await open()
 		await pick('member')
 		await wrapper.find('textarea').setValue('ENROL-abc')
