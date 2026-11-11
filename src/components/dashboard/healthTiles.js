@@ -117,7 +117,8 @@ export function fleetPanel(status) {
 // the core raises its own alert for a box after as long
 const FLEET_GONE_MS = 10 * 60 * 1000
 
-export function attentionItems({ health, snapraid, backup, fleet }, t, now = Date.now()) {
+// `mounts` are the mounts df cannot read (GET /v1/disks/unreadable), an empty mount point when df itself hangs.
+export function attentionItems({ health, snapraid, backup, fleet, mounts }, t, now = Date.now()) {
 	const items = []
 	if (health === 'failed') {
 		items.push({ key: 'disk', level: 'danger', text: t('The system drive reports a failure') })
@@ -128,6 +129,11 @@ export function attentionItems({ health, snapraid, backup, fleet }, t, now = Dat
 	}
 	if (backup && backup.status === 'failed') {
 		items.push({ key: 'backup', level: 'danger', text: t('The last backup failed') })
+	}
+	for (const mount of Array.isArray(mounts) ? mounts : []) {
+		items.push(mount.mount_point
+			? { key: `mount_${mount.mount_point}`, level: 'warning', text: t('The mount {path} cannot be read ({error}): check /etc/fstab or the server it comes from', { path: mount.mount_point, error: mount.error }) }
+			: { key: 'mount_hung', level: 'warning', text: t('A mount does not answer: check /etc/fstab or the servers of the network shares') })
 	}
 	for (const box of fleetPanel(fleet)?.boxes || []) {
 		if (box.state === 'offline' && now - Date.parse(box.lastSeen) >= FLEET_GONE_MS) {

@@ -151,7 +151,7 @@ describe('health strip', () => {
 					$EventBus: { $emit: vi.fn() },
 					$api: {
 						backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) },
-						disks: { snapraid: () => Promise.reject(new Error('404')), zfs },
+						disks: { snapraid: () => Promise.reject(new Error('404')), zfs, unreadable: () => Promise.resolve({ data: { data: [{ mount_point: '/media/ser/fotos', error: 'Stale file handle' }] } }) },
 						storage: { list: () => Promise.reject(new Error('502')) },
 					},
 				},
@@ -175,6 +175,8 @@ describe('health strip', () => {
 		expect(drives[3].find('.panel-dot').classes()).toContain('is-none')
 		expect(drives[3].find('.tile-detail').text()).toBe('')
 		expect(wrapper.find('.storage .panel-chip').text()).toContain('failing')
+		// the dead mount the storage list stumbled on is named in Needs attention
+		expect(wrapper.find('.attention').text()).toContain('The mount {path} cannot be read')
 	})
 
 	it('lists the disks the box reports with their role, SMART state and temperature', async () => {

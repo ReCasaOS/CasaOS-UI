@@ -188,6 +188,8 @@ export default {
 			driveList: [],
 			// the ZFS pools (GET /v1/disks/zfs); none on a box without ZFS or a LocalStorage without the route
 			zfsPools: [],
+			// the mounts df cannot read (GET /v1/disks/unreadable); none on an older LocalStorage
+			unreadableMounts: [],
 			speed: null,
 			watts: null,
 			runs: [],
@@ -227,7 +229,7 @@ export default {
 			return this.destinations.includes(this.backup.destination) ? this.backup.destination : (this.destinations[0] || '')
 		},
 		attention() {
-			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState }, this.translate)
+			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState, mounts: this.unreadableMounts }, this.translate)
 		},
 		// the chips of the heads: what each card says before it is read. The attention list is worst first.
 		attentionChip() {
@@ -428,10 +430,11 @@ export default {
 	},
 	watch: {
 		// the bell of the beta bar counts them
-		attention: {
+		// on the count: the list is rebuilt on each refresh
+		'attention.length': {
 			immediate: true,
-			handler(items) {
-				this.$emit('attention', items.length)
+			handler(count) {
+				this.$emit('attention', count)
 			},
 		},
 	},
@@ -666,6 +669,11 @@ export default {
 				this.zfsPools = (await this.$api.disks.zfs()).data.data.pools || []
 			} catch {
 				this.zfsPools = []
+			}
+			try {
+				this.unreadableMounts = (await this.$api.disks.unreadable()).data.data || []
+			} catch {
+				this.unreadableMounts = []
 			}
 			// 404 on a core without a fleet, nothing to show on a box that is not a master
 			try {

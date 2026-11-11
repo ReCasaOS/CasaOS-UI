@@ -111,5 +111,10 @@ const disks = {
 	zfsIo() {
 		return api.get(`${PREFIX}/zfs/io`)
 	},
+
+	// the mounts df cannot read: [{mount_point, error}]
+	unreadable() {
+		return api.get(`${PREFIX}/unreadable`)
+	},
 }
 export default disks
