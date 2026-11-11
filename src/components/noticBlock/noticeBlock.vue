@@ -85,6 +85,11 @@
 					class="is-flex-grow-1 footer-hint">
 					{{ $t('{num} items', { num: Object.keys(noticeData.content).length }) }}
 				</div>
+				<!-- what the bar is about, e.g. the image being downloaded -->
+				<div v-if="noticeData.contentType === 'progress' && noticeData.content.detail"
+					:title="noticeData.content.detail" class="is-flex-grow-1 footer-hint _progress-detail _nowrap">
+					{{ noticeData.content.detail }}
+				</div>
 			</div>
 			<!-- end of section footer -->
 		</div>
@@ -196,6 +201,13 @@ export default {
 			border-top: 1px solid rgba(255, 255, 255, 0.1);
 		}
 	}
+}
+
+// under the bar, so on the bar's margins
+._progress-detail {
+	margin: 0 2rem;
+	min-width: 0;
+	opacity: 0.65;
 }
 
 ._nowrap {
