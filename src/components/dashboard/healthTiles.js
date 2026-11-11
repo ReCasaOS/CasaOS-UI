@@ -137,6 +137,21 @@ export function attentionItems({ health, snapraid, backup, fleet }, t, now = Dat
 	return items.sort((a, b) => (a.level === 'danger' ? 0 : 1) - (b.level === 'danger' ? 0 : 1))
 }
 
+// The Storage panel's rows of the ZFS pools (GET /v1/disks/zfs): their disks hold no mounted volume, so
+// GET /v1/storage never lists them. ONLINE is healthy, any other state read is not; an unread one says nothing.
+export function zfsPoolRows(pools) {
+	return (Array.isArray(pools) ? pools : []).map(pool => ({
+		key: `zfs_${pool.name}`,
+		name: pool.name,
+		role: 'zfs',
+		known: pool.known,
+		state: pool.state,
+		health: pool.known ? (pool.state === 'ONLINE' ? 'passed' : 'failed') : '',
+		size: pool.size,
+		used: pool.allocated,
+	}))
+}
+
 // The Storage panel's rows, one per disk, from GET /v1/storage (the disks with their volumes, the
 // system one among them), GET /v1/disks (the drives: SMART and temperature) and the volumes
 // SnapRAID holds by mount point ('data' | 'parity', see snapraidHeld). The system disk may not

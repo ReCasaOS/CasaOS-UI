@@ -63,7 +63,7 @@
 									<span :class="`is-${drive.health || 'none'}`" class="panel-dot"></span>
 									<span class="panel-grow">{{ drive.name }}</span>
 									<!-- the colour of the dot, in words, read out always and shown when it is bad news -->
-									<span v-if="drive.health" :class="[`is-${drive.health}`, { 'is-sr-only': drive.health !== 'failed' }]" class="drive-health">{{ driveHealthLabel(drive.health) }}</span>
+									<span v-if="drive.health" :class="[`is-${drive.health}`, { 'is-sr-only': drive.health !== 'failed' }]" class="drive-health">{{ drive.healthText || driveHealthLabel(drive.health) }}</span>
 									<span v-if="roleLabel(drive.role)" class="panel-role">{{ roleLabel(drive.role) }}</span>
 									<span class="panel-value">{{ drive.percent }} %</span>
 								</div>
@@ -160,7 +160,8 @@ import escape from 'lodash/escape'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
-import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent } from '@/components/dashboard/healthTiles'
+import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent, zfsPoolRows } from '@/components/dashboard/healthTiles'
+import { zfsTag } from '@/components/Storage/zfs'
 import { DUE_GRACE, backupRunning, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 import { liveFigures, liveTitle } from '@/components/backup/liveBackup.js'
 
@@ -185,6 +186,8 @@ export default {
 			// the disks with their volumes (GET /v1/storage) and the drives (GET /v1/disks); empty on a box that does not answer
 			storageList: [],
 			driveList: [],
+			// the ZFS pools (GET /v1/disks/zfs); none on a box without ZFS or a LocalStorage without the route
+			zfsPools: [],
 			speed: null,
 			watts: null,
 			runs: [],
@@ -344,7 +347,18 @@ export default {
 					detail: `${this.renderSize(row.used)} / ${this.renderSize(row.size)}`,
 				}))
 				: this.utilizationDrives()
-			return list.map(drive => ({
+			const pools = zfsPoolRows(this.zfsPools).map(pool => ({
+				key: pool.key,
+				name: pool.name,
+				role: pool.role,
+				health: pool.health,
+				// "Degraded" says more than the "Damage" of a disk
+				healthText: pool.health === 'failed' ? zfsTag(pool, this.$t).text : '',
+				temperature: 0,
+				percent: percent(pool.used, pool.size),
+				detail: pool.size > 0 ? `${this.renderSize(pool.used)} / ${this.renderSize(pool.size)}` : '',
+			}))
+			return [...list, ...pools].map(drive => ({
 				...drive,
 				level: drive.health === 'failed' ? 'danger' : this.barLevel(drive.percent),
 			}))
@@ -505,7 +519,7 @@ export default {
 		},
 
 		roleLabel(role) {
-			return { system: this.$t('System'), data: this.$t('Data disk'), parity: this.$t('Parity disk') }[role] || ''
+			return { system: this.$t('System'), data: this.$t('Data disk'), parity: this.$t('Parity disk'), zfs: 'ZFS' }[role] || ''
 		},
 
 		fleetStateLabel(state) {
@@ -647,6 +661,11 @@ export default {
 			} catch {
 				this.storageList = []
 				this.driveList = []
+			}
+			try {
+				this.zfsPools = (await this.$api.disks.zfs()).data.data.pools || []
+			} catch {
+				this.zfsPools = []
 			}
 			// 404 on a core without a fleet, nothing to show on a box that is not a master
 			try {
