@@ -136,6 +136,49 @@ describe('health strip', () => {
 		expect(wrapper.find('.beta-main .apps-here').exists()).toBe(true)
 	})
 
+	// their disks hold no mounted volume: GET /v1/storage never lists them, here it even fails (a 502)
+	it('adds a row per ZFS pool, with the state of the pool when it is not online', async () => {
+		const zfs = () => Promise.resolve({ data: { data: { pools: [
+			{ name: 'pool1', known: true, state: 'ONLINE', size: 2000, allocated: 1340 },
+			{ name: 'tank', known: true, state: 'DEGRADED', size: 1000, allocated: 500 },
+			{ name: 'cold', known: false, state: '', size: -1, allocated: -1 },
+		] } } })
+		const wrapper = mount(HealthStrip, {
+			global: {
+				mocks: {
+					$t: key => key,
+					$store: { state: { hardwareInfo } },
+					$EventBus: { $emit: vi.fn() },
+					$api: {
+						backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) },
+						disks: { snapraid: () => Promise.reject(new Error('404')), zfs, unreadable: () => Promise.resolve({ data: { data: [{ mount_point: '/media/ser/fotos', error: 'Stale file handle' }] } }) },
+						storage: { list: () => Promise.reject(new Error('502')) },
+					},
+				},
+			},
+		})
+		await settle()
+
+		const drives = wrapper.findAll('.storage .drive')
+		expect(drives).toHaveLength(4)
+		expect(drives[0].text()).toContain('System drive')
+		expect(drives[1].text()).toContain('pool1')
+		expect(drives[1].text()).toContain('ZFS')
+		expect(drives[1].text()).toContain('67 %')
+		expect(drives[1].find('.panel-dot').classes()).toContain('is-passed')
+		expect(drives[2].text()).toContain('Degraded')
+		expect(drives[2].text()).not.toContain('Damage')
+		expect(drives[2].find('.tile-bar div').classes()).toContain('danger')
+		// a state that could not be read says nothing, and no size is no figure
+		expect(drives[3].text()).toContain('cold')
+		expect(drives[3].text()).toContain('0 %')
+		expect(drives[3].find('.panel-dot').classes()).toContain('is-none')
+		expect(drives[3].find('.tile-detail').text()).toBe('')
+		expect(wrapper.find('.storage .panel-chip').text()).toContain('failing')
+		// the dead mount the storage list stumbled on is named in Needs attention
+		expect(wrapper.find('.attention').text()).toContain('The mount {path} cannot be read')
+	})
+
 	it('lists the disks the box reports with their role, SMART state and temperature', async () => {
 		const wrapper = mount(HealthStrip, {
 			global: {

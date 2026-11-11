@@ -2966,6 +2966,8 @@
   "Not supported: {reason}": "Not supported: {reason}",
   "Not supported here": "Not supported here",
   "The box {name} is offline": "The box {name} is offline",
+  "The mount {path} cannot be read ({error}): check /etc/fstab or the server it comes from": "The mount {path} cannot be read ({error}): check /etc/fstab or the server it comes from",
+  "A mount does not answer: check /etc/fstab or the servers of the network shares": "A mount does not answer: check /etc/fstab or the servers of the network shares",
   "{online} of {total} boxes online": "{online} of {total} boxes online",
   "Data disk": "Data disk",
   "Parity disk": "Parity disk",

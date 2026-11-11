@@ -2969,6 +2969,8 @@
   "Not supported: {reason}": "Non pris en charge : {reason}",
   "Not supported here": "Non pris en charge ici",
   "The box {name} is offline": "La box {name} est hors ligne",
+  "The mount {path} cannot be read ({error}): check /etc/fstab or the server it comes from": "Le montage {path} est illisible ({error}) : vérifiez /etc/fstab ou le serveur dont il vient",
+  "A mount does not answer: check /etc/fstab or the servers of the network shares": "Un montage ne répond pas : vérifiez /etc/fstab ou les serveurs des partages réseau",
   "{online} of {total} boxes online": "{online} box sur {total} en ligne",
   "Data disk": "Disque de données",
   "Parity disk": "Disque de parité",

@@ -178,6 +178,25 @@ describe('attentionItems and the fleet', () => {
 	})
 })
 
+describe('attentionItems and the mounts df cannot read', () => {
+	const tp = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, name) => params[name])
+	const healthy = { health: 'passed', snapraid: null, backup: { status: 'ok' } }
+
+	it('names each dead mount with its complaint, and says so when df itself hangs', () => {
+		const items = attentionItems({ ...healthy, mounts: [{ mount_point: '/media/ser/fotos', error: 'Stale file handle' }, { mount_point: '', error: 'df did not answer within 15 s' }] }, tp)
+
+		expect(items).toEqual([
+			{ key: 'mount_/media/ser/fotos', level: 'warning', text: 'The mount /media/ser/fotos cannot be read (Stale file handle): check /etc/fstab or the server it comes from' },
+			{ key: 'mount_hung', level: 'warning', text: 'A mount does not answer: check /etc/fstab or the servers of the network shares' },
+		])
+	})
+
+	it('says nothing without dead mounts, or on a LocalStorage without the route', () => {
+		expect(attentionItems({ ...healthy, mounts: [] }, tp)).toEqual([])
+		expect(attentionItems({ ...healthy, mounts: undefined }, tp)).toEqual([])
+	})
+})
+
 describe('diskRows', () => {
 	const storages = [
 		{ path: '/dev/sda', disk_name: 'System', disk_model: 'Samsung SSD', children: [{ mount_point: '/', size: '100', used: '40' }] },

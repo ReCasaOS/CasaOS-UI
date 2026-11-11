@@ -117,7 +117,8 @@ export function fleetPanel(status) {
 // the core raises its own alert for a box after as long
 const FLEET_GONE_MS = 10 * 60 * 1000
 
-export function attentionItems({ health, snapraid, backup, fleet }, t, now = Date.now()) {
+// `mounts` are the mounts df cannot read (GET /v1/disks/unreadable), an empty mount point when df itself hangs.
+export function attentionItems({ health, snapraid, backup, fleet, mounts }, t, now = Date.now()) {
 	const items = []
 	if (health === 'failed') {
 		items.push({ key: 'disk', level: 'danger', text: t('The system drive reports a failure') })
@@ -129,12 +130,32 @@ export function attentionItems({ health, snapraid, backup, fleet }, t, now = Dat
 	if (backup && backup.status === 'failed') {
 		items.push({ key: 'backup', level: 'danger', text: t('The last backup failed') })
 	}
+	for (const mount of Array.isArray(mounts) ? mounts : []) {
+		items.push(mount.mount_point
+			? { key: `mount_${mount.mount_point}`, level: 'warning', text: t('The mount {path} cannot be read ({error}): check /etc/fstab or the server it comes from', { path: mount.mount_point, error: mount.error }) }
+			: { key: 'mount_hung', level: 'warning', text: t('A mount does not answer: check /etc/fstab or the servers of the network shares') })
+	}
 	for (const box of fleetPanel(fleet)?.boxes || []) {
 		if (box.state === 'offline' && now - Date.parse(box.lastSeen) >= FLEET_GONE_MS) {
 			items.push({ key: `fleet_${box.key}`, level: 'warning', text: t('The box {name} is offline', { name: box.name }) })
 		}
 	}
 	return items.sort((a, b) => (a.level === 'danger' ? 0 : 1) - (b.level === 'danger' ? 0 : 1))
+}
+
+// The Storage panel's rows of the ZFS pools (GET /v1/disks/zfs): their disks hold no mounted volume, so
+// GET /v1/storage never lists them. ONLINE is healthy, any other state read is not; an unread one says nothing.
+export function zfsPoolRows(pools) {
+	return (Array.isArray(pools) ? pools : []).map(pool => ({
+		key: `zfs_${pool.name}`,
+		name: pool.name,
+		role: 'zfs',
+		known: pool.known,
+		state: pool.state,
+		health: pool.known ? (pool.state === 'ONLINE' ? 'passed' : 'failed') : '',
+		size: pool.size,
+		used: pool.allocated,
+	}))
 }
 
 // The Storage panel's rows, one per disk, from GET /v1/storage (the disks with their volumes, the
