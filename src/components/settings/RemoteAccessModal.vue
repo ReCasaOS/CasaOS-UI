@@ -99,6 +99,7 @@
 				</template>
 
 				<share-section />
+				<share-guard-section />
 			</template>
 			<b-loading v-else :active="!error" :is-full-page="false" />
 		</section>
@@ -112,6 +113,7 @@
 <script>
 import copy from 'clipboard-copy'
 import escape from 'lodash/escape'
+import ShareGuardSection from '@/components/PublicShare/ShareGuardSection.vue'
 import ShareSection from '@/components/PublicShare/ShareSection.vue'
 import { OFFICIAL_RELAY, fleetApi } from '@/service/fleet'
 import { readLeaveWarning } from '@/service/publicShare'
@@ -120,7 +122,7 @@ const HTTPS = /^https:\/\/.+/i
 
 export default {
 	name: 'RemoteAccessModal',
-	components: { ShareSection },
+	components: { ShareGuardSection, ShareSection },
 	emits: ['close'],
 	data() {
 		return {

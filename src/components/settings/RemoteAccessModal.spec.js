@@ -10,6 +10,7 @@ import i18n from '@/plugins/i18n'
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/fleet', () => ({ OFFICIAL_RELAY: 'https://relay.official.test', fleetApi: { status: vi.fn(), setRemote: vi.fn(), remote: vi.fn(), removeDevice: vi.fn(), addDevice: vi.fn() } }))
 vi.mock('@/service/publicShare', async () => ({ publicShare: (await import('vue')).reactive({ status: null, ok: false }), readLeaveWarning: vi.fn(), refresh: vi.fn(() => Promise.resolve()), apply: vi.fn() }))
+vi.mock('@/service/shareGuard', async () => ({ shareGuard: (await import('vue')).reactive({ view: null, ok: false }), refreshGuard: vi.fn(() => Promise.resolve()), shareGuardApi: {}, applyGuard: vi.fn(), touchGuard: vi.fn() }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 
 const answer = data => Promise.resolve({ data: { success: 200, data } })
@@ -49,6 +50,13 @@ describe('the Remote access window', () => {
 		await flushPromises()
 		expect(fleetApi.setRemote).toHaveBeenCalledWith({ enabled: true, relay: 'https://relay.official.test' })
 		expect(wrapper.text()).toContain('Address of this box: http://100.64.0.7')
+	})
+
+	it('shows the protection of shared apps right after the public sharing', async () => {
+		fleetApi.status.mockReturnValue(answer(ON))
+		wrapper = mount(RemoteAccessModal, { attachTo: document.body, global: { plugins: [Buefy, i18n], stubs: { ShareSection: { template: '<i class="sharing" />' }, ShareGuardSection: { template: '<i class="guard" />' } }, mocks: { $EventBus: { $emit: vi.fn(), $on: vi.fn(), $off: vi.fn() } } } })
+		await flushPromises()
+		expect(wrapper.find('.sharing + .guard').exists()).toBe(true)
 	})
 
 	it('refuses a relay that is not https', async () => {
