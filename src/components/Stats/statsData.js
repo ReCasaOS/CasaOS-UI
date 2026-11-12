@@ -397,8 +397,9 @@ export function chartOptions(chart, { zoom, height, locale = 'en', range = 'live
 		legend: { show: false },
 		stroke: { curve: 'straight', width: 2 },
 		dataLabels: { enabled: false },
-		xaxis: { type: 'datetime', min: zoom ? zoom.min : null, max: zoom ? zoom.max : null, labels: { formatter: time, datetimeUTC: false } },
-		yaxis: { min: 0, max: scaleMax(chart, scale), labels: { formatter: y } },
+		// 12px is the smallest text the app shows; ApexCharts' own default is 11px
+		xaxis: { type: 'datetime', min: zoom ? zoom.min : null, max: zoom ? zoom.max : null, labels: { formatter: time, datetimeUTC: false, style: { fontSize: '12px' } } },
+		yaxis: { min: 0, max: scaleMax(chart, scale), labels: { formatter: y, style: { fontSize: '12px' } } },
 		tooltip: { shared: true, x: { formatter: time }, y: { formatter: y } },
 		annotations: {},
 	}

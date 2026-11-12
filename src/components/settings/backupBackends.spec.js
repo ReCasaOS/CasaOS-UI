@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BACKUP_BACKENDS, backendHelp, parametersFrom, suggestedFields } from './backupBackends'
+import { BACKUP_BACKENDS, backendHelp, canSignIn, parametersFrom, suggestedFields } from './backupBackends'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 
@@ -35,6 +35,23 @@ describe('suggested fields', () => {
 		expect(suggestedFields('onedrive').map(row => row.key)).toEqual(['token', 'drive_id', 'drive_type'])
 		expect(backendHelp('s3')).toBe('')
 		expect(backendHelp('swift')).toBe('')
+	})
+
+	it('signs in for the person to the cloud drives', () => {
+		expect(canSignIn('drive')).toBe(true)
+		expect(canSignIn('dropbox')).toBe(true)
+		// the box also finds OneDrive's drive_id and drive_type
+		expect(canSignIn('onedrive')).toBe(true)
+		expect(canSignIn('s3')).toBe(false)
+		expect(canSignIn('swift')).toBe(false)
+	})
+
+	it('translates what the sign-in says', () => {
+		for (const key of ['Sign in with {provider}', 'Finish sign-in', 'Open the sign-in page again']) {
+			expect(en[key]).toBe(key)
+			expect(fr[key]).toBeTruthy()
+			expect(fr[key]).not.toBe(key)
+		}
 	})
 
 	it('says plainly that FTP is not encrypted', () => {

@@ -24,7 +24,9 @@ import { h } from 'vue'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Navigation, Pagination } from 'swiper/modules'
 import sortBy from 'lodash/sortBy'
+import escape from 'lodash/escape'
 import { failuresToAnnounce, rememberBackupFailures, seenBackupFailures } from '@/components/settings/backupFailures'
+import { backupSubject } from '@/components/settings/backupScheduleGroups'
 import noticeBlock from '@/components/noticBlock/noticeBlock'
 import { mixin } from '@/mixins/mixin'
 import SyncBlock from '@/components/syncthing/SyncBlock.vue'
@@ -151,11 +153,11 @@ export default {
 					position: 'is-top',
 					indefinite: true,
 					queue: false,
-					message: this.$t('Scheduled backup of {app} to {destination} failed: {error}', {
+					message: escape(this.$t('Scheduled backup of {app} to {destination} failed: {error}', {
 						app: run.app,
 						destination: run.destination,
 						error: run.error,
-					}),
+					})),
 				})
 				seen.push(run.stamp)
 			}
@@ -608,10 +610,48 @@ export default {
 			return `${res.Properties['backup:kind'] || 'backup'}:${res.Properties['app:name']}`
 		},
 
+		// the box's own backup goes under a name nobody reads as the box
+		// (capitalised where it starts the sentence)
+		backupTitle(res, box = 'this box') {
+			return backupSubject(res.Properties, (...args) => this.$t(...args), box)
+		},
+
 		backupCardTitle(res) {
 			return res.Properties['backup:kind'] === 'restore'
-				? this.$t('Restoring {title}', { title: this.appTitle(res) })
-				: this.$t('Backing up {title}', { title: this.appTitle(res) })
+				? this.$t('Restoring {title}', { title: this.backupTitle(res) })
+				: this.$t('Backing up {title}', { title: this.backupTitle(res) })
+		},
+
+		// What the install is busy with, in words. The app service names the step; one
+		// that does not yet is answered with nothing, and the percentage is worded alone.
+		installStepText(res) {
+			const several = Number(res.imageCount) > 1
+				? [this.$t('image {index} of {count}', { index: res.imageIndex, count: res.imageCount })]
+				: []
+			const downloaded = Number(res.downloaded)
+			const size = Number(res.size)
+
+			switch (res.step) {
+				case 'pull':
+					return [
+						this.$t('Downloading'),
+						// a layer says its size only when its download starts: until all
+						// have, there is no total to give
+						...(size > 0
+							? [this.$t('{done} of {total}', { done: this.renderSize(downloaded), total: this.renderSize(size) })]
+							: downloaded > 0 ? [this.renderSize(downloaded)] : []),
+						// last: it is what a narrow card can lose
+						...several,
+					].join(' · ')
+				case 'extract':
+					return [this.$t('Unpacking the image'), ...several].join(' · ')
+				case 'create':
+					return this.$t('Creating the containers')
+				case 'start':
+					return this.$t('Starting, waiting for the app to answer')
+				default:
+					return ''
+			}
 		},
 
 		transformAppInstallationProgress(res) {
@@ -626,44 +666,80 @@ export default {
 				return
 			}
 
-			if (this.noticesData[res.name]) {
-				if (res.message !== '') {
-					try {
-						const progress = Number(res.message) < 0 ? 0 : Number(res.message)
-						let currentInstallAppText = ''
-						if (String(res.name).startsWith('backup:') || String(res.name).startsWith('restore:')) {
-							currentInstallAppText = this.$t('{percent}% done', { percent: progress })
-						} else if (progress?.toString() === '0') {
-							currentInstallAppText = this.$t('Starting installation')
-						} else if (progress?.toString() === '100') {
-							currentInstallAppText = this.$t('Installation completed')
-						} else {
-							// shown as written rather than through $t at the other end,
-							// so it has to arrive translated
-							currentInstallAppText = this.$t('Installing {progress}%', { progress })
-						}
-						this.noticesData[res.name].content = {
-							text: currentInstallAppText,
-							value: progress,
-						}
-					} catch (e) {
-						console.log(e)
-					}
+			const afterTheImages = step => step === 'create' || step === 'start'
+
+			if (!this.noticesData[res.name]) {
+				// A step alone opens nothing. A restore that installs the app goes through
+				// the same steps with no install around them, so nothing would ever take
+				// the card away; and a step that lands after the end of its install would
+				// open it again for good.
+				if (afterTheImages(res.step)) {
+					return
 				}
+
+				// a backup's title comes already worded: "Installing" before it said the wrong thing
+				const isBackup = String(res.name).startsWith('backup:') || String(res.name).startsWith('restore:')
+				const data = {
+					title: isBackup ? res.title : this.$t('Installing {title}', { title: res.title }),
+					icon: res.icon,
+					content: {
+						text: res?.message,
+						value: 0,
+					},
+					contentType: 'progress',
+					operate: false,
+				}
+				this.addNotice(data, res.name)
+
+				// The page can load half way through an install, and the first thing it
+				// hears is then a frame of the download: a figure, which went up as the
+				// bare number. It is worded below like any other frame.
+				if (res.type !== 'pull') {
+					return
+				}
+			}
+
+			const card = this.noticesData[res.name]
+			if (res.message === '') {
 				return
 			}
 
-			const data = {
-				title: this.$t('Installing {title}', { title: res.title }),
-				icon: res.icon,
-				content: {
-					text: res?.message,
-					value: 0,
-				},
-				contentType: 'progress',
-				operate: false,
+			// Words, not a figure: something is beginning on a card that was left up.
+			// It starts over, rather than reading "Installing NaN%".
+			const progress = Math.max(0, Number(res.message))
+			if (Number.isNaN(progress)) {
+				card.content = { text: res.message, value: 0 }
+				return
 			}
-			this.addNotice(data, res.name)
+
+			// Events are published without waiting for one another, so the last frame of
+			// the download can land after the step that follows it.
+			if (afterTheImages(card.content.step) && !afterTheImages(res.step)) {
+				return
+			}
+
+			let text = this.installStepText(res)
+			if (text === '') {
+				if (String(res.name).startsWith('backup:') || String(res.name).startsWith('restore:')) {
+					text = this.$t('{percent}% done', { percent: progress })
+				} else if (progress === 0) {
+					text = this.$t('Starting installation')
+				} else if (progress === 100) {
+					text = this.$t('Installation completed')
+				} else {
+					// shown as written rather than through $t at the other end,
+					// so it has to arrive translated
+					text = this.$t('Installing {progress}%', { progress })
+				}
+			}
+
+			card.content = {
+				text,
+				// nobody knows how long creating and starting take: no value is a bar
+				// that moves without a figure
+				value: afterTheImages(res.step) ? undefined : progress,
+				...(res.step ? { step: res.step, detail: afterTheImages(res.step) ? '' : res.image } : {}),
+			}
 		},
 
 	},
@@ -692,7 +768,7 @@ export default {
 		},
 		'app:apply-changes-end': function (res) {
 			this.$buefy.toast.open({
-				message: `The setting of ${res.Properties['app:name']} is complete`,
+				message: escape(`The setting of ${res.Properties['app:name']} is complete`),
 				duration: 5000,
 				type: 'is-success',
 			})
@@ -706,7 +782,7 @@ export default {
 		},
 		'app:apply-changes-error': function (res) {
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -730,7 +806,7 @@ export default {
 				id: res.Properties['app:name'],
 				success: true,
 				type: 'install-begin',
-				message: 'Starting installation',
+				message: this.$t('Starting installation'),
 				icon: res.Properties['app:icon'],
 			})
 		},
@@ -790,7 +866,7 @@ export default {
 		// it died on, saying nothing, until the page was reloaded.
 		'app:update-error': function (res) {
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -833,9 +909,9 @@ export default {
 		'backup:end': function (res) {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
-				message: res.Properties['backup:kind'] === 'restore'
-					? this.$t('{title} restored from {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] })
-					: this.$t('{title} backed up to {destination}.', { title: this.appTitle(res), destination: res.Properties['backup:destination'] }),
+				message: escape(res.Properties['backup:kind'] === 'restore'
+					? this.$t('{title} restored from {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] })
+					: this.$t('{title} backed up to {destination}.', { title: this.backupTitle(res, 'This box'), destination: res.Properties['backup:destination'] })),
 				type: 'is-success',
 				duration: 5000,
 			})
@@ -843,9 +919,9 @@ export default {
 		'backup:error': function (res) {
 			this.transformAppInstallationProgress({ finished: true, name: this.backupCardName(res) })
 			this.$buefy.toast.open({
-				message: res.Properties['backup:kind'] === 'restore'
-					? this.$t('Restoring {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message })
-					: this.$t('Backing up {title} failed: {reason}', { title: this.appTitle(res), reason: res.Properties.message }),
+				message: escape(res.Properties['backup:kind'] === 'restore'
+					? this.$t('Restoring {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message })
+					: this.$t('Backing up {title} failed: {reason}', { title: this.backupTitle(res), reason: res.Properties.message })),
 				type: 'is-danger',
 				duration: 8000,
 			})
@@ -861,6 +937,12 @@ export default {
 				type: 'pull',
 				message: res.Properties['app:progress'],
 				icon: res.Properties['app:icon'],
+				step: res.Properties['app:install:step'],
+				image: res.Properties['docker:image:name'],
+				imageIndex: res.Properties['docker:image:index'],
+				imageCount: res.Properties['docker:image:count'],
+				downloaded: res.Properties['docker:image:downloaded'],
+				size: res.Properties['docker:image:size'],
 			})
 		},
 	},

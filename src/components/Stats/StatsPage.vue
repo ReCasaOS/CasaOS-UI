@@ -1,9 +1,10 @@
 <template>
-	<div class="modal-card stats-page">
+	<div class="modal-card stats-page touch-targets">
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 ref="title" class="title is-header mb-0 mr-2" tabindex="-1">{{ $t('Statistics') }}</h3>
 			</div>
+			<NewTabButton :params="{ item: selectedKey }" page="stats" />
 			<button :aria-label="$t('Close')" class="close-button ml-2" type="button" @click="$emit('close')">
 				<b-icon icon="close-outline" pack="casa" />
 			</button>
@@ -145,6 +146,7 @@ import { formatDateTime, formatValue, localeTag } from './statsFormat'
 import { clean } from '@/components/settings/osPlan'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { STATS_SOURCES, statsApi } from '@/service/stats'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const REFRESH_MS = 5000
 
@@ -190,7 +192,7 @@ function failureCode(e) {
 
 export default {
 	name: 'StatsPage',
-	components: { AlertSettingsDialog, StatsChart },
+	components: { NewTabButton, AlertSettingsDialog, StatsChart },
 	props: {
 		initialItem: { type: String, default: '' },
 	},
@@ -717,7 +719,7 @@ $stats-narrow: 44rem;
 		flex-shrink: 0;
 		padding: 0 0.4rem;
 		border-radius: 1rem;
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		color: var(--casa-text-warning);
 		background: var(--casa-warning-tint);
 	}
@@ -804,7 +806,7 @@ $stats-narrow: 44rem;
 
 			// a finger, not a pointer
 			@media (max-width: 600px) {
-				min-height: 2.25rem;
+				min-height: 2.75rem;
 			}
 
 			&:focus-visible {
@@ -901,16 +903,17 @@ $stats-narrow: 44rem;
 </style>
 
 <style lang="scss">
-// The modal the page opens in: the same size as the one of the virtual machines.
+// The modal the page opens in: the same size as the one of the logs.
 .stats-modal {
 	.animation-content {
-		width: 66rem;
+		width: 100rem;
 		max-width: calc(100vw - 2rem) !important;
 	}
 
 	.modal-card.stats-page {
 		width: 100%;
-		max-height: calc(100vh - 5rem);
+		height: calc(100vh - 3rem);
+		max-height: calc(100vh - 3rem);
 
 		.modal-card-body {
 			overflow-y: auto;

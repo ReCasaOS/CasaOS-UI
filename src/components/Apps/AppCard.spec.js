@@ -1,12 +1,32 @@
 // @vitest-environment happy-dom
 import Buefy from 'buefy'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import i18n from '@/plugins/i18n'
 import AppCard from '@/components/Apps/AppCard.vue'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import { alertBadge } from '@/components/Stats/alertBadge'
+import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
+import BackupBadge from '@/components/backup/BackupBadge.vue'
+import { backupStatus, refresh } from '@/service/backupStatus'
+import { publicShare } from '@/service/publicShare'
+
+vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
+vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
+
+// the service reads the box's backup routes: the card is given its answers instead
+vi.mock('@/service/backupStatus', async () => {
+	const { reactive } = await import('vue')
+	return { backupStatus: reactive({ states: [], ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
+
+// the service reads the box's /v1/share: the card is given its answer instead
+vi.mock('@/service/publicShare', async () => {
+	const { reactive } = await import('vue')
+	return { publicShare: reactive({ status: null, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
 
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
@@ -18,6 +38,8 @@ vi.mock('@/assets/lang', () => ({
 			'Statistics, {count} active alert': 'Statistics, {count} active alert',
 			'Statistics, {count} active alerts': 'Statistics, {count} active alerts',
 			'Updating {name} failed: {reason}': 'Updating {name} failed: {reason}',
+			'Backed up {when} to {destination}': 'Backed up {when} to {destination}',
+			'Backup failed: {reason}': 'Backup failed: {reason}',
 			'{name} now runs the image that was just pulled.': '{name} now runs the image that was just pulled.',
 			'{name} already runs the newest image, so it was left as it is.': '{name} already runs the newest image, so it was left as it is.',
 			'Could not check whether a newer image exists for {name}. It keeps the image it has.': 'Could not check whether a newer image exists for {name}. It keeps the image it has.',
@@ -51,6 +73,11 @@ async function card(item, mocks = {}) {
 // on someone else's markup.
 afterEach(() => {
 	document.body.innerHTML = ''
+	backupStatus.states = []
+	backupStatus.ok = false
+	publicShare.status = null
+	publicShare.ok = false
+	vi.mocked(refresh).mockClear()
 })
 
 function badges(wrapper) {
@@ -602,6 +629,289 @@ describe('the system app marker', () => {
 		const wrapper = await card({ app_type })
 
 		expect(marker(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+})
+
+describe('the Fleet card', () => {
+	it('opens the Fleet page from its card', () => {
+		const vm = { $buefy: { modal: { open: vi.fn() } }, $store: { state: { appLaunchInIframe: true, appLaunchExceptions: [] } } }
+		AppCard.methods.openSystemApps.call(vm, { name: FLEET_APP_NAME, app_type: 'system' })
+		expect(openFleet).toHaveBeenCalledWith(vm.$buefy, vm.$store.state)
+	})
+})
+
+describe('logs', () => {
+	const state = { appLaunchInIframe: true, appLaunchExceptions: [] }
+	const labels = () => [...document.body.querySelectorAll('button')].map(b => b.textContent.trim())
+
+	it('opens the Logs page from its card', () => {
+		const vm = { $buefy: {}, $store: { state } }
+		AppCard.methods.openSystemApps.call(vm, { name: LOGS_APP_NAME, app_type: 'system' })
+		expect(openLogs).toHaveBeenCalledWith(vm.$buefy, state)
+	})
+
+	it('offers Logs in the menu of a compose app only where AppManagement keeps logs', async () => {
+		hasLogs.mockResolvedValueOnce(true)
+		let wrapper = await card({})
+		await flushPromises()
+		expect(labels()).toContain('Logs')
+		wrapper.unmount()
+
+		wrapper = await card({})
+		await flushPromises()
+		expect(labels()).not.toContain('Logs')
+		wrapper.unmount()
+	})
+
+	it('opens a compose app on its project, and a v1 app on the name of its container', async () => {
+		const vm = { $buefy: {}, $store: { state }, item: { name: 'immich' }, isV1App: false }
+		await AppCard.methods.showLogs.call(vm)
+		expect(openLogs).toHaveBeenLastCalledWith(vm.$buefy, state, { app: 'immich' })
+
+		const getDetail = vi.fn().mockResolvedValue({ data: { data: { name: 'jellyfin' } } })
+		const v1 = { ...vm, item: { name: 'ab12cd34ef56' }, isV1App: true, $api: { container: { getDetail } } }
+		await AppCard.methods.showLogs.call(v1)
+		expect(getDetail).toHaveBeenCalledWith('ab12cd34ef56')
+		expect(openLogs).toHaveBeenLastCalledWith(v1.$buefy, state, { app: 'jellyfin' })
+	})
+})
+
+describe('the compact card (beta dashboard)', () => {
+	function compactCard(compact, item = { name: 'Files', app_type: 'system', status: 'running', title: { en_us: 'Files' } }) {
+		const homeShowFiles = vi.fn()
+		const wrapper = mount(AppCard, {
+			props: { item, compact },
+			global: {
+				plugins: [Buefy, i18n],
+				provide: { homeShowFiles, openAppStore: () => {} },
+				mocks: { $baseIp: 'localhost' },
+			},
+			attachTo: document.body,
+		})
+		return { wrapper, homeShowFiles }
+	}
+
+	it('opens the app from a click anywhere on the card', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true)
+
+		await wrapper.find('.cards-content p').trigger('click')
+
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+		expect(wrapper.attributes('role')).toBe('button')
+	})
+
+	it('opens the app once from a click on the icon, and from the keyboard', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true)
+
+		await wrapper.find('img').trigger('click')
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+
+		await wrapper.trigger('keydown.enter')
+		expect(homeShowFiles).toHaveBeenCalledTimes(2)
+	})
+
+	it('leaves the menu button to itself', async () => {
+		const { wrapper, homeShowFiles } = compactCard(true, { name: 'syncthing', app_type: 'LinkApp', hostname: 'http://x', status: 'running', title: { en_us: 'X' } })
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		await wrapper.find('.action-btn p').trigger('click')
+
+		expect(open).not.toHaveBeenCalled()
+		expect(homeShowFiles).not.toHaveBeenCalled()
+		open.mockRestore()
+	})
+
+	it('changes nothing on the classic card: only the icon opens the app', async () => {
+		const { wrapper, homeShowFiles } = compactCard(false)
+
+		await wrapper.find('.cards-content p').trigger('click')
+		expect(homeShowFiles).not.toHaveBeenCalled()
+
+		await wrapper.find('img').trigger('click')
+		expect(homeShowFiles).toHaveBeenCalledTimes(1)
+		expect(wrapper.attributes('role')).toBeUndefined()
+	})
+})
+
+describe('the compact card favorites and subtitle (beta dashboard)', () => {
+	const mounted = []
+	// the menu is appended to the body: a card left mounted would leak its items into the next test
+	afterEach(() => {
+		mounted.splice(0).forEach(wrapper => wrapper.unmount())
+	})
+
+	function card(props) {
+		const wrapper = mount(AppCard, {
+			props: { item: { name: 'jellyfin', app_type: 'v2app', status: 'running', title: { en_us: 'Jellyfin' } }, ...props },
+			global: {
+				plugins: [Buefy, i18n],
+				provide: { homeShowFiles: () => {}, openAppStore: () => {} },
+				mocks: { $baseIp: 'localhost' },
+			},
+			attachTo: document.body,
+		})
+		mounted.push(wrapper)
+		return wrapper
+	}
+
+	it('offers to pin the app from its menu, and says so once it is pinned', async () => {
+		const wrapper = card({ compact: true })
+		// the menu is appended to the body
+		expect(document.body.textContent).toContain('Add to favorites')
+
+		await wrapper.setProps({ favorite: true })
+		expect(document.body.textContent).toContain('Remove from favorites')
+	})
+
+	it('asks the section to pin or unpin it', () => {
+		const wrapper = card({ compact: true })
+
+		wrapper.vm.toggleFavorite()
+
+		expect(wrapper.emitted('toggleFavorite')).toEqual([[wrapper.vm.item]])
+	})
+
+	it('has no pin item on the classic card, and shows a subtitle only on the compact one', () => {
+		expect(card({ compact: false }).text()).not.toContain('Your files')
+		expect(document.body.textContent).not.toContain('Add to favorites')
+
+		expect(card({ compact: true, subtitle: 'Your files' }).text()).toContain('Your files')
+	})
+
+	it('says the memory the app uses beside its state, on a running card only', async () => {
+		const wrapper = card({ compact: true, memory: 1024 * 1024 * 640 })
+		expect(wrapper.find('.app-state').text()).toContain('640 MB')
+
+		await wrapper.setProps({ item: { name: 'jellyfin', app_type: 'v2app', status: 'exited', title: { en_us: 'Jellyfin' } } })
+		expect(wrapper.find('.app-state').text()).not.toContain('MB')
+
+		expect(card({ compact: true }).find('.app-state').text()).not.toContain('·')
+	})
+
+	it('says an update in a chip, and has no NEW marker, on the compact card only', async () => {
+		const item = { name: 'jellyfin', app_type: 'v2app', status: 'running', update_available: true, title: { en_us: 'Jellyfin' } }
+		const compact = card({ compact: true, item })
+		await compact.setData({ newAppIds: ['jellyfin'] })
+
+		expect(compact.find('.update-chip').text()).toBe('Available update')
+		expect(compact.text()).not.toContain('NEW')
+		// the corner tooltip of the classic card is not drawn a second time
+		expect(compact.text()).not.toContain('Update available')
+
+		const classic = card({ compact: false, item })
+		await classic.setData({ newAppIds: ['jellyfin'] })
+		expect(classic.find('.update-chip').exists()).toBe(false)
+		expect(classic.text()).toContain('NEW')
+	})
+})
+
+describe('the backup badge on the tile', () => {
+	const couple = (over = {}) => ({ app: 'syncthing', destination: 'nas', state: 'ok', running: false, last_error: '', last_ok_at: new Date(Date.now() - 3600000).toISOString(), ...over })
+	const badge = wrapper => wrapper.findComponent(BackupBadge)
+
+	it('asks the service for the backup state of this box when it is created', async () => {
+		const wrapper = await card({})
+		expect(refresh).toHaveBeenCalledTimes(1)
+		wrapper.unmount()
+	})
+
+	it('shows ok for an app whose scheduled backups are all fine', async () => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('ok')
+		expect(badge(wrapper).props('title')).toContain('to nas')
+		wrapper.unmount()
+	})
+
+	it('shows a cross with the reason when the last backup failed', async () => {
+		backupStatus.states = [couple({ state: 'failed', last_error: 'disk full' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('failed')
+		expect(badge(wrapper).props('title')).toContain('disk full')
+		wrapper.unmount()
+	})
+
+	it('shows grey attention for a late backup', async () => {
+		backupStatus.states = [couple({ state: 'late' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).props('kind')).toBe('attention')
+		wrapper.unmount()
+	})
+
+	it('shows nothing for an app without an enabled schedule', async () => {
+		backupStatus.states = [couple({ app: 'jellyfin', state: 'failed', last_error: 'x' })]
+		backupStatus.ok = true
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows nothing while the service is not ok, whatever it last held', async () => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = false
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('appears when the service answers after the card was drawn', async () => {
+		const wrapper = await card({})
+		expect(badge(wrapper).exists()).toBe(false)
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		await nextTick()
+		expect(badge(wrapper).props('kind')).toBe('ok')
+		wrapper.unmount()
+	})
+
+	it.each([[false], [true]])('sits by the title, outside the action menu, on the card (compact: %s)', async (compact) => {
+		backupStatus.states = [couple()]
+		backupStatus.ok = true
+		const wrapper = mount(AppCard, {
+			props: { compact, item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' } } },
+			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost' } },
+			attachTo: document.body,
+		})
+		await nextTick()
+		expect(badge(wrapper).exists()).toBe(true)
+		expect(badge(wrapper).element.closest('.action-btn')).toBeNull()
+		expect(badge(wrapper).element.closest('.app-text')).not.toBeNull()
+		// the menu trigger is still there
+		expect(wrapper.find('.action-btn').exists()).toBe(true)
+		wrapper.unmount()
+	})
+})
+
+describe('public sharing on the card', () => {
+	const shared = { supported: true, reason: '', name: 'b', apps: [{ name: 'jellyfin', shared: true, url: 'https://jellyfin.b.box.x' }] }
+	const shareButton = () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Share on the Internet'))
+
+	it('shows Public on a shared app', async () => {
+		publicShare.status = shared
+		publicShare.ok = true
+		const wrapper = await card({ name: 'jellyfin' })
+		expect(wrapper.find('.public-badge').attributes('title')).toBe('https://jellyfin.b.box.x')
+		expect(wrapper.find('.public-badge').text()).toBe('Public')
+		expect(shareButton()).toBeTruthy()
+		wrapper.unmount()
+	})
+
+	it('shows no badge on an app that is not shared', async () => {
+		publicShare.status = shared
+		publicShare.ok = true
+		const wrapper = await card({ name: 'nextcloud' })
+		expect(wrapper.find('.public-badge').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('no share entry on an old core', async () => {
+		const wrapper = await card({ name: 'jellyfin' })
+		expect(wrapper.find('.public-badge').exists()).toBe(false)
+		expect(shareButton()).toBeUndefined()
 		wrapper.unmount()
 	})
 })

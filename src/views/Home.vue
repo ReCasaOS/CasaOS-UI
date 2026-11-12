@@ -7,7 +7,9 @@
 		<!-- Content Start -->
 		<div class="contents  pt-55 contextmenu-canvas" @contextmenu.prevent="openHomeContaxtMenu">
 			<div class="container">
-				<div class="columns is-variable is-2">
+				<!-- the beta dashboard is opt-in (Settings); the classic one stays the default -->
+				<DashboardBeta v-if="barData.dashboard_beta && !hardwareInfoLoading" @leave="setDashboardBeta(false)" />
+				<div v-else class="columns is-variable is-2">
 					<div class="column is-one-quarter slider-content">
 						<!-- SideBar Start -->
 						<SideBar v-if="!hardwareInfoLoading" @searchBarChange="handleSearchBarChange" />
@@ -70,11 +72,13 @@ import SideBar from '@/components/SideBar.vue'
 import TopBar from '@/components/TopBar.vue'
 import CoreService from '@/components/CoreService.vue'
 import AppSection from '@/components/Apps/AppSection.vue'
+import DashboardBeta from '@/components/DashboardBeta.vue'
 import FilePanel from '@/components/filebrowser/FilePanel.vue'
 import UpdateCompleteModal from '@/components/settings/UpdateCompleteModal.vue'
 import { mixin } from '@/mixins/mixin'
 import { FILES_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import events from '@/events/events'
+import { openPage } from '@/router/pageTabs'
 
 const wallpaperConfig = 'wallpaper'
 
@@ -84,6 +88,7 @@ export default {
 		SideBar,
 		SearchBar,
 		AppSection,
+		DashboardBeta,
 		TopBar,
 		CoreService,
 		FilePanel,
@@ -163,6 +168,7 @@ export default {
 					shortcuts_switch: true,
 					widgets_switch: true,
 					existing_apps_switch: true,
+					dashboard_beta: false,
 				}
 				// save
 				const saveRes = await this.$api.users.setCustomStorage('system', barData)
@@ -207,6 +213,23 @@ export default {
 		},
 
 		/**
+		 * @description: Switch between the classic and the beta dashboard (saved with the other system settings)
+		 * @param {boolean} value
+		 * @return {*} void
+		 */
+		async setDashboardBeta(value) {
+			this.barData = {
+				...this.barData,
+				dashboard_beta: Boolean(value),
+			}
+
+			const saveRes = await this.$api.users.setCustomStorage('system', this.barData)
+			if (saveRes.data.success === 200) {
+				this.barData = saveRes.data.data
+			}
+		},
+
+		/**
 		 * @description: Show Files
 		 * @param {*}
 		 * @return {*} void
@@ -214,8 +237,7 @@ export default {
 		showFiles(path) {
 			// the App launching setting covers Files as it covers the apps
 			if (builtinOpensInNewTab(FILES_LAUNCH_ID, this.$store.state)) {
-				const query = path ? `?path=${encodeURIComponent(path)}` : ''
-				window.open(`${window.location.pathname}#/files${query}`, '_blank')
+				openPage('files', { path })
 				return
 			}
 

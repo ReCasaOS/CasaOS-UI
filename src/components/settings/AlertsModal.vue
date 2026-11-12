@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card alerts-modal">
+	<div class="modal-card alerts-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('Alerts') }}
@@ -7,7 +7,7 @@
 		</header>
 
 		<section class="modal-card-body">
-			<p class="is-size-7 mb-3">
+			<p class="settings-intro mb-3">
 				{{ $t('Be told on your phone or by e-mail when something needs you: a backup that failed, a disk failing or full, an app that stopped, an update that paused.') }}
 			</p>
 
@@ -30,9 +30,9 @@
 				<p v-if="!view.channels.length" class="is-size-7 mb-3">
 					{{ $t('No channel yet: nothing is sent. Add one below.') }}
 				</p>
-				<div v-for="channel in view.channels" :key="channel.id" class="channel is-flex is-flex-wrap-wrap is-align-items-center is-gap-1 mb-2">
+				<div v-for="channel in view.channels" :key="channel.id" class="channel settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
 					<div class="is-flex-grow-1">
-						<div class="has-text-weight-medium">
+						<div class="has-text-weight-semibold">
 							{{ channel.name }}
 						</div>
 						<div class="is-size-7 _has-text-gray">
@@ -42,12 +42,12 @@
 							{{ tested[channel.id] }}
 						</div>
 					</div>
-					<div class="is-flex">
+					<div class="is-flex is-flex-wrap-wrap is-gap-1">
 						<!-- a channel not saved yet has no id: a test without one would go to every channel -->
-						<b-button :disabled="!channel.id || saving" :loading="busy === channel.id" class="mr-1" rounded size="is-small" @click="test(channel)">
+						<b-button :disabled="!channel.id || saving" :loading="busy === channel.id" rounded size="is-small" @click="test(channel)">
 							{{ $t('Test') }}
 						</b-button>
-						<b-button :disabled="saving" class="mr-1" rounded size="is-small" @click="rename(channel)">
+						<b-button :disabled="saving" rounded size="is-small" @click="rename(channel)">
 							{{ $t('Rename') }}
 						</b-button>
 						<b-button :disabled="saving" rounded size="is-small" type="is-danger" @click="remove(channel)">
@@ -59,68 +59,69 @@
 					{{ $t('A channel\'s address and its secrets stay on this box and are never shown again: to change them, remove the channel and add it again.') }}
 				</p>
 
-				<hr>
+				<div class="settings-card">
+					<h4 class="has-text-weight-bold mb-3">
+						{{ $t('Add a channel') }}
+					</h4>
+					<b-field :label="$t('Name')" label-position="on-border">
+						<b-input v-model="draft.name" :placeholder="$t('Phone')" expanded size="is-small" />
+					</b-field>
+					<b-field :label="$t('Service')" label-position="on-border">
+						<b-select :model-value="draft.kind" expanded size="is-small" @update:model-value="pick">
+							<option v-for="option in kinds" :key="option.id" :value="option.id">
+								{{ $t(option.label) }}
+							</option>
+						</b-select>
+					</b-field>
+					<p class="is-size-7 _has-text-gray mb-3">
+						{{ $t(kind.help) }}
+					</p>
+					<b-field v-for="field in kind.fields" :key="field.key" :label="$t(field.label)" label-position="on-border">
+						<!-- new-password: the browser must not fill the dashboard's own login in here -->
+						<b-input v-model="draft.values[field.key]"
+							:autocomplete="field.secret ? 'new-password' : 'off'"
+							:password-reveal="field.secret"
+							:placeholder="field.placeholder"
+							:type="field.secret ? 'password' : 'text'"
+							expanded
+							size="is-small" />
+					</b-field>
+					<div class="is-flex is-justify-content-flex-end">
+						<b-button :disabled="!draft.name.trim() || !draftURL || saving"
+							rounded
+							size="is-small"
+							type="is-primary"
+							@click="add">
+							{{ $t('Add channel') }}
+						</b-button>
+					</div>
 
-				<h4 class="has-text-weight-bold mb-3">
-					{{ $t('Add a channel') }}
-				</h4>
-				<b-field :label="$t('Name')" label-position="on-border">
-					<b-input v-model="draft.name" :placeholder="$t('Phone')" expanded size="is-small" />
-				</b-field>
-				<b-field :label="$t('Service')" label-position="on-border">
-					<b-select :model-value="draft.kind" expanded size="is-small" @update:model-value="pick">
-						<option v-for="option in kinds" :key="option.id" :value="option.id">
-							{{ $t(option.label) }}
-						</option>
-					</b-select>
-				</b-field>
-				<p class="is-size-7 _has-text-gray mb-3">
-					{{ $t(kind.help) }}
-				</p>
-				<b-field v-for="field in kind.fields" :key="field.key" :label="$t(field.label)" label-position="on-border">
-					<!-- new-password: the browser must not fill the dashboard's own login in here -->
-					<b-input v-model="draft.values[field.key]"
-						:autocomplete="field.secret ? 'new-password' : 'off'"
-						:password-reveal="field.secret"
-						:placeholder="field.placeholder"
-						:type="field.secret ? 'password' : 'text'"
-						expanded
-						size="is-small" />
-				</b-field>
-				<div class="is-flex is-justify-content-flex-end">
-					<b-button :disabled="!draft.name.trim() || !draftURL || saving"
-						rounded
-						size="is-small"
-						type="is-primary"
-						@click="add">
-						{{ $t('Add channel') }}
-					</b-button>
 				</div>
 
-				<hr>
-
-				<h4 class="has-text-weight-bold mb-3">
-					{{ $t('What to send') }}
-				</h4>
-				<b-field v-for="category in shownCategories" :key="category.key" class="mb-2">
-					<b-checkbox :disabled="saving"
-						:model-value="view.categories[category.key]"
-						size="is-small"
-						@update:model-value="save({ categories: { ...view.categories, [category.key]: $event } })">
-						{{ $t(category.label) }}
-					</b-checkbox>
-				</b-field>
-				<div class="is-flex is-align-items-center is-size-7">
-					{{ $t('A disk counts as full above') }}
-					<b-select :disabled="saving"
-						:model-value="view.disk_threshold"
-						class="ml-2"
-						size="is-small"
-						@update:model-value="save({ disk_threshold: $event })">
-						<option v-for="percent in thresholds" :key="percent" :value="percent">
-							{{ percent }} %
-						</option>
-					</b-select>
+				<div class="settings-card">
+					<h4 class="has-text-weight-bold mb-3">
+						{{ $t('What to send') }}
+					</h4>
+					<b-field v-for="category in shownCategories" :key="category.key" class="mb-2">
+						<b-checkbox :disabled="saving"
+							:model-value="view.categories[category.key]"
+							size="is-small"
+							@update:model-value="save({ categories: { ...view.categories, [category.key]: $event } })">
+							{{ $t(category.label) }}
+						</b-checkbox>
+					</b-field>
+					<div class="is-flex is-align-items-center is-size-7">
+						{{ $t('A disk counts as full above') }}
+						<b-select :disabled="saving"
+							:model-value="view.disk_threshold"
+							class="ml-2"
+							size="is-small"
+							@update:model-value="save({ disk_threshold: $event })">
+							<option v-for="percent in thresholds" :key="percent" :value="percent">
+								{{ percent }} %
+							</option>
+						</b-select>
+					</div>
 				</div>
 			</template>
 			<b-loading :is-full-page="false" :model-value="!view && !error" />
@@ -133,6 +134,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { ALERT_KINDS, blankValues, channelURL } from './alertChannels'
 
 // The core names a channel's service by its URL's scheme: the two the forms build read as the forms name them.
@@ -162,15 +164,16 @@ export default {
 				{ key: 'updates', label: 'An update fails or pauses, or a new release is out' },
 				{ key: 'apps', label: 'An app operation fails, or an app stops or keeps restarting' },
 				{ key: 'resources', label: 'A container or a virtual machine uses too much processor or memory, or a virtual machine crashes' },
+				{ key: 'fleet', label: 'Fleet' },
 			],
 			// the core's bounds
 			thresholds: Array.from({ length: 50 }, (_, i) => 50 + i),
 		}
 	},
 	computed: {
-		// A core older than the category sends no such key: a box for it would be a switch that does nothing.
+		// A core older than a category sends no such key: a box for it would be a switch that does nothing.
 		shownCategories() {
-			return this.categories.filter(category => category.key !== 'resources' || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, 'resources'))
+			return this.categories.filter(category => !['resources', 'fleet'].includes(category.key) || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, category.key))
 		},
 		kind() {
 			return ALERT_KINDS.find(kind => kind.id === this.draft.kind)
@@ -230,7 +233,7 @@ export default {
 
 		rename(channel) {
 			this.$buefy.dialog.prompt({
-				message: this.$t('New name for {name}', { name: channel.name }),
+				message: escape(this.$t('New name for {name}', { name: channel.name })),
 				inputAttrs: { value: channel.name, required: true },
 				confirmText: this.$t('Save'),
 				cancelText: this.$t('Cancel'),
@@ -243,7 +246,7 @@ export default {
 
 		remove(channel) {
 			this.$buefy.dialog.confirm({
-				message: this.$t('Remove {name}? Alerts are no longer sent there.', { name: channel.name }),
+				message: escape(this.$t('Remove {name}? Alerts are no longer sent there.', { name: channel.name })),
 				confirmText: this.$t('Remove'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',

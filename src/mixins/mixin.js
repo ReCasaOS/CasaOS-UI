@@ -12,7 +12,7 @@ const typeMap = {
 	'image-x-generic': ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'svg', 'tiff'],
 	'video-x-generic': ['mkv', 'mp4', '3gp', 'avi', 'm2ts', 'webm', 'flv', 'vob', 'ts', 'mts', 'mov', 'wmv', 'rm', 'rmvb', 'asf', 'wmv', 'mpg', 'm4v', 'mpeg', 'f4v'],
 	'audio-x-generic': ['aac', 'aiff', 'alac', 'amr', 'ape', 'flac', 'm4a', 'mp3', 'ogg', 'opus', 'wma', 'wav'],
-	'text-x-generic': ['txt', 'log', 'pages', 'conf', 'config', 'list', 'ini', 'toml', 'cfg', 'rc', 'env', 'service', 'conf.d', 'htaccess', 'gitconfig', 'vim', 'curlrc', 'wgetrc', 'gitignore'],
+	'text-x-generic': ['txt', 'log', 'pages', 'conf', 'config', 'list', 'ini', 'toml', 'cfg', 'rc', 'env', 'service', 'conf.d', 'htaccess', 'gitconfig', 'vim', 'curlrc', 'wgetrc', 'gitignore', 'm3u', 'm3u8', 'strm', 'nfo', 'vtt', 'properties', 'ovpn', 'patch', 'readme', 'license', 'lock', 'awk', 'cjs', 'desktop', 'gradle', 'jsx', 'lst', 'mjs', 'pls', 'rules', 'sed', 'socket', 'ssa', 'timer', 'tsx', 'webmanifest', 'xspf', 'pem', 'crt', 'cert', 'key', 'pub', 'sub'],
 	'text-markdown': ['md'],
 	'text-css': ['php', 'css', 'less', 'scss', 'sass', 'aspx', 'lua', 'vue', 'js', 'go', 'asp', 'bat', 'c', 'cpp', 'cs', 'json', 'py', 'perl', 'sh', 'xml', 'yaml', 'vb', 'vbs', 'sql', 'swift', 'rust', 'rs', 'jsp', 'yml', 'r', 'pl', 'rb', 'src', 'h', 'tex', 'rtf', 'jsonld', 'ttl', 'n3', 'rss', 'atom', 'srt', 'ass', 'tsv', 'vcard', 'asc', 'url', 'diff', 'plaintext'],
 	'text-html': ['html', 'htm', 'shtml', 'shtm'],
@@ -34,7 +34,7 @@ const typeMap = {
 const hasThumbImageType = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'svg']
 
 const filePanelMap = {
-	'code-editor': union(typeMap['text-x-generic'], typeMap['text-css'], typeMap['text-html'], typeMap['text-x-cmake'], typeMap['text-dockerfile']),
+	'code-editor': union(typeMap['text-x-generic'], typeMap['text-markdown'], typeMap['text-css'], typeMap['text-html'], typeMap['text-x-cmake'], typeMap['text-dockerfile']),
 	'video-player': union(typeMap['video-x-generic'], typeMap['audio-x-generic']),
 	'image-viewer': typeMap['image-x-generic'],
 	'doc-viewer': union(typeMap['application-vnd.ms-word']),
@@ -280,7 +280,6 @@ export const mixin = {
 			const deleteShortcut = async (item) => {
 				try {
 					await deleteShare(item.extensions.share.id)
-					this.$store.commit('REMOVE_SHORTCUT', item.path)
 				} catch (e) {
 					console.log(`${e} in delete shortcut`)
 				}
@@ -288,10 +287,9 @@ export const mixin = {
 
 			// a disk that is read-only, or a trash folder that is not ours: say which, and offer the permanent delete of those only
 			const offerPermanentDelete = (refused) => {
-				const list = refused.map(r => `<li><b>${escape(r.path)}</b><br><span class="is-size-7">${escape(r.reason)}</span></li>`).join('')
 				this.$buefy.dialog.confirm({
 					title: this.$t('Cannot move to the trash'),
-					message: `${this.$t('These items cannot go to the trash:')}<ul class="my-3">${list}</ul>${this.$t('Delete them permanently? This cannot be undone.')}`,
+					message: `${this.$t('These items cannot go to the trash:')}<ul class="my-3">${refused.map(r => `<li><b>${escape(r.path)}</b><br><span class="is-size-7">${escape(r.reason)}</span></li>`).join('')}</ul>${this.$t('Delete them permanently? This cannot be undone.')}`,
 					confirmText: this.$t('Delete permanently'),
 					type: 'is-danger',
 					hasIcon: true,

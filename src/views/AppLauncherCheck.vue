@@ -31,7 +31,7 @@
 			<a @click="openThirdApp(appDetailData);">{{ $t('Click here') }}
 			</a> {{ $t('to open the app. If it does not work, please restart or try again later.') }}
 		</span>
-		<img :src="require('@/assets/img/logo/logo.svg')" alt="" class="is-absolute position">
+		<img :src="require('@/assets/img/logo/logo.svg')" alt="ReCasaOS" class="is-absolute position">
 	</div>
 </template>
 
@@ -64,10 +64,9 @@ export default {
 	},
 
 	async created() {
+		// the app is the one the dashboard hands over, never one read from the address of the page
 		if (this.appDetail) {
 			this.appDetailData = this.appDetail
-		} else if (this.$route.query.appDetailData) {
-			this.appDetailData = JSON.parse(this.$route.query.appDetailData)
 		}
 		await this.startContainer()
 		if (this.isCancelled)
@@ -182,6 +181,8 @@ export default {
 }
 
 .position {
+	width: 11.25rem;
+	height: auto;
 	left: 2rem;
 	bottom: 1.25rem;
 }

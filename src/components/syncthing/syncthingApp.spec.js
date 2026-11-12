@@ -48,4 +48,8 @@ describe('findSyncthing', () => {
 		expect(findSyncthing([proxied], '10.0.0.2').url).toBe('https://sync.example.org:443/sync/')
 		expect(findSyncthing([{ ...syncthing, index: '' }], '10.0.0.2').url).toBe('http://10.0.0.2:8384')
 	})
+
+	it('opens over http an app whose scheme is neither http nor https', () => {
+		expect(findSyncthing([{ ...syncthing, scheme: 'javascript:alert(document.domain)//' }], '10.0.0.2').url).toBe('http://10.0.0.2:8384/')
+	})
 })

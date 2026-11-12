@@ -174,8 +174,16 @@ export const PLAN_SOURCE_REASONS = {
 	// the core refuses it when it has not read the lists of a source that is not a known archive host: it says to run apt-get update first
 	undecided: 'The plan could not tell whether this source is the distribution\'s own. Update the package lists first (apt-get update, or the System packages window), then make the plan again.',
 	deb822: 'A .sources file (the deb822 form) is not read by this plan yet.',
+	// the .sources files of the hop from Debian 12 to 13
+	deb822_form: 'A line of the .sources file is neither a field of a stanza (a name, a colon, a value) nor the continuation of one.',
+	field: 'A stanza of the .sources file has a field that apt does not read.',
+	field_twice: 'A stanza of the .sources file has the same field twice.',
+	enabled: 'A stanza of the .sources file says Enabled, which the plan writes itself: remove the stanza, or the field, then make the plan again.',
 	unreadable: 'The file could not be read.',
 	no_distribution_line: 'No line of the distribution\'s own sources was found to plan against.',
+	// the hops of Ubuntu: a line of the archive of the other distribution, and Ubuntu Pro, whose sources the pro client rewrites during an upgrade
+	other_distro: 'The source is the archive of another distribution than this machine\'s: it cannot be upgraded with the machine. Remove it, then make the plan again.',
+	ubuntu_pro: 'This machine is attached to Ubuntu Pro (esm.ubuntu.com). Its sources are rewritten by Ubuntu\'s pro tool during an upgrade, which this plan does not do: upgrade this machine with Ubuntu\'s own tool, do-release-upgrade.',
 	other: 'The line is not in a form the plan reads.',
 }
 
@@ -225,6 +233,15 @@ export const PLAN_ERRORS = {
 		'A file of package sources mixes the distribution\'s own lines with others. Split it in two, then try again.',
 	],
 	sources_cdrom: ['A package source is a disc or a local folder, which cannot be upgraded from.'],
+	// a hop of Ubuntu: Canonical's list of the upgrades it offers (meta-release-lts) does not offer it, or could not be read (no `reason`)
+	not_offered: {
+		by: 'reason',
+		variants: {
+			absent: ['Canonical does not offer this upgrade yet: it opens it with the first update of the new release, and can hold it back for a while. Try again later.'],
+			unsupported: ['Canonical\'s list of upgrades says this upgrade is not supported, so no plan was made.'],
+		},
+		text: ['Canonical\'s list of the upgrades it offers could not be read, so no plan was made. Check the network of the machine, then try again.'],
+	},
 	sandbox_update_failed: { by: 'kind', variants: PLAN_UPDATE_KINDS, text: PLAN_UPDATE_KINDS.other },
 	sandbox_solver_failed: ['apt could not work out the upgrade.'],
 	// `reason`: the core's word for what it did not understand; `not_fully_installed` is not an apt that was not understood but a dpkg

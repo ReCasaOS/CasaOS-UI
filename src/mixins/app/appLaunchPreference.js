@@ -13,6 +13,8 @@ export const FILES_LAUNCH_ID = 'casaos:files'
 export const APP_STORE_LAUNCH_ID = 'casaos:app-store'
 export const VMS_LAUNCH_ID = 'casaos:virtual-machines'
 export const STATS_LAUNCH_ID = 'casaos:statistics'
+export const FLEET_LAUNCH_ID = 'casaos:fleet'
+export const LOGS_LAUNCH_ID = 'casaos:logs'
 
 function identifiersOf(appInfo) {
 	return [appInfo && appInfo.id, appInfo && appInfo.name]

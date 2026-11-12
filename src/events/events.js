@@ -17,6 +17,8 @@ const events = {
 	RELOAD_APP_LIST: 'reloadAppList',
 	// ModulesModal -> AppSection: an optional module was installed or removed
 	MODULES_CHANGED: 'modulesChanged',
+	// FleetModal -> AppSection: this box became, or stopped being, the master of a fleet
+	FLEET_CHANGED: 'fleetChanged',
 	UPDATE_SYNC_STATUS: 'updateSyncStatus',
 	UN_SHARE: 'unShare',
 	GOTO: 'goto',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { combineWidgetSettings, moveWidget } from './widgetOrder'
+import { combineWidgetSettings, moveWidget, resetWidgetOrder } from './widgetOrder'
 
 const shipped = [
 	{ name: 'clock', show: true },
@@ -54,5 +54,28 @@ describe('moving a widget with the keyboard', () => {
 		expect(moveWidget(shipped, 3, 1)).toBe(shipped)
 		moveWidget(shipped, 1, 1)
 		expect(shipped.map(w => w.name)).toEqual(['clock', 'cpu', 'disks', 'network'])
+	})
+})
+
+describe('putting the widgets back in the order they ship', () => {
+	it('restores the shipped order and keeps what was hidden hidden', () => {
+		const chosen = [
+			{ name: 'network', show: true },
+			{ name: 'clock', show: false },
+			{ name: 'disks', show: true },
+			{ name: 'cpu', show: true },
+		]
+		expect(resetWidgetOrder(chosen, shipped.map(w => w.name))).toEqual([
+			{ name: 'clock', show: false },
+			{ name: 'cpu', show: true },
+			{ name: 'disks', show: true },
+			{ name: 'network', show: true },
+		])
+		expect(chosen[0].name).toBe('network')
+	})
+
+	it('puts a name the dashboard does not ship at the end rather than losing it', () => {
+		const list = [{ name: 'weather', show: true }, { name: 'disks', show: true }, { name: 'clock', show: true }]
+		expect(resetWidgetOrder(list, ['clock', 'disks']).map(w => w.name)).toEqual(['clock', 'disks', 'weather'])
 	})
 })

@@ -6,17 +6,25 @@ import { describe, expect, it, vi } from 'vitest'
 import TopBar from './TopBar.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import FleetModal from './settings/FleetModal.vue'
+import RemoteAccessModal from './settings/RemoteAccessModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
+import LogsSettingsModal from './settings/LogsSettingsModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import createEventBus from '@/events/eventBus'
 import events from '@/events/events'
+import { fleetApi } from '@/service/fleet'
+import { hasLogs } from '@/components/Logs/entry'
 
 // The locale table is assembled with webpack's `require.context`, which Vite has
 // no equivalent for; TopBar only reads the language names from it.
 vi.mock('@/assets/lang', () => ({ default: { en_us: { lang_name: 'English' } } }))
+vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(() => new Promise(() => {})) } }))
+vi.mock('@/components/Logs/entry', () => ({ hasLogs: vi.fn() }))
+vi.mock('@/service/logs', () => ({ logsApi: {} }))
 
 // From the project root: import.meta.url is not a file URL under happy-dom.
 const source = readFileSync('src/components/TopBar.vue', 'utf8')
@@ -82,6 +90,8 @@ describe('the anonymous statistics switch', () => {
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getTelemetry', 'onTelemetryChanged', 'setTelemetry', 'showTelemetryPreview'])
@@ -196,6 +206,8 @@ describe('the automatic update row', () => {
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
 		for (const name of ['getAutoUpdate', 'setAutoUpdate', 'showUpgradeLog'])
@@ -258,7 +270,7 @@ describe('the automatic update row', () => {
 
 		expect(block).toMatch(/setAutoUpdate\(\{ window_start: \$event \}\)/)
 		expect(block).toMatch(/setAutoUpdate\(\{ window_end: \$event \}\)/)
-		expect(block).toContain('New releases install at night, two days after they come out, never during a backup or an app operation.')
+		expect(block).toContain('New releases install at night, one day after they come out, never during a backup or an app operation.')
 		expect(block).toContain('{{ autoUpdateStateText }}')
 	})
 
@@ -342,7 +354,7 @@ describe('the automatic update row', () => {
 		'Update automatically',
 		'Between',
 		'and',
-		'New releases install at night, two days after they come out, never during a backup or an app operation.',
+		'New releases install at night, one day after they come out, never during a backup or an app operation.',
 		'Up to date',
 		'{version} will be installed after {date}',
 		'Updating…',
@@ -402,6 +414,8 @@ describe('the alerts row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -496,6 +510,8 @@ describe('the modules row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
+			getFleet: vi.fn(),
+			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
 			checkVersion: vi.fn(),
@@ -628,9 +644,25 @@ describe('the system support badge', () => {
 		expect(wrapper.find('.navbar-menu .os-support-badge').exists()).toBe(false)
 	})
 
+	// the upgrade is offered whatever the end of support
+	it('says quietly until when a supported system is supported', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'supported', ends: '2028-06-30', precision: 'day' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('System supported until {date}')
+		expect(badge(wrapper).classes()).toContain('is-neutral')
+		expect(badge(wrapper).find('b-icon-stub').attributes('icon')).toBe('information-outline')
+	})
+
+	it('names the operating system when the core gives no end', async () => {
+		const { wrapper } = mountBar(answer(osView({ state: 'unknown' })))
+		await flushPromises()
+
+		expect(badge(wrapper).text()).toBe('Operating system')
+		expect(badge(wrapper).classes()).toContain('is-neutral')
+	})
+
 	it.each([
-		['a supported system', osView({ state: 'supported', ends: '2028-06-30', precision: 'day' })],
-		['an unknown state', osView({ state: 'unknown' })],
 		['a system the core does not know', osView({ state: 'unknown' }, { id: 'linuxmint', known: false, next: undefined })],
 		['a known flag of false with a state that would show', osView({ state: 'security_ended' }, { known: false })],
 		// Raspberry Pi OS and its kind say debian: the core says known:false and a variant, nothing more
@@ -779,5 +811,199 @@ describe('the restart and the shutdown while an upgrade works on the machine', (
 		expect(en['Failed to perform power operation.']).toBe('Failed to perform power operation.')
 		expect(fr['Failed to perform power operation.']).toBeTruthy()
 		expect(fr['Failed to perform power operation.']).not.toBe('Failed to perform power operation.')
+	})
+})
+
+// The Fleet row: visible only when the core answers GET /v1/fleet, like the alerts row.
+describe('the fleet row', () => {
+	function bar() {
+		const vm = {
+			fleetAvailable: false,
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getFleet', 'showFleet'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('shows the Fleet row only when the core answers /v1/fleet', async () => {
+		fleetApi.status.mockReturnValueOnce(Promise.resolve({ data: { success: 200, data: { role: 'none' } } }))
+		const vm = bar()
+		vm.getFleet()
+		await flushPromises()
+		expect(vm.fleetAvailable).toBe(true)
+
+		fleetApi.status.mockReturnValueOnce(Promise.reject(new Error('404')))
+		const older = bar()
+		older.getFleet()
+		await flushPromises()
+		expect(older.fleetAvailable).toBe(false)
+		expect(source).toMatch(/<!-- Fleet Start -->\s*<div v-if="fleetAvailable"/)
+	})
+
+	it('asks the core when the bar mounts', () => {
+		const vm = {
+			$EventBus: createEventBus(),
+			getAlerts: vi.fn(),
+			getModules: vi.fn(),
+			getOs: vi.fn(),
+			getFleet: vi.fn(),
+			getLogs: vi.fn(),
+			checkVersion: vi.fn(),
+			getUserInfo: vi.fn(),
+			getUsbStatus: vi.fn(),
+			getTelemetry: vi.fn(),
+			getAutoUpdate: vi.fn(),
+			getHardwareInfo: vi.fn(),
+			onTelemetryChanged: vi.fn(),
+		}
+		TopBar.mounted.call(vm)
+		expect(vm.getFleet).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens the dialog from Configure', async () => {
+		const vm = bar()
+		await vm.showFleet()
+		expect(source).toMatch(/<!-- Fleet Start -->[\s\S]*?@click="showFleet"[\s\S]*?<!-- Fleet End -->/)
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: FleetModal }))
+	})
+
+	it('shows the remote access row with the fleet row and opens its window', async () => {
+		expect(source).toMatch(/<!-- Fleet End -->\s*<!-- Remote access Start -->\s*<div v-if="fleetAvailable"[\s\S]*?icon="cellphone-link"[\s\S]*?@click="showRemoteAccess"[\s\S]*?<!-- Remote access End -->/)
+		const vm = bar()
+		vm.showRemoteAccess = TopBar.methods.showRemoteAccess.bind(vm)
+		await vm.showRemoteAccess()
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: RemoteAccessModal }))
+	})
+
+	// an icon name the installed font lacks draws nothing
+	it('has an icon the installed Material Design font draws', () => {
+		const icon = source.match(/<!-- Fleet Start -->[\s\S]*?icon="([^"]+)"/)[1]
+		const mdi = readFileSync('node_modules/@mdi/font/css/materialdesignicons.css', 'utf8')
+		expect(mdi).toContain(`.mdi-${icon}::before`)
+	})
+
+	it('says "Fleet" in English and French', () => {
+		expect(en.Fleet).toBe('Fleet')
+		expect(fr.Fleet).toBe('Flotte')
+	})
+})
+
+describe('the logs row', () => {
+	function bar() {
+		const vm = {
+			logsAvailable: false,
+			$buefy: { modal: { open: vi.fn() } },
+			$refs: { settingsDrop: { toggle: vi.fn() } },
+		}
+		for (const name of ['getLogs', 'showLogsSettings'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('shows, after Alerts, once AppManagement answers the logs settings', async () => {
+		hasLogs.mockResolvedValue(true)
+		const vm = bar()
+
+		await vm.getLogs()
+
+		expect(vm.logsAvailable).toBe(true)
+		expect(source).toMatch(/<!-- Alerts End -->\s*<!-- Logs Start -->\s*<div v-if="logsAvailable"[\s\S]*?text-box-outline[\s\S]*?\$t\("Logs"\)[\s\S]*?@click="showLogsSettings"[\s\S]*?\$t\("Configure"\)[\s\S]*?<!-- Logs End -->/)
+	})
+
+	// an AppManagement older than the feature answers 404: no row
+	it('shows no row against an older AppManagement', async () => {
+		hasLogs.mockResolvedValue(false)
+		const vm = bar()
+
+		await vm.getLogs()
+
+		expect(vm.logsAvailable).toBe(false)
+	})
+
+	it('asks when the bar mounts', () => {
+		const vm = { $EventBus: createEventBus() }
+		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
+			vm[name] = vi.fn()
+
+		TopBar.mounted.call(vm)
+
+		expect(vm.getLogs).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens the settings from Configure', async () => {
+		const vm = bar()
+
+		await vm.showLogsSettings()
+
+		expect(vm.$refs.settingsDrop.toggle).toHaveBeenCalled()
+		expect(vm.$buefy.modal.open).toHaveBeenCalledWith(expect.objectContaining({ component: LogsSettingsModal, hasModalCard: true, canCancel: ['escape'] }))
+	})
+})
+
+// The new login page switch: the box keeps the choice, for every browser.
+describe('the new login page switch', () => {
+	function bar(setLoginStyle) {
+		const vm = {
+			loginBeta: true,
+			loginBetaSaving: false,
+			$api: { users: { setLoginStyle } },
+			$buefy: { toast: { open: vi.fn() } },
+			$store: { commit: vi.fn() },
+			$t: s => s,
+		}
+		return vm
+	}
+
+	it('sits under the new dashboard switch', () => {
+		expect(source.indexOf('<!-- Beta login page Switch Start')).toBeGreaterThan(source.indexOf('<!-- Beta dashboard Switch End -->'))
+	})
+
+	// the router's status call has the answer already: no call of its own, so a
+	// late answer can never move the switch back
+	it('starts from the store and asks nothing when the bar mounts', () => {
+		expect(TopBar.data.call({ $store: { state: { loginStyle: 'beta' } }, getInitLang: () => 'en_us' }).loginBeta).toBe(true)
+		expect(TopBar.data.call({ $store: { state: { loginStyle: 'classic' } }, getInitLang: () => 'en_us' }).loginBeta).toBe(false)
+		expect(source).not.toMatch(/getLoginStyle|getUserStatus\(\)\.then\(\(res\) => \{\s*this\.loginBeta/)
+	})
+
+	it('tells the box, and the store (and this browser) follow', async () => {
+		const setLoginStyle = vi.fn(() => Promise.resolve({ data: { success: 200 } }))
+		const vm = bar(setLoginStyle)
+		await TopBar.methods.setLoginBeta.call(vm, true)
+		expect(setLoginStyle).toHaveBeenCalledWith('beta')
+		expect(vm.$store.commit).toHaveBeenCalledWith('SET_LOGIN_STYLE', 'beta')
+		expect(vm.loginBeta).toBe(true)
+		expect(vm.loginBetaSaving).toBe(false)
+
+		vm.loginBeta = false
+		await TopBar.methods.setLoginBeta.call(vm, false)
+		expect(setLoginStyle).toHaveBeenLastCalledWith('classic')
+		expect(vm.$store.commit).toHaveBeenLastCalledWith('SET_LOGIN_STYLE', 'classic')
+	})
+
+	it('goes back where it was when the box refuses, and says so', async () => {
+		const vm = bar(() => Promise.reject(new Error('500')))
+		await TopBar.methods.setLoginBeta.call(vm, true)
+		expect(vm.loginBeta).toBe(false)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith(expect.objectContaining({ message: 'The login page could not be changed', type: 'is-danger' }))
+		expect(vm.$store.commit).not.toHaveBeenCalled()
+		expect(vm.loginBetaSaving).toBe(false)
+	})
+})
+
+describe('top bar dropdown widths (#106)', () => {
+	const styles = source.slice(source.indexOf('<style'))
+
+	it('makes only the settings panel wide on a PC, not the Account menu', () => {
+		expect(source).toMatch(/<b-dropdown ref="settingsDrop"[^>]*class="navbar-item settings-drop"/)
+		// the 72rem width sits under .settings-drop, never on every dropdown of the bar
+		expect(styles).toMatch(/\.settings-drop \.dropdown-menu \{\s*@media screen and \(min-width: 1024px\) \{\s*width: min\(72rem/)
+		expect(styles.match(/72rem/g)).toHaveLength(1)
 	})
 })

@@ -61,6 +61,17 @@ export default [
 		},
 	},
 	{
+		// the Terminal alone, the whole window: a link or bookmark opens it
+		path: '/terminal',
+		name: 'Terminal',
+		hidden: true,
+		component: () => import('@/views/TerminalTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
 		path: '/vms',
 		name: 'VirtualMachines',
 		hidden: true,
@@ -81,13 +92,23 @@ export default [
 		},
 	},
 	{
-		path: '/launch',
-		name: 'AppLauncherCheck',
+		path: '/logs',
+		name: 'Logs',
 		hidden: true,
-		component: () => import('@/views/AppLauncherCheck.vue'),
+		component: () => import('@/components/Logs/LogsTab.vue'),
 		meta: {
-			requireAuth: false,
-			showBackground: false,
+			requireAuth: true,
+			showBackground: true,
+		},
+	},
+	{
+		path: '/fleet',
+		name: 'Fleet',
+		hidden: true,
+		component: () => import('@/components/Fleet/FleetTab.vue'),
+		meta: {
+			requireAuth: true,
+			showBackground: true,
 		},
 	},
 	{

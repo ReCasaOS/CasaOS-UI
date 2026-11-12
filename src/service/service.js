@@ -81,6 +81,17 @@ instance.interceptors.response.use(
 		const originalConfig = error?.config
 		const refresh_token = localStorage.getItem('refresh_token')
 		if (originalConfig.url !== '/users/register' && error?.response?.status === 401) {
+			// The refresh itself was refused, or a call was refused again with the token it
+			// was replayed with: no newer token is coming. The refresh used to be parked in
+			// its own queue, so it never ended and `isRefreshing` stayed true until the page
+			// was reloaded; rejected, its catch below gives up and signs the user out.
+			if (originalConfig.url === '/v1/users/refresh' || originalConfig.replayed) {
+				// a token the box hands out and then refuses is a session that cannot go on
+				if (originalConfig.replayed) {
+					logout()
+				}
+				return Promise.reject(error)
+			}
 			// Access Token was expired
 			if (!isRefreshing) {
 				isRefreshing = true
@@ -109,8 +120,6 @@ instance.interceptors.response.use(
 					giveUp()
 					console.log(error)
 				})
-			} else if (originalConfig.url === '/v1/users/refresh' && error?.response?.status === 401) {
-				logout()
 			}
 			return new Promise((resolve, reject) => {
 				requests.push((token) => {
@@ -125,6 +134,7 @@ instance.interceptors.response.use(
 					// The request keeps its own headers: a text/plain body retried
 					// under the JSON default would be re-encoded as a JSON string.
 					originalConfig.headers.Authorization = token
+					originalConfig.replayed = true
 					resolve(instance(originalConfig))
 				})
 			})

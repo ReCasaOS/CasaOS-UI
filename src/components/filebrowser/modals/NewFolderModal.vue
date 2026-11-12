@@ -24,7 +24,7 @@
 				<div class="notification pl-4 pri-height">
 					<b-field>
 						<b-checkbox v-show="isRootorDATA" v-model="shortcut" type="is-info">
-							{{ $t('Add a shortcut') }}
+							{{ $t('Add to Starred') }}
 						</b-checkbox>
 					</b-field>
 					<b-field>
@@ -77,6 +77,10 @@ export default {
 	mixins: [mixin],
 	props: {
 		currentPath: String,
+		rootPath: {
+			type: String,
+			default: '/DATA',
+		},
 	},
 	data() {
 		return {
@@ -93,7 +97,7 @@ export default {
 	},
 	computed: {
 		isRootorDATA() {
-			return this.currentPath === '/' || this.currentPath === '/DATA'
+			return this.currentPath === '/' || this.currentPath === this.rootPath
 		},
 	},
 	mounted() {
@@ -153,7 +157,6 @@ export default {
 							})
 							// save shortcut
 							// await this.$api.users.saveShutcutDetail(shortcut);
-							// LURK BUG: shortcut data not update
 							await this.$store.dispatch('SET_SHORTCUT_DATA', shortcut)
 						}
 

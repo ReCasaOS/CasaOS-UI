@@ -82,6 +82,16 @@ const sys = {
 		return api.put(`/gateway/port`, data)
 	},
 
+	// the gateway's own HTTPS port ("0" = off, "" = default 443); an older gateway answers 404
+	getHttpsPort() {
+		return api.get(`/gateway/httpsport`)
+	},
+
+	// edit it live, body { port: "0" } turns HTTPS off
+	editHttpsPort(data) {
+		return api.put(`/gateway/httpsport`, data)
+	},
+
 	// get usb status
 	getUsbStatus() {
 		return api.get(`/usb/usb-auto-mount`)

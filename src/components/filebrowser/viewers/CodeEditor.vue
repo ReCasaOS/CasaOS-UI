@@ -37,7 +37,7 @@
 
 		<!-- Editor Start -->
 		<div class="is-flex is-justify-content-center is-align-items-center is-flex-grow-1 v-container pb-5">
-			<codemirror ref="cmEditor" v-model="code" :options="cmOptions" @input="onCmCodeChange" @ready="onCmReady" />
+			<codemirror ref="cmEditor" :value="code" :options="cmOptions" @input="onCmCodeChange" @ready="onCmReady" />
 		</div>
 		<!-- Editor End -->
 	</div>
@@ -122,6 +122,7 @@ import { CSSLint } from 'csslint'
 import { JSHINT } from 'jshint'
 import jsonlint from 'jsonlint-mod'
 import jsyaml from 'js-yaml'
+import escape from 'lodash/escape'
 import codemirror from '@/components/basicComponents/CodeMirror.vue'
 import { mixin } from '@/mixins/mixin'
 
@@ -197,7 +198,10 @@ export default {
 	},
 
 	methods: {
-		onCmCodeChange() {
+		// The editor wrapper takes `value` and emits `input`: a v-model here would pass `modelValue`,
+		// which it ignores, and every file would open empty.
+		onCmCodeChange(text) {
+			this.code = text
 			this.isChange = true
 		},
 		onCmReady() {
@@ -243,7 +247,7 @@ export default {
 					}
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-danger',
 					})
 				}

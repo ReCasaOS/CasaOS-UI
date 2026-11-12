@@ -4,7 +4,7 @@
 			<!-- merge fs storage item -->
 			<div class="li" v-if="hasMergerFunction">
 				<div :class="{ active: isActived }" class="is-flex list-item new-list-item"
-					@click="filePanel.getFileList('/DATA')">
+					@click="filePanel.getFileList(filePanel.rootPath)">
 					<div class="cover mr-2 is-flex-shrink-0 is-relative">
 						<div class="icon" @click="warning" @mouseleave="hover = false" @mouseover="hover = true">
 							<i :class="{
@@ -56,7 +56,10 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import TreeListItem from './TreeListItem.vue'
+import { apiErrorMessage, emptyCloudOnError } from './apiError.js'
+import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
 
@@ -98,7 +101,7 @@ export default {
 	},
 	computed: {
 		isActived() {
-			return this.$store.state.currentPath === '/DATA'
+			return this.$store.state.currentPath === this.filePanel.rootPath
 		},
 	},
 	created() {
@@ -127,6 +130,9 @@ export default {
 				console.log(error)
 			}
 
+			// the SnapRAID parity disk holds only parity files: browsing it risks the protection, so it stays out of the file manager
+			const held = snapraidHeld(await this.$api.disks.snapraid().then(res => res.data.data?.config, () => undefined))
+
 			// Local Storage
 			try {
 				const storageRes = await this.$api.storage.list()
@@ -134,6 +140,9 @@ export default {
 				const usbStorageArray = []
 				storageRes.data.data.forEach((item) => {
 					item.children.forEach((part) => {
+						if (held[part.mount_point] === 'parity') {
+							return
+						}
 						if (!mergeRes.find(mp => mp === part.uuid)) {
 							if (item.type === 'usb') {
 								usbStorageArray.push(part)
@@ -167,7 +176,7 @@ export default {
 				})
 			} catch (error) {
 				this.isLoading = false
-				console.log(error.reponse.message)
+				console.log(apiErrorMessage(error))
 			}
 
 			// Merger Storage
@@ -213,7 +222,7 @@ export default {
 				})
 			} catch (error) {
 				this.isLoading = false
-				console.log(error.reponse.message)
+				console.log(apiErrorMessage(error))
 			}
 		},
 		// Network Storage
@@ -234,7 +243,7 @@ export default {
 				})
 			} catch (error) {
 				this.isLoading = false
-				console.log(error.reponse.message)
+				console.log(apiErrorMessage(error))
 			}
 		},
 		// USB Storage
@@ -260,7 +269,7 @@ export default {
 				})
 			} catch (error) {
 				this.isLoading = false
-				console.log(error.reponse.message)
+				console.log(apiErrorMessage(error))
 			}
 		},
 		// Cloud Storage
@@ -281,7 +290,7 @@ export default {
 					}
 				})
 			} catch (error) {
-				console.log(error.reponse.message)
+				this.cloudStorageList = emptyCloudOnError(error)
 			}
 		},
 
@@ -348,7 +357,7 @@ export default {
 		// go to DATA folder
 		goToDataFolder(item) {
 			if (this.$store.state.currentPath.startsWith(item.path)) {
-				this.filePanel.getFileList('/DATA')
+				this.filePanel.getFileList(this.filePanel.rootPath)
 			}
 		},
 
@@ -397,30 +406,7 @@ export default {
 		},
 		storage_status() {
 			setTimeout(() => {
-				this.$api.storage
-					.list()
-					.then((res) => {
-						const storageArray = []
-						res.data.data.forEach((item) => {
-							item.children.forEach((part) => {
-								storageArray.push(part)
-							})
-						})
-						this.localStorageList = storageArray.map((storage) => {
-							return {
-								name: storage.label,
-								icon: 'storage-other',
-								pack: 'casa',
-								path: storage.mount_point,
-								visible: true,
-								selected: true,
-								extensions: null,
-							}
-						})
-					})
-					.catch((error) => {
-						console.log(error.reponse.message)
-					})
+				this.getLocalStorage()
 			}, 500)
 		},
 		'casaos:file:recover': function (data) {
@@ -450,7 +436,7 @@ export default {
 					break
 			}
 			this.$buefy.toast.open({
-				message: this.$t(data.message.replace(reg, '$1')),
+				message: escape(this.$t(data.message.replace(reg, '$1'))),
 				duration: 5000,
 				type: toastType,
 			})

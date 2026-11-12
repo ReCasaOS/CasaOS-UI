@@ -1,6 +1,8 @@
 <template>
-	<div class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
-		@mouseleave="hover = true" @mouseover="hover = true">
+	<div :class="{ 'is-compact': compact }" :role="compact ? 'button' : undefined" :tabindex="compact ? 0 : undefined" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
+		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="hover = true">
+		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
+		<span v-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
@@ -35,6 +37,9 @@
 								$t('launch-and-open') }}
 						</b-button>
 					</template>
+					<b-button v-if="compact && !isContainerApp" expanded type="is-text" @click="toggleFavorite">
+						{{ favorite ? $t('Remove from favorites') : $t('Add to favorites') }}
+					</b-button>
 					<b-button v-if="isV2App" expanded icon-pack="casa" icon-right="question-outline" size="is-16"
 						type="is-text" @click="openTips(item.name)">
 						{{ $t('Tips') }}
@@ -56,6 +61,10 @@
 						</b-loading>
 					</b-button>
 
+					<b-button v-if="logsAvailable && (isV2App || isV1App)" expanded type="is-text" @click="showLogs()">
+						{{ $t('Logs') }}
+					</b-button>
+
 					<b-button v-if="isContainerApp" expanded type="is-text" @click="showContainerDetail()">
 						{{
 							$t('Details')
@@ -73,6 +82,12 @@
 					<b-button v-if="isV2App" expanded type="is-text" @click="backupApp()">
 						{{
 							$t('Back up')
+						}}
+					</b-button>
+
+					<b-button v-if="isV2App && publicShare.ok" expanded type="is-text" @click="shareApp()">
+						{{
+							$t('Share on the Internet')
 						}}
 					</b-button>
 
@@ -137,18 +152,19 @@
 						<div class="is-relative">
 							<b-image :alt="statsBadge ? statsBadge.label : undefined" :class="dotClass(item.status, isLoading)" :src="item.icon"
 								:src-fallback="require('@/assets/img/app/default.svg')" class="is-64x64"
-								webp-fallback=".jpg" @click="openApp(item)" />
+								webp-fallback=".jpg" @click="!compact && openApp(item)" />
 							<!-- The number of active resource alerts, on the Statistics card only. Numbers only: the words are the icon's alt. -->
 							<span v-if="statsBadge" aria-hidden="true" class="stats-badge">{{ statsBadge.text }}</span>
 							<!-- Unstable -->
-							<CTooltip v-if="newAppIds.includes(item.name)" class="__position" content="NEW" />
+							<!-- the compact card has no NEW marker, and says an update in its own chip -->
+							<CTooltip v-if="!compact && newAppIds.includes(item.name)" class="__position" content="NEW" />
 							<!-- Shown from what the last image check found, so an app nobody has
 								checked yet carries no badge rather than a claim of being current.
 								v-else so it never stacks on top of the NEW marker. -->
 							<!-- A git app's state, or its new commits: gitApps.js says which wins. Before
 								the image badge, since a failed build matters more than a newer image. -->
 							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
-							<CTooltip v-else-if="item.update_available" class="__position __position-wide" content="Update available" />
+							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
 						</div>
 
 						<!-- Loading Bar Start -->
@@ -160,25 +176,40 @@
 						<!-- Loading Bar End -->
 					</div>
 
-					<p class="mt-3 one-line">
-						<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
-						<a class="one-line" style="cursor:default">
-							{{ i18n(item.title) || item.name }}
-						</a>
-					</p>
+					<div class="app-text">
+						<p class="mt-3 title-row">
+							<!-- an app whose compose file has no x-casaos has no title: its name is what it is called -->
+							<a class="one-line" style="cursor:default">
+								{{ i18n(item.title) || item.name }}
+							</a>
+							<!-- its scheduled backups, by the title; nothing for an app without a schedule or while the box cannot say -->
+							<BackupBadge v-if="backupBadge" :kind="backupBadge.kind" :title="backupBadge.title" />
+							<!-- the address it answers at on the Internet, as the core sends it -->
+							<span v-if="publicUrl" class="public-badge" :title="publicUrl">{{ $t('Public') }}</span>
+						</p>
 
-					<!-- Docker hands out names like `adoring_antonelli`, and a container
-						whose name it never set falls back to its id. For those cards the
-						name identifies nothing, and the image does. -->
-					<p v-if="facts.length" class="one-line has-text-full-03 _facts">
-						{{ facts.join(' · ') }}
-					</p>
-					<!-- The compose list could not load this container's stack. Saying so, with
-						the loader's words on hover and in the detail panel, turns "why can I not
-						edit it" into something to fix. -->
-					<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
-						{{ $t('CasaOS cannot read its compose file.') }}
-					</p>
+						<!-- beta dashboard: whether the app is up, under its name -->
+						<p v-if="compact && item.app_type !== 'system'" class="one-line app-state">
+							<span :class="item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
+							{{ item.status === 'running' ? $t('Running') : $t('Stopped') }}
+							<template v-if="memory > 0 && item.status === 'running'"> · {{ renderSize(memory) }}</template>
+						</p>
+
+						<!-- Docker hands out names like `adoring_antonelli`, and a container
+							whose name it never set falls back to its id. For those cards the
+							name identifies nothing, and the image does. -->
+						<p v-if="compact && subtitle" class="one-line app-state">{{ subtitle }}</p>
+
+						<p v-if="facts.length" class="one-line has-text-full-03 _facts">
+							{{ facts.join(' · ') }}
+						</p>
+						<!-- The compose list could not load this container's stack. Saying so, with
+							the loader's words on hover and in the detail panel, turns "why can I not
+							edit it" into something to fix. -->
+						<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
+							{{ $t('CasaOS cannot read its compose file.') }}
+						</p>
+					</div>
 				</div>
 			</b-tooltip>
 			<!-- Card Content End -->
@@ -190,18 +221,28 @@
 import isNull from 'lodash/isNull'
 import YAML from 'yaml'
 import FileSaver from 'file-saver'
+import escape from 'lodash/escape'
 import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
+import { appEntry } from '@/components/PublicShare/shareWords'
+import { publicShare, refresh as refreshPublicShare } from '@/service/publicShare'
+import BackupBadge from '@/components/backup/BackupBadge.vue'
+import { badgeOfApp } from '@/components/backup/backupStatus'
+import { backupStatus, refresh as refreshBackupStatus } from '@/service/backupStatus'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
+import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_OpenThirdApp from '@/mixins/app/Business_OpenThirdApp'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
+import { renderSize } from '@/mixins/file_utils'
 import tipEditorModal from '@/components/Apps/TipEditorModal.vue'
 import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
 
@@ -224,6 +265,7 @@ export default {
 	name: 'AppCard',
 	components: {
 		CTooltip: cTooltip,
+		BackupBadge,
 	},
 	mixins: [business_ShowNewAppTag, business_OpenThirdApp, business_LinkApp, commonI18n],
 	inject: ['homeShowFiles', 'openAppStore'],
@@ -231,9 +273,29 @@ export default {
 		item: {
 			type: Object,
 		},
+		// beta dashboard: the icon beside the name and the state, not above it
+		compact: {
+			type: Boolean,
+			default: false,
+		},
+		// beta dashboard: pinned in the favorites; the second line of a system card
+		favorite: {
+			type: Boolean,
+			default: false,
+		},
+		subtitle: {
+			type: String,
+			default: '',
+		},
+		// bytes the app's containers use (compact card)
+		memory: {
+			type: Number,
+			default: 0,
+		},
 	},
 	data() {
 		return {
+			publicShare,
 			hover: false,
 			dropState: false,
 			isUninstalling: false,
@@ -249,10 +311,21 @@ export default {
 			isSaving: false,
 			isActiveTooltip: false,
 			dropdownPosition: 'is-bottom-right',
+			// whether AppManagement keeps logs: an older one gets no Logs entry
+			logsAvailable: false,
 		}
 	},
 
 	computed: {
+		// where this app answers on the Internet, as the core sends it; '' unless shared
+		publicUrl() {
+			const entry = publicShare.ok ? appEntry(publicShare.status, this.item.name) : null
+			return entry?.shared ? entry.url : ''
+		},
+		// the worst state of this app's scheduled backups, from the box's own answers; null without a schedule
+		backupBadge() {
+			return backupStatus.ok ? badgeOfApp(backupStatus.states, this.item.name, this.$t) : null
+		},
 		// The count of active resource alerts, for the Statistics card: its number and the sentence that names it.
 		statsBadge() {
 			// the system app only: an app a person installed may carry the same name
@@ -390,7 +463,17 @@ export default {
 		},
 	},
 
+	created() {
+		// shared and at most once a minute: every card may ask
+		refreshBackupStatus()
+		refreshPublicShare()
+		hasLogs().then((available) => {
+			this.logsAvailable = available
+		})
+	},
+
 	methods: {
+		renderSize,
 		handleDorpdownPosition(event) {
 			this.$nextTick(() => {
 				const rightOffset = window.innerWidth - event.clientX - 160
@@ -399,6 +482,17 @@ export default {
 				const verticalPos = bottomOffset > 0 ? 'bottom' : 'top'
 				this.dropdownPosition = `is-${verticalPos}-${horizontalPos}`
 			})
+		},
+		toggleFavorite() {
+			this.$refs.dro.isActive = false
+			this.$emit('toggleFavorite', this.item)
+		},
+		// the menu button has its own click; a card at work is not opened a second time
+		openFromCard(event) {
+			if (this.isLoading || (event.target.closest && event.target.closest('.action-btn'))) {
+				return
+			}
+			this.openApp(this.item)
 		},
 		/**
 		 * @description: Open app in new windows
@@ -461,6 +555,30 @@ export default {
 			})
 		},
 
+		shareApp() {
+			this.$refs.dro.isActive = false
+			this.$buefy.modal.open({
+				component: ShareAppModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				animation: 'zoom-in',
+				props: { appName: this.item.name, appTitle: this.i18n(this.item.title) || this.item.name },
+			})
+		},
+
+		// The logs keep an app under the name AppManagement gives it: the compose project for a compose app, the
+		// container's name for a v1 app, whose card knows only the container's id.
+		async showLogs() {
+			let app = this.item.name
+			if (this.isV1App) {
+				try {
+					app = (await this.$api.container.getDetail(this.item.name)).data.data?.name || app
+				} catch {}
+			}
+			openLogs(this.$buefy, this.$store.state, { app })
+		},
+
 		openSystemApps(item) {
 			switch (item.name) {
 				case 'App Store':
@@ -474,6 +592,12 @@ export default {
 					break
 				case STATS_APP_NAME:
 					openStatistics(this.$buefy, this.$store.state)
+					break
+				case FLEET_APP_NAME:
+					openFleet(this.$buefy, this.$store.state)
+					break
+				case LOGS_APP_NAME:
+					openLogs(this.$buefy, this.$store.state)
 					break
 				default:
 					break
@@ -511,7 +635,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -526,7 +650,7 @@ export default {
 				this.updateState()
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -563,7 +687,7 @@ export default {
 			this.$refs.dro.isActive = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
-				message: this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName }),
+				message: escape(this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName })),
 				type: 'is-dark',
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
@@ -581,7 +705,7 @@ export default {
 			} catch (err) {
 				this.isUninstalling = false
 				this.$buefy.toast.open({
-					message: err.response?.data?.message || err.message,
+					message: escape(err.response?.data?.message || err.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,
@@ -609,7 +733,7 @@ export default {
 					}
 				}).catch((err) => {
 					this.$buefy.toast.open({
-						message: err.response.data.data,
+						message: escape(err.response.data.data),
 						type: 'is-danger',
 						position: 'is-top',
 						duration: 5000,
@@ -623,7 +747,7 @@ export default {
 					}
 				}).catch((err) => {
 					this.$buefy.toast.open({
-						message: err.response.data.data,
+						message: escape(err.response.data.data),
 						type: 'is-danger',
 						position: 'is-top',
 						duration: 5000,
@@ -640,7 +764,7 @@ export default {
 			this.$refs.dro.isActive = false
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
-				message: this.$t('{name} will be stopped and replaced by a new container running the newest image. Its volumes and bind mounts are carried over with the data in them; anything written elsewhere inside the container is lost with it. Its settings are copied from the container as it runs now, and CasaOS keeps no copy of them: this container was imported, not installed by CasaOS. If no newer image is published, nothing is touched.', { name: this.containerName }),
+				message: escape(this.$t('{name} will be stopped and replaced by a new container running the newest image. Its volumes and bind mounts are carried over with the data in them; anything written elsewhere inside the container is lost with it. Its settings are copied from the container as it runs now, and CasaOS keeps no copy of them: this container was imported, not installed by CasaOS. If no newer image is published, nothing is touched.', { name: this.containerName })),
 				type: 'is-dark',
 				confirmText: this.$t('Recreate container'),
 				cancelText: this.$t('Cancel'),
@@ -661,7 +785,7 @@ export default {
 			this.$openAPI.appManagement.container.recreateContainerByID(this.item.name, true, undefined, { params }).catch((err) => {
 				this.isRecreating = false
 				this.$buefy.toast.open({
-					message: err.response?.data?.message || this.$t('Unable to update at the moment!'),
+					message: escape(err.response?.data?.message || this.$t('Unable to update at the moment!')),
 					type: 'is-danger',
 					duration: 5000,
 				})
@@ -783,7 +907,7 @@ export default {
 				} else {
 					this.$buefy.dialog.alert({
 						title: 'Error',
-						message: res.data.data || res.data.message,
+						message: escape(res.data.data || res.data.message),
 						type: 'is-danger',
 						ariaRole: 'alertdialog',
 						ariaModal: true,
@@ -791,7 +915,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 3000,
@@ -808,7 +932,7 @@ export default {
 			}).catch((err) => {
 				this.$buefy.dialog.alert({
 					title: 'Error',
-					message: err.response.data.data || err.response.data.message,
+					message: escape(err.response.data.data || err.response.data.message),
 					type: 'is-danger',
 					ariaRole: 'alertdialog',
 					ariaModal: true,
@@ -851,7 +975,7 @@ export default {
 
 					this.$api.container.install(initData).catch((err) => {
 						this.$buefy.toast.open({
-							message: err.response.data.message,
+							message: escape(err.response.data.message),
 							type: 'is-warning',
 						})
 					}).then(() => {
@@ -873,7 +997,7 @@ export default {
 				FileSaver.saveAs(blob, `${item.image}.yaml`)
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-warning',
 				})
 			})
@@ -912,7 +1036,7 @@ export default {
 					this.$messageBus('apps_checkupdate', this.item.name.toString())
 					this.$buefy.toast.open({
 						// value is `In the process of asynchronous updating.` or `compose app `app Name` is up to date`
-						message: resp.data.message,
+						message: escape(resp.data.message),
 						type: 'is-success',
 					})
 				} else {
@@ -957,7 +1081,7 @@ export default {
 		'app:start-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -971,7 +1095,7 @@ export default {
 		'app:stop-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -985,7 +1109,7 @@ export default {
 		'app:restart-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1004,7 +1128,7 @@ export default {
 		'app:apply-changes-error': function (res) {
 			// toast info.
 			this.$buefy.toast.open({
-				message: res.Properties.message,
+				message: escape(res.Properties.message),
 				duration: 5000,
 				type: 'is-danger',
 			})
@@ -1053,7 +1177,7 @@ export default {
 				this.updateState()
 				const outcome = this.recreateOutcome(data.Properties)
 				if (outcome)
-					this.$buefy.toast.open({ ...outcome, duration: 5000 })
+					this.$buefy.toast.open({ message: escape(outcome.message), type: outcome.type, duration: 5000 })
 				return
 			}
 			if (data.Properties['app:name'] !== this.item.name)
@@ -1069,7 +1193,7 @@ export default {
 			// comes from the v1 recreate path alone.
 			if (data.Properties['docker:image:updated'] === 'false') {
 				this.$buefy.toast.open({
-					message: this.$t(`{appName} is the latest version!`, { appName: this.item.name }),
+					message: escape(this.$t(`{appName} is the latest version!`, { appName: this.item.name })),
 					type: 'is-success',
 					duration: 5000,
 				})
@@ -1081,7 +1205,7 @@ export default {
 				this.isRebuilding = false
 				// 5.message toast
 				this.$buefy.toast.open({
-					message: this.$t(`{title} rebulid completed`, { title: ice_i18n(this.item.title) }),
+					message: escape(this.$t(`{title} rebulid completed`, { title: ice_i18n(this.item.title) })),
 					type: 'is-success',
 				})
 			}
@@ -1092,7 +1216,7 @@ export default {
 				this.isRebuilding = false
 				// 5.message toast
 				this.$buefy.toast.open({
-					message: res.Properties.message,
+					message: escape(res.Properties.message),
 					type: 'is-warning',
 				})
 			}
@@ -1107,10 +1231,10 @@ export default {
 			this.isRecreating = false
 			this.isUpdating = false
 			this.$buefy.toast.open({
-				message: this.$t('Updating {name} failed: {reason}', {
+				message: escape(this.$t('Updating {name} failed: {reason}', {
 					name: this.containerName,
 					reason: data.Properties.message,
-				}),
+				})),
 				type: 'is-danger',
 				duration: 5000,
 			})
@@ -1128,6 +1252,18 @@ export default {
 </script>
 
 <style lang="scss">
+.public-badge {
+  flex: none;
+  margin-left: 0.35rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: #1f6fe5;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  vertical-align: middle;
+}
 .pb-3px {
   padding-bottom: 3px;
 }
@@ -1339,6 +1475,114 @@ export default {
 .dropdown.is-left .dropdown-menu {
   top: 0;
   left: calc(-100% - 14px);
+}
+
+// the title and, when the app has a backup schedule, its badge
+.app-card .title-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+
+	> a {
+		min-width: 0;
+	}
+}
+
+// beta dashboard: a row, not a square
+.app-card.is-compact {
+  // the proposal's chip: the accent of the beta dashboard, over the card's top right corner
+  .update-chip {
+    position: absolute;
+    top: -0.5rem;
+    right: 0.75rem;
+    z-index: 30;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.5rem;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1rem;
+    pointer-events: none;
+  }
+
+  aspect-ratio: auto;
+  cursor: pointer;
+  justify-content: flex-start;
+  min-height: 4.5rem;
+
+  .cards-content,
+  .in-card.b-tooltip,
+  .in-card .tooltip-trigger {
+    display: block;
+    width: 100%;
+  }
+
+  .img-c {
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-start !important;
+    padding: 0.75rem 2rem 0.75rem 0.875rem !important;
+    text-align: left;
+    gap: 0.75rem;
+
+    > .is-flex {
+      flex-shrink: 0;
+    }
+  }
+
+  .image.is-64x64,
+  .is-64x64 {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .app-text {
+    min-width: 0;
+    // here and not on .img-c, whose has-text-centered is !important: a short second line stays under the start of the name
+    text-align: left;
+
+    p {
+      margin: 0 !important;
+    }
+
+    // the compact card's text is left-aligned, and so is the title with its badge
+    .title-row {
+      justify-content: flex-start;
+    }
+  }
+
+  .action-btn {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .system-marker {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .app-state {
+    font-size: 0.75rem;
+    opacity: 0.85;
+  }
+
+  .state-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.25rem;
+    border-radius: 50%;
+
+    &.is-running {
+      background: #8fd16a;
+    }
+
+    &.is-stopped {
+      background: #9aa4ad;
+    }
+  }
 }
 </style>
 

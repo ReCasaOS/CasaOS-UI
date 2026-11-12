@@ -7,8 +7,11 @@
  * Copyright (c) 2022 by IceWhale, All Rights Reserved.
  */
 
+import escape from 'lodash/escape'
 import events from '@/events/events'
 import { shouldOpenInNewWindow } from '@/mixins/app/appLaunchPreference'
+import { frameRefused } from '@/mixins/app/frameCheck'
+import { webScheme } from '@/mixins/app/webScheme'
 
 export default {
 	methods: {
@@ -32,7 +35,7 @@ export default {
 		},
 		warnNothingToOpen(appInfo) {
 			this.$buefy.toast.open({
-				message: this.$t('{name} has no web interface to open. If it has one, set its port under Settings › Web UI.', { name: appInfo.name }),
+				message: escape(this.$t('{name} has no web interface to open. If it has one, set its port under Settings › Web UI.', { name: appInfo.name })),
 				type: 'is-warning',
 				position: 'is-top',
 				duration: 4000,
@@ -49,12 +52,13 @@ export default {
 			this.$messageBus('apps_open', appInfo.name)
 			if (appInfo.hostname !== '' || appInfo.port !== '' || appInfo.index !== '') {
 				const hostIp = appInfo.hostname || this.$baseIp
-				const scheme = appInfo.scheme || 'http'
+				const scheme = webScheme(appInfo.scheme)
 				const port = appInfo.port ? `:${appInfo.port}` : ''
 				const index = appInfo.index || ''
 				const url = `${scheme}://${hostIp}${port}${index}`
 
-				if (this.shouldOpenInNewWindow(appInfo)) {
+				// an app the box already found refusing a frame goes to a tab (frameCheck.js)
+				if (this.shouldOpenInNewWindow(appInfo) || frameRefused(url)) {
 					window.open(url, '_blank')
 					this.$EventBus.$emit(events.CLOSE_APP_IFRAME)
 					return

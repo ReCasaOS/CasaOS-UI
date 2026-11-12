@@ -337,6 +337,8 @@ export default {
 					white-space: nowrap;
 					text-overflow: ellipsis;
 					color: #fff;
+					// Bulma 1 paints a.dropdown-item with the scheme's (white) surface.
+					background: transparent;
 					font-size: 0.75rem;
 					margin-bottom: 0.25rem;
 

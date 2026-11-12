@@ -16,9 +16,9 @@ const HOSTILE = '<img src=x onerror="window.pwned = 1">'
 const buefy = { modal: { open: vi.fn() } }
 const state = { appLaunchInIframe: true }
 
-function tile(vm) {
+function tile(vm, props = {}) {
 	return mount(VmTile, {
-		props: { vm: aVm(vm) },
+		props: { vm: aVm(vm), ...props },
 		global: { plugins: [i18n], mocks: { $buefy: buefy, $store: { state } } },
 		attachTo: document.body,
 	})
@@ -31,6 +31,14 @@ describe('the tile of a virtual machine', () => {
 		delete window.pwned
 		// the read on click fails here: the tile goes by the state it has
 		getVirtualMachine.mockRejectedValue(new Error('not read'))
+	})
+
+	it('says its state under its name on the beta dashboard only', () => {
+		const compact = tile({ title: 'Debian', state: 'running' }, { compact: true })
+
+		expect(compact.find('.vm-tile').classes()).toContain('is-compact')
+		expect(compact.find('.app-state').text()).toBe('Running')
+		expect(tile({ title: 'Debian', state: 'running' }).find('.app-state').exists()).toBe(false)
 	})
 
 	// (1) named like the VM, a VM and not an app

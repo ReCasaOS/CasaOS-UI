@@ -147,6 +147,31 @@
         }
     }
 
+    // A section of a settings window: one thing (a destination, a schedule, a form)
+    // on a raised card, so a long window reads as a few blocks rather than a column of text.
+    .settings-card {
+        background: var(--casa-surface-card);
+        border: 1px solid var(--casa-divider-soft);
+        border-radius: 12px;
+        padding: .75rem 1rem;
+
+        &:not(:last-child) {
+            margin-bottom: .75rem;
+        }
+
+        h4,
+        .has-text-weight-semibold {
+            color: var(--casa-text-strong);
+        }
+    }
+
+    // the sentence under a tab or a title that says what the window is for
+    .settings-intro {
+        color: var(--casa-text-secondary);
+        font-size: .8125rem;
+        line-height: 1.45;
+    }
+
     .modal-card-foot {
         padding: .75rem 1.5rem 1.5rem 1.5rem;
         border-top: 1px solid var(--casa-divider-soft);
@@ -165,6 +190,20 @@
             padding-right: calc(1em + .25em);
         }
     }
+}
+
+// Every window opened as a card is as wide as the Statistics and the VM windows
+// (owner's choice). Buefy caps the wrapper at 960px inline, hence !important.
+// :where() keeps both rules at the weight of one class, so a window that sets
+// its own size (Files, App Store, Logs, Fleet) still wins, and Buefy's
+// confirms (.dialog) and the power box (no card) keep theirs.
+// (Bulma registers the variable on .modal itself, so it is set there.)
+.modal {
+    --bulma-modal-content-width: 66rem;
+}
+
+:where(.modal:not(.dialog)) > .animation-content:where(:has(> .modal-card)) {
+    max-width: calc(100vw - 2rem) !important;
 }
 
 .terminal-modal {
@@ -218,14 +257,6 @@
 
 .modal-background {
     background: rgba(0, 0, 0, .8);
-}
-
-@media screen and (min-width: 769px) {
-    .terminal-modal {
-        .modal-card {
-            width: 50rem;
-        }
-    }
 }
 
 /************************************

@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card modules-modal" tabindex="-1" @keydown.tab="onTab">
+	<div class="modal-card modules-modal touch-targets" tabindex="-1" @keydown.tab="onTab">
 		<header class="modal-card-head">
 			<!-- takes the focus when the window opens, to be read; nobody types into it -->
 			<h3 ref="title" class="title is-header modules-title" tabindex="-1">
@@ -669,7 +669,7 @@ export default {
 	computed: {
 		// The language of the dates and sizes, as the other settings windows say their own: a language without these texts falls back to English.
 		locale() {
-			return this.$te('Modules') ? this.$i18n.locale : 'en_us'
+			return this.$te('Modules', this.$i18n.locale) ? this.$i18n.locale : 'en_us'
 		},
 		// the buttons are shut while a call or a job is out, while the window looks for one, and while the core says it is busy
 		disabled() {
@@ -1231,9 +1231,10 @@ export default {
 }
 
 .modules-card {
-	padding: 0.75rem;
-	border: 1px solid var(--casa-border-hairline);
-	border-radius: 6px;
+	padding: 0.75rem 1rem;
+	background: var(--casa-surface-card);
+	border: 1px solid var(--casa-divider-soft);
+	border-radius: 12px;
 }
 
 .modules-card-head {
@@ -1245,6 +1246,7 @@ export default {
 
 .modules-card-title {
 	font-size: 1rem;
+	color: var(--casa-text-strong);
 }
 
 // the kind of module is a word on a tag, and a sentence under it: the tag is not the only thing that says it

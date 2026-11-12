@@ -2,6 +2,23 @@
 
 All notable changes to CasaOS UI are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Widgets Settings has a "Reset to the default order" link** that puts the widgets back in the order the dashboard ships them and keeps which ones are hidden. It is off while the order already is the shipped one. The drag handles and arrow keys it completes come from IceWhaleTech/CasaOS-UI#270 by moderathor12 (Apache-2.0).
+- **Docker labels on a container.** The settings of an app, and the install wizard, have a Labels field beside the environment variables: one row per label, read from `labels` of the compose file in its list or its map form, and written back as `key=value`. The labels CasaOS sets itself (`casaos`, `origin`, `icon`, `io.casaos.*`, `com.docker.compose.*`...) are not shown and are written back unchanged. A name that is not letters, digits and `. _ - /`, a reserved name, a value with a control character, a repeated name or more than 50 changes is told under the field and blocks the save; what the file already had when it was opened is left alone. Labels for a reverse proxy (`traefik.*`) are allowed. Needs AppManagement with `labels` in `GET /v2/app_management/info`: without it the field is not there and the labels of the file are kept as they are. The idea comes from brianewman's IceWhaleTech/CasaOS-UI#259 (Apache-2.0), reworked: it took any name, wrote every label back in one list and stored its hidden ones inside the service.
+- **A fleet of boxes from one dashboard.** A box whose core is a fleet master gets a Fleet card next to Statistics. Its page lists every box of the fleet: an overview (online or offline since when, ReCasaOS version and the one available, operating system and its support, apps running, VMs, processor, memory and disk), every container and every VM of every box with Start, Stop, Restart and Update on the selection, and an Updates tab that updates ReCasaOS, the system packages or the apps on several boxes at once. Every grouped action answers box by box: done, refused with the box's reason, offline, or failed. A box that does not answer, or has no VM module, shows that on its own row only. The Fleet row of the settings menu enables the master role (with the address the boxes join it at), adds boxes and shows their enrolment code once, or joins a fleet by pasting a code. The Alerts dialog gains a Fleet category. All of it needs a core with `/v1/fleet`; an older core shows none of it.
+- **`pnpm dev:mock`** runs the dashboard against an in-repo stub (home, app grid, stats, login) without a CasaOS box. Node 24, as CI.
+- **`pnpm dev:stack`** starts the sibling Go stack (`../CasaOS/dev/stack.sh`) and the Vue server on 8080. Welcome creates the first account. Files follows the managed roots the stack publishes.
+
+### Fixed
+
+- **The snapshots of a ZFS dataset open.** The ZFS tab asked for them as `?params[dataset]=…`, so the box saw no dataset and answered "no such ZFS dataset" for every one. Reported by se3 in ReCasaOS/CasaOS discussion 66.
+- Leaving mock mode clears leftover `mock-access` / `mock-refresh` tokens so a real Gateway is not sent a stub session.
+- Locations does not overlay an error when rclone is absent: the cloud list becomes empty.
+- Files waits at most three seconds for `GET /v1/file/roots` and then opens `/DATA`, so a slow or silent core does not leave the panel empty. Only the first `[file] ManagementRoots` entry is used; later roots are not in the sidebar.
+
 ## [0.4.65] - 2026-09-15
 
 ### Fixed

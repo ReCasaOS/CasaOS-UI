@@ -8,11 +8,18 @@ import i18n from '@/plugins/i18n'
 // require.context has no Vite equivalent; an empty table makes $t return its key.
 vi.mock('@/assets/lang', () => ({ default: { en_us: {} } }))
 vi.mock('file-saver', () => ({ default: { saveAs: vi.fn() } }))
+vi.mock('@/service/logs', () => ({ logsApi: {} }))
+vi.mock('@/service/service.js', () => ({ instance: {} }))
+let logsThere = true
+vi.mock('@/components/Logs/entry', () => ({ hasLogs: () => Promise.resolve(logsThere) }))
 
 const FileSaver = (await import('file-saver')).default
 
 // The two cards open a websocket and a fullscreen teleport; neither is under test here.
 const CardStub = { template: '<div/>', props: ['data', 'initWsUrl'], methods: { active() {} } }
+const LogsCardStub = { ...CardStub, template: '<div class="logs-card-stub"/>' }
+const download = vi.fn()
+const StreamStub = { name: 'LogStream', template: '<div class="log-stream"/>', props: { apps: Array, services: Array, embedded: Boolean }, methods: { download } }
 
 function setup(props = {}) {
 	const composeAppLogs = vi.fn().mockResolvedValue({ status: 200, data: { data: 'line one\nline two' } })
@@ -20,7 +27,7 @@ function setup(props = {}) {
 		props: { appid: 'c1', appName: 'jellyfin', initialTab: 'logs', ...props },
 		global: {
 			plugins: [Buefy, i18n],
-			stubs: { 'terminal-card': CardStub, 'logs-card': CardStub },
+			stubs: { 'terminal-card': CardStub, 'logs-card': LogsCardStub, 'LogStream': StreamStub },
 			mocks: {
 				$openAPI: { appManagement: { compose: { composeAppLogs } } },
 				$store: { state: { access_token: 't', device: 'desktop' } },
@@ -33,8 +40,57 @@ function setup(props = {}) {
 }
 
 describe('appTerminalPanel logs', () => {
-	beforeEach(() => vi.useFakeTimers())
+	beforeEach(() => {
+		logsThere = true
+		vi.useFakeTimers()
+	})
 	afterEach(() => vi.useRealTimers())
+
+	it('streams the logs of the app instead of polling them', async () => {
+		const { wrapper, composeAppLogs } = setup()
+		await flushPromises()
+		const stream = wrapper.findComponent(StreamStub)
+		expect(stream.exists()).toBe(true)
+		expect(stream.props('apps')).toEqual(['jellyfin'])
+		expect(stream.props('services')).toBeNull()
+		expect(stream.props('embedded')).toBe(true)
+
+		vi.advanceTimersByTime(10000)
+		expect(composeAppLogs).not.toHaveBeenCalled()
+		expect(wrapper.find('select').exists()).toBe(false)
+		expect(wrapper.find('.logs-card-stub').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('streams the one service it was opened on, and downloads through the stream', async () => {
+		const { wrapper, composeAppLogs } = setup({ serviceName: 'gluetun' })
+		await flushPromises()
+		expect(wrapper.findComponent(StreamStub).props('services')).toEqual(['gluetun'])
+
+		await wrapper.findAll('button').find(b => b.text().includes('Download')).trigger('click')
+		expect(download).toHaveBeenCalled()
+		vi.advanceTimersByTime(10000)
+		expect(composeAppLogs).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})
+
+// An AppManagement older than the Logs feature has no stream: the tab keeps the polled log.
+describe('appTerminalPanel logs against an older AppManagement', () => {
+	beforeEach(() => {
+		logsThere = false
+		vi.useFakeTimers()
+	})
+	afterEach(() => vi.useRealTimers())
+
+	it('shows the polled log, not the stream', async () => {
+		const { wrapper } = setup()
+		await flushPromises()
+		expect(wrapper.findComponent(StreamStub).exists()).toBe(false)
+		expect(wrapper.find('.logs-card-stub').exists()).toBe(true)
+		expect(wrapper.find('select').exists()).toBe(true)
+		wrapper.unmount()
+	})
 
 	it('asks for the chosen number of lines, and keeps polling for a bounded log', async () => {
 		const { wrapper, composeAppLogs } = setup()

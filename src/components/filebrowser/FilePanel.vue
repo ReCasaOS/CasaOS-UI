@@ -105,6 +105,7 @@
 									<!--  Close Button Start -->
 									<div
 										class="is-flex is-align-items-center modal-close-container modal-close-container-line">
+										<NewTabButton :params="{ path: currentPath }" class="mr-2" page="files" />
 										<div class="close-button" @click="$emit('close')">
 											<b-icon icon="close-outline" pack="casa"></b-icon>
 										</div>
@@ -239,6 +240,7 @@
 import { defineAsyncComponent } from 'vue'
 import orderBy from 'lodash/orderBy'
 import dropRight from 'lodash/dropRight'
+import escape from 'lodash/escape'
 
 import TreeList from './sidebar/TreeList.vue'
 import MountList from './sidebar/MountList.vue'
@@ -270,6 +272,7 @@ import GlobalActionButton from './components/GlobalActionButton.vue'
 import MountActionButton from './components/MountActionButton.vue'
 // storage settings requirement document
 import DropEntryButton from './drop/DropEntryButton.vue'
+import { FILE_ROOTS_TIMEOUT_MS, fileRootFrom, withTimeout } from './fileRoot.js'
 import MergeStorages from '@/components/Storage/MergeStorages.vue'
 
 // Drop
@@ -277,6 +280,7 @@ import events from '@/events/events'
 import VueBreakpointMixin from '@/mixins/breakpoint'
 import { filterHiddenFiles } from '@/mixins/file_utils'
 import { mixin } from '@/mixins/mixin'
+import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
 const SHOW_HIDDEN_FILES_STORAGE_KEY = 'casaos-filebrowser-show-hidden-files'
 
@@ -289,6 +293,7 @@ export default {
 		}
 	},
 	components: {
+		NewTabButton,
 		ListView,
 		GirdView,
 		FileBreadcrumb,
@@ -323,6 +328,7 @@ export default {
 	data() {
 		return {
 			isCreated: false,
+			isUnmounted: false,
 			isLoading: true,
 			isModalOpen: false,
 			isDragIn: false,
@@ -333,6 +339,7 @@ export default {
 			panelType: null,
 			currentItem: null,
 			rootPath: '/DATA',
+			fileRootReady: false,
 			currentPath: '',
 			currentPathName: '',
 			isViewGird: true,
@@ -462,13 +469,7 @@ export default {
 	},
 
 	mounted() {
-		this.init()
-		// on a tab of its own nobody calls init(path): the folder comes in the
-		// address (#/files?path=/DATA/...)
-		if (this.$route.path == '/files') {
-			this.init(this.$route.query.path)
-		}
-
+		// everything that listens is set up now; only the first folder waits for the root
 		if (this.pageType == 'file') {
 			this.beforeInit()
 		}
@@ -484,8 +485,11 @@ export default {
 		this.$EventBus.$on(events.UN_SHARE, this.handleUnShare)
 		this.$EventBus.$on(events.SHOW_FILES_SIDEBAR, this.handleShowSideBar)
 		this.$EventBus.$on(events.HIDE_FILES_SIDEBAR, this.handleHideSideBar)
+
+		this.openFirstFolder()
 	},
 	unmounted() {
+		this.isUnmounted = true
 		this.$EventBus.$off(events.SHOW_FILES_SIDEBAR, this.handleShowSideBar)
 		this.$EventBus.$off(events.HIDE_FILES_SIDEBAR, this.handleHideSideBar)
 		this.destroyedAction()
@@ -557,6 +561,31 @@ export default {
 		showTrash() {
 			this.pageType = 'trash'
 			this.hideMobileSidebar()
+		},
+
+		async openFirstFolder() {
+			await this.resolveFileRoot()
+			// the panel was closed while the root was being asked
+			if (this.isUnmounted) {
+				return
+			}
+			this.init()
+			this.$EventBus.$emit(events.RELOAD_FILE_LIST)
+			// on a tab of its own nobody calls init(path): the folder comes in the
+			// address (#/files?path=/DATA/...)
+			if (this.$route.path == '/files') {
+				this.init(this.$route.query.path)
+			}
+		},
+
+		async resolveFileRoot() {
+			try {
+				const res = await withTimeout(this.$api.file.getRoots(), FILE_ROOTS_TIMEOUT_MS)
+				this.rootPath = fileRootFrom(res?.data?.data?.roots)
+			} catch {
+				this.rootPath = '/DATA'
+			}
+			this.fileRootReady = true
 		},
 
 		/**
@@ -760,7 +789,7 @@ export default {
 					this.$store.commit('SET_OPERATE_OBJECT', null)
 				} else {
 					this.$buefy.toast.open({
-						message: res.data.message,
+						message: escape(res.data.message),
 						type: 'is-danger',
 					})
 				}
@@ -898,6 +927,7 @@ export default {
 				animation: 'zoom-in',
 				props: {
 					currentPath: this.currentPath,
+					rootPath: this.rootPath,
 				},
 				events: {
 					reload: () => {
@@ -985,6 +1015,11 @@ export default {
 		 * @return {*}
 		 */
 		handleRemove() {
+			this.confirmDelete(this.selectedArray, () => this.handleClose())
+		},
+
+		// shared by the toolbar and the right-click menu: a reliable modal, not an inline confirm the menu can dismiss before the second click
+		confirmDelete(items, afterConfirm) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Deleting files'),
 				// 30: trash.Retention in the core
@@ -995,8 +1030,10 @@ export default {
 				hasIcon: true,
 				onConfirm: () => {
 					const permanent = document.getElementById('deletePermanently')?.checked === true
-					this.deleteItem(this.selectedArray, permanent)
-					this.handleClose()
+					this.deleteItem(items, permanent)
+					if (afterConfirm) {
+						afterConfirm()
+					}
 				},
 			})
 		},
@@ -1180,7 +1217,7 @@ export default {
 		},
 		'local-storage:disk:added': function () {
 			setTimeout(() => {
-				if (this.currentPath == '/DATA') {
+				if (this.currentPath == this.rootPath) {
 					this.reload()
 				}
 			}, 500)

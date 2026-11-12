@@ -10,6 +10,7 @@ import * as entry from '@/components/Stats/entry'
 import { HOSTILE } from '@/components/Stats/__fixtures__/contract'
 import { alertBadge } from '@/components/Stats/alertBadge'
 import { createAlertFeed } from '@/components/Stats/resourceAlerts'
+import { renderSize } from '@/mixins/file_utils'
 
 vi.mock('@/components/Stats/alertBadge', () => ({ alertBadge: { load: vi.fn(), refreshSoon: vi.fn(), stop: vi.fn() } }))
 
@@ -26,8 +27,9 @@ function service() {
 		$EventBus: { $emit: vi.fn() },
 		$buefy: { toast: { open: vi.fn() } },
 		addIdToSessionStorage: vi.fn(),
+		renderSize,
 	}
-	for (const name of ['addNotice', 'removeNotice', 'appTitle', 'transformAppInstallationProgress'])
+	for (const name of ['addNotice', 'removeNotice', 'appTitle', 'backupTitle', 'backupCardName', 'backupCardTitle', 'installStepText', 'transformAppInstallationProgress'])
 		vm[name] = CoreService.methods[name].bind(vm)
 
 	const fire = (event, properties) => CoreService.sockets[event].call(vm, { Properties: properties })
@@ -40,6 +42,20 @@ const sonarr = {
 	'app:title': '{"en_us":"Sonarr"}',
 	'app:icon': 'sonarr.png',
 }
+
+describe('backing up', () => {
+	// the card came up as "Installing Backing up casaos-system"
+	it('titles the backup of the box as the box, not as an install', () => {
+		const { vm, fire } = service()
+
+		fire('backup:begin', { 'app:name': 'casaos-system', 'backup:kind': 'backup' })
+		fire('backup:progress', { 'app:name': 'casaos-system', 'backup:kind': 'backup', 'app:progress': '40' })
+
+		const card = vm.noticesData['backup:casaos-system']
+		expect(card.prelude.title).toBe('Backing up this box')
+		expect(card.content).toEqual({ text: '40% done', value: 40 })
+	})
+})
 
 describe('updating an app', () => {
 	it('draws one card, under the app it is updating', () => {
@@ -86,6 +102,136 @@ describe('updating an app', () => {
 		expect(vm.noticesData.sonarr).toBeUndefined()
 		expect(vm.noticesData.sonarrerror.content.text).toBe('no space left on device')
 		expect(vm.$buefy.toast.open).toHaveBeenCalled()
+	})
+})
+
+// The card said "Installing 75%" and nothing else: 75% of what, of which image, and
+// "Installation completed" at the end of the download, with the containers still to be
+// created and started -- the part that can take minutes.
+describe('installing an app', () => {
+	const llm = { 'app:name': 'anythingllm', 'app:title': '{"en_us":"AnythingLLM"}' }
+	const pulling = {
+		...llm,
+		'app:progress': '25',
+		'app:install:step': 'pull',
+		'docker:image:name': 'mintplexlabs/anythingllm:latest',
+		'docker:image:index': '1',
+		'docker:image:count': '2',
+		'docker:image:downloaded': '327155712',
+		'docker:image:size': '1503238553',
+	}
+
+	it('says which image is downloading, which of how many, and how much of it is here', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', pulling)
+
+		expect(vm.noticesData.anythingllm.content).toMatchObject({
+			text: 'Downloading · 312 MB of 1.4 GB · image 1 of 2',
+			value: 25,
+			detail: 'mintplexlabs/anythingllm:latest',
+		})
+	})
+
+	// a layer says its size only when its download starts: until all have, there is no total
+	it('gives the bytes alone while the size of the image is not known', () => {
+		const { vm, fire } = service()
+		const { 'docker:image:size': _, ...sizeless } = pulling
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...sizeless, 'docker:image:count': '1' })
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('Downloading · 312 MB')
+	})
+
+	it('says so when the image is being unpacked', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...pulling, 'app:install:step': 'extract', 'docker:image:count': '1' })
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('Unpacking the image')
+	})
+
+	// nobody knows how long these take, so the bar stops pretending: no value is a bar
+	// that moves without a figure
+	it.each([
+		['create', 'Creating the containers'],
+		['start', 'Starting, waiting for the app to answer'],
+	])('names the %s step, on a bar with no figure', (step, text) => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': step })
+
+		expect(vm.noticesData.anythingllm.content).toMatchObject({ text, value: undefined, detail: '' })
+	})
+
+	// events are published without waiting for one another, so the last frame of the
+	// download can land after the step that follows it
+	it('does not go back to the download once the containers are being created', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'create' })
+		fire('app:install-progress', pulling)
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('Creating the containers')
+	})
+
+	// A restore that installs the app goes through the same steps with no install around
+	// them, so nothing would ever take the card away; and a step that lands after the end
+	// of its install would open it again for good.
+	it('does not open a card for a step alone', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'start' })
+
+		expect(vm.noticesData).toEqual({})
+	})
+
+	// a save that failed leaves its card up, and the next one begins on it: the download
+	// of that one is not a late frame of the last
+	it('starts over when something begins on a card left at a later step', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'start' })
+		fire('app:update-begin', llm)
+		expect(vm.noticesData.anythingllm.content).toEqual({ text: 'Starting update', value: 0 })
+
+		fire('app:install-progress', pulling)
+		expect(vm.noticesData.anythingllm.content.step).toBe('pull')
+	})
+
+	// the page loaded half way through: the card wrote the bare number, "25"
+	it('says what is going on from the first frame it sees', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-progress', pulling)
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('Downloading · 312 MB of 1.4 GB · image 1 of 2')
+	})
+
+	// what the app service sent before it named its steps
+	it('keeps the percentage alone when the step is not said', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '75' })
+
+		expect(vm.noticesData.anythingllm.content).toMatchObject({ text: 'Installing 75%', value: 75 })
+	})
+
+	// it went out as written, in English, whatever the language
+	it('words the first line in the language of the dashboard', () => {
+		const { vm, fire } = service()
+		vm.$t = key => `[${key}]`
+
+		fire('app:install-begin', llm)
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('[Starting installation]')
 	})
 })
 

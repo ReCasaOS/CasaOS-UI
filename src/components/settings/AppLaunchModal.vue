@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card app-launch-modal">
+	<div class="modal-card app-launch-modal touch-targets">
 		<header class="modal-card-head">
 			<h3 class="title is-header">
 				{{ $t('App launching') }}
@@ -18,7 +18,7 @@
 			</p>
 
 			<template v-if="inIframe">
-				<p class="is-size-7 mb-2">
+				<p class="settings-intro mb-2">
 					{{ $t('Always open these apps in a new tab:') }}
 				</p>
 
@@ -55,8 +55,10 @@
 </template>
 
 <script>
-import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
+import { APP_STORE_LAUNCH_ID, FILES_LAUNCH_ID, FLEET_LAUNCH_ID, LOGS_LAUNCH_ID, STATS_LAUNCH_ID, VMS_LAUNCH_ID } from '@/mixins/app/appLaunchPreference'
 import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
+import { hasFleet } from '@/components/Fleet/entry'
+import { hasLogs } from '@/components/Logs/entry'
 
 export default {
 	name: 'AppLaunchModal',
@@ -66,6 +68,8 @@ export default {
 			exceptions: [...(this.$store.state.appLaunchExceptions || [])],
 			apps: [],
 			hasVMs: false,
+			logsAvailable: false,
+			isMaster: false,
 			isLoading: true,
 			loadError: '',
 		}
@@ -77,8 +81,14 @@ export default {
 				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
 				{ id: STATS_LAUNCH_ID, title: this.$t('Statistics') },
 			]
+			if (this.logsAvailable) {
+				builtins.push({ id: LOGS_LAUNCH_ID, title: this.$t('Logs') })
+			}
 			if (this.hasVMs) {
 				builtins.push({ id: VMS_LAUNCH_ID, title: this.$t('Virtual Machines') })
+			}
+			if (this.isMaster) {
+				builtins.push({ id: FLEET_LAUNCH_ID, title: this.$t('Fleet') })
 			}
 			return builtins
 		},
@@ -86,6 +96,12 @@ export default {
 	async mounted() {
 		hasVirtualMachines().then((available) => {
 			this.hasVMs = available
+		})
+		hasFleet().then((master) => {
+			this.isMaster = master
+		})
+		hasLogs().then((available) => {
+			this.logsAvailable = available
 		})
 
 		try {

@@ -46,7 +46,7 @@
 
 			<p class="section-title">{{ $t('Storage & CD') }}</p>
 			<b-field :label="$t('Disk size (GB)')" :message="diskMessage" :type="errors.disk_gib ? 'is-danger' : ''">
-				<b-numberinput v-model="form.disk_gib" :min="1" controls-position="compact" expanded size="is-small"></b-numberinput>
+				<b-numberinput v-model="form.disk_gib" :aria-minus-label="$t('Decrease')" :aria-plus-label="$t('Increase')" :min="1" controls-position="compact" expanded size="is-small"></b-numberinput>
 			</b-field>
 			<b-field :label="$t('Save in')" :message="folderMessage" :type="folderError ? 'is-danger' : ''" class="mt-3">
 				<b-input :model-value="form.storage_path" expanded readonly size="is-small"></b-input>
@@ -59,6 +59,7 @@
 			<network-field v-model="form.network" v-model:address="form.address" :host="host" />
 
 			<b-switch v-model="form.start" class="mt-4" size="is-small">{{ $t('Start it once it is created') }}</b-switch>
+			<b-switch v-model="form.autostart" class="mt-3" size="is-small">{{ $t('Start it when this machine starts') }}</b-switch>
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -276,7 +277,6 @@ export default {
 
 <style lang="scss" scoped>
 .vm-create {
-	width: 36rem;
 	max-width: 100%;
 
 	// the edit form's tabs, as headings

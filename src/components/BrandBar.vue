@@ -1,7 +1,7 @@
 <template>
 	<div class="brand-bar is-flex is-align-items-flex-end has-text-white">
 		<figure class="image _is-136x26 mb-3">
-			<img alt="logo" srcset="../assets/img/logo/logo.svg 2x, ../assets/img/logo/logo.png 1x">
+			<img alt="ReCasaOS" srcset="../assets/img/logo/logo.svg 2x, ../assets/img/logo/logo.png 1x">
 		</figure>
 		<!-- Two lines, because they answer two different questions: who publishes this
 			build, and whose work it stands on. The README says the same thing in more
@@ -9,6 +9,7 @@
 		<div class="brand-text ml-4">
 			<span class="intro-text">Made with ❤️ by ReCasaOS and YOU!</span>
 			<span class="upstream-text">Built on CasaOS by IceWhale</span>
+			<a class="kofi-link" href="https://ko-fi.com/recasaos" rel="noopener noreferrer" target="_blank">{{ $t('Support ReCasaOS on Ko-fi') }}</a>
 		</div>
 	</div>
 </template>
@@ -46,6 +47,19 @@ export default {
 		white-space: nowrap;
 	}
 
+	.kofi-link {
+		font-size: 0.75rem;
+		line-height: 1rem;
+		color: var(--casa-on-glass-dim);
+		white-space: nowrap;
+		width: fit-content;
+
+		&:hover {
+			color: inherit;
+			text-decoration: underline;
+		}
+	}
+
 	.upstream-text {
 		font-weight: 400;
 		font-size: 0.75rem;
@@ -80,7 +94,7 @@ export default {
 }
 
 ._is-136x26 {
-	width: 8.5rem;
+	width: 11.25rem;
 	height: 1.625rem;
 }
 </style>

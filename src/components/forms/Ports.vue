@@ -18,17 +18,17 @@
 					:model-value="item.host_ip ? `${item.host_ip}:${item.published}` : item.published" :name="`host-${index}`"
 					:rules="`yaml_port|not_in_ports:${invalidPortsInUse(item.published, item.protocol)}`">
 					<!-- Only show title when the first item. -->
-					<b-field :label="index < 1 ? $t('Host') : ''"
+					<b-field :label="index < 1 ? $t('Host') : ''" :message="errors"
 						:type="{ 'is-danger': errors[0], 'is-success': meta.valid }" expanded>
 						<b-input :placeholder="$t('Host')"
 							:model-value="item.host_ip ? `${item.host_ip}:${item.published}` : item.published" expanded
-							@blur="(event, val) => assignPortsItem(event.target._value, item)"></b-input>
+							@blur="(event, val) => assignPortsItem(event.target.value, item)"></b-input>
 					</b-field>
 				</VeeField>
 
 				<VeeField v-slot="{ errors, meta }" :model-value="item.target" :name="`container-${index}`" rules="yaml_port">
 					<!-- Only show title when the first item. -->
-					<b-field :label="index < 1 ? $t('Container') : ''"
+					<b-field :label="index < 1 ? $t('Container') : ''" :message="errors"
 						:type="{ 'is-danger': errors[0], 'is-success': meta.valid }" expanded>
 						<b-input v-model.number="item.target" :placeholder="$t('Container')" expanded></b-input>
 					</b-field>

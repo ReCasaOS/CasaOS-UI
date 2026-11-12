@@ -9,7 +9,7 @@ import api from '@/service/api'
 vi.mock('@/store', async () => {
 	const { createStore } = await import('vuex')
 	const { default: mutations } = await import('@/store/mutations')
-	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false }, mutations }) }
+	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false, loginStyle: 'classic' }, mutations }) }
 })
 vi.mock('@/service/api', () => ({
 	default: { users: { getUserStatus: vi.fn() } },
@@ -90,5 +90,58 @@ describe('a first account made on the machine', () => {
 	it('is the dashboard\'s own form against a core that does not say', () => {
 		store.commit('SET_FIRST_ADMIN', undefined)
 		expect(store.state.firstAdmin).toBe('web')
+	})
+})
+
+// A link to a page of the dashboard, opened signed out, ends on that page once
+// signed in: the login is told where it was going.
+describe('a link opened signed out', () => {
+	beforeEach(() => {
+		store.commit('SET_NEED_INITIALIZATION', false)
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true } } })
+		localStorage.removeItem('access_token')
+		store.commit('SET_ACCESS_TOKEN', '')
+	})
+
+	it('keeps where it was going for after the login', async () => {
+		vi.doMock('@/views/TerminalTab.vue', () => ({ default: { render: () => null } }))
+		await router.push('/terminal')
+
+		expect(router.currentRoute.value.path).toBe('/login')
+		expect(router.currentRoute.value.query.redirect).toBe('/terminal')
+	})
+
+	it('adds nothing for the dashboard itself', async () => {
+		await router.push('/logout')
+		await router.push('/')
+
+		expect(router.currentRoute.value.fullPath).toBe('/login')
+	})
+})
+
+// The login page asks the box nothing of its own: the guard's status call says
+// which page to show, and the store (and this browser) keep it.
+describe('the login style', () => {
+	beforeEach(() => {
+		localStorage.clear()
+		store.commit('SET_NEED_INITIALIZATION', false)
+	})
+
+	it('comes from the status the guard asks anyway', async () => {
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true, login_style: 'beta' } } })
+		await router.push('/login?x=1')
+		expect(store.state.loginStyle).toBe('beta')
+		expect(localStorage.getItem('login-style')).toBe('beta')
+
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true } } })
+		await router.push('/login?x=2')
+		expect(store.state.loginStyle).toBe('classic')
+	})
+
+	it('stays what it was when the box does not answer', async () => {
+		store.commit('SET_LOGIN_STYLE', 'beta')
+		api.users.getUserStatus.mockRejectedValue(new Error('502'))
+		await router.push('/login?x=3')
+		expect(store.state.loginStyle).toBe('beta')
 	})
 })

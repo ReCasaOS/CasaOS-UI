@@ -1,67 +1,60 @@
 <template>
-	<div class="mb-4 pb-3 background-item is-flex is-flex-direction-column">
-		<div class="is-flex mt-3 mr-3 mb-3 ml-3">
-			<div class="header-icon">
-				<b-image :src="require('@/assets/img/storage/storage.png')" class="is-64x64"></b-image>
+	<div class="storage settings-card p-0 mb-4">
+		<div class="_head">
+			<span :class="{ 'is-warn': item.usePercent >= 80 }" class="_tile"><b-icon :icon="item.isSystem ? 'home-outline' : 'harddisk'" /></span>
+			<div class="_text">
+				<p class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1">
+					<span class="_name">{{ item.name }}</span>
+					<b-tag v-if="item.isSystem" rounded>OS</b-tag>
+					<b-tag v-if="item.isMergeSource && !item.isSystem" rounded>{{ $t('Merged') }}</b-tag>
+					<b-tag v-if="item.snapraid && !(item.snapraid === 'data' && item.isMergeSource)" rounded>{{ item.snapraid === 'parity' ? $t('SnapRAID parity') : $t('SnapRAID') }}</b-tag>
+					<b-tag v-if="item.usePercent >= 80" :type="getProgressType(item.usePercent)" rounded>{{ $t('{percent} % full', { percent: Math.round(item.usePercent) }) }}</b-tag>
+				</p>
+				<p class="is-size-7 _has-text-gray">
+					{{ item.raid ? raidLevel(item.raid.level) : $t('Single Drive Storage') }} · <span class="is-uppercase">{{ item.fsType }}</span>
+					<b-tooltip :label="$t('CasaOS reserves 1% of file space when creating storage in EXT4 format.')" append-to-body>
+						<b-icon class="_hint" icon="question-outline" pack="casa" size="is-small" />
+					</b-tooltip>
+					<template v-if="item.diskModel || item.diskPath">
+						· {{ item.diskModel || item.diskPath }}<template v-if="item.diskModel && item.diskPath"> ({{ item.diskPath }})</template>
+					</template>
+					<template v-if="item.mount_point"> · {{ item.mount_point }}</template>
+				</p>
 			</div>
-			<div class="ml-3 is-flex-grow-1 is-flex is-align-items-center">
-				<div>
-					<h4 class="mb-0 has-text-left one-line has-text-emphasis-02 is-flex is-align-items-center">
-						{{ item.name }}
-						<b-tag v-if="item.isSystem" class="ml-2 has-text-full-04">OS
-						</b-tag>
-						<b-tag v-if="item.isMergeSource && !item.isSystem" class="ml-2 has-text-full-04">{{ $t('Merged') }}
-						</b-tag>
-					</h4>
 
-					<p class="has-text-left has-text-full-04 has-text-grey-light mt-1">{{ item.raid ? raidLevel(item.raid.level) : $t('Single Drive Storage') }},
-						<span class="is-uppercase">{{ item.fsType }}</span>
-						<b-tooltip :label="$t('CasaOS reserves 1% of file space when creating storage in EXT4 format.')"
-							append-to-body>
-							<b-icon class="mr-2 " icon="question-outline" pack="casa" size="is-small"></b-icon>
-						</b-tooltip>
-						<span v-if="item.diskPath || item.diskModel" class="ml-2">
-							· {{ $t('Drive') }}:
-							<span v-if="item.diskModel">{{ item.diskModel }}</span>
-							<span v-if="item.diskModel && item.diskPath"> ({{ item.diskPath }})</span>
-							<span v-else>{{ item.diskPath }}</span>
-						</span>
-					</p>
-					<p class="has-text-left has-text-full-04 mt-1">{{
-						$t("Available Total", {
-							name: item.diskName,
-							avl: renderSize(item.availSize),
-							total: renderSize(item.size),
-						})
-					}}</p>
-					<raid-status v-if="item.raid" :array="item.raid" class="mt-2" @changed="$emit('getDiskList')"></raid-status>
-				</div>
-
-			</div>
-			<div v-if="!item.isSystem && !item.isMergeSource" class="is-flex is-align-items-center b-group">
+			<div v-if="!item.isSystem && !item.isMergeSource && !item.snapraid" class="is-flex is-flex-wrap-wrap is-gap-1">
 				<b-button :disabled="isRemoving || isRenaming" :loading="isFormating" :type="isFormating ? 'is-primary' : ''"
 					rounded size="is-small" @click="formatStorage(item.path, item.mount_point)">
 					{{ $t('Format') }}
 				</b-button>
-				<b-button :disabled="isFormating || isRemoving" :loading="isRenaming" :type="isRenaming ? 'is-primary' : ''" class="ml-2"
+				<b-button :disabled="isFormating || isRemoving" :loading="isRenaming" :type="isRenaming ? 'is-primary' : ''"
 					rounded size="is-small" @click="renameStorage(item.path, item.name)">
 					{{ $t('Rename') }}
 				</b-button>
-				<b-button :disabled="isFormating || isRenaming" :loading="isRemoving" :type="isRemoving ? 'is-primary' : ''" class="ml-2"
-					rounded size="is-small" @click="removeStorage(item.disk)"> {{ $t('Remove') }}
+				<b-button :disabled="isFormating || isRenaming" :loading="isRemoving" :type="isRemoving ? 'is-primary' : ''"
+					rounded size="is-small" @click="item.raid ? deleteRaid(item.raid.name) : removeStorage(item.disk)">
+					{{ $t('Remove') }}
 				</b-button>
 			</div>
-			<p v-else-if="item.isSystem && item.usePercent >= 80" class="has-text-right is-flex is-flex-direction-column-reverse">
-				<span>{{ $t("Free up storage") }}</span>
+			<p v-else-if="item.snapraid && !item.isMergeSource" class="_has-text-gray is-size-7 _note">
+				{{ $t('Remove the SnapRAID protection first to format or remove it.') }}
 			</p>
+			<p v-else-if="item.isSystem && item.usePercent >= 80" class="is-size-7">{{ $t('Free up storage') }}</p>
 		</div>
-		<b-progress :type="getProgressType(item.usePercent)" :value="item.usePercent || 0"
-			class="ml-3 mr-3" size="is-small"></b-progress>
+
+		<div class="_body">
+			<b-progress :type="getProgressType(item.usePercent)" :value="item.usePercent || 0" class="mb-0" size="is-small" />
+			<p class="is-size-7">
+				<b>{{ renderSize(item.availSize) }}</b> <span class="_has-text-gray">{{ $t('free of {total}', { total: renderSize(item.size) }) }}</span>
+			</p>
+			<raid-status v-if="item.raid" :array="item.raid" :fs-size="Number(item.size) || 0" @changed="$emit('getDiskList')" />
+		</div>
 	</div>
 </template>
 
 <script>
 import delay from 'lodash/delay'
+import escape from 'lodash/escape'
 import RaidStatus from './RaidStatus.vue'
 import { raidLevel } from './raid'
 import { mixin } from '@/mixins/mixin'
@@ -114,7 +107,7 @@ export default {
 							this.isRenaming = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							return
@@ -128,7 +121,7 @@ export default {
 						this.isRenaming = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response?.data?.message || e.message,
+							message: escape(e.response?.data?.message || e.message),
 							type: 'is-danger',
 						})
 						console.error(e)
@@ -163,7 +156,7 @@ export default {
 							this.isRemoving = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							console.error(res)
@@ -179,11 +172,46 @@ export default {
 						this.isRemoving = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response.data.message,
+							message: escape(e.response.data.message),
 							type: 'is-danger',
 						})
 						console.error(e)
 					})
+				},
+			})
+		},
+
+		// an array is not a disk to unmount: deleting it stops it and leaves its disks blank, which the person confirms by typing its name
+		deleteRaid(name) {
+			this.isRemoving = true
+			this.$buefy.dialog.prompt({
+				title: escape(this.$t('Delete {name}?', { name })),
+				message: escape(this.$t('Everything on {name} is erased and its disks are left blank. This cannot be undone. Type {name} to delete it.', { name })),
+				inputAttrs: {
+					type: 'text',
+					placeholder: name,
+					required: true,
+					pattern: `^${name}$`,
+					autocomplete: 'off',
+				},
+				type: 'is-danger',
+				hasIcon: true,
+				trapFocus: true,
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onCancel: () => {
+					this.isRemoving = false
+				},
+				onConfirm: async (value) => {
+					try {
+						await this.$api.disks.deleteRaid(name, value)
+						this.$buefy.toast.open({ message: escape(this.$t('{name} is deleted. Its disks are blank.', { name })), type: 'is-success' })
+						this.$emit('getDiskList')
+					} catch (e) {
+						this.$buefy.toast.open({ duration: 5000, message: escape(e?.response?.data?.message || String(e)), type: 'is-danger' })
+					} finally {
+						this.isRemoving = false
+					}
 				},
 			})
 		},
@@ -215,7 +243,7 @@ export default {
 							this.isFormating = false
 							this.$buefy.toast.open({
 								duration: 3000,
-								message: res.data.message,
+								message: escape(res.data.message),
 								type: 'is-danger',
 							})
 							console.error(res)
@@ -230,7 +258,7 @@ export default {
 						this.isFormating = false
 						this.$buefy.toast.open({
 							duration: 3000,
-							message: e.response.data.message,
+							message: escape(e.response.data.message),
 							type: 'is-danger',
 						})
 						console.error(e)
@@ -244,16 +272,58 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.tag {
-	background-color: var(--casa-surface-soft);
-	border: 1px solid hsla(208, 100%, 45%, 1);
-	color: hsla(208, 100%, 45%, 1);
-	padding: 2px 6px;
-	height: 1.25rem;
-}
+.storage {
+	._head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+	}
 
-.background-item {
-	background-color: var(--casa-surface-soft);
-	border-radius: 0.5rem;
+	._tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.75rem;
+		background: rgba($primary, 0.12);
+		color: $primary;
+	}
+
+	._text {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
+
+	._name {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--casa-text-strong);
+	}
+
+	._body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0 1rem 0.875rem;
+	}
+
+	._tile.is-warn {
+		background: rgba($warning, 0.18);
+		color: $warning;
+	}
+
+	._hint {
+		vertical-align: middle;
+	}
+
+	// the reason there is no button, where the buttons would be
+	._note {
+		flex: 0 1 16rem;
+		text-align: right;
+	}
 }
 </style>

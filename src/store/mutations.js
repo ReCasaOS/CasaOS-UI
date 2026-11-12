@@ -2,6 +2,7 @@ import {
 	APP_LAUNCH_EXCEPTIONS_KEY,
 	APP_LAUNCH_IFRAME_KEY,
 } from '@/mixins/app/appLaunchPreference'
+import { LOGIN_STYLES, cacheLoginStyle } from '@/views/loginStyle'
 
 const mutations = {
 	// User and tokens
@@ -38,6 +39,11 @@ const mutations = {
 	// Site
 	SET_SITE_LOADING(state, loading) {
 		state.siteLoading = loading
+	},
+
+	SET_LOGIN_STYLE(state, style) {
+		state.loginStyle = LOGIN_STYLES.includes(style) ? style : 'classic'
+		cacheLoginStyle(state.loginStyle)
 	},
 
 	SET_NEED_INITIALIZATION(state, need) {

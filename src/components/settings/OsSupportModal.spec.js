@@ -7,7 +7,7 @@ import OsSupportModal from './OsSupportModal.vue'
 import OsUpgradePlan from './OsUpgradePlan.vue'
 import OsUpgradeReadiness from './OsUpgradeReadiness.vue'
 import OsUpgradeRun from './OsUpgradeRun.vue'
-import { EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
+import { BADGE_LABELS, EXTENDED_SENTENCES, SUPPORT_SENTENCES } from './osSupport'
 import real from './__fixtures__/os-plan-d11-12.json'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
@@ -113,6 +113,13 @@ describe('the operating system window', () => {
 		expect(wrapper.find('.os-status').text()).toBe('Standard security support for Ubuntu 22.04.5 LTS ends around June 2027.')
 		expect(wrapper.find('article.message').classes()).toContain('is-warning')
 		expect(wrapper.find('article.message').classes()).not.toContain('is-danger')
+	})
+
+	it('says until when the free security updates of a supported Debian run, as good news', () => {
+		open({ ...BULLSEYE, support: { state: 'supported', ends: '2028-06-30', precision: 'day' } })
+
+		expect(wrapper.find('.os-status').text()).toBe('Free security updates for Debian GNU/Linux 11 (bullseye) run until June 30, 2028.')
+		expect(wrapper.find('article.message').classes()).toContain('is-success')
 	})
 
 	it('says a day-precision date that is still to come as a date', () => {
@@ -224,7 +231,7 @@ describe('the operating system window', () => {
 	})
 
 	it('says nothing of a support state that has no sentence', () => {
-		open({ ...BULLSEYE, support: { state: 'supported', ends: '2028-06-30', precision: 'day' } })
+		open({ ...BULLSEYE, support: { state: 'unknown', ends: '2028-06-30', precision: 'day' } })
 
 		expect(wrapper.find('.os-status').exists()).toBe(false)
 	})
@@ -372,7 +379,7 @@ describe('the plan section of the operating system window', () => {
 		expect(wrapper.find('.os-plan-title').text()).toBe('Que ferait la mise à niveau ?')
 	})
 
-	it('is not in the window when the core says the machine cannot be planned', async () => {
+	it('says in the window why the core says the machine cannot be planned, and offers no plan', async () => {
 		const api = {
 			getOsPlan: vi.fn().mockReturnValue(answer({ plannable: false, reason: 'identity_unsupported', state: 'idle' })),
 			getOsReadiness: vi.fn(),
@@ -381,7 +388,8 @@ describe('the plan section of the operating system window', () => {
 		await flushPromises()
 
 		expect(section().exists()).toBe(true)
-		expect(wrapper.find('.os-plan').exists()).toBe(false)
+		expect(wrapper.find('.os-plan-cannot').exists()).toBe(true)
+		expect(wrapper.find('.os-plan-start').exists()).toBe(false)
 		// the readiness section is none the worse
 		expect(wrapper.find('.os-readiness-title').exists()).toBe(true)
 	})
@@ -610,9 +618,7 @@ describe('the operating system window in a language that has no translation yet'
 
 describe('the language files', () => {
 	const keys = [
-		'Operating system',
-		'System support ended',
-		'System support ends soon',
+		...BADGE_LABELS,
 		...SUPPORT_SENTENCES,
 		...EXTENDED_SENTENCES,
 		'{name} is the next release.',

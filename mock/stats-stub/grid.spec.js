@@ -67,13 +67,40 @@ describe('the stub of the shell', () => {
 		expect(ask('GET', '/v1/sys/utilization').body.data).toMatchObject({ cpu: { num: 4 }, mem: { total: expect.any(Number) } })
 		expect(ask('GET', '/v1/sys/telemetry').body.data).toEqual({ enabled: false })
 		expect(ask('GET', '/v1/gateway/port').body.data).toBe('80')
+		expect(ask('GET', '/v1/gateway/httpsport').body.data).toBe('443')
 		expect(ask('GET', '/v1/usb/usb-auto-mount').body.data).toBe('False')
+	})
+
+	it('accepts an https port and refuses the plain one', () => {
+		expect(ask('PUT', '/v1/gateway/httpsport', { port: '0' }).body).toMatchObject({ success: 200, data: '0' })
+		expect(ask('PUT', '/v1/gateway/httpsport', { port: '80' }).body).toMatchObject({ success: 400, message: expect.any(String) })
 	})
 
 	it('leaves every other path to the caller', () => {
 		expect(ask('GET', '/v1/sys/nothing-here')).toBeNull()
 		expect(ask('DELETE', '/v2/virt_management/vms')).toBeNull()
 		expect(ask('GET', '/v2/virt_management/stats')).toBeNull()
+	})
+})
+
+describe('the stub of login and refresh', () => {
+	it('answers POST /v1/users/login in the Login.vue envelope', () => {
+		const { status, body } = ask('POST', '/v1/users/login', { username: 'x', password: 'secret' })
+		expect(status).toBe(200)
+		expect(body.data.token.access_token).toBe('mock-access')
+		expect(body.data.user.username).toBe('casaos')
+		expect(body.success).toBe(200)
+	})
+
+	it('answers POST /v1/users/refresh without a nested token', () => {
+		const { status, body } = ask('POST', '/v1/users/refresh', { refresh_token: 'x' })
+		expect(status).toBe(200)
+		expect(body.data.access_token).toBe('mock-access')
+		expect(body.data.token).toBeUndefined()
+	})
+
+	it('still leaves an unrelated POST to the caller', () => {
+		expect(ask('POST', '/v1/samba/shares')).toBeNull()
 	})
 })
 
@@ -127,5 +154,21 @@ describe('the stub of the image upload', () => {
 		for (const [code, status] of Object.entries(codes)) {
 			expect(put(`${code}.iso`, 'x', state)).toEqual({ status, body: { message: code } })
 		}
+	})
+})
+
+describe('the stub of public sharing', () => {
+	it('claims a name, shares and stops an app, and refuses a name without the terms', () => {
+		const state = newGridState()
+		expect(ask('GET', '/v1/share', null, state).body.data).toMatchObject({ supported: true, name: '', tunnel: { connected: false } })
+		expect(ask('PUT', '/v1/share/apps/jellyfin', null, state).status).toBe(400)
+		expect(ask('PUT', '/v1/share/name', { name: 'mybox' }, state).status).toBe(400)
+		expect(ask('PUT', '/v1/share/name', { name: 'mybox', accept_tos: true }, state).body.data.host).toBe('mybox.box.recasaos.org')
+
+		const shared = ask('PUT', '/v1/share/apps/jellyfin', null, state).body.data
+		expect(shared.apps.find(a => a.name === 'jellyfin')).toMatchObject({ shared: true, url: 'https://jellyfin.mybox.box.recasaos.org' })
+		expect(shared.tunnel.connected).toBe(true)
+
+		expect(ask('DELETE', '/v1/share/apps', null, state).body.data.apps.some(a => a.shared)).toBe(false)
 	})
 })

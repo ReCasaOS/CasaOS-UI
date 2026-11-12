@@ -317,3 +317,41 @@ x-casaos:
 		expect(model.services.plex.volumes).toHaveLength(1)
 	})
 })
+
+describe('composeConfig $AppID in the settings of an installed app', () => {
+	const storeYaml = `name: filebrowser
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /data
+    devices:
+      - /DATA/AppData/\${AppID}/dev:/dev/x
+`
+
+	function parsed(state) {
+		const context = {
+			makeArray,
+			volumeAutoCheck,
+			state,
+			volumes: {},
+			totalMemory: 4096,
+			configData: { 'name': 'filebrowser', 'x-casaos': { title: { en_us: 'filebrowser' } } },
+		}
+		return parseComposeItem.call(context, YAML.parse(storeYaml).services.filebrowser)
+	}
+
+	it('shows the folder the app really uses, and saves it as the same folder', () => {
+		const service = parsed('update')
+		expect(service.volumes[0].source).toBe('/DATA/AppData/filebrowser/data')
+		expect(service.devices[0].host).toBe('/DATA/AppData/filebrowser/dev')
+		const saved = emitYaml({ name: 'filebrowser', services: { filebrowser: service } }, storeYaml).services.filebrowser
+		expect(saved.volumes[0].source).toBe('/DATA/AppData/filebrowser/data')
+	})
+
+	it('leaves $AppID for the install form, where the name is not settled yet', () => {
+		expect(parsed('install').volumes[0].source).toBe('/DATA/AppData/$AppID/data')
+	})
+})

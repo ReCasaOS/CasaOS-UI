@@ -177,6 +177,12 @@ describe('createRequest', () => {
 		const body = createRequest({ title: ' Alpine ', image_path: '', vcpus: 1, memory_mib: 512, disk_gib: 2, firmware: 'uefi', start: true })
 		expect(body).toEqual({ title: 'Alpine', vcpus: 1, memory_mib: 512, disk_gib: 2, firmware: 'uefi', start: true })
 	})
+
+	it('asks for autostart only when chosen', () => {
+		const form = { title: 'HA', image_path: '', vcpus: 1, memory_mib: 512, disk_gib: 2, firmware: 'uefi', start: true }
+		expect(createRequest({ ...form, autostart: false })).not.toHaveProperty('autostart')
+		expect(createRequest({ ...form, autostart: true }).autostart).toBe(true)
+	})
 })
 
 describe('applyOrder', () => {
@@ -204,6 +210,13 @@ describe('updateRequest', () => {
 		const vm = { title: 'A', vcpus: 1, memory_mib: 512 }
 		expect(updateRequest(vm, { title: 'A ', vcpus: 1, memory_mib: 512 })).toEqual({})
 		expect(updateRequest(vm, { title: 'B', vcpus: 2, memory_mib: 512 })).toEqual({ title: 'B', vcpus: 2 })
+	})
+
+	it('sends autostart when it changed, and never to a module that does not know it', () => {
+		const vm = { title: 'A', vcpus: 1, memory_mib: 512, autostart: false }
+		expect(updateRequest(vm, { title: 'A', vcpus: 1, memory_mib: 512, autostart: false })).toEqual({})
+		expect(updateRequest(vm, { title: 'A', vcpus: 1, memory_mib: 512, autostart: true })).toEqual({ autostart: true })
+		expect(updateRequest({ title: 'A', vcpus: 1, memory_mib: 512 }, { title: 'A', vcpus: 1, memory_mib: 512, autostart: undefined })).toEqual({})
 	})
 })
 

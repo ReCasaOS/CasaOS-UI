@@ -24,12 +24,28 @@
 								</b-button>
 							</div>
 						</b-tooltip>
+						<b-tooltip :active="unDiskData.length < 2"
+							:label="$t('Plug at least two blank drives to make a RAID.')" append-to-body
+							content-class="create-storage-tip" position="is-bottom" type="is-dark">
+							<div class="ml-2">
+								<b-button :disabled="unDiskData.length < 2" class="o" rounded size="is-small"
+									type="is-link is-light" @click="showCreateRaid">{{ $t('Create RAID') }}
+								</b-button>
+							</div>
+						</b-tooltip>
 
 					</div>
 					<b-tabs v-model="activeTab" :animated="false">
 						<b-tab-item :label="$t('Storage')" class="scrollbars-light-auto tab-item">
+							<!-- the way to a merged storage that survives a drive failing: nobody looks for it under Merged Storage -->
+							<div v-if="canCreateSnapRaid" class="settings-card _hint mb-4 is-flex is-align-items-center is-flex-wrap-wrap is-gap-2">
+								<span class="_tile"><b-icon icon="shield-outline" /></span>
+								<p class="is-flex-grow-1 is-size-7 _has-text-gray">{{ $t('Several drives? SnapRAID merges them into one storage and keeps a drive that can rebuild any one of them if it fails.') }}</p>
+								<b-button rounded size="is-small" type="is-link" @click="showCreateSnapRaid">{{ $t('Create SnapRAID') }}</b-button>
+							</div>
 							<!-- an array with no storage mounted on it (stopped, or never formatted) is still shown -->
-							<div v-for="array in unmountedArrays" :key="array.path" class="mb-4 pb-3 pt-3 pl-3 pr-3 background-item">
+							<div v-for="array in unmountedArrays" :key="array.path" class="settings-card mb-4">
+								<p class="is-size-7 _has-text-gray mb-2">{{ $t('No storage is mounted on this array.') }}</p>
 								<raid-status :array="array" @changed="getDiskList"></raid-status>
 							</div>
 							<template v-if="storageData.length">
@@ -43,21 +59,40 @@
 						<b-tab-item :label="$t('Merged Storage')" class="scrollbars-light-auto tab-item">
 							<storage-combination v-if="mergeConbinationsStorageData.length"
 								:storage-data="mergeConbinationsStorageData"
+								:mount-point="mergeMountPoint"
 								:type="state_mainstorage_operability"
 								@merge-success="showMergedStorage"
 								@reload="getDiskList"></storage-combination>
 							<div v-else class="has-text-centered has-text-grey-light mt-6">
 								<p>{{ $t('No merged storage has been configured.') }}</p>
 								<div class="is-flex is-justify-content-center mt-4">
+									<b-button v-if="canCreateSnapRaid" class="mr-2" rounded type="is-link" @click="showCreateSnapRaid">{{ $t('Create SnapRAID') }}
+									</b-button>
 									<b-button :type="state_mainstorage_operability" rounded
 										@click="showStorageSettingsModal">{{ $t('Merge Storages') }}
 									</b-button>
 									<cToolTip is-block></cToolTip>
 								</div>
 							</div>
+							<snap-raid-panel v-if="mergeConbinationsStorageData.length" :candidates="parityCandidates" :pool="mergeMountPoint"></snap-raid-panel>
 						</b-tab-item>
 						<b-tab-item :label="$t('Drive')" class="scrollbars-light-auto tab-item">
-							<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
+							<p class="settings-intro mb-3">{{ $t('The physical drives of this box, their SMART health and temperature, and what they carry.') }}</p>
+							<!-- the head of the drives table; each drive-item is a row of the same columns -->
+							<div class="settings-card p-0 _drives">
+								<div class="_drives-head is-size-7" aria-hidden="true">
+									<span></span>
+									<span>{{ $t('Drive') }}</span>
+									<span class="_carries">{{ $t('Carries') }}</span>
+									<span>{{ $t('Health') }}</span>
+									<span>{{ $t('Temp') }}</span>
+								</div>
+								<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
+							</div>
+						</b-tab-item>
+						<!-- last, so that the places of the others do not move; only on a box that has a ZFS pool -->
+						<b-tab-item v-if="hasZfs" :label="$t('ZFS')" class="scrollbars-light-auto tab-item">
+							<zfs-panel :active="activeTab === 3"></zfs-panel>
 						</b-tab-item>
 						<!-- the storage layer (GET /v2/storage), where the storage service has it -->
 						<b-tab-item v-if="poolView" :label="$t('Pool')" class="scrollbars-light-auto tab-item">
@@ -74,7 +109,7 @@
 						<VeeField v-slot="{ errors, meta }" :model-value="createStorageName" name="StorageName" rules="required">
 							<b-field :label="$t('Storage Name')" :message="errors"
 								:type="{ 'is-danger': errors[0], 'is-success': meta.valid }">
-								<b-input v-model="createStorageName" ref="inputs"
+								<b-input ref="inputs" v-model="createStorageName"
 									@keyup="createStorageName = createStorageName.replace(/[^\w]/g, '')"
 									@paste="createStorageName = createStorageName.replace(/[^\w]/g, '')"></b-input>
 							</b-field>
@@ -178,10 +213,16 @@ import delay from 'lodash/delay'
 import max from 'lodash/max'
 import orderBy from 'lodash/orderBy'
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
+import escape from 'lodash/escape'
 import DriveItem from './DriveItem.vue'
 import StorageItem from './StorageItem.vue'
 import StorageCombination from './StorageCombination.vue'
 import RaidStatus from './RaidStatus.vue'
+import RaidCreate from './RaidCreate.vue'
+import SnapRaidPanel from './SnapRaidPanel.vue'
+import SnapRaidCreate from './SnapRaidCreate.vue'
+import ZfsPanel from './ZfsPanel.vue'
+import { POOL, poolDisks, snapraidHeld } from './snapraidPool'
 import StoragePool from './StoragePool.vue'
 import { poolWorking } from './pools'
 import { mixin } from '@/mixins/mixin'
@@ -199,6 +240,8 @@ export default {
 		StorageItem,
 		StorageCombination,
 		RaidStatus,
+		SnapRaidPanel,
+		ZfsPanel,
 		StoragePool,
 		CToolTip: cToolTip,
 	},
@@ -219,11 +262,14 @@ export default {
 			unDiskData: [],
 			storageData: [],
 			raidArrays: [],
+			hasZfs: false,
 			// GET /v2/storage's data; null: the storage service has no storage layer
 			poolView: null,
 			poolTimer: null,
 			poolWorked: false,
 			mergeConbinationsStorageData: [],
+			// the folder the merged storage appears in, read with the merge
+			mergeMountPoint: POOL,
 			hasMergeState: false,
 		}
 	},
@@ -231,6 +277,14 @@ export default {
 	computed: {
 		unmountedArrays() {
 			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
+		},
+		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet
+		canCreateSnapRaid() {
+			return poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
+		},
+		// the storages of their own that could hold a SnapRAID parity: mounted, not the system's, not a disk of the merge
+		parityCandidates() {
+			return this.storageData.filter(storage => !storage.isSystem && !storage.isMergeSource && storage.mount_point)
 		},
 		title() {
 			return this.creatIsShow ? this.$t('Create Storage') : this.$t('Storage Manager')
@@ -310,9 +364,9 @@ export default {
 				return
 			}
 			if (first) {
-				// the Pool tab, after Storage, Merged Storage and Drive: once rendered, or b-tabs ignores the index
+				// the Pool tab, after Storage, Merged Storage, Drive (and ZFS): once rendered, or b-tabs ignores the index
 				await this.$nextTick()
-				this.activeTab = 3
+				this.activeTab = this.hasZfs ? 4 : 3
 			}
 			const working = poolWorking(this.poolView)
 			if (working) {
@@ -326,6 +380,26 @@ export default {
 		async showMergedStorage() {
 			await this.getDiskList()
 			this.activeTab = 1
+		},
+
+		showCreateSnapRaid() {
+			this.$buefy.modal.open({
+				component: SnapRaidCreate,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				props: { storages: this.storageData, drives: this.unDiskData },
+				events: { changed: () => this.showMergedStorage() },
+			})
+		},
+
+		showCreateRaid() {
+			this.$buefy.modal.open({
+				component: RaidCreate,
+				hasModalCard: true,
+				trapFocus: true,
+				events: { changed: () => this.getDiskList() },
+			})
 		},
 
 		/**
@@ -342,6 +416,9 @@ export default {
 			} catch (error) {
 				console.log(error.response.message)
 			}
+
+			// the storages SnapRAID holds: not offered for format or removal (not set up, or not answering: none)
+			const held = snapraidHeld(await this.$api.disks.snapraid().then(res => res.data.data?.config, () => undefined))
 
 			// get storage list
 			// TODO: the part is repetition
@@ -362,7 +439,7 @@ export default {
 				console.log(e)
 			}
 
-			await this.refreshPool()
+			this.mergeMountPoint = mergeInfo?.mount_point || POOL
 
 			// silent on failure: an older LocalStorage has no such route, and the storages show anyway
 			const raidByPath = {}
@@ -373,6 +450,21 @@ export default {
 				})
 			} catch {
 				this.raidArrays = []
+			}
+
+			// the ZFS tab only shows on a box that has ZFS with a pool; silent when LocalStorage is older or ZFS is not there. A reading that is not ready keeps what we had
+			try {
+				const zfs = (await this.$api.disks.zfs()).data.data
+				if (!zfs?.busy) {
+					this.hasZfs = !!(zfs?.available && zfs.pools?.length)
+				}
+			} catch {
+				this.hasZfs = false
+			}
+			// after the ZFS tab is known: the Pool tab comes after it
+			await this.refreshPool()
+			if (this.activeTab > 2 + Number(this.hasZfs) + Number(Boolean(this.poolView))) {
+				this.activeTab = 0
 			}
 
 			try {
@@ -446,6 +538,7 @@ export default {
 						persistedIn: storage.persisted_in,
 						raid: raidByPath[storage.disk],
 						isMergeSource: storage.diskName !== 'System' && mergeConbinations.some(item => item.uuid === storage.uuid),
+						snapraid: held[storage.mount_point],
 					}
 				}
 				this.storageData = storageArraySort.map(remapStorage)
@@ -596,7 +689,7 @@ export default {
 				this.isValiding = false
 				this.$buefy.toast.open({
 					duration: 3000,
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-danger',
 				})
 				console.error(err)
@@ -638,7 +731,7 @@ export default {
 			}).catch((err) => {
 				this.$buefy.toast.open({
 					duration: 3000,
-					message: err.response.data.message,
+					message: escape(err.response.data.message),
 					type: 'is-danger',
 				})
 				console.error(err)
@@ -653,6 +746,24 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss">
+// Not scoped: `storage-modal` is the class Home.vue gives the modal, and Buefy's
+// default card is ~640px. The ZFS datasets are a table of six columns, and a
+// storage with its drives and its RAID is a row of its own: both want the width
+// the backups window already has.
+@media screen and (min-width: 769px) {
+  .storage-modal {
+    .animation-content {
+      max-width: 94% !important;
+    }
+
+    .modal-card {
+      width: min(94vw, 60rem) !important;
+    }
+  }
+}
+</style>
 
 <style lang="scss" scoped>
 .modal-card .b-tabs {
@@ -709,6 +820,39 @@ export default {
 
 	&::before {
 		border-bottom-color: #505459 !important;
+	}
+}
+</style>
+
+<style lang="scss" scoped>
+// the cards of the Storage tab that are not a component of their own
+._hint ._tile {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 0.75rem;
+	background: var(--casa-hover-tint);
+	color: var(--casa-text-hint);
+}
+
+._drives-head {
+	display: grid;
+	grid-template-columns: 2.5rem minmax(0, 1.6fr) minmax(0, 1.2fr) 8rem 7rem;
+	gap: 0.875rem;
+	padding: 0.625rem 1rem 0.25rem;
+	color: var(--casa-text-hint);
+	font-weight: 600;
+
+	@media (max-width: 768px) {
+		grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+
+		._carries,
+		> :nth-child(4) {
+			display: none;
+		}
 	}
 }
 </style>

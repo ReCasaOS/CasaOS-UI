@@ -86,6 +86,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import SambaUsersModal from './SambaUsersModal.vue'
 
 export default {
@@ -251,7 +252,7 @@ export default {
 			} catch (error) {
 				this.isSaving = false
 				this.$buefy.toast.open({
-					message: error.response.data.message,
+					message: escape(error.response.data.message),
 					type: 'is-danger',
 				})
 			}

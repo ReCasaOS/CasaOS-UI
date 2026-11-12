@@ -1,3 +1,9 @@
+<p align="center"><img src="https://raw.githubusercontent.com/ReCasaOS/.github/main/assets/recasaos-banner.svg" alt="ReCasaOS" width="640"></p>
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/recasaos)
+
+[Support ReCasaOS](https://github.com/ReCasaOS/.github/blob/main/FUNDING.md)
+
 # CasaOS-UI
 
 > **Not affiliated with IceWhale.** An independent, community-maintained distribution of CasaOS, not produced or endorsed by Shanghai IceWhale Technology Limited. CASAOS is their trademark, used here only to say what this is a release of. The original project is [IceWhaleTech/CasaOS](https://github.com/IceWhaleTech/CasaOS); report problems with this distribution at [ReCasaOS/CasaOS/issues](https://github.com/ReCasaOS/CasaOS/issues).
@@ -16,6 +22,18 @@ Four routes, hash mode, in [`src/router/route.js`](src/router/route.js):
 | `/login` | sign-in |
 | `/` | the dashboard: wallpaper, sidebar widgets, app grid, top bar, file browser |
 | `/launch` | the waiting screen while an app starts, before it opens |
+
+The built-in pages also have an address of their own, so a link or a bookmark opens one alone on a tab. Without a session they go to the login and come back to the page afterwards. Each window has an *Open in a new tab* button that opens its address where the window is (folder, VM, item…), and Settings → App launching → "new tab" opens them this way from the dashboard.
+
+| Address | Page | Opens on |
+|---|---|---|
+| `/#/files` | Files | `?path=/DATA/...`, a folder |
+| `/#/terminal` | Terminal | |
+| `/#/vms` | Virtual Machines | `?vm=<id>`, one VM |
+| `/#/stats` | Statistics | `?item=...`, one item |
+| `/#/logs` | Logs | `?app=`, `?box=`, `?at=<ISO time>` |
+| `/#/fleet` | Fleet | |
+| `/#/appstore` | App Store | `?store=<id>`, one app |
 
 It calls `/v1/...` on CasaOS core for accounts, Samba shares, system information and files, `/v2/...` on AppManagement, LocalStorage and UserService, and holds a socket.io connection to `/v2/message_bus/socket.io/` for live app and installation events.
 
@@ -56,17 +74,33 @@ Since alvins82's v0.4.30. The full list per release is in [CHANGELOG.md](CHANGEL
 
 ## Development
 
-Node 20 and pnpm 9.0.6 — what CI uses and what `packageManager` declares.
+Node 24 and pnpm 9.0.6 — what CI uses and what `packageManager` declares. `engines` allows Node 20 and 22; 26 is outside the range (Vue CLI on 26 is untested).
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm vitest run                 # 37 tests
+pnpm exec vitest run
 pnpm build                      # writes build/sysroot/...
 ```
 
-`pnpm test` starts vitest in watch mode; `pnpm vitest run` is the one-shot form CI runs.
+`pnpm test` starts vitest in watch mode; `pnpm exec vitest run` is the one-shot form CI runs.
 
-To point a development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
+Without a CasaOS box, run the dashboard against the in-repo stub:
+
+```sh
+pnpm dev:mock
+```
+
+It starts the stub on port 8099 and the dev server on 8080, and signs you in as `casaos`. The stub answers the home page, the app grid, the VM tiles, stats, login and refresh. It does not run Docker, serve files, share disks, or speak the message-bus WebSocket.
+
+With the Go component repositories cloned next to this one, the dashboard can talk to a real local Gateway instead of the stub:
+
+```sh
+pnpm dev:stack
+```
+
+That starts `../CasaOS/dev/stack.sh` (Gateway on 8081) and the Vue server on 8080. The first visit is welcome: create the account there. Compose and Storage on that stack use a fake Engine and fixture disks, not the host Docker socket and not the host's `lsblk`; Files follows the managed roots (CasaOS `.dev-runtime/data`). rclone is optional; without it, Locations has no cloud drives. The commands, layout and limits are in `../CasaOS/dev/README.md`. `pnpm dev:mock` remains the path that needs no Go services. Do not run `dev:mock` and `dev:stack` at the same time; both use port 8080.
+
+To point the development server at a real CasaOS box, copy `.env.dev` to `.env.dev.local` (git-ignored), set `VUE_APP_DEV_IP` to its address, then:
 
 ```sh
 pnpm dev

@@ -1,5 +1,5 @@
 <template>
-	<div class="modal-card os-support-modal">
+	<div class="modal-card os-support-modal touch-targets">
 		<header class="modal-card-head">
 			<!-- takes the focus when the window opens, to be read; nobody types into it -->
 			<h3 ref="title" class="title is-header os-title" tabindex="-1">
@@ -17,7 +17,7 @@
 			</p>
 
 			<b-message v-if="statusText"
-				:type="os.support.state === 'security_ended' ? 'is-danger' : 'is-warning'"
+				:type="{ security_ended: 'is-danger', ending_soon: 'is-warning' }[os.support.state] || 'is-success'"
 				class="os-status mt-3"
 				size="is-small">
 				{{ statusText }}
@@ -83,7 +83,7 @@ export default {
 		// window's texts falls back to English, and so does its date. The title is the
 		// key asked, because $te reads a key with a full stop as a path.
 		locale() {
-			return this.$te('Operating system') ? this.$i18n.locale : 'en_us'
+			return this.$te('Operating system', this.$i18n.locale) ? this.$i18n.locale : 'en_us'
 		},
 		statusText() {
 			const sentence = supportSentence(this.os.support, this.locale, this.os.id)

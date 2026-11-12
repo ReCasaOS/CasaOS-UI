@@ -115,6 +115,7 @@
 </template>
 
 <script>
+import escape from 'lodash/escape'
 import { CONTAINER_STATES, containerActions, containerRows, healthCell } from './containerSummary'
 import { renderSize } from '@/mixins/file_utils'
 
@@ -200,7 +201,7 @@ export default {
 			} catch (error) {
 				const data = error.response && error.response.data
 				this.$buefy.toast.open({
-					message: (data && data.message) || error.message,
+					message: escape((data && data.message) || error.message),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 5000,

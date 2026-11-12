@@ -263,10 +263,8 @@ export default {
 			return tempO.font
 		},
 		zoomScreenshot(img) {
-			const customVNode = h('div', { class: 'modal-content' }, [h('img', { src: img })])
-
 			this.$buefy.modal.open({
-				content: [customVNode],
+				content: [h('div', { class: 'modal-content' }, [h('img', { src: img })])],
 				customClass: '_zoom-screenshot',
 				fullScreen: true,
 				hasModalCard: true,

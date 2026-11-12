@@ -233,10 +233,6 @@ export default {
 		}
 	}
 
-	.modal-card {
-		width: 30rem;
-	}
-
 	.file-list {
 		height: 19.6875rem;
 		overflow-x: hidden;

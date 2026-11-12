@@ -1,5 +1,57 @@
 <template>
 	<div class="home-section has-text-left">
+		<!-- System row (beta dashboard): the built-ins first, out of the draggable grid -->
+		<template v-if="systemFirst && systemApps.length > 0">
+			<div class="is-flex is-align-items-center mb-4">
+				<app-section-title-tip id="appTitleSystem"
+					class="is-flex-grow-1 has-text-sub-04"
+					label="Built into CasaOS."
+					title="System">
+				</app-section-title-tip>
+			</div>
+			<div :class="{ 'is-compact': compact, 'is-tiles': compact }" class="app-list contextmenu-canvas mb-5">
+				<div v-for="item in systemApps" :id="`app-${item.name}`" :key="item.name" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
+					<vm-tile v-if="item.vmTile" :compact="compact" :vm="item.vm"></vm-tile>
+					<app-card v-else :compact="compact" :item="item" :subtitle="systemSubtitle(item)"
+						@configApp="showConfigPanel"
+						@importApp="showContainerPanel"
+						@updateState="getList"></app-card>
+				</div>
+			</div>
+		</template>
+
+		<!-- Favorites (beta dashboard): the apps pinned from a card's menu, above the whole list -->
+		<template v-if="compact && favoriteApps.length > 0">
+			<div class="is-flex is-align-items-center mb-4">
+				<app-section-title-tip id="appTitleFavorites"
+					class="is-flex-grow-1 has-text-sub-04"
+					label="Pinned apps."
+					title="Favorites">
+				</app-section-title-tip>
+			</div>
+			<!-- dragged among themselves only: the group keeps a favorite out of the main grid -->
+			<draggable :draggable="draggable"
+				:model-value="favoriteApps"
+				v-bind="favoriteDragOptions"
+				class="app-list is-compact is-tiles contextmenu-canvas mb-5"
+				item-key="name"
+				tag="div"
+				@update:model-value="reorderFavorites">
+				<template #item="{ element: item }">
+					<div :id="`favorite-${item.name}`" class="handle">
+						<app-card :favorite="true"
+							:item="item"
+							:memory="memory[item.name] || 0"
+							compact
+							@configApp="showConfigPanel"
+							@importApp="showContainerPanel"
+							@toggleFavorite="toggleFavorite"
+							@updateState="getList"></app-card>
+					</div>
+				</template>
+			</draggable>
+		</template>
+
 		<!-- Title Bar Start -->
 		<div class="is-flex is-align-items-center mb-4">
 			<app-section-title-tip id="appTitle1"
@@ -7,6 +59,18 @@
 				label="Drag icons to sort."
 				title="Apps">
 			</app-section-title-tip>
+
+			<!-- beta dashboard: which apps to show; the order can only be changed on the whole list -->
+			<div v-if="compact" class="filters mr-3" role="group">
+				<button v-for="option in filterOptions"
+					:key="option.id"
+					:class="{ 'is-active': filter === option.id }"
+					class="filter-chip"
+					type="button"
+					@click="filter = option.id">
+					{{ option.label }} <span class="filter-count">{{ option.count }}</span>
+				</button>
+			</div>
 
 			<b-dropdown animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
 				<template #trigger>
@@ -43,6 +107,7 @@
 			v-model="gridList"
 			:draggable="draggable"
 			:move="checkMove"
+			:class="{ 'is-compact': compact }"
 			class="app-list contextmenu-canvas"
 			item-key="name"
 			tag="div"
@@ -53,7 +118,8 @@
 			<template #item="{ element: item }">
 				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
-					<app-card v-else :item="item"
+					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item" :memory="memory[item.name] || 0"
+						@toggleFavorite="toggleFavorite"
 						@configApp="showConfigPanel"
 						@importApp="showContainerPanel"
 						@updateState="getList"></app-card>
@@ -61,7 +127,7 @@
 			</template>
 			<!-- App Icon Card End -->
 		</draggable>
-		<div v-else class="app-list contextmenu-canvas">
+		<div v-else :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas">
 			<div v-for="index in skCount" :id="`app-${index}`" :key="`app-${index}`" class="handle">
 				<app-card-skeleton :index="index"></app-card-skeleton>
 			</div>
@@ -81,9 +147,9 @@
 					</app-section-title-tip>
 				</div>
 
-				<div class="app-list contextmenu-canvas">
+				<div :class="{ 'is-compact': compact }" class="app-list contextmenu-canvas">
 					<div v-for="item in group.items" :id="`app-${item.name}`" :key="`app-${item.name}`" class="handle">
-						<app-card :is-casa="false"
+						<app-card :compact="compact" :is-casa="false"
 							:item="item"
 							@configApp="showConfigPanel"
 							@importApp="showContainerPanel"
@@ -102,6 +168,7 @@ import xor from 'lodash/xor'
 import concat from 'lodash/concat'
 import last from 'lodash/last'
 import isEqual from 'lodash/isEqual'
+import escape from 'lodash/escape'
 import { groupLegacyApps } from './legacyApps'
 import AppCard from './AppCard.vue'
 import AppCardSkeleton from './AppCardSkeleton.vue'
@@ -112,6 +179,11 @@ import GitAppModal from '@/components/Apps/GitAppModal.vue'
 import { withoutContainer } from '@/components/Apps/gitApps'
 import { APP_STORE_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import { STATS_APP_NAME } from '@/components/Stats/entry'
+import { createPoller } from '@/components/Stats/poller'
+import { refresh as refreshBackupStatus } from '@/service/backupStatus'
+import { memoryByApp } from '@/components/Apps/appMemory'
+import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
+import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -119,6 +191,7 @@ import events from '@/events/events'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { ice_i18n } from '@/mixins/base/common-i18n'
+import { openPage } from '@/router/pageTabs'
 
 // Syncthing in the app store: the old store numbered its apps, the v2 one names
 // them, and asking it for 74 is a 404
@@ -158,10 +231,35 @@ const builtInApplications = [
 	},
 ]
 
+const isSystemApp = app => app.app_type === 'system'
+
+// a tile per VM right after the Virtual Machines card, in whichever list has that card
+function withVmTiles(apps, vms) {
+	const at = apps.findIndex(app => app.name === VM_APP_NAME)
+	if (at < 0 || !vms.length) {
+		return apps
+	}
+	const tiles = vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
+	return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
+}
+
+// the compact grid's filters; a link app has no state to be running or stopped in
+const FILTERS = {
+	all: () => true,
+	running: app => app.status === 'running',
+	stopped: app => app.status !== 'running' && app.app_type !== 'LinkApp',
+	updates: app => Boolean(app.update_available),
+}
+
 const orderConfig = 'app_order'
+// the names pinned in the compact grid, in the order they were pinned
+const favoritesConfig = 'app_favorites'
 
 // how often the VM tiles read the VMs again, while the tab is shown
 const VM_POLL_MS = 5000
+
+// how often the compact cards read the memory of the apps; the daemon is read twice for it
+const MEMORY_POLL_MS = 30000
 // how long a read of the VMs may take before it counts as failed
 const VM_LIST_MS = 15000
 // failed reads in a row after which the tiles go
@@ -196,6 +294,18 @@ export default {
 			openAppStore: this.showInstall,
 		}
 	},
+	props: {
+		// beta dashboard: Files and the App Store in their own row above the grid
+		systemFirst: {
+			type: Boolean,
+			default: false,
+		},
+		// beta dashboard: one row per app (icon, name, state) and a filter by state
+		compact: {
+			type: Boolean,
+			default: false,
+		},
+	},
 	data() {
 		return {
 			user_id: localStorage.getItem('user_id'),
@@ -214,11 +324,18 @@ export default {
 			gridMissing: false,
 			// the order last read or saved: what saving keeps for apps not shown
 			savedOrder: [],
+			// the cards whose probe has not answered yet: a save keeps their place
+			cardsProbing: [],
 			skCount: 0,
 			ListRefreshTimer: null,
 			isCheckingImages: false,
 			// the VMs of the tiles, by title
 			vms: [],
+			// compact grid: 'all' | 'running' | 'stopped' | 'updates'
+			filter: 'all',
+			favorites: [],
+			// compact grid: the bytes each app's containers use, by app name
+			memory: {},
 		}
 	},
 	computed: {
@@ -226,7 +343,8 @@ export default {
 			return {
 				animation: 300,
 				group: 'description',
-				disabled: false,
+				// a filtered grid lacks apps: dragging in it would save an order without them
+				disabled: this.filter !== 'all',
 				ghostClass: 'ghost',
 				// on a touch screen a swipe scrolls the grid: only a long press starts a drag; a mouse drags at once
 				delay: 300,
@@ -241,18 +359,44 @@ export default {
 		// Machines card. The tiles are not apps: what is dragged comes back here
 		// without them, so the saved order never has them, and they go back after
 		// their card.
+		// With the System row (beta dashboard) the built-ins leave the grid the same
+		// way: appList, and so the saved order, keeps them first. The tiles follow
+		// their card into that row (systemApps).
 		gridList: {
 			get() {
-				const at = this.appList.findIndex(app => app.name === VM_APP_NAME)
-				if (at < 0 || !this.vms.length) {
-					return this.appList
+				const apps = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
+				if (this.filter !== 'all') {
+					return apps.filter(FILTERS[this.filter])
 				}
-				const tiles = this.vms.map(vm => ({ name: `vm-tile:${vm.id}`, vmTile: true, vm }))
-				return [...this.appList.slice(0, at + 1), ...tiles, ...this.appList.slice(at + 1)]
+				return withVmTiles(apps, this.vms)
 			},
 			set(list) {
-				this.appList = list.filter(item => !item.vmTile)
+				if (this.filter !== 'all') {
+					return
+				}
+				const system = this.systemFirst ? this.appList.filter(isSystemApp) : []
+				this.appList = concat(system, list.filter(item => !item.vmTile))
 			},
+		},
+		// the System row as drawn: the Virtual Machines card is there, so its tiles are too
+		systemApps() {
+			return this.systemFirst ? withVmTiles(this.appList.filter(isSystemApp), this.vms) : []
+		},
+		// a pinned app that is gone (uninstalled) is skipped, and forgotten at the next pin
+		favoriteApps() {
+			return this.favorites.map(name => this.appList.find(app => app.name === name && !isSystemApp(app))).filter(Boolean)
+		},
+		favoriteDragOptions() {
+			return { ...this.dragOptions, group: 'favorites', disabled: false }
+		},
+		filterOptions() {
+			const apps = this.appList.filter(app => !isSystemApp(app))
+			const labels = { all: 'All', running: 'Running', stopped: 'Stopped', updates: 'Updates' }
+			return Object.keys(FILTERS).map(id => ({
+				id,
+				label: this.$t(labels[id]),
+				count: apps.filter(FILTERS[id]).length,
+			}))
 		},
 		hasVmCard() {
 			return this.appList.some(app => app.name === VM_APP_NAME)
@@ -281,6 +425,9 @@ export default {
 		},
 	},
 	created() {
+		if (this.compact) {
+			this.loadFavorites()
+		}
 		this.getList()
 		this.draggable = this.isMobile() ? '' : '.handle'
 		this.$EventBus.$on(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING, () => {
@@ -292,9 +439,12 @@ export default {
 		})
 
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$on(events.FLEET_CHANGED, this.syncFleetCard)
 
 		this.ListRefreshTimer = setInterval(() => {
 			this.getList()
+			// the tiles' backup badges: the service reads at most once a minute, whoever asks
+			refreshBackupStatus()
 		}, 5000)
 
 		// the VM tiles' polling: plain fields, not data, as nothing is drawn from them
@@ -304,16 +454,30 @@ export default {
 		this.vmFailures = 0
 		document.addEventListener('visibilitychange', this.onVisibility)
 		this.pollVms()
+
+		if (this.compact) {
+			// silent on failure: a card without its memory is a card all the same
+			this.memoryPoller = createPoller({
+				intervalMs: MEMORY_POLL_MS,
+				// the service client brings the router and the store with it: loaded when the poll runs
+				run: () => import('@/service/stats').then(({ statsApi }) => statsApi.list('app_management')).then((raw) => {
+					this.memory = memoryByApp(raw)
+				}),
+			})
+			this.memoryPoller.start()
+		}
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$off(events.FLEET_CHANGED, this.syncFleetCard)
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
 
 		this.vmPollStopped = true
 		clearTimeout(this.vmPollTimer)
+		this.memoryPoller?.stop()
 		document.removeEventListener('visibilitychange', this.onVisibility)
 	},
 	mounted() {
@@ -321,6 +485,50 @@ export default {
 		this.getSkCount()
 	},
 	methods: {
+		// silent on failure: no favorites is a fine state, and the grid shows all the same
+		loadFavorites() {
+			this.$api.users.getCustomStorage(favoritesConfig)
+				.then((res) => {
+					this.favorites = res.data.data.data || []
+				})
+				.catch(() => {})
+		},
+
+		// the new order of the pinned apps, as the drag leaves it
+		reorderFavorites(apps) {
+			this.favorites = apps.map(app => app.name)
+			this.$api.users.setCustomStorage(favoritesConfig, { data: this.favorites })
+		},
+
+		isFavorite(app) {
+			return this.favorites.includes(app.name)
+		},
+
+		toggleFavorite(app) {
+			const names = this.isFavorite(app) ? this.favorites.filter(name => name !== app.name) : [...this.favorites, app.name]
+			// the names of apps no longer there go with the change
+			const known = new Set(this.appList.map(item => item.name))
+			this.favorites = names.filter(name => known.has(name))
+			this.$api.users.setCustomStorage(favoritesConfig, { data: this.favorites })
+		},
+
+		// the second line of a system card (beta dashboard): what is worth knowing at a glance
+		systemSubtitle(app) {
+			const updates = this.appList.filter(item => item.update_available).length
+			switch (app.name) {
+				case 'App Store':
+					return updates > 0 ? this.$t('Updates: {count}', { count: updates }) : this.$t('App catalogue')
+				case 'Files':
+					return this.$t('Your files')
+				case STATS_APP_NAME:
+					return this.$t('CPU, memory, disks')
+				case VM_APP_NAME:
+					return this.vms.length > 0 ? this.$t('VMs: {count}', { count: this.vms.length }) : this.$t('Virtual Machines')
+				default:
+					return ''
+			}
+		},
+
 		/**
 		 * @description: Ask every app's registry whether its image has moved, then
 		 * reload the grid so the badges reflect the answer. One network round trip
@@ -372,10 +580,10 @@ export default {
 
 				for (const toast of imageUpdateSummary(result)) {
 					this.$buefy.toast.open({
-						message: this.$t(toast.message, toast.params),
+						message: escape(this.$t(toast.message, toast.params)),
 						type: toast.type,
 						// a toast that names apps and reasons needs longer than an acknowledgement
-						...(toast.duration ? { duration: toast.duration } : {}),
+						duration: toast.duration || undefined, // undefined is Buefy's own length
 					})
 				}
 			} catch (error) {
@@ -458,8 +666,14 @@ export default {
 				// list read again keeps the card it already shows.
 				const hasVmCard = this.appList.some(app => app.name === VM_APP_NAME)
 				const vmApps = hasVmCard ? [vmApplication()] : []
+				// the Fleet card the same way, where the core says this box is a master
+				const hasFleetCard = this.appList.some(app => app.name === FLEET_APP_NAME)
+				const fleetApps = hasFleetCard ? [fleetApplication()] : []
+				// the Logs card the same way, where AppManagement keeps logs
+				const hasLogsCard = this.appList.some(app => app.name === LOGS_APP_NAME)
+				const logsApps = hasLogsCard ? [logsApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, vmApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(builtInApplications, vmApps, fleetApps, logsApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -471,11 +685,17 @@ export default {
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				if (!hasVmCard) {
 					this.addVmCardWhenThere(lateSortList)
+				}
+				if (!hasFleetCard) {
+					this.addFleetCardWhenThere(lateSortList)
+				}
+				if (!hasLogsCard) {
+					this.addLogsCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -550,9 +770,55 @@ export default {
 			})
 		},
 
+		// This box became, or stopped being, a master: ask the core again, then add
+		// the Fleet card or take it away, without the page being reloaded.
+		syncFleetCard() {
+			forgetFleet()
+			return hasFleet().then((available) => {
+				const has = this.appList.some(app => app.name === FLEET_APP_NAME)
+				if (available && !has) {
+					this.appList = this.sortApps(concat(this.appList, fleetApplication()), [])
+				} else if (!available && has) {
+					this.appList = this.appList.filter(app => app.name !== FLEET_APP_NAME)
+				}
+			})
+		},
+
+		// Runs a card's probe; until it answers, a save keeps the card's saved place.
+		probeCard(name, probe) {
+			this.cardsProbing.push(name)
+			return probe().finally(() => {
+				this.cardsProbing.splice(this.cardsProbing.indexOf(name), 1)
+			})
+		},
+
+		// Adds the Fleet card at its saved place once the core says master.
+		addFleetCardWhenThere(savedOrder) {
+			return this.probeCard(FLEET_APP_NAME, hasFleet).then((available) => {
+				if (available && !this.appList.some(app => app.name === FLEET_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, fleetApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(FLEET_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
+		},
+
+		// Adds the Logs card at its saved place once AppManagement says it keeps logs.
+		addLogsCardWhenThere(savedOrder) {
+			return this.probeCard(LOGS_APP_NAME, hasLogs).then((available) => {
+				if (available && !this.appList.some(app => app.name === LOGS_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, logsApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(LOGS_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
+		},
+
 		// a save while the grid's apps are missing keeps them (saveSortData, gridMissing)
 		addVmCardWhenThere(savedOrder) {
-			return hasVirtualMachines().then((available) => {
+			return this.probeCard(VM_APP_NAME, hasVirtualMachines).then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, vmApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
@@ -612,6 +878,7 @@ export default {
 		},
 
 		onVisibility() {
+			this.memoryPoller?.visibilityChanged()
 			if (document.hidden) {
 				clearTimeout(this.vmPollTimer)
 				return
@@ -625,15 +892,16 @@ export default {
 		 * @return {*}
 		 */
 		saveSortData() {
-			let newList = this.appList.map((item) => {
+			const shown = this.appList.map((item) => {
 				// compose milestone :: name is unique, global index.
 				return item.name
 			})
-			// the grid's apps are not shown (a drag while the grid fails): they keep
-			// their saved place, behind the app saved before them
-			if (this.gridMissing) {
-				newList = keepUnshown(newList, this.savedOrder || [])
-			}
+			// apps not shown keep their saved place, behind the app saved before them:
+			// the grid's apps while the grid fails (a drag meanwhile), and a card whose
+			// probe has not answered yet (another card's probe answered first)
+			const probing = this.cardsProbing || []
+			const kept = (this.savedOrder || []).filter(name => this.gridMissing || shown.includes(name) || probing.includes(name))
+			const newList = keepUnshown(shown, kept)
 			this.savedOrder = newList
 			const data = {
 				data: newList,
@@ -660,8 +928,7 @@ export default {
 			} else if (builtinOpensInNewTab(APP_STORE_LAUNCH_ID, this.$store.state)) {
 				// the store follows the App launching setting; a custom install is a
 				// form, and stays here
-				const query = storeId ? `?store=${storeId}` : ''
-				window.open(`${window.location.pathname}#/appstore${query}`, '_blank')
+				openPage('appstore', { store: storeId })
 				return
 			}
 			this.isShowing = true
@@ -826,7 +1093,7 @@ export default {
 		messageBusToast(message, type) {
 			const duration = 5000
 			this.$buefy.toast.open({
-				message,
+				message: escape(message),
 				duration,
 				type,
 			})
@@ -886,10 +1153,10 @@ export default {
 				this.addIdToSessionStorage(data.Properties['app:name'])
 
 				this.$buefy.toast.open({
-					message: this.$t(`{name} has been updated to the latest version!`, {
+					message: escape(this.$t(`{name} has been updated to the latest version!`, {
 						// the publisher sends app:name; there has never been a `name`
 						name: data.Properties['app:name'],
-					}),
+					})),
 					type: 'is-success',
 				})
 				this.getList().then(() => {
@@ -919,6 +1186,78 @@ export default {
 
 	@include fullhd {
 		grid-template-columns: repeat(5, minmax(0, 1fr));
+	}
+
+	// beta dashboard: as many rows' worth of columns as fit
+	&.is-compact {
+		grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+		gap: 0.75rem;
+	}
+
+	// the system and favorite apps of the beta dashboard on a phone: tiles of three, icon over name, as the proposal draws them
+	&.is-tiles {
+		@include touch {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.625rem;
+
+			:deep(.app-card.is-compact) {
+				.img-c {
+					flex-direction: column !important;
+					justify-content: center !important;
+					padding: 0.75rem 0.375rem !important;
+					text-align: center;
+					gap: 0.5rem;
+				}
+
+				.app-text {
+					width: 100%;
+					text-align: center;
+
+					// the title and its backup badge, centred like the rest of the tile
+					.title-row {
+						justify-content: center;
+					}
+				}
+
+				.app-state {
+					font-size: 0.625rem;
+				}
+
+				.action-btn {
+					top: 0.25rem;
+					right: 0.125rem;
+					transform: none;
+				}
+			}
+		}
+	}
+}
+
+.filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+}
+
+.filter-chip {
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 999px;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.75rem;
+	line-height: 1.25rem;
+	padding: 0.125rem 0.625rem;
+
+	&.is-active {
+		background: rgba(255, 255, 255, 0.9);
+		border-color: transparent;
+		color: #1a1f24;
+	}
+
+	.filter-count {
+		opacity: 0.7;
 	}
 }
 </style>

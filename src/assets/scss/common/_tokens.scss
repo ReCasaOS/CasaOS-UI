@@ -17,6 +17,7 @@
 	// Light chrome: the top bar, modals, dropdowns, panels, toasts.
 	--casa-surface: #{$white};
 	--casa-surface-raised: #{$white}; // popovers over a modal, toasts, snackbars
+	--casa-surface-card: #f8f8f8; // a block inside a window: a destination, a schedule, a settings group
 	--casa-surface-sunken: #f8f8f8; // nav strips, upload zones, tag boxes
 	--casa-surface-disabled: hsl(0, 0%, 96%); // a control switched off: the add-source row of the app store
 	--casa-surface-translucent: rgba(255, 255, 255, 0.8); // file browser drag mask
@@ -105,6 +106,7 @@
 html[data-theme='dark'] {
 	--casa-surface: #1f2023;
 	--casa-surface-raised: #2a2b2f;
+	--casa-surface-card: #2a2b2f;
 	--casa-surface-sunken: #17181a;
 	--casa-surface-disabled: #242424;
 	--casa-surface-translucent: rgba(31, 32, 35, 0.8);

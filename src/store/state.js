@@ -1,4 +1,5 @@
 import { readAppLaunchPreference } from '@/mixins/app/appLaunchPreference'
+import { cachedLoginStyle } from '@/views/loginStyle'
 
 const appLaunch = readAppLaunchPreference()
 
@@ -37,6 +38,8 @@ const state = {
 
 	siteLoading: true,
 	needInitialization: false,
+	// the login page the box shows: GET /v1/users/status says it, this browser the last answer
+	loginStyle: cachedLoginStyle(),
 	hardwareInfo: {},
 	isMobile: false,
 
@@ -52,7 +55,7 @@ const state = {
 	},
 
 	// Samba and nfs data
-	networkStorage: JSON.parse(localStorage.getItem('networkStorage')) || [],
+	networkStorage: (typeof localStorage !== 'undefined' && JSON.parse(localStorage.getItem('networkStorage'))) || [],
 
 	// shortcut data
 	shortcutData: [],

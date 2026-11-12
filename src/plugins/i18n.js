@@ -9,7 +9,7 @@ import messages from '@/assets/lang'
 // dialog's checkbox that way) — do not "fix" those by escaping them.
 export default createI18n({
 	legacy: true,
-	locale: localStorage.getItem('lang') || 'en_us',
+	locale: (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'en_us',
 	fallbackLocale: 'en_us',
 	silentTranslationWarn: true,
 	silentFallbackWarn: true,
