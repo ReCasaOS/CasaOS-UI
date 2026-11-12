@@ -269,3 +269,46 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+// six blocks in two columns, each a small card with its "Same as the box" tick in the head; Save under them
+.guard-policy-form {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.625rem;
+
+	> .message,
+	> .button {
+		grid-column: 1 / -1;
+	}
+
+	> .button {
+		justify-self: end;
+	}
+
+	> section {
+		margin-bottom: 0 !important;
+		padding: 0.75rem 0.875rem;
+		border: 1px solid var(--casa-divider-soft);
+		border-radius: 0.75rem;
+		background: var(--casa-hover-tint);
+
+		> div:first-child {
+			margin-bottom: 0.5rem !important;
+
+			h4 {
+				flex: 1;
+				font-size: 0.8125rem;
+			}
+
+			.checkbox {
+				color: var(--casa-text-hint);
+			}
+		}
+	}
+
+	@media (max-width: 768px) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+</style>

@@ -37,10 +37,10 @@
 					</thead>
 					<tbody>
 						<tr v-for="(e, i) in page" :key="`${e.time}-${e.key}-${i}`">
-							<td>{{ when(e.time) }}</td><td>{{ e.ip }}</td><td><country-flag :cc="e.country" />{{ place(e.country) }}</td><td>{{ network(e) }}</td>
+							<td>{{ when(e.time) }}</td><td class="_ip">{{ e.ip }}</td><td><country-flag :cc="e.country" />{{ place(e.country) }}</td><td>{{ network(e) }}</td>
 							<td v-if="!app">{{ e.app }}</td><td>{{ e.path }}</td>
 							<td>{{ reasonText(e, $t, locale) }}</td>
-							<td>{{ actionText(e.action, $t) }}<span v-if="e.count > 1" class="ml-1">×{{ e.count }}</span></td>
+							<td><span :class="`is-${e.action}`" class="_act">{{ actionText(e.action, $t) }}<span v-if="e.count > 1" class="ml-1">×{{ e.count }}</span></span></td>
 							<td>
 								<b-button v-if="e.reason === 'waf' && canStop(e)" class="stop-rule" size="is-small" type="is-text" :disabled="busy" @click="stopRule(e)">{{ $t('Stop applying this rule to {app}', { app: e.app }) }}</b-button>
 							</td>
@@ -56,7 +56,7 @@
 					</thead>
 					<tbody>
 						<tr v-for="b in page" :key="b.key">
-							<td>{{ b.ip }}</td><td><country-flag :cc="b.country" />{{ place(b.country) }}</td><td>{{ network(b) }}</td><td>{{ b.app }}</td>
+							<td class="_ip">{{ b.ip }}</td><td><country-flag :cc="b.country" />{{ place(b.country) }}</td><td>{{ network(b) }}</td><td>{{ b.app }}</td>
 							<td>{{ reasonLabel(b.reason) }}</td><td>{{ when(b.since) }}</td><td>{{ when(b.until) }}</td>
 							<td class="has-text-right">
 								<b-button class="unban" size="is-small" :disabled="busy" @click="unban(b)">{{ $t('Unban') }}</b-button>
@@ -229,3 +229,68 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+.guard-journal {
+	.table-container {
+		border-radius: 0.625rem;
+		border: 1px solid var(--casa-divider-soft);
+	}
+
+	.table {
+		background: transparent;
+		color: inherit;
+
+		th {
+			border: 0;
+			color: var(--casa-text-hint);
+			font-size: 0.75rem;
+			font-weight: 600;
+			white-space: nowrap;
+		}
+
+		td {
+			border-color: var(--casa-divider-soft);
+			vertical-align: middle;
+		}
+	}
+
+	// what was done with the request, in a chip the colour of its weight
+	._act {
+		display: inline-flex;
+		align-items: center;
+		height: 1.25rem;
+		padding: 0 0.5rem;
+		border-radius: 0.625rem;
+		background: var(--casa-hover-tint);
+		font-size: 0.7rem;
+		font-weight: 600;
+		white-space: nowrap;
+
+		&.is-blocked {
+			background: rgba($warning, 0.18);
+			color: $warning;
+		}
+
+		&.is-banned {
+			background: rgba($danger, 0.16);
+			color: $danger;
+		}
+	}
+
+	._ip {
+		font-family: ui-monospace, sfmono-regular, menlo, consolas, monospace;
+		white-space: nowrap;
+	}
+
+	// a phone keeps the date, the address, the country, the reason and the action
+	@media (max-width: 768px) {
+		.guard-events th:nth-child(4),
+		.guard-events td:nth-child(4),
+		.guard-events th:nth-child(6),
+		.guard-events td:nth-child(6) {
+			display: none;
+		}
+	}
+}
+</style>
