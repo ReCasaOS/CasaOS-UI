@@ -3430,5 +3430,8 @@
   "Use the settings of the box?": "Use the settings of the box?",
   "The own settings of this app are dropped.": "The own settings of this app are dropped.",
   "Use the box": "Use the box",
-  "Only people with an access code get in.": "Only people with an access code get in."
+  "Only people with an access code get in.": "Only people with an access code get in.",
+  "Protection settings of shared apps were reset: every shared app asks for a code, people must be added again": "Protection settings of shared apps were reset: every shared app asks for a code, people must be added again",
+  "{app}: {n} addresses banned in 10 minutes": "{app}: {n} addresses banned in 10 minutes",
+  "Country filtering of shared apps is not working": "Country filtering of shared apps is not working"
 }

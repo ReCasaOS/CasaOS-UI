@@ -118,7 +118,7 @@ export function fleetPanel(status) {
 const FLEET_GONE_MS = 10 * 60 * 1000
 
 // `mounts` are the mounts df cannot read (GET /v1/disks/unreadable), an empty mount point when df itself hangs.
-export function attentionItems({ health, snapraid, backup, fleet, mounts }, t, now = Date.now()) {
+export function attentionItems({ health, snapraid, backup, fleet, mounts, guard }, t, now = Date.now()) {
 	const items = []
 	if (health === 'failed') {
 		items.push({ key: 'disk', level: 'danger', text: t('The system drive reports a failure') })
@@ -140,7 +140,30 @@ export function attentionItems({ health, snapraid, backup, fleet, mounts }, t, n
 			items.push({ key: `fleet_${box.key}`, level: 'warning', text: t('The box {name} is offline', { name: box.name }) })
 		}
 	}
+	items.push(...guardItems(guard, t))
 	return items.sort((a, b) => (a.level === 'danger' ? 0 : 1) - (b.level === 'danger' ? 0 : 1))
+}
+
+// `guard` is the view of GET /v1/share/guard, null on a core without it. `apps` lists the shared apps only:
+// a wave on an app that is not shared any more is history.
+function guardItems(guard, t) {
+	if (!guard) {
+		return []
+	}
+	const items = []
+	if (guard.reset) {
+		items.push({ key: 'share-reset', level: 'danger', text: t('Protection settings of shared apps were reset: every shared app asks for a code, people must be added again') })
+	}
+	for (const { app, bans } of guard.waves || []) {
+		if (!guard.apps || Object.hasOwn(guard.apps, app)) {
+			items.push({ key: `share-wave-${app}`, level: 'danger', text: t('{app}: {n} addresses banned in 10 minutes', { app, n: bans }) })
+		}
+	}
+	const filters = Object.values(guard.apps || {}).some(app => app.effective?.countries?.mode && app.effective.countries.mode !== 'none')
+	if (guard.protection && filters && guard.geo?.country === false) {
+		items.push({ key: 'share-geo', level: 'warning', text: t('Country filtering of shared apps is not working') })
+	}
+	return items
 }
 
 // The Storage panel's rows of the ZFS pools (GET /v1/disks/zfs): their disks hold no mounted volume, so

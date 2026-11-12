@@ -161,6 +161,7 @@ import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { attentionItems, backupTile, cpuFrequency, cpuWatts, diskRows, fleetPanel, netSpeed, percent, snapraidTile, usbPercent, zfsPoolRows } from '@/components/dashboard/healthTiles'
+import { refreshGuard, shareGuard } from '@/service/shareGuard'
 import { zfsTag } from '@/components/Storage/zfs'
 import { DUE_GRACE, backupRunning, backupSubject, durationText, longestRun, nextOfAll, whenOf } from '@/components/settings/backupScheduleGroups.js'
 import { liveFigures, liveTitle } from '@/components/backup/liveBackup.js'
@@ -229,7 +230,7 @@ export default {
 			return this.destinations.includes(this.backup.destination) ? this.backup.destination : (this.destinations[0] || '')
 		},
 		attention() {
-			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState, mounts: this.unreadableMounts }, this.translate)
+			return attentionItems({ health: this.health, snapraid: this.snapraidState, backup: this.backup, fleet: this.fleetState, mounts: this.unreadableMounts, guard: shareGuard.view }, this.translate)
 		},
 		// the chips of the heads: what each card says before it is read. The attention list is worst first.
 		attentionChip() {
@@ -501,6 +502,8 @@ export default {
 				this.openBackups()
 			} else if (item.key.startsWith('fleet_')) {
 				this.openFleetPage()
+			} else if (item.key.startsWith('share-')) {
+				this.openRemoteAccess()
 			} else {
 				this.openStorage()
 			}
@@ -511,6 +514,20 @@ export default {
 			const panel = this.$refs.attentionPanel
 			panel.scrollIntoView({ behavior: 'smooth', block: 'center' })
 			panel.focus({ preventScroll: true })
+		},
+
+		// the window where the shared apps are protected, as the app's sharing window opens it
+		openRemoteAccess() {
+			return import('@/components/settings/RemoteAccessModal.vue').then(({ default: RemoteAccessModal }) => {
+				this.$buefy.modal.open({
+					component: RemoteAccessModal,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: ['escape'],
+					scroll: 'keep',
+					animation: 'zoom-in',
+				})
+			})
 		},
 
 		openFleetPage() {
@@ -681,6 +698,8 @@ export default {
 			} catch {
 				this.fleetState = null
 			}
+			// a core without the route leaves the store empty: no item
+			await refreshGuard()
 		},
 	},
 	sockets: {

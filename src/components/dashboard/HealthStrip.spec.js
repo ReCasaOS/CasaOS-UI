@@ -3,8 +3,15 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HealthStrip from './HealthStrip.vue'
 import { openFleet } from '@/components/Fleet/entry'
+import { refreshGuard, shareGuard } from '@/service/shareGuard'
 
 vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
+// the store the strip reads, and the read it asks for once a minute
+vi.mock('@/service/shareGuard', async () => {
+	const { reactive } = await import('vue')
+	return { shareGuard: reactive({ view: null, ok: false }), refreshGuard: vi.fn(() => Promise.resolve()) }
+})
+vi.mock('@/components/settings/RemoteAccessModal.vue', () => ({ default: { name: 'RemoteAccessModal', render: () => null } }))
 
 const hardwareInfo = {
 	cpu: { percent: 12.4, temperature: 46, num: 4 },
@@ -547,6 +554,35 @@ describe('health strip opens the dialogs behind its panels', () => {
 		await wrapper.find('.attention .attention-item').trigger('click')
 
 		expect(open).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('health strip and the protection of shared apps', () => {
+	afterEach(() => {
+		shareGuard.view = null
+	})
+
+	it('reads the guard with its other sources and lists a wave and a reset, which open the Remote access window', async () => {
+		shareGuard.view = { reset: true, apps: { jellyfin: { effective: { countries: { mode: 'none' } } } }, waves: [{ app: 'jellyfin', bans: 23 }] }
+		const open = vi.fn()
+		const wrapper = strip({ buefy: { modal: { open } } })
+		await settle()
+
+		expect(refreshGuard).toHaveBeenCalled()
+		const rows = wrapper.findAll('.attention .attention-item')
+		expect(rows.map(row => row.text())).toEqual([expect.stringContaining('were reset'), 'jellyfin: 23 addresses banned in 10 minutes'])
+
+		await rows[1].trigger('click')
+		await settle()
+
+		expect(open).toHaveBeenCalledWith(expect.objectContaining({ hasModalCard: true, component: expect.objectContaining({ name: 'RemoteAccessModal' }) }))
+	})
+
+	it('lists nothing on a core without the route', async () => {
+		const wrapper = strip()
+		await settle()
+
+		expect(wrapper.findAll('.attention .attention-item')).toHaveLength(0)
 	})
 })
 

@@ -3432,5 +3432,8 @@
   "Use the settings of the box?": "Reprendre les réglages de la box ?",
   "The own settings of this app are dropped.": "Les réglages propres de cette app sont supprimés.",
   "Use the box": "Reprendre ceux de la box",
-  "Only people with an access code get in.": "Seules les personnes ayant un code d'accès entrent."
+  "Only people with an access code get in.": "Seules les personnes ayant un code d'accès entrent.",
+  "Protection settings of shared apps were reset: every shared app asks for a code, people must be added again": "Les réglages de protection des apps partagées ont été réinitialisés : chaque app partagée demande un code, il faut rajouter les personnes",
+  "{app}: {n} addresses banned in 10 minutes": "{app} : {n} adresses bannies en 10 minutes",
+  "Country filtering of shared apps is not working": "Le filtrage par pays des apps partagées ne fonctionne pas"
 }

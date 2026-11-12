@@ -120,11 +120,13 @@ const CORE_GETS = {
 const CUSTOM = /^\/v1\/users\/current\/custom\/([^/]+)$/
 const ONE_VM = /^\/v2\/virt_management\/vms\/([^/]+)$/
 
-export function newGridState() {
+// `demo`: a box already sharing jellyfin and nextcloud (the dev server's); the specs start from a box that shares nothing
+export function newGridState(demo = false) {
 	return {
 		custom: new Map(),
 		images: [{ path: `${ISO_FOLDER}/alpine-virt-3.20.iso`, name: 'alpine-virt-3.20.iso', kind: 'iso', size_bytes: 64 * 1048576 }],
-		share: { name: '', apps: new Set() },
+		share: demo ? { name: 'mybox', apps: new Set(['jellyfin', 'nextcloud']) } : { name: '', apps: new Set() },
+		guard: demoGuard(),
 	}
 }
 
@@ -157,7 +159,154 @@ function shareStatus({ name, apps }) {
 
 const shareRefused = message => ({ status: 400, body: { success: 400, message } })
 
-function share(verb, path, body, state) {
+// /v1/share/guard with the contract's example data: protection on, one box policy, jellyfin behind a code with its own
+// settings, nextcloud open, one person, one wave. The state lives in memory; `apps` follows what is shared.
+const ago = minutes => new Date(Date.now() - minutes * 60000).toISOString()
+
+function demoGuard() {
+	return {
+		protection: true,
+		reset: false,
+		box: {
+			waf: 'block',
+			rules_off: [],
+			allow: [],
+			block: [],
+			countries: { mode: 'none', list: [] },
+			rate_per_min: 600,
+			ban: { waf_hits: 10, waf_window_s: 600, scan_404: 100, scan_window_s: 60, rate_strikes: 3, rate_window_s: 600, code_fails: 5, code_window_s: 600 },
+		},
+		access: {
+			jellyfin: { access: 'code', override: { waf: 'observe', rules_off: [942100], allow: [], block: [], countries: null, rate_per_min: null, ban: null } },
+			nextcloud: { access: 'open', override: null },
+		},
+		people: [{ id: 'p_7f3a', name: 'Maman', apps: ['jellyfin'], created_at: '2026-11-12T10:00:00Z', last_used_at: ago(10) }],
+		geo: { country: true, asn: true, updated_at: '2026-11-01T03:00:00Z', error: '' },
+		waves: [{ app: 'jellyfin', bans: 23 }],
+		events: [
+			{ time: ago(1), ip: '203.0.113.9', key: '203.0.113.9', country: 'FR', asn: 3215, as_org: 'Orange', app: 'jellyfin', path: '/x', reason: 'waf', rule: 942100, detail: 'SQL Injection Attack Detected via libinjection', action: 'blocked', count: 1 },
+			{ time: ago(3), ip: '198.51.100.7', key: '198.51.100.7', country: 'US', asn: 0, as_org: '', app: 'jellyfin', path: '/wp-login.php', reason: 'scan', action: 'banned', count: 1 },
+			{ time: ago(5), ip: '192.0.2.44', key: '192.0.2.44', country: 'RU', asn: 0, as_org: '', app: 'nextcloud', path: '/', reason: 'country', action: 'blocked', count: 1 },
+		],
+		bans: [
+			{ key: '198.51.100.7', ip: '198.51.100.7', country: 'US', asn: 0, as_org: '', app: 'jellyfin', reason: 'scan', since: ago(3), until: ago(-57), strikes: 1 },
+			{ key: '2001:db8:1:2::/64', ip: '2001:db8:1:2::1', country: 'DE', asn: 0, as_org: '', app: 'jellyfin', reason: 'waf', since: ago(8), until: ago(-52), strikes: 2 },
+		],
+		counter: 0,
+	}
+}
+
+// what the app's own settings change: waf, countries, rate and ban replace the box's value, the lists add to it
+function effective(box, override) {
+	const own = override || {}
+	const out = { ...box }
+	for (const field of ['waf', 'countries', 'rate_per_min', 'ban']) {
+		out[field] = own[field] ?? box[field]
+	}
+	for (const field of ['rules_off', 'allow', 'block']) {
+		out[field] = [...box[field], ...(own[field] || [])]
+	}
+	return out
+}
+
+function guardView({ guard, share }) {
+	const apps = {}
+	for (const name of share.apps) {
+		const { access, override } = guard.access[name] || { access: 'code', override: null }
+		apps[name] = { access, override, effective: effective(guard.box, override) }
+	}
+	return {
+		supported: true,
+		reason: '',
+		reset: guard.reset,
+		protection: guard.protection,
+		box: guard.box,
+		apps,
+		people: guard.people.map(person => ({ ...person, apps: person.apps.filter(app => share.apps.has(app)) })),
+		geo: guard.geo,
+		waves: guard.waves,
+	}
+}
+
+const CODE = 'ABCD-EFGH-JKMN'
+const GUARD_PATH = /^\/v1\/share\/guard(?:\/(protection|box|apps|people|events|bans)(?:\/([^/]+))?(?:\/(code))?)?$/
+
+function guardRoute(verb, path, query, body, state) {
+	const match = path.match(GUARD_PATH)
+	if (!match) {
+		return null
+	}
+	const [, part, id, code] = match
+	const { guard, share } = state
+	const view = () => core(guardView(state))
+	if (!part) {
+		return verb === 'GET' ? view() : null
+	}
+	// any write is a real change: the protection that was reset is not any more
+	if (verb !== 'GET') {
+		guard.reset = false
+	}
+	if (part === 'protection' && verb === 'PUT') {
+		guard.protection = !!body?.on
+		return view()
+	}
+	if (part === 'box' && verb === 'PUT') {
+		guard.box = body
+		return view()
+	}
+	if (part === 'apps' && id && verb === 'PUT') {
+		const name = decodeURIComponent(id)
+		if (!share.apps.has(name)) {
+			return shareRefused('not_shared')
+		}
+		guard.access[name] = { access: body?.access, override: body?.override ?? null }
+		return view()
+	}
+	if (part === 'people' && !id && verb === 'POST') {
+		const bad = (body?.apps || []).find(app => !share.apps.has(app))
+		if (!body?.name || body.name.length > 40) {
+			return shareRefused('bad_name')
+		}
+		if (bad) {
+			return shareRefused(`unknown_app:${bad}`)
+		}
+		const person = { id: `p_${(++guard.counter).toString(16).padStart(4, '0')}`, name: body.name, apps: body.apps || [], created_at: new Date().toISOString() }
+		guard.people.push(person)
+		return core({ person, code: CODE })
+	}
+	const person = id ? guard.people.find(p => p.id === decodeURIComponent(id)) : null
+	if (part === 'people' && id && !person) {
+		return shareRefused('not_found')
+	}
+	if (part === 'people' && id && !code && verb === 'PUT') {
+		Object.assign(person, { name: body?.name || person.name, apps: body?.apps || person.apps })
+		return core(person)
+	}
+	if (part === 'people' && code && verb === 'POST') {
+		return core({ code: CODE })
+	}
+	if (part === 'people' && id && !code && verb === 'DELETE') {
+		guard.people = guard.people.filter(p => p !== person)
+		return { status: 204, body: null }
+	}
+	if (part === 'events' && verb === 'GET') {
+		const rows = guard.events.filter(e => (!query.app || e.app === query.app) && (!query.reason || e.reason === query.reason))
+		return core(rows.slice(0, Number(query.limit) || 200))
+	}
+	if (part === 'bans' && !id && verb === 'GET') {
+		return core(guard.bans)
+	}
+	if (part === 'bans' && id && verb === 'DELETE') {
+		guard.bans = guard.bans.filter(b => b.key !== decodeURIComponent(id))
+		return { status: 204, body: null }
+	}
+	return null
+}
+
+function share(verb, path, query, body, state) {
+	if (path.startsWith('/v1/share/guard')) {
+		return guardRoute(verb, path, query, body, state)
+	}
 	const box = state.share
 	if (path === '/v1/share') {
 		return verb === 'GET' ? shareStatus(box) : null
@@ -240,7 +389,7 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 		return verb === 'PUT' ? upload(query, body, state) : null
 	}
 	if (path.startsWith('/v1/share')) {
-		return share(verb, path, body, state)
+		return share(verb, path, query, body, state)
 	}
 	const custom = path.match(CUSTOM)
 	if (custom) {

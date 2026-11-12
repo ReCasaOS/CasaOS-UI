@@ -7,6 +7,8 @@
 // message bus) goes to that box. Without it, grid.js answers what the home page asks of a box (the virtual machine
 // module, the app grid, the shell's core calls), and every other path answers 404.
 //
+// It also answers /v1/share and /v1/share/guard (a box sharing jellyfin and nextcloud, protection on), state in memory.
+//
 //   GET /__stub/alerts?on=1   puts 2 active alerts on one container (on=0 takes them off)
 import { Buffer } from 'node:buffer'
 import { createServer, request } from 'node:http'
@@ -31,7 +33,7 @@ if (!['real', 'bare'].includes(envelope) || !Number.isInteger(port)) {
 const [upstreamHost, upstreamPort = '80'] = upstream.split(':')
 
 const options = { envelope, alerts: false, down: [], rules: new Map() }
-const grid = newGridState()
+const grid = newGridState(true)
 const UPLOAD = '/v2/virt_management/images/upload'
 const STATS = /^\/v[12]\/(?:sys|app_management|virt_management)\/stats(?:\/|$)/
 
