@@ -477,7 +477,10 @@ export default {
 
 				const remapStorage = (storage) => {
 					const size = Number(storage.size)
-					const used = Number(storage.used)
+					// `used` can be missing or empty (Number('') is 0): fall back to size - avail
+					const hasUsed = storage.used !== undefined && storage.used !== null && storage.used !== '' && Number.isFinite(Number(storage.used))
+					const avail = Number(storage.avail)
+					const used = hasUsed ? Number(storage.used) : (Number.isFinite(avail) ? Math.max(0, size - avail) : NaN)
 					const usePercent = size > 0 && Number.isFinite(used)
 						? Math.min(100, Math.floor(used * 100 / size))
 						: 0
