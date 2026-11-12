@@ -109,6 +109,7 @@ describe('the protection section', () => {
 		await flushPromises()
 		expect(shareGuardApi.setProtection).not.toHaveBeenCalled()
 		expect(wrapper.find('.switch input').element.checked).toBe(false)
+		expect(document.activeElement).toBe(wrapper.find('.switch input').element)
 	})
 
 	it('draws the switch off again when turning protection on fails', async () => {
