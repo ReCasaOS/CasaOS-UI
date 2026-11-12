@@ -130,4 +130,13 @@ describe('the people with an access code', () => {
 		expect(wrapper.text()).toContain('A name is 1 to 40 characters')
 		expect(wrapper.emitted('code')).toBeUndefined()
 	})
+
+	it('reads the people again when a write fails', async () => {
+		shareGuardApi.deletePerson.mockRejectedValue({ response: { status: 500, data: { message: 'x' } } })
+		await show()
+		await button('Delete').trigger('click')
+		await confirm('Delete')
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(1)
+		expect(wrapper.text()).toContain('Something went wrong')
+	})
 })

@@ -33,6 +33,7 @@ import escape from 'lodash/escape'
 import ShareNameForm from './ShareNameForm.vue'
 import { certText, reasonText, shareErrorText, sharedApps, tunnelText } from './shareWords'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
+import { refreshGuard } from '@/service/shareGuard'
 
 export default {
 	name: 'ShareSection',
@@ -77,6 +78,8 @@ export default {
 			this.error = ''
 			try {
 				await apply(call())
+				// an unshared app leaves the people form and the journal filter at once
+				refreshGuard({ force: true })
 			} catch (e) {
 				this.error = shareErrorText(e, this.$t)
 			} finally {

@@ -3346,7 +3346,7 @@
   "Address blocked": "Adresse bloquée",
   "Banned address": "Adresse bannie",
   "Banned": "Bannie",
-  "Observed, not blocked": "Observé, pas bloqué",
+  "Observed, not blocked": "Observée, pas bloquée",
   "the allowed addresses": "les adresses autorisées",
   "the blocked addresses": "les adresses bloquées",
   "the countries": "les pays",
@@ -3382,7 +3382,7 @@
   "Requests per minute": "Requêtes par minute",
   "Bans": "Bans",
   "Rule hits (OWASP)": "Règles OWASP déclenchées",
-  "Missing pages (404)": "Pages introuvables (404)",
+  "Missing pages (404)": "Pages inexistantes (404)",
   "Wrong codes": "Codes erronés",
   "within": "en",
   "minutes": "minutes",
@@ -3393,7 +3393,7 @@
   "Action": "Action",
   "All apps": "Toutes les apps",
   "All reasons": "Toutes les raisons",
-  "Scan": "Scan",
+  "Scan": "Balayage",
   "Request limit": "Limite de requêtes",
   "Access code": "Code d'accès",
   "Blocklist": "Liste de blocage",
@@ -3435,5 +3435,7 @@
   "Only people with an access code get in.": "Seules les personnes ayant un code d'accès entrent.",
   "Protection settings of shared apps were reset: every shared app asks for a code, people must be added again": "Les réglages de protection des apps partagées ont été réinitialisés : chaque app partagée demande un code, il faut rajouter les personnes",
   "{app}: {n} addresses banned in 10 minutes": "{app} : {n} adresses bannies en 10 minutes",
-  "Country filtering of shared apps is not working": "Le filtrage par pays des apps partagées ne fonctionne pas"
+  "Country filtering of shared apps is not working": "Le filtrage par pays des apps partagées ne fonctionne pas",
+  "Saved; it will reach the box's gateway in a moment.": "Enregistré ; la passerelle de la box le prendra en compte dans un instant.",
+  "Turned off": "Désactivées"
 }

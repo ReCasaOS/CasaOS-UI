@@ -22,7 +22,7 @@ export const shareGuardApi = {
 	unban: async key => (await client()).delete(`${G}/bans/${enc(key)}`),
 }
 
-// `ok` is true once a GET answered; `view` is its Data. A core without the route leaves both empty: nothing shows.
+// `ok` is true once a GET answered; `view` is its Data. A core without the route (404) empties both: nothing shows.
 export const shareGuard = reactive({ view: null, ok: false })
 
 const EVERY = 60000
@@ -47,10 +47,14 @@ async function read() {
 		if (seen !== writes) {
 			return
 		}
-		shareGuard.view = null
-		shareGuard.ok = false
-		// no route: an old core, asked again in a minute only
-		wait = e?.response?.status === 404 ? EVERY : wait === EVERY ? RETRY : Math.min(wait * 2, EVERY)
+		// no route: an old core, asked again in a minute only; any other failure keeps the last view (an open form stays)
+		if (e?.response?.status === 404) {
+			shareGuard.view = null
+			shareGuard.ok = false
+			wait = EVERY
+		} else {
+			wait = wait === EVERY ? RETRY : Math.min(wait * 2, EVERY)
+		}
 	}
 }
 

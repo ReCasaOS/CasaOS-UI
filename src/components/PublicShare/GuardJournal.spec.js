@@ -16,7 +16,7 @@ const view = (override = null) => ({ box: box(), apps: { jellyfin: { access: 'op
 
 let wrapper
 async function show(props = {}) {
-	wrapper = mount(GuardJournal, { props: { boxPolicy: box(), ...props }, global: { plugins: [Buefy, i18n] } })
+	wrapper = mount(GuardJournal, { props, global: { plugins: [Buefy, i18n] } })
 	await flushPromises()
 }
 async function click(find) {
@@ -33,7 +33,12 @@ beforeEach(() => {
 	vi.spyOn(shareGuardApi, 'unban').mockResolvedValue({})
 	vi.spyOn(shareGuardApi, 'setApp').mockResolvedValue(answer(view()))
 	vi.spyOn(shareGuardApi, 'setBox').mockResolvedValue(answer(view()))
+	vi.spyOn(shareGuardApi, 'view').mockImplementation(async () => answer(shareGuard.view))
 })
+async function banTab() {
+	await wrapper.findAll('[role=tab], .tabs a').at(1).trigger('click')
+	await flushPromises()
+}
 afterEach(() => {
 	wrapper.unmount()
 	vi.restoreAllMocks()
@@ -63,7 +68,6 @@ describe('the protection journal', () => {
 		await show()
 		await click('.stop-rule')
 		expect(shareGuardApi.setApp).toHaveBeenCalledWith('jellyfin', 'open', { waf: null, rules_off: [942100], allow: null, block: null, countries: null, rate_per_min: null, ban: null })
-		expect(wrapper.emitted('changed')).toHaveLength(1)
 	})
 
 	it('appends the rule to the rules the override already turns off', async () => {
@@ -97,7 +101,7 @@ describe('the protection journal', () => {
 		await click('.allow')
 		expect(wrapper.find('.message.is-danger').exists()).toBe(true)
 		expect(wrapper.find('.guard-bans tbody tr').exists()).toBe(true)
-		expect(wrapper.emitted('changed')).toHaveLength(1)
+		expect(shareGuardApi.view).toHaveBeenCalled()
 	})
 
 	it('unbans and reloads the bans', async () => {
@@ -133,13 +137,31 @@ describe('the protection journal', () => {
 		expect(shareGuardApi.setBox).toHaveBeenCalledWith({ ...box(), allow: ['192.0.2.1', '198.51.100.7', '203.0.113.9'] })
 	})
 
-	it('tells the parent the box changed even when the unban then fails', async () => {
-		shareGuardApi.unban.mockRejectedValue({ response: { status: 500 } })
+	it('reads the store again when a write fails, the core may have saved it', async () => {
+		shareGuardApi.setApp.mockRejectedValue({ response: { status: 500, data: { message: 'the change is saved, but the Gateway has not taken it yet: it will be sent again' } } })
 		await show()
-		await wrapper.findAll('[role=tab], .tabs a').at(1).trigger('click')
-		await flushPromises()
-		await click('.allow')
-		expect(wrapper.emitted('changed')).toHaveLength(1)
+		await click('.stop-rule')
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(1)
+		expect(wrapper.text()).toContain('Saved; it will reach the box\'s gateway in a moment.')
+	})
+
+	it('offers no rule button when the app already does not apply the rule', async () => {
+		shareGuard.view = { ...view(), apps: { jellyfin: { access: 'open', override: null, effective: { rules_off: [942100] } } } }
+		await show()
+		expect(wrapper.find('.stop-rule').exists()).toBe(false)
+	})
+
+	it('lists only the bans of its app', async () => {
+		shareGuardApi.bans.mockResolvedValue(answer([ban(), ban({ key: '198.51.100.2', ip: '198.51.100.2', app: 'nextcloud' })]))
+		await show({ app: 'jellyfin' })
+		await banTab()
+		expect(wrapper.findAll('.guard-bans tbody tr')).toHaveLength(1)
+		expect(wrapper.text()).not.toContain('198.51.100.2')
+	})
+
+	it('names the banned reason as an address in the filter', async () => {
+		await show()
+		expect(wrapper.find('select[name=reason-filter] option[value=banned]').text()).toBe('Banned address')
 	})
 
 	it('does not repeat a rule the override already turns off', async () => {

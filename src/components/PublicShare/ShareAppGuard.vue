@@ -1,7 +1,7 @@
 <template>
 	<div v-if="app" class="share-app-guard mt-4">
 		<p class="has-text-weight-medium mb-2">{{ $t('Access') }}</p>
-		<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
+		<b-message v-if="error && !formError" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
 		<div class="access-switch">
 			<b-switch :key="`a${key}`" :model-value="protectedByCode" :disabled="busy" @update:model-value="toggle">{{ protectedByCode ? $t('Protected by code') : $t('Open to anyone') }}</b-switch>
 		</div>
@@ -19,7 +19,7 @@
 			</div>
 			<guard-policy-form v-if="own" :policy="view.box" :box="view.box" :override="app.override" :busy="busy" :error="formError" @save="saveOverride" />
 			<p class="has-text-weight-medium mt-4 mb-2">{{ $t('Events') }}</p>
-			<guard-journal :app="appName" :box-policy="view.box" />
+			<guard-journal :app="appName" />
 		</template>
 	</div>
 </template>
@@ -28,7 +28,7 @@
 import GuardJournal from './GuardJournal.vue'
 import GuardPolicyForm from './GuardPolicyForm.vue'
 import { guardErrorText } from './guardWords'
-import { applyGuard, shareGuard, shareGuardApi } from '@/service/shareGuard'
+import { applyGuard, refreshGuard, shareGuard, shareGuardApi } from '@/service/shareGuard'
 
 export default {
 	name: 'ShareAppGuard',
@@ -106,12 +106,14 @@ export default {
 				await applyGuard(shareGuardApi.setApp(this.appName, access, override))
 			} catch (e) {
 				const message = e?.response?.data?.message
-				// the form highlights a refused field with the raw message; the sentence is said above in every case
-				if (fromForm && typeof message === 'string' && message.startsWith('bad_policy')) {
+				// the form says and highlights a refused field itself; any other failure is said above
+				if (fromForm && typeof message === 'string' && message.startsWith('bad_policy:')) {
 					this.formError = message
 				}
 				this.error = guardErrorText(e, this.$t)
-				// the switch and the radios keep their own value: draw them again from the store
+				// the core may have saved it all the same; the switch and the radios keep their own value: draw them
+				// again from the store
+				await refreshGuard({ force: true })
 				this.key++
 			} finally {
 				this.busy = false

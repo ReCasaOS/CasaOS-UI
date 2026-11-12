@@ -120,6 +120,29 @@ describe('the protection section', () => {
 		expect(wrapper.text()).toContain('too old to protect shared apps')
 	})
 
+	it('reads the store again when turning protection on fails, and gives the focus back to the switch', async () => {
+		localStorage.setItem('share-guard-ddos-seen', '1')
+		shareGuardApi.setProtection.mockRejectedValue({ response: { status: 500, data: { message: 'the change is saved, but the Gateway has not taken it yet: it will be sent again' } } })
+		await show()
+		shareGuardApi.view.mockResolvedValue(answer(view({ protection: true })))
+		await flip()
+		expect(wrapper.text()).toContain('Saved; it will reach the box\'s gateway in a moment.')
+		expect(wrapper.find('.switch input').element.checked).toBe(true)
+		expect(document.activeElement).toBe(wrapper.find('.switch input').element)
+	})
+
+	it('says a failed box save above the form, and reads the store again', async () => {
+		shareGuard.view = view({ protection: true })
+		await show()
+		const reads = shareGuardApi.view.mock.calls.length
+		shareGuardApi.setBox.mockRejectedValue({ response: { status: 500, data: { message: 'the change is saved, but the Gateway has not taken it yet: it will be sent again' } } })
+		await wrapper.find('.guard-policy-form').trigger('submit')
+		await flushPromises()
+		expect(wrapper.findComponent({ name: 'GuardPolicyForm' }).props('error')).toBe('')
+		expect(wrapper.text().split('Saved; it will reach the box\'s gateway in a moment.')).toHaveLength(2)
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(reads + 1)
+	})
+
 	it('keeps the new code shown when the read after it fails, and drops it on close', async () => {
 		vi.spyOn(shareGuardApi, 'addPerson').mockResolvedValue(answer({ person: { id: 'p_2', name: 'Papa', apps: ['jellyfin'] }, code: 'ABCD-EFGH-JKMN' }))
 		await show()
@@ -129,7 +152,8 @@ describe('the protection section', () => {
 		await wrapper.find('input[name=person-app]').setValue(true)
 		await wrapper.find('form').trigger('submit')
 		await flushPromises()
-		expect(wrapper.find('.share-guard-section').exists()).toBe(false)
+		// a transient failure keeps the last view: the section stays
+		expect(wrapper.find('.share-guard-section').exists()).toBe(true)
 		expect(wrapper.find('.code-value').text()).toBe('ABCD-EFGH-JKMN')
 		expect(wrapper.text()).toContain('This code will not be shown again.')
 		await wrapper.find('.close-code').trigger('click')

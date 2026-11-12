@@ -1,6 +1,6 @@
 // The words of the protection of shared apps, from what the core and the Gateway send. Pure: `t` is this.$t, and every
 // key is a literal call of t so that shareKeys.spec.js finds it.
-import { gatewayUnsupportedText, shareErrorText } from '@/components/PublicShare/shareWords'
+import { gatewayUnsupportedText } from '@/components/PublicShare/shareWords'
 
 export function reasonText(event, t, locale) {
 	switch (event?.reason) {
@@ -58,6 +58,10 @@ function fieldText(name, t) {
 export function guardErrorText(e, t) {
 	const message = e?.response?.data?.message
 	const text = typeof message === 'string' ? message : ''
+	// the core saved the change and will push it to the Gateway again (its message holds a colon)
+	if (e?.response?.status === 500 && text.startsWith('the change is saved')) {
+		return t('Saved; it will reach the box\'s gateway in a moment.')
+	}
 	const colon = text.indexOf(':')
 	const code = colon < 0 ? text : text.slice(0, colon)
 	const arg = colon < 0 ? '' : text.slice(colon + 1)
@@ -72,8 +76,7 @@ export function guardErrorText(e, t) {
 		case 'not_shared': return t('This app is not shared')
 		case 'not_found': return t('This person no longer exists')
 		case 'gateway_unsupported': return gatewayUnsupportedText(t)
-		default:
-			// the relay's busy and unreachable answers are known words; any other text is never shown raw
-			return [429, 502, 503].includes(e?.response?.status) ? shareErrorText(e, t) : t('Something went wrong. Try again in a moment.')
+		// any other text is never shown raw
+		default: return t('Something went wrong. Try again in a moment.')
 	}
 }

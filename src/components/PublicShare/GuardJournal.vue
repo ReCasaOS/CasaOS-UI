@@ -75,7 +75,7 @@
 
 <script>
 import { actionText, countryName, flag, guardErrorText, reasonText } from './guardWords'
-import { applyGuard, shareGuard, shareGuardApi, touchGuard } from '@/service/shareGuard'
+import { applyGuard, refreshGuard, shareGuard, shareGuardApi, touchGuard } from '@/service/shareGuard'
 
 const PER = 25
 const NO_OVERRIDE = { waf: null, rules_off: null, allow: null, block: null, countries: null, rate_per_min: null, ban: null }
@@ -84,11 +84,9 @@ export default {
 	name: 'GuardJournal',
 	props: {
 		app: { type: String, default: null },
-		boxPolicy: { type: Object, default: null },
 	},
-	emits: ['changed'],
 	data() {
-		return { shareGuard, PER, tab: 0, events: [], bans: [], error: '', writeError: '', loading: false, busy: false, seq: 0, partial: false, current: 1, appFilter: '', reasonFilter: '' }
+		return { shareGuard, PER, tab: 0, events: [], bans: [], error: '', writeError: '', loading: false, busy: false, seq: 0, current: 1, appFilter: '', reasonFilter: '' }
 	},
 	computed: {
 		locale() {
@@ -97,11 +95,13 @@ export default {
 		appNames() {
 			return Object.keys(shareGuard.view?.apps || {})
 		},
+		// the reasons of the events filter (the bans have no filter)
 		reasons() {
-			return this.tab === 0 ? ['waf', 'country', 'scan', 'rate', 'code', 'blocklist', 'banned'] : ['waf', 'scan', 'rate', 'code']
+			return ['waf', 'country', 'scan', 'rate', 'code', 'blocklist', 'banned']
 		},
+		// the bans route has no app parameter: an app's window keeps its own bans
 		rows() {
-			return this.tab === 0 ? this.events : this.bans
+			return this.tab === 0 ? this.events : this.app ? this.bans.filter(b => b.app === this.app) : this.bans
 		},
 		page() {
 			return this.rows.slice((this.current - 1) * PER, this.current * PER)
@@ -127,7 +127,7 @@ export default {
 				case 'rate': return this.$t('Request limit')
 				case 'code': return this.$t('Access code')
 				case 'blocklist': return this.$t('Blocklist')
-				case 'banned': return this.$t('Banned')
+				case 'banned': return this.$t('Banned address')
 				default: return ''
 			}
 		},
@@ -175,8 +175,10 @@ export default {
 				}
 			}
 		},
+		// not for a rule the app already does not apply
 		canStop(e) {
-			return e.rule > 0 && !!shareGuard.view?.apps?.[e.app]
+			const a = shareGuard.view?.apps?.[e.app]
+			return e.rule > 0 && !!a && !(a.effective?.rules_off || []).includes(e.rule)
 		},
 		async stopRule(e) {
 			const a = shareGuard.view?.apps?.[e.app]
@@ -197,14 +199,13 @@ export default {
 			})
 		},
 		async allow(b) {
-			const box = shareGuard.view?.box || this.boxPolicy
+			const box = shareGuard.view?.box
 			if (!box) {
 				return
 			}
 			await this.write(async () => {
 				const allow = box.allow || []
 				await applyGuard(shareGuardApi.setBox({ ...box, allow: allow.includes(b.ip) ? allow : [...allow, b.ip] }))
-				this.partial = true
 				await shareGuardApi.unban(b.key)
 				touchGuard()
 				await this.load()
@@ -213,16 +214,12 @@ export default {
 		async write(fn) {
 			this.busy = true
 			this.writeError = ''
-			this.partial = false
 			try {
 				await fn()
-				this.$emit('changed')
 			} catch (e) {
 				this.writeError = guardErrorText(e, this.$t)
-				// the box was saved before the unban failed: the parent's copy is stale
-				if (this.partial) {
-					this.$emit('changed')
-				}
+				// the core may have saved it all the same
+				await refreshGuard({ force: true })
 			} finally {
 				this.busy = false
 			}

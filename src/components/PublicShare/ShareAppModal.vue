@@ -119,6 +119,8 @@ export default {
 			this.error = ''
 			try {
 				await apply(value ? publicShareApi.share(this.appName) : publicShareApi.unshare(this.appName))
+				// the app joins or leaves the protection view at once, not at the next read
+				refreshGuard({ force: true })
 			} catch (e) {
 				this.error = shareErrorText(e, this.$t)
 			} finally {

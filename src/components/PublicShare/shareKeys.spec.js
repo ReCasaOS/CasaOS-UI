@@ -10,7 +10,7 @@ const en = JSON.parse(read(lang('en_US.json')))
 const fr = JSON.parse(read(lang('fr_FR.json')))
 
 // words that are the same in French
-const SAME = ['Public', 'Boxes', 'iPhone / iPad', 'minutes', 'Bans', 'Date', 'Action', 'Scan', 'Protection']
+const SAME = ['Public', 'Boxes', 'iPhone / iPad', 'minutes', 'Bans', 'Date', 'Action', 'Protection']
 
 const sources = [
 	...readdirSync(folder).filter(f => /\.(?:vue|js)$/.test(f) && !f.endsWith('.spec.js')).map(f => join(folder, f)),

@@ -91,6 +91,8 @@ export default {
 				await refreshGuard({ force: true })
 			} catch (e) {
 				this.error = guardErrorText(e, this.$t)
+				// the core may have saved it all the same
+				await refreshGuard({ force: true })
 			} finally {
 				this.busy = false
 			}

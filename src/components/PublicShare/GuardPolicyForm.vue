@@ -11,7 +11,7 @@
 			<template v-if="b === 'waf'">
 				<div class="select is-small" :class="{ 'is-danger': bad('waf') }">
 					<select v-model="d.waf" name="waf" :aria-label="titles.waf" :disabled="same.waf">
-						<option value="off">{{ $t('Off') }}</option>
+						<option value="off">{{ $t('Turned off') }}</option>
 						<option value="observe">{{ $t('Observe') }}</option>
 						<option value="block">{{ $t('Block') }}</option>
 					</select>
@@ -23,7 +23,7 @@
 			<template v-else-if="b === 'rules'">
 				<pre v-if="box && box.rules_off?.length" class="guard-box-entries has-text-grey is-size-7 p-1">{{ box.rules_off.join(', ') }}</pre>
 				<div>
-					<span v-for="id in d.rules" :key="id" class="tag is-light ml-1" :class="{ 'is-danger': bad('rules_off') }">
+					<span v-for="id in d.rules" :key="id" class="tag is-primary is-light ml-1" :class="{ 'is-danger': bad('rules_off') }">
 						{{ id }}<button class="delete is-small" type="button" :aria-label="`${$t('Remove')} ${id}`" :disabled="same.rules" @click="d.rules = d.rules.filter(r => r !== id)"></button>
 					</span>
 					<input v-model="ruleId" class="input is-small ml-2" name="rule-id" style="width: 7rem" inputmode="numeric" :aria-label="$t('Rule number')" :disabled="same.rules" @keydown.enter.prevent="addRule">
@@ -155,17 +155,35 @@ export default {
 				this.awaiting = false
 			}
 		},
-		// the parent saved or loaded something else: follow it, unless the person is in the middle of an edit
-		// (after our own save the answer is the new baseline, even if it differs from the draft)
+		// the parent is done with the save, whatever came of it; after the tick, so that its answer, in the same
+		// flush, is still taken as the baseline
+		busy(now, was) {
+			if (was && !now) {
+				this.$nextTick(() => (this.awaiting = false))
+			}
+		},
+		// the parent saved or loaded something else: follow it (after our own save the answer is the new baseline,
+		// even if it differs from the draft); in the middle of an edit, only in the blocks the person has not touched
 		sources() {
+			const f = this.fresh()
 			if (!this.dirty || this.awaiting) {
 				this.awaiting = false
-				const f = this.fresh()
 				this.same = f.same
 				this.d = f.d
 				this.snapshot = JSON.stringify(f)
 				this.$nextTick(() => (this.memory = false))
+				return
 			}
+			const base = JSON.parse(this.snapshot)
+			const part = (x, b) => JSON.stringify([x.same[b], ...KEYS[b].map(k => x.d[k])])
+			BLOCKS.filter(b => part(this, b) === part(base, b)).forEach((b) => {
+				this.same[b] = base.same[b] = f.same[b]
+				KEYS[b].forEach(k => (this.d[k] = base.d[k] = f.d[k]))
+				if (b === 'waf') {
+					this.$nextTick(() => (this.memory = false))
+				}
+			})
+			this.snapshot = JSON.stringify(base)
 		},
 	},
 	methods: {

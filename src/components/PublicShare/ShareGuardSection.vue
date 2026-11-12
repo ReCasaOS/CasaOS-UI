@@ -5,7 +5,7 @@
 			<p v-if="!view.supported" class="update-sentence">{{ $t('Update ReCasaOS to protect shared apps') }}</p>
 			<template v-else>
 				<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
-				<b-switch :key="switchKey" :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
+				<b-switch ref="protect" :key="switchKey" :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
 
 				<template v-if="view.protection">
 					<p class="has-text-weight-medium mt-3 mb-2">{{ $t('Settings for every shared app') }}</p>
@@ -17,7 +17,7 @@
 
 				<template v-if="view.protection">
 					<p class="has-text-weight-medium mt-4 mb-2">{{ $t('Events') }}</p>
-					<guard-journal :app="null" :box-policy="view.box" />
+					<guard-journal :app="null" />
 				</template>
 			</template>
 		</div>
@@ -80,7 +80,7 @@ export default {
 				hasIcon: true,
 				confirmText: this.$t('Turn on'),
 				cancelText: this.$t('Cancel'),
-				onCancel: () => this.switchKey++,
+				onCancel: () => this.redraw(),
 				onConfirm: () => {
 					try {
 						localStorage.setItem(SEEN, '1')
@@ -106,6 +106,11 @@ export default {
 				this.error = this.$t('This could not be copied')
 			}
 		},
+		// a new switch, focused like the one it replaces (the finally that enables it runs before the tick)
+		redraw() {
+			this.switchKey++
+			this.$nextTick(() => this.$refs.protect?.focus())
+		},
 		seen() {
 			try {
 				return localStorage.getItem(SEEN) === '1'
@@ -120,8 +125,9 @@ export default {
 				await applyGuard(shareGuardApi.setProtection(on))
 			} catch (e) {
 				this.error = guardErrorText(e, this.$t)
-				// the switch keeps its own value: draw it again from the store
-				this.switchKey++
+				// the core may have saved it all the same; the switch keeps its own value: draw it again from the store
+				await refreshGuard({ force: true })
+				this.redraw()
 			} finally {
 				this.busy = false
 			}
@@ -134,12 +140,13 @@ export default {
 				await applyGuard(shareGuardApi.setBox(policy))
 			} catch (e) {
 				const message = e?.response?.data?.message
-				// the form highlights and says a refusal that has a message; any other failure is said here
-				if (typeof message === 'string' && message) {
+				// the form highlights and says a refused field; any other failure is said here
+				if (typeof message === 'string' && message.startsWith('bad_policy:')) {
 					this.boxError = message
 				} else {
 					this.boxText = guardErrorText(e, this.$t)
 				}
+				await refreshGuard({ force: true })
 			} finally {
 				this.boxBusy = false
 			}

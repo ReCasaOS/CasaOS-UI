@@ -165,6 +165,20 @@ describe('the share window of an app', () => {
 		expect(wrapper.text()).not.toContain('This could not be copied')
 	})
 
+	it('reads the protection again after sharing and after stopping', async () => {
+		show(withApp(JELLY))
+		await mountIt()
+		const reads = shareGuardApi.view.mock.calls.length
+		publicShareApi.share.mockResolvedValue(SHARED)
+		await sw().setValue(true)
+		await flushPromises()
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(reads + 1)
+		publicShareApi.unshare.mockResolvedValue(withApp(JELLY))
+		await sw().setValue(false)
+		await flushPromises()
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(reads + 2)
+	})
+
 	it('a refused share leaves the switch off', async () => {
 		show(withApp(JELLY))
 		await mountIt()
@@ -291,8 +305,21 @@ describe('the share window of an app', () => {
 			vi.spyOn(shareGuardApi, 'setApp').mockRejectedValue({ response: { status: 400, data: { message: 'bad_policy:rate_per_min' } } })
 			wrapper.findComponent({ name: 'GuardPolicyForm' }).vm.$emit('save', { waf: 'block' })
 			await flushPromises()
-			expect(wrapper.text()).toContain('Invalid value in the request limit')
+			expect(wrapper.text().split('Invalid value in the request limit')).toHaveLength(2)
 			expect(wrapper.findComponent({ name: 'GuardPolicyForm' }).props('error')).toBe('bad_policy:rate_per_min')
+		})
+
+		it('a change saved but not pushed yet reads the store again, and the switch follows it', async () => {
+			guard(gview({ access: 'code' }))
+			await mountIt()
+			vi.spyOn(shareGuardApi, 'setApp').mockRejectedValue({ response: { status: 500, data: { message: 'the change is saved, but the Gateway has not taken it yet: it will be sent again' } } })
+			shareGuardApi.view.mockResolvedValue(answer(gview()))
+			await access().setValue(false)
+			await flushPromises()
+			expect(shareGuardApi.setApp).toHaveBeenCalledWith('jellyfin', 'open', null)
+			expect(wrapper.text()).toContain('Saved; it will reach the box\'s gateway in a moment.')
+			expect(access().element.checked).toBe(false)
+			expect(wrapper.text()).toContain('Open to anyone')
 		})
 	})
 })

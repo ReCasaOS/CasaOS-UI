@@ -62,8 +62,13 @@ describe('the words of the protection', () => {
 			expect(shareErrorText(err('gateway_unsupported'), t)).toBe(sentence)
 		})
 
+		it('says a change the core saved but could not push yet is saved', () => {
+			expect(guardErrorText(err('the change is saved, but the Gateway has not taken it yet: it will be sent again', 500), t)).toBe('Saved; it will reach the box\'s gateway in a moment.')
+		})
+
 		it('never shows a raw string', () => {
-			expect(guardErrorText(err('', 429), t)).toBe('The relay is busy, try again later')
+			expect(guardErrorText(err('', 429), t)).toBe('Something went wrong. Try again in a moment.')
+			expect(guardErrorText(err('the relay is busy', 503), t)).toBe('Something went wrong. Try again in a moment.')
 			expect(guardErrorText(new Error('offline'), t)).toBe('Something went wrong. Try again in a moment.')
 			expect(guardErrorText(err('some server text', 500), t)).toBe('Something went wrong. Try again in a moment.')
 			expect(guardErrorText(err('unknown_app'), t)).toBe('This app is not shared')

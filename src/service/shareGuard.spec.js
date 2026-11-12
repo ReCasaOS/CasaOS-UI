@@ -50,6 +50,17 @@ describe('the protection of the shared apps', () => {
 		expect(instance.get).toHaveBeenCalledTimes(3)
 	})
 
+	it('keeps the last view on a failed read, and drops it on a 404 (older core)', async () => {
+		instance.get.mockImplementation(() => body({ supported: true }))
+		await refreshGuard()
+		instance.get.mockImplementation(() => Promise.reject(Object.assign(new Error('500'), { response: { status: 500 } })))
+		await refreshGuard({ force: true })
+		expect(shareGuard).toMatchObject({ ok: true, view: { supported: true } })
+		instance.get.mockImplementation(() => Promise.reject(Object.assign(new Error('404'), { response: { status: 404 } })))
+		await refreshGuard({ force: true })
+		expect(shareGuard).toMatchObject({ ok: false, view: null })
+	})
+
 	it('a write puts its answer in the store', async () => {
 		const data = { protection: true, apps: {} }
 		expect(await applyGuard(body(data))).toEqual(data)

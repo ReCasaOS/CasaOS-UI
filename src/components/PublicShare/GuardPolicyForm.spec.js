@@ -216,6 +216,37 @@ describe('the protection policy form', () => {
 		expect(wrapper.find('input[name=rate]').element.value).toBe('70')
 	})
 
+	it('mid-edit, takes a change of the props in the blocks left untouched and keeps the edited ones', async () => {
+		form({ box: base(), override: null })
+		await wrapper.find('input[name=same-limit]').setValue(false)
+		await wrapper.find('input[name=rate]').setValue('70')
+		await wrapper.setProps({ override: { waf: null, rules_off: [942100], allow: null, block: null, countries: null, rate_per_min: null, ban: null } })
+		expect(wrapper.text()).toContain('942100')
+		expect(wrapper.find('input[name=rate]').element.value).toBe('70')
+		await save()
+		expect(emitted()[0][0]).toMatchObject({ rules_off: [942100], rate_per_min: 70 })
+	})
+
+	it('stops waiting for its save once the parent is no longer busy', async () => {
+		form()
+		await wrapper.find('input[name=rate]').setValue('70')
+		await save()
+		await wrapper.setProps({ busy: true })
+		await wrapper.setProps({ busy: false })
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 90 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('70')
+	})
+
+	it('draws the app\'s own rule ids apart from the box ones', () => {
+		form({ box: { ...base(), rules_off: [920100] }, override: { rules_off: [942100] } })
+		expect(wrapper.find('.tag').classes()).toContain('is-primary')
+	})
+
+	it('names the OWASP mode off in its own words', () => {
+		form()
+		expect(wrapper.find('select[name=waf] option[value=off]').text()).toBe('Turned off')
+	})
+
 	it('clears a number highlight once the field is edited', async () => {
 		form()
 		await wrapper.find('input[name=rate]').setValue('')
