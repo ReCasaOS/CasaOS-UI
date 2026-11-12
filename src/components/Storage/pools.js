@@ -1,4 +1,4 @@
-// What the dashboard says about the storage layer's pool (GET /v2/storage), and what each action asks.
+// What the dashboard says about the storage layer's pools (GET /v2/storage), and what each action asks.
 import { raidTag } from './raid'
 
 // the pool's state as a tag, as for a RAID array
@@ -6,15 +6,15 @@ export function poolTag(pool, t) {
 	return raidTag(pool, t)
 }
 
-// a layout in a person's words, short
+// a layout in a person's words, short; stripe is speed only (the same protection)
 export function layoutName(layout, t) {
 	switch (layout?.kind) {
 		case 'mirror':
-			return t('Mirror, {copies} copies', { copies: layout.copies })
+			return layout.stripe ? t('Mirror, {copies} copies, striped', { copies: layout.copies }) : t('Mirror, {copies} copies', { copies: layout.copies })
 		case 'parity':
 			return layout.parity === 1 ? t('Parity (RAID 5)') : t('Double parity (RAID 6)')
 		case 'none':
-			return t('No protection')
+			return layout.stripe ? t('No protection, striped') : t('No protection')
 	}
 	return ''
 }
@@ -31,6 +31,7 @@ export function survives(n, t) {
 export function verbTitle(verb, t) {
 	return {
 		'create-pool': t('Create a pool'),
+		'delete-pool': t('Delete the pool'),
 		'add-disk': t('Add a disk'),
 		'replace-disk': t('Replace a disk'),
 		'remove-disk': t('Take a disk out'),
@@ -62,8 +63,9 @@ export function choices(verb, pool) {
 
 // the layouts a pool can change to: the btrfs ones it is not
 export function layoutTargets(pool) {
-	const all = [{ kind: 'none' }, { kind: 'mirror', copies: 2 }, { kind: 'mirror', copies: 3 }]
-	return all.filter(l => !(pool?.layout_known && l.kind === pool.layout.kind && (l.copies || 0) === (pool.layout.copies || 0)))
+	const all = [{ kind: 'none' }, { kind: 'none', stripe: true }, { kind: 'mirror', copies: 2 }, { kind: 'mirror', copies: 2, stripe: true }, { kind: 'mirror', copies: 3 }]
+	const same = l => l.kind === pool.layout.kind && (l.copies || 0) === (pool.layout.copies || 0) && Boolean(l.stripe) === Boolean(pool.layout.stripe)
+	return all.filter(l => !(pool?.layout_known && same(l)))
 }
 
 // the members a verb can be asked about
@@ -84,9 +86,12 @@ export function diskChoices(verb, drives, member) {
 	return free
 }
 
-// the intent sent for the preview
-export function intent(verb, { disks = [], member = '', layout = null } = {}) {
+// the intent sent for the preview; every verb but create-pool and wipe-disk names its pool
+export function intent(verb, { pool = '', disks = [], member = '', layout = null } = {}) {
 	const i = { verb }
+	if (pool && verb !== 'create-pool' && verb !== 'wipe-disk') {
+		i.pool = pool
+	}
 	if (disks.length) {
 		i.disks = disks
 	}
@@ -99,8 +104,8 @@ export function intent(verb, { disks = [], member = '', layout = null } = {}) {
 	return i
 }
 
-// the pool is doing something long: the dashboard looks again soon
+// a pool is doing something long: the dashboard looks again soon
 export function poolWorking(view) {
-	const p = view?.pool
-	return Boolean(view?.busy || (p && (p.action !== 'idle' || ['rebuilding', 'resyncing', 'checking', 'reshaping'].includes(p.state))))
+	const working = p => p.action !== 'idle' || ['rebuilding', 'resyncing', 'checking', 'reshaping'].includes(p.state)
+	return Boolean(view?.busy || (view?.pools || []).some(working))
 }

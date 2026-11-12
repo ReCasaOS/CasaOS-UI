@@ -80,9 +80,9 @@ describe('a storage plan', () => {
 
 	it('goes straight to the preview when there is nothing to choose', async () => {
 		const api = { plan: vi.fn().mockResolvedValue({ data: { data: { ...plan, confirm: '', effects: { ...plan.effects, erases: [] } } } }) }
-		const { wrapper } = dialog({ verb: 'check', pool: { backend: 'btrfs', members: [] }, drives }, api)
+		const { wrapper } = dialog({ verb: 'check', pool: { id: 'data', backend: 'btrfs', members: [] }, drives }, api)
 		await flushPromises()
-		expect(api.plan).toHaveBeenCalledWith({ verb: 'check' })
+		expect(api.plan).toHaveBeenCalledWith({ verb: 'check', pool: 'data' })
 		expect(wrapper.vm.confirmed).toBe(true)
 	})
 

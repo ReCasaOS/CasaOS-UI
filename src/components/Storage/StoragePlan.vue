@@ -97,7 +97,7 @@ import escape from 'lodash/escape'
 import { choices, diskChoices, intent, layoutName, layoutTargets, memberChoices, survives, verbTitle } from './pools'
 import { renderSize } from '@/mixins/file_utils'
 
-const layoutKey = l => `${l.kind}:${l.copies || l.parity || 0}`
+const layoutKey = l => `${l.kind}:${l.copies || l.parity || 0}${l.stripe ? ':stripe' : ''}`
 
 export default {
 	name: 'storage-plan',
@@ -227,7 +227,7 @@ export default {
 			this.isLoading = true
 			this.refusal = ''
 			try {
-				const body = intent(this.verb, { disks: this.chosenDisks, member: this.asks.member ? this.memberName : '', layout: this.asks.layout ? this.chosenLayout : null })
+				const body = intent(this.verb, { pool: this.pool?.id, disks: this.chosenDisks, member: this.asks.member ? this.memberName : '', layout: this.asks.layout ? this.chosenLayout : null })
 				this.plan = (await this.$api.pools.plan(body)).data.data
 				this.typed = ''
 				this.showCommands = false

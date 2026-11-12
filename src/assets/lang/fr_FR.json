@@ -3380,5 +3380,8 @@
   "{size} for data": "{size} pour les données",
   "{summary} failed: {error}": "{summary} a échoué : {error}",
   "{used} used of {size}": "{used} utilisés sur {size}",
-  "Restore protection": "Rétablir la protection"
+  "Restore protection": "Rétablir la protection",
+  "Mirror, {copies} copies, striped": "Miroir, {copies} copies, en bandes",
+  "No protection, striped": "Sans protection, en bandes",
+  "Delete the pool": "Supprimer le pool"
 }

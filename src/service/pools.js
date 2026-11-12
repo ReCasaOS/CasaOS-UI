@@ -1,11 +1,11 @@
-// The storage layer: one pool over the drives, backend-neutral (btrfs, md), plan → preview → apply.
+// The storage layer: pools over the drives, backend-neutral (btrfs, md), plan → preview → apply.
 // GET /v2/storage answers only where the storage service has it (ReCasaNix's recasanix-storage); the
 // Storage manager shows its Pool tab only then.
 import { api } from './service.js'
 
 const PREFIX = '/v2/storage'
 const pools = {
-	// the pool (or null), the drives with their roles, the layouts, the recent jobs
+	// the pools, the box's verbs (create-pool), the drives with their roles, the layouts, the recent jobs
 	overview() {
 		return api.get(PREFIX)
 	},
@@ -15,7 +15,7 @@ const pools = {
 		return api.get(`${PREFIX}/layouts?disks=${encodeURIComponent(disks.join(','))}`)
 	},
 
-	// an intent ({verb, layout, disks, member}) → a plan to preview, or a refusal (409) saying why
+	// an intent ({verb, pool, layout, disks, member}) → a plan to preview, or a refusal (409) saying why
 	plan(intent) {
 		return api.post(`${PREFIX}/plans`, intent)
 	},

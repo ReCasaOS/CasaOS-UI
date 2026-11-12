@@ -23,6 +23,10 @@ describe('what the dashboard says about the pool', () => {
 		expect(layoutName({ kind: 'parity', parity: 1 }, t)).toBe('Parity (RAID 5)')
 		expect(layoutName({ kind: 'parity', parity: 2 }, t)).toBe('Double parity (RAID 6)')
 		expect(layoutName({ kind: 'none' }, t)).toBe('No protection')
+		// stripe is speed only: the same protection, said once
+		expect(layoutName({ kind: 'mirror', copies: 2, stripe: true }, t)).toBe('Mirror, 2 copies, striped')
+		expect(layoutName({ kind: 'none', stripe: true }, t)).toBe('No protection, striped')
+		expect(verbTitle('delete-pool', t)).toBe('Delete the pool')
 		expect(survives(0, t)).toBe('No disk may fail')
 		expect(survives(1, t)).toBe('Survives 1 disk failing')
 		expect(survives(2, t)).toBe('Survives 2 disks failing')
@@ -50,19 +54,23 @@ describe('what the dashboard says about the pool', () => {
 	})
 
 	it('offers the other layouts a pool can change to', () => {
-		expect(layoutTargets(mirror)).toEqual([{ kind: 'none' }, { kind: 'mirror', copies: 3 }])
+		expect(layoutTargets(mirror)).toEqual([{ kind: 'none' }, { kind: 'none', stripe: true }, { kind: 'mirror', copies: 2, stripe: true }, { kind: 'mirror', copies: 3 }])
 	})
 
 	it('sends only what was chosen', () => {
 		expect(intent('check')).toEqual({ verb: 'check' })
 		expect(intent('replace-disk', { disks: ['sdc'], member: 'devid 2' })).toEqual({ verb: 'replace-disk', disks: ['sdc'], member: 'devid 2' })
+		// the pool is named, but not where there is none yet, or none involved
+		expect(intent('check', { pool: 'data' })).toEqual({ verb: 'check', pool: 'data' })
+		expect(intent('create-pool', { pool: 'data', disks: ['sdc'] })).toEqual({ verb: 'create-pool', disks: ['sdc'] })
+		expect(intent('wipe-disk', { pool: 'data', disks: ['sde'] })).toEqual({ verb: 'wipe-disk', disks: ['sde'] })
 	})
 
 	it('looks again while the pool works', () => {
-		expect(poolWorking({ pool: { action: 'idle', state: 'ok' }, busy: false })).toBe(false)
-		expect(poolWorking({ pool: { action: 'idle', state: 'degraded' }, busy: false })).toBe(false)
-		expect(poolWorking({ pool: { action: 'recover', state: 'rebuilding' }, busy: false })).toBe(true)
-		expect(poolWorking({ pool: null, busy: true })).toBe(true)
+		expect(poolWorking({ pools: [{ action: 'idle', state: 'ok' }], busy: false })).toBe(false)
+		expect(poolWorking({ pools: [{ action: 'idle', state: 'degraded' }], busy: false })).toBe(false)
+		expect(poolWorking({ pools: [{ action: 'idle', state: 'ok' }, { action: 'recover', state: 'rebuilding' }], busy: false })).toBe(true)
+		expect(poolWorking({ pools: [], busy: true })).toBe(true)
 	})
 })
 

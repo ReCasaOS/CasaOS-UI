@@ -3378,5 +3378,8 @@
   "{size} for data": "{size} for data",
   "{summary} failed: {error}": "{summary} failed: {error}",
   "{used} used of {size}": "{used} used of {size}",
-  "Restore protection": "Restore protection"
+  "Restore protection": "Restore protection",
+  "Mirror, {copies} copies, striped": "Mirror, {copies} copies, striped",
+  "No protection, striped": "No protection, striped",
+  "Delete the pool": "Delete the pool"
 }
