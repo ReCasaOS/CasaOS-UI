@@ -611,6 +611,19 @@ export default {
 		 */
 		setDropState(e) {
 			this.dropState = e
+			if (e) {
+				// the menu grew with logs, backup and sharing entries: measure it rather than guess a height
+				this.$nextTick(() => {
+					const menu = this.$refs.dro && this.$refs.dro.$refs.dropdownMenu
+					const trigger = this.$refs.dro && this.$refs.dro.$refs.trigger
+					if (!menu || !trigger || !menu.offsetHeight) {
+						return
+					}
+					const room = window.innerHeight - trigger.getBoundingClientRect().bottom
+					const horizontal = this.dropdownPosition.split('-')[2]
+					this.dropdownPosition = `is-${room > menu.offsetHeight + 8 ? 'bottom' : 'top'}-${horizontal}`
+				})
+			}
 		},
 
 		/**
