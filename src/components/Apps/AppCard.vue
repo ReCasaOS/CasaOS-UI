@@ -616,7 +616,9 @@ export default {
 				this.$nextTick(() => {
 					const menu = this.$refs.dro && this.$refs.dro.$refs.dropdownMenu
 					const trigger = this.$refs.dro && this.$refs.dro.$refs.trigger
-					if (!menu || !trigger || !menu.offsetHeight) return
+					if (!menu || !trigger || !menu.offsetHeight) {
+						return
+					}
 					const room = window.innerHeight - trigger.getBoundingClientRect().bottom
 					const horizontal = this.dropdownPosition.split('-')[2]
 					this.dropdownPosition = `is-${room > menu.offsetHeight + 8 ? 'bottom' : 'top'}-${horizontal}`
