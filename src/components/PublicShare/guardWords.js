@@ -2,10 +2,10 @@
 // key is a literal call of t so that shareKeys.spec.js finds it.
 import { gatewayUnsupportedText, shareErrorText } from '@/components/PublicShare/shareWords'
 
-export function reasonText(event, t) {
+export function reasonText(event, t, locale) {
 	switch (event?.reason) {
 		case 'waf': return t('OWASP rule {rule}: {detail}', { rule: event.rule, detail: event.detail })
-		case 'country': return t('Country blocked: {country}', { country: event.country })
+		case 'country': return t('Country blocked: {country}', { country: countryName(event.country, locale) || event.country })
 		case 'scan': return t('Scan: many missing pages')
 		case 'rate': return t('Request limit exceeded')
 		case 'code': return t('Access code wrong too often')
@@ -58,7 +58,9 @@ function fieldText(name, t) {
 export function guardErrorText(e, t) {
 	const message = e?.response?.data?.message
 	const text = typeof message === 'string' ? message : ''
-	const [code, arg = ''] = [text.split(':')[0], text.slice(text.indexOf(':') + 1)]
+	const colon = text.indexOf(':')
+	const code = colon < 0 ? text : text.slice(0, colon)
+	const arg = colon < 0 ? '' : text.slice(colon + 1)
 	switch (code) {
 		case 'bad_policy': {
 			const m = arg.match(FIELD)
@@ -66,10 +68,12 @@ export function guardErrorText(e, t) {
 		}
 		case 'bad_request': return t('The settings were refused. Try again, or update ReCasaOS.')
 		case 'bad_name': return t('A name is 1 to 40 characters, with no control character')
-		case 'unknown_app': return t('{app} is not shared', { app: arg })
+		case 'unknown_app': return arg ? t('{app} is not shared', { app: arg }) : t('This app is not shared')
 		case 'not_shared': return t('This app is not shared')
 		case 'not_found': return t('This person no longer exists')
 		case 'gateway_unsupported': return gatewayUnsupportedText(t)
-		default: return shareErrorText(e, t)
+		default:
+			// the relay's busy and unreachable answers are known words; any other text is never shown raw
+			return [429, 502, 503].includes(e?.response?.status) ? shareErrorText(e, t) : t('Something went wrong. Try again in a moment.')
 	}
 }

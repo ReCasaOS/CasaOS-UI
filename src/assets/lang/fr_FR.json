@@ -3345,13 +3345,13 @@
   "Access code wrong too often": "Code d'accès erroné trop souvent",
   "Address blocked": "Adresse bloquée",
   "Banned address": "Adresse bannie",
-  "Banned": "Banni",
+  "Banned": "Bannie",
   "Observed, not blocked": "Observé, pas bloqué",
   "the allowed addresses": "les adresses autorisées",
   "the blocked addresses": "les adresses bloquées",
   "the countries": "les pays",
   "the request limit": "la limite de requêtes",
-  "the ban thresholds": "les seuils de ban",
+  "the ban thresholds": "les seuils de bannissement",
   "the OWASP rules": "les règles OWASP",
   "the disabled OWASP rules": "les règles OWASP désactivées",
   "Invalid value in {field}: {path}": "Valeur invalide dans {field} : {path}",
@@ -3360,5 +3360,6 @@
   "{app} is not shared": "{app} n'est pas partagée",
   "This app is not shared": "Cette app n'est pas partagée",
   "This person no longer exists": "Cette personne n'existe plus",
-  "This box's gateway is too old to protect shared apps: update ReCasaOS.": "La passerelle de cette box est trop ancienne pour protéger les apps partagées : mettez ReCasaOS à jour."
+  "This box's gateway is too old to protect shared apps: update ReCasaOS.": "La passerelle de cette box est trop ancienne pour protéger les apps partagées : mettez ReCasaOS à jour.",
+  "Something went wrong. Try again in a moment.": "Une erreur s'est produite. Réessayez dans un instant."
 }

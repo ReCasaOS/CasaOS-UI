@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyGuard, refreshGuard, resetShareGuard, shareGuard, shareGuardApi } from './shareGuard.js'
+import { applyGuard, refreshGuard, resetShareGuard, shareGuard, shareGuardApi, touchGuard } from './shareGuard.js'
 import { instance } from '@/service/service.js'
 
 vi.mock('@/service/service.js', () => {
@@ -68,6 +68,22 @@ describe('the protection of the shared apps', () => {
 		settle({ data: { data: { protection: false } } })
 		await reading
 		expect(shareGuard.view).toEqual(data)
+	})
+
+	it('a write that does not answer with the view drops the read in flight, and a forced read reads again', async () => {
+		let settle
+		instance.get.mockImplementationOnce(() => new Promise((resolve) => {
+			settle = resolve
+		}))
+		const reading = refreshGuard({ force: true })
+		await vi.waitFor(() => expect(instance.get).toHaveBeenCalledTimes(1))
+		touchGuard()
+		instance.get.mockImplementation(() => body({ people: [1] }))
+		const again = refreshGuard({ force: true })
+		settle({ data: { data: { people: [] } } })
+		await Promise.all([reading, again])
+		expect(instance.get).toHaveBeenCalledTimes(2)
+		expect(shareGuard.view).toEqual({ people: [1] })
 	})
 
 	it('a failed write keeps the view', async () => {

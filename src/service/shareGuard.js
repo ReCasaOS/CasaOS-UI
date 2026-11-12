@@ -54,15 +54,24 @@ async function read() {
 	}
 }
 
+// At most one read a minute whoever asks; `force` skips the wait, and after a read already in flight it reads again.
 export function refreshGuard({ force = false } = {}) {
-	if (!inFlight && (force || Date.now() - readAt >= wait)) {
+	if (inFlight ? force : force || Date.now() - readAt >= wait) {
 		readAt = Date.now()
-		inFlight = read().finally(() => {
-			inFlight = null
+		const p = (inFlight ? inFlight.then(read) : read()).finally(() => {
+			if (inFlight === p) {
+				inFlight = null
+			}
 		})
+		inFlight = p
 	}
 
 	return inFlight || Promise.resolve()
+}
+
+// A write that does not answer with the view (people, codes, bans) calls this: a read in flight is older than it.
+export function touchGuard() {
+	writes++
 }
 
 // For the writes that answer with the new view (protection, box, app). A refusal rethrows and leaves the store as it was.

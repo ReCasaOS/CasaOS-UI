@@ -8,7 +8,8 @@ const err = (message, status = 400) => ({ response: { status, data: { message } 
 describe('the words of the protection', () => {
 	it('says why a request was refused', () => {
 		expect(reasonText({ reason: 'waf', rule: 942100, detail: 'SQL Injection' }, t)).toBe('OWASP rule 942100: SQL Injection')
-		expect(reasonText({ reason: 'country', country: 'FR' }, t)).toBe('Country blocked: FR')
+		expect(reasonText({ reason: 'country', country: 'FR' }, t, 'en_US')).toBe('Country blocked: France')
+		expect(reasonText({ reason: 'country', country: 'ZZZ' }, t, 'en_US')).toBe('Country blocked: ZZZ')
 		expect(reasonText({ reason: 'scan' }, t)).toBe('Scan: many missing pages')
 		expect(reasonText({ reason: 'rate' }, t)).toBe('Request limit exceeded')
 		expect(reasonText({ reason: 'code' }, t)).toBe('Access code wrong too often')
@@ -61,9 +62,11 @@ describe('the words of the protection', () => {
 			expect(shareErrorText(err('gateway_unsupported'), t)).toBe(sentence)
 		})
 
-		it('falls back to the sharing words for anything else', () => {
+		it('never shows a raw string', () => {
 			expect(guardErrorText(err('', 429), t)).toBe('The relay is busy, try again later')
-			expect(guardErrorText(new Error('offline'), t)).toBe('offline')
+			expect(guardErrorText(new Error('offline'), t)).toBe('Something went wrong. Try again in a moment.')
+			expect(guardErrorText(err('some server text', 500), t)).toBe('Something went wrong. Try again in a moment.')
+			expect(guardErrorText(err('unknown_app'), t)).toBe('This app is not shared')
 		})
 	})
 })

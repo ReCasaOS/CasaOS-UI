@@ -3358,5 +3358,6 @@
   "{app} is not shared": "{app} is not shared",
   "This app is not shared": "This app is not shared",
   "This person no longer exists": "This person no longer exists",
-  "This box's gateway is too old to protect shared apps: update ReCasaOS.": "This box's gateway is too old to protect shared apps: update ReCasaOS."
+  "This box's gateway is too old to protect shared apps: update ReCasaOS.": "This box's gateway is too old to protect shared apps: update ReCasaOS.",
+  "Something went wrong. Try again in a moment.": "Something went wrong. Try again in a moment."
 }
