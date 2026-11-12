@@ -24,7 +24,8 @@
 								</b-button>
 							</div>
 						</b-tooltip>
-						<b-tooltip :active="unDiskData.length < 2"
+						<!-- where the storage layer answers, pools are made on its Pool tab -->
+						<b-tooltip v-if="!poolView" :active="unDiskData.length < 2"
 							:label="$t('Plug at least two blank drives to make a RAID.')" append-to-body
 							content-class="create-storage-tip" position="is-bottom" type="is-dark">
 							<div class="ml-2">
@@ -93,6 +94,10 @@
 						<!-- last, so that the places of the others do not move; only on a box that has a ZFS pool -->
 						<b-tab-item v-if="hasZfs" :label="$t('ZFS')" class="scrollbars-light-auto tab-item">
 							<zfs-panel :active="activeTab === 3"></zfs-panel>
+						</b-tab-item>
+						<!-- the storage layer (GET /v2/storage), where the storage service has it -->
+						<b-tab-item v-if="poolView" :label="$t('Pool')" class="scrollbars-light-auto tab-item">
+							<storage-pool :view="poolView" @changed="refreshPool"></storage-pool>
 						</b-tab-item>
 					</b-tabs>
 
@@ -219,6 +224,8 @@ import SnapRaidPanel from './SnapRaidPanel.vue'
 import SnapRaidCreate from './SnapRaidCreate.vue'
 import ZfsPanel from './ZfsPanel.vue'
 import { POOL, poolDisks, snapraidHeld } from './snapraidPool'
+import StoragePool from './StoragePool.vue'
+import { poolWorking } from './pools'
 import { mixin } from '@/mixins/mixin'
 import smoothReflow from '@/mixins/smoothReflow'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
@@ -236,6 +243,7 @@ export default {
 		RaidStatus,
 		SnapRaidPanel,
 		ZfsPanel,
+		StoragePool,
 		CToolTip: cToolTip,
 	},
 	mixins: [smoothReflow, mixin],
@@ -256,6 +264,10 @@ export default {
 			storageData: [],
 			raidArrays: [],
 			hasZfs: false,
+			// GET /v2/storage's data; null: the storage service has no storage layer
+			poolView: null,
+			poolTimer: null,
+			poolWorked: false,
 			mergeConbinationsStorageData: [],
 			// the folder the merged storage appears in, read with the merge
 			mergeMountPoint: POOL,
@@ -267,9 +279,9 @@ export default {
 		unmountedArrays() {
 			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
 		},
-		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet
+		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet; not where the storage layer makes pools
 		canCreateSnapRaid() {
-			return poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
+			return !this.poolView && poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
 		},
 		// the storages of their own that could hold a SnapRAID parity: mounted, not the system's, not a disk of the merge
 		parityCandidates() {
@@ -337,9 +349,35 @@ export default {
 
 	beforeUnmount() {
 		this.$EventBus.$off(events.REFRESH_DISKLIST)
+		clearTimeout(this.poolTimer)
 	},
 
 	methods: {
+		// the storage layer's view; looked at again every few seconds while the pool works (a rebuild,
+		// a conversion, a check); a service without it answers 404 and the tab stays hidden
+		async refreshPool() {
+			clearTimeout(this.poolTimer)
+			const first = this.poolView === null
+			try {
+				this.poolView = (await this.$api.pools.overview()).data.data
+			} catch {
+				this.poolView = null
+				return
+			}
+			if (first) {
+				// the Pool tab, after Storage, Merged Storage, Drive (and ZFS): once rendered, or b-tabs ignores the index
+				await this.$nextTick()
+				this.activeTab = this.hasZfs ? 4 : 3
+			}
+			const working = poolWorking(this.poolView)
+			if (working) {
+				this.poolTimer = setTimeout(() => this.refreshPool(), 3000)
+			} else if (this.poolWorked) {
+				this.getDiskList() // done: the storages and drives changed too
+			}
+			this.poolWorked = working
+		},
+
 		async showMergedStorage() {
 			await this.getDiskList()
 			this.activeTab = 1
@@ -424,7 +462,9 @@ export default {
 			} catch {
 				this.hasZfs = false
 			}
-			if (!this.hasZfs && this.activeTab === 3) {
+			// after the ZFS tab is known: the Pool tab comes after it
+			await this.refreshPool()
+			if (this.activeTab > 2 + Number(this.hasZfs) + Number(Boolean(this.poolView))) {
 				this.activeTab = 0
 			}
 
