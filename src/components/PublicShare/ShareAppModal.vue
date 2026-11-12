@@ -22,7 +22,8 @@
 				<template v-else>
 					<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
 					<template v-if="!shared">
-						<p class="mb-2">{{ $t('This app will be reachable by anyone who knows the address. Only its own login page protects it.') }}</p>
+						<p v-if="byCode" class="mb-2">{{ $t('This app will be reachable by anyone who knows the address. Only people with an access code get in.') }}</p>
+						<p v-else class="mb-2">{{ $t('This app will be reachable by anyone who knows the address. Only its own login page protects it.') }}</p>
 						<p class="mb-2 is-size-7">{{ $t('Some apps must know their public address (Nextcloud: trusted_domains); see their documentation.') }}</p>
 						<p v-if="!sharedApps(status).length" class="mb-2 is-size-7">
 							<a :href="status.tos_url" rel="noopener noreferrer" target="_blank">{{ $t('By turning it on, you accept the terms of service of Let\'s Encrypt.') }}</a>
@@ -37,6 +38,7 @@
 						</p>
 						<p class="is-size-7">{{ certLine }}</p>
 						<p v-if="tunnelLine" class="is-size-7">{{ tunnelLine }}</p>
+						<share-app-guard :app-name="appName" @manage="openRemoteAccess" />
 					</template>
 				</template>
 			</template>
@@ -50,13 +52,15 @@
 
 <script>
 import copy from 'clipboard-copy'
+import ShareAppGuard from './ShareAppGuard.vue'
 import ShareNameForm from './ShareNameForm.vue'
 import { appEntry, certText, reasonText, shareErrorText, sharedApps, tunnelText } from './shareWords'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
+import { refreshGuard, shareGuard } from '@/service/shareGuard'
 
 export default {
 	name: 'ShareAppModal',
-	components: { ShareNameForm },
+	components: { ShareAppGuard, ShareNameForm },
 	props: {
 		appName: { type: String, required: true },
 		appTitle: { type: String, default: '' },
@@ -75,6 +79,9 @@ export default {
 		},
 		shared() {
 			return this.entry?.shared === true
+		},
+		byCode() {
+			return shareGuard.ok && shareGuard.view?.apps?.[this.appName]?.access === 'code'
 		},
 		reason() {
 			return reasonText(this.status.reason, this.$t)
@@ -98,6 +105,7 @@ export default {
 		},
 	},
 	async mounted() {
+		refreshGuard()
 		try {
 			await refresh({ force: true })
 		} finally {

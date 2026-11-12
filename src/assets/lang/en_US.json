@@ -3418,5 +3418,17 @@
   "Settings for every shared app": "Settings for every shared app",
   "Turn protection on?": "Turn protection on?",
   "Turn on": "Turn on",
-  "A ban on the box comes after the relay and your Internet connection: it does not stop a flood (DDoS).": "A ban on the box comes after the relay and your Internet connection: it does not stop a flood (DDoS)."
+  "A ban on the box comes after the relay and your Internet connection: it does not stop a flood (DDoS).": "A ban on the box comes after the relay and your Internet connection: it does not stop a flood (DDoS).",
+  "Protection": "Protection",
+  "Open to anyone": "Open to anyone",
+  "Protected by code": "Protected by code",
+  "No one has access yet.": "No one has access yet.",
+  "Manage people": "Manage people",
+  "Own settings": "Own settings",
+  "Protect this app by code?": "Protect this app by code?",
+  "Mobile and sync apps (Jellyfin, Nextcloud, Home Assistant…) will no longer connect: only a web browser gets in.": "Mobile and sync apps (Jellyfin, Nextcloud, Home Assistant…) will no longer connect: only a web browser gets in.",
+  "Use the settings of the box?": "Use the settings of the box?",
+  "The own settings of this app are dropped.": "The own settings of this app are dropped.",
+  "Use the box": "Use the box",
+  "This app will be reachable by anyone who knows the address. Only people with an access code get in.": "This app will be reachable by anyone who knows the address. Only people with an access code get in."
 }

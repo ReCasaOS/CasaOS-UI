@@ -6,6 +6,7 @@ import copy from 'clipboard-copy'
 import ShareAppModal from './ShareAppModal.vue'
 import i18n from '@/plugins/i18n'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
+import { resetShareGuard, shareGuard, shareGuardApi } from '@/service/shareGuard'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
@@ -34,6 +35,17 @@ function show(status, ok = true) {
 	publicShare.ok = ok
 }
 
+const answer = data => ({ data: { data } })
+const POLICY = { waf: 'off', allow: [], block: [], rules_off: [], countries: { mode: 'none', list: [] }, rate_per_min: 600, ban: { waf_hits: 5, waf_window_s: 300, scan_404: 20, scan_window_s: 300, rate_strikes: 3, rate_window_s: 600, code_fails: 5, code_window_s: 900 } }
+const gview = (app = {}, extra = {}) => ({ supported: true, reason: '', protection: false, box: POLICY, apps: { jellyfin: { access: 'open', override: null, effective: POLICY, ...app } }, people: [], ...extra })
+function guard(view) {
+	shareGuard.view = view
+	shareGuard.ok = true
+}
+const SHARED = withApp({ ...JELLY, shared: true, url: 'https://jellyfin.mybox.relay.test' })
+const dialogButton = label => [...document.querySelectorAll('.dialog button')].find(b => b.textContent.includes(label))
+const MOBILE = 'will no longer connect: only a web browser gets in.'
+
 let wrapper
 async function mountIt() {
 	wrapper = mount(ShareAppModal, { props: { appName: 'jellyfin', appTitle: 'Jellyfin' }, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
@@ -47,6 +59,10 @@ describe('the share window of an app', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		show(null, false)
+		resetShareGuard()
+		vi.spyOn(shareGuardApi, 'view').mockImplementation(async () => (shareGuard.ok ? answer(shareGuard.view) : Promise.reject(new Error('no'))))
+		vi.spyOn(shareGuardApi, 'events').mockResolvedValue(answer([]))
+		vi.spyOn(shareGuardApi, 'bans').mockResolvedValue(answer([]))
 	})
 	afterEach(() => wrapper?.unmount())
 
@@ -158,5 +174,97 @@ describe('the share window of an app', () => {
 		expect(wrapper.text()).toContain('This relay does not support public sharing yet.')
 		expect(sw().element.checked).toBe(false)
 		expect(apply).toHaveBeenCalledTimes(1)
+	})
+
+	describe('protection of the shared app', () => {
+		const access = () => wrapper.find('.access-switch input')
+		beforeEach(() => show(SHARED))
+
+		it('asks before protecting by code, then keeps the override', async () => {
+			guard(gview({ override: { waf: 'block' } }))
+			await mountIt()
+			expect(wrapper.text()).toContain('Open to anyone')
+			vi.spyOn(shareGuardApi, 'setApp').mockResolvedValue(answer(gview({ access: 'code' })))
+			await access().setValue(true)
+			await flushPromises()
+			expect(document.body.textContent).toContain(MOBILE)
+			dialogButton('Turn on').click()
+			await flushPromises()
+			expect(shareGuardApi.setApp).toHaveBeenCalledWith('jellyfin', 'code', { waf: 'block' })
+			expect(wrapper.text()).toContain('Protected by code')
+		})
+
+		it('cancel makes no call and leaves it open', async () => {
+			guard(gview())
+			vi.spyOn(shareGuardApi, 'setApp')
+			await mountIt()
+			await access().setValue(true)
+			await flushPromises()
+			dialogButton('Cancel').click()
+			await flushPromises()
+			expect(shareGuardApi.setApp).not.toHaveBeenCalled()
+			expect(access().element.checked).toBe(false)
+		})
+
+		it('a Gateway that cannot do it is said, the mode stays open', async () => {
+			guard(gview())
+			vi.spyOn(shareGuardApi, 'setApp').mockRejectedValue({ response: { status: 400, data: { message: 'gateway_unsupported' } } })
+			await mountIt()
+			await access().setValue(true)
+			await flushPromises()
+			dialogButton('Turn on').click()
+			await flushPromises()
+			expect(wrapper.text()).toContain('gateway is too old')
+			expect(access().element.checked).toBe(false)
+			expect(wrapper.text()).toContain('Open to anyone')
+		})
+
+		it('lists the people of a protected app and links to manage them', async () => {
+			guard(gview({ access: 'code' }, { people: [{ id: 'p1', name: 'Maman', apps: ['jellyfin'] }, { id: 'p2', name: 'Papa', apps: ['other'] }] }))
+			await mountIt()
+			expect(wrapper.find('.people-line').text()).toBe('Maman')
+			const spy = vi.spyOn(wrapper.vm.$buefy.modal, 'open').mockImplementation(() => {})
+			await wrapper.find('.manage-people').trigger('click')
+			await flushPromises()
+			expect(wrapper.emitted('close')).toHaveLength(1)
+			expect(spy).toHaveBeenCalledWith(expect.objectContaining({ hasModalCard: true }))
+		})
+
+		it('shows the Protection part only when the box protects', async () => {
+			guard(gview())
+			await mountIt()
+			expect(wrapper.text()).not.toContain('Own settings')
+			wrapper.unmount()
+			guard(gview({}, { protection: true }))
+			await mountIt()
+			expect(wrapper.text()).toContain('Own settings')
+			expect(wrapper.findAll('.protection-mode input')[0].element.checked).toBe(true)
+		})
+
+		it('same as the box drops the override after a confirmation', async () => {
+			guard(gview({ override: { waf: 'block' } }, { protection: true }))
+			vi.spyOn(shareGuardApi, 'setApp').mockResolvedValue(answer(gview({}, { protection: true })))
+			await mountIt()
+			expect(wrapper.findAll('.protection-mode input')[1].element.checked).toBe(true)
+			await wrapper.findAll('.protection-mode input')[0].setValue(true)
+			await flushPromises()
+			expect(shareGuardApi.setApp).not.toHaveBeenCalled()
+			dialogButton('Use the box').click()
+			await flushPromises()
+			expect(shareGuardApi.setApp).toHaveBeenCalledWith('jellyfin', 'open', null)
+			expect(wrapper.findAll('.protection-mode input')[0].element.checked).toBe(true)
+		})
+
+		it('hides everything, silently, when the app leaves the view or the core is old', async () => {
+			guard(gview({}, { protection: true }))
+			await mountIt()
+			expect(wrapper.find('.share-app-guard').exists()).toBe(true)
+			shareGuard.view = { ...gview(), apps: {} }
+			await flushPromises()
+			expect(wrapper.find('.share-app-guard').exists()).toBe(false)
+			guard({ ...gview(), supported: false })
+			await flushPromises()
+			expect(wrapper.find('.share-app-guard').exists()).toBe(false)
+		})
 	})
 })
