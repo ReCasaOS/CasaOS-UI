@@ -24,11 +24,6 @@ export function actionText(action, t) {
 	}
 }
 
-// regional-indicator letters make the flag emoji; '' when there is no two-letter code
-export function flag(cc) {
-	return /^[a-z]{2}$/i.test(cc || '') ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : ''
-}
-
 export function countryName(cc, locale) {
 	if (!cc) {
 		return ''

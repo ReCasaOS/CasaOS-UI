@@ -37,7 +37,7 @@
 					</thead>
 					<tbody>
 						<tr v-for="(e, i) in page" :key="`${e.time}-${e.key}-${i}`">
-							<td>{{ when(e.time) }}</td><td>{{ e.ip }}</td><td>{{ place(e.country) }}</td><td>{{ network(e) }}</td>
+							<td>{{ when(e.time) }}</td><td>{{ e.ip }}</td><td><country-flag :cc="e.country" />{{ place(e.country) }}</td><td>{{ network(e) }}</td>
 							<td v-if="!app">{{ e.app }}</td><td>{{ e.path }}</td>
 							<td>{{ reasonText(e, $t, locale) }}</td>
 							<td>{{ actionText(e.action, $t) }}<span v-if="e.count > 1" class="ml-1">×{{ e.count }}</span></td>
@@ -56,7 +56,7 @@
 					</thead>
 					<tbody>
 						<tr v-for="b in page" :key="b.key">
-							<td>{{ b.ip }}</td><td>{{ place(b.country) }}</td><td>{{ network(b) }}</td><td>{{ b.app }}</td>
+							<td>{{ b.ip }}</td><td><country-flag :cc="b.country" />{{ place(b.country) }}</td><td>{{ network(b) }}</td><td>{{ b.app }}</td>
 							<td>{{ reasonLabel(b.reason) }}</td><td>{{ when(b.since) }}</td><td>{{ when(b.until) }}</td>
 							<td class="has-text-right">
 								<b-button class="unban" size="is-small" :disabled="busy" @click="unban(b)">{{ $t('Unban') }}</b-button>
@@ -74,7 +74,8 @@
 </template>
 
 <script>
-import { actionText, countryName, flag, guardErrorText, reasonText } from './guardWords'
+import CountryFlag from './CountryFlag.vue'
+import { actionText, countryName, guardErrorText, reasonText } from './guardWords'
 import { applyGuard, refreshGuard, shareGuard, shareGuardApi, touchGuard } from '@/service/shareGuard'
 
 const PER = 25
@@ -82,6 +83,7 @@ const NO_OVERRIDE = { waf: null, rules_off: null, allow: null, block: null, coun
 
 export default {
 	name: 'GuardJournal',
+	components: { CountryFlag },
 	props: {
 		app: { type: String, default: null },
 	},
@@ -136,7 +138,7 @@ export default {
 			return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(this.locale)
 		},
 		place(cc) {
-			return cc ? `${flag(cc)} ${countryName(cc, this.locale)}`.trim() : ''
+			return cc ? countryName(cc, this.locale) || cc : ''
 		},
 		network(x) {
 			return [x.as_org, x.asn > 0 ? `AS${x.asn}` : ''].filter(Boolean).join(' ')

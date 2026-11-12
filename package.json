@@ -41,6 +41,7 @@
     "dateformat": "^5.0.3",
     "dompurify": "^3.4.16",
     "file-saver": "^2.0.5",
+    "flag-icons": "7.6.0",
     "gsap": "^3.12.2",
     "hitbox-js": "^1.0.2",
     "htmlhint": "^1.9.2",

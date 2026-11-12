@@ -44,12 +44,12 @@
 				<label v-for="m in modes" :key="m.v" class="radio mr-3" :class="{ 'has-text-danger': bad('countries.mode') }"><input v-model="d.mode" type="radio" :value="m.v" :disabled="same.countries" class="mr-1">{{ m.text }}</label>
 				<div v-if="d.mode !== 'none'" class="mt-2">
 					<span v-for="cc in d.list" :key="cc" class="tag is-light mr-1 mb-1" :class="{ 'is-danger': bad('countries.list') }">
-						{{ flag(cc) }} {{ countryName(cc, $i18n.locale) }}<button class="delete is-small" type="button" :aria-label="`${$t('Remove')} ${cc}`" :disabled="same.countries" @click="d.list = d.list.filter(c => c !== cc)"></button>
+						<country-flag :cc="cc" />{{ countryName(cc, $i18n.locale) }}<button class="delete is-small" type="button" :aria-label="`${$t('Remove')} ${cc}`" :disabled="same.countries" @click="d.list = d.list.filter(c => c !== cc)"></button>
 					</span>
 					<div class="select is-small" :class="{ 'is-danger': bad('countries.list') || bad('countries.mode') }">
 						<select name="country-add" :aria-label="$t('Add a country')" :disabled="same.countries" @change="addCountry">
 							<option value="">{{ $t('Add a country') }}</option>
-							<option v-for="c in countries" :key="c.cc" :value="c.cc" :disabled="d.list.includes(c.cc)">{{ flag(c.cc) }} {{ c.name }}</option>
+							<option v-for="c in countries" :key="c.cc" :value="c.cc" :disabled="d.list.includes(c.cc)">{{ c.name }}</option>
 						</select>
 					</div>
 				</div>
@@ -75,7 +75,8 @@
 </template>
 
 <script>
-import { countryName, flag, guardErrorText } from './guardWords'
+import CountryFlag from './CountryFlag.vue'
+import { countryName, guardErrorText } from './guardWords'
 import { lines, validAddress } from './guardIp'
 
 const BLOCKS = ['waf', 'rules', 'lists', 'countries', 'limit', 'ban']
@@ -89,6 +90,7 @@ const CODES = 'AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG
 
 export default {
 	name: 'GuardPolicyForm',
+	components: { CountryFlag },
 	props: {
 		// the box policy to edit (or, with `box`, ignored: the override is edited against `box`)
 		policy: { type: Object, required: true },
@@ -219,7 +221,6 @@ export default {
 				KEYS[b].forEach(k => (this.d[k] = d[k]))
 			}
 		},
-		flag,
 		countryName,
 		bad(name) {
 			return this.numBad.includes(name) || this.field === name || this.field.startsWith(`${name}[`)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionText, countryName, flag, guardErrorText, reasonText } from './guardWords.js'
+import { actionText, countryName, guardErrorText, reasonText } from './guardWords.js'
 import { shareErrorText } from './shareWords.js'
 
 const t = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, k) => params[k])
@@ -25,11 +25,7 @@ describe('the words of the protection', () => {
 		expect(actionText('', t)).toBe('')
 	})
 
-	it('flags and names countries', () => {
-		expect(flag('FR')).toBe('🇫🇷')
-		expect(flag('fr')).toBe('🇫🇷')
-		expect(flag('')).toBe('')
-		expect(flag(undefined)).toBe('')
+	it('names countries', () => {
 		expect(countryName('FR', 'en_US')).toBe('France')
 		expect(countryName('DE', 'fr_FR')).toBe('Allemagne')
 		expect(countryName('', 'en_US')).toBe('')
