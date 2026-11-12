@@ -196,4 +196,32 @@ describe('the protection policy form', () => {
 		await save()
 		expect(emitted()[1][0]).toEqual({ waf: null, rules_off: null, allow: null, block: null, countries: null, rate_per_min: null, ban: null, ...Object.fromEntries(Object.entries({ waf: base().waf, rules_off: [], allow: [], block: [], countries: base().countries, rate_per_min: 600, ban: base().ban }).filter(([k]) => k in set)) })
 	})
+
+	it('takes the parent answer as its new baseline after a save', async () => {
+		form()
+		await wrapper.find('input[name=rate]').setValue('70')
+		await save()
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 71 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('71')
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 80 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('80')
+	})
+
+	it('keeps the edit when the parent refuses the save', async () => {
+		form()
+		await wrapper.find('input[name=rate]').setValue('70')
+		await save()
+		await wrapper.setProps({ error: 'bad_policy:rate_per_min' })
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 99 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('70')
+	})
+
+	it('clears a number highlight once the field is edited', async () => {
+		form()
+		await wrapper.find('input[name=rate]').setValue('')
+		await save()
+		expect(wrapper.find('input[name=rate]').classes()).toContain('is-danger')
+		await wrapper.find('input[name=rate]').setValue('5')
+		expect(wrapper.find('input[name=rate]').classes()).not.toContain('is-danger')
+	})
 })

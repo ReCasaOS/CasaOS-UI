@@ -102,7 +102,7 @@ export default {
 	emits: ['save'],
 	data() {
 		const f = this.fresh()
-		return { blocks: BLOCKS, same: f.same, d: f.d, ruleId: '', memory: false, snapshot: JSON.stringify(f), numBad: [] }
+		return { blocks: BLOCKS, same: f.same, d: f.d, ruleId: '', memory: false, snapshot: JSON.stringify(f), numBad: [], awaiting: false }
 	},
 	computed: {
 		titles() {
@@ -146,9 +146,20 @@ export default {
 				this.memory = true
 			}
 		},
+		// an edit clears the highlight of the numbers refused at the last save
+		d: { deep: true, handler() { this.numBad = [] } },
+		same: { deep: true, handler() { this.numBad = [] } },
+		// the parent refused the save: the edit stays
+		error(e) {
+			if (e) {
+				this.awaiting = false
+			}
+		},
 		// the parent saved or loaded something else: follow it, unless the person is in the middle of an edit
+		// (after our own save the answer is the new baseline, even if it differs from the draft)
 		sources() {
-			if (!this.dirty) {
+			if (!this.dirty || this.awaiting) {
+				this.awaiting = false
 				const f = this.fresh()
 				this.same = f.same
 				this.d = f.d
@@ -225,6 +236,7 @@ export default {
 			}
 			const ban = { ...d.ban }
 			BANS.forEach(([, w]) => (ban[w] = Math.round(d.min[w] * 60)))
+			this.awaiting = true
 			this.$emit('save', {
 				waf: s.waf ? null : d.waf,
 				rules_off: s.rules ? null : [...d.rules],
