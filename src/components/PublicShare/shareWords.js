@@ -22,6 +22,11 @@ export function reasonText(reason, t) {
 	}
 }
 
+// the 400 of the core when the Gateway has no protection routes (sharing an app or writing the protection)
+export function gatewayUnsupportedText(t) {
+	return t('This box\'s gateway is too old to protect shared apps: update ReCasaOS.')
+}
+
 export function certText(cert, locale, t) {
 	if (cert?.pending) {
 		return t('Certificate: being obtained')
@@ -67,6 +72,7 @@ const KNOWN = [
 	[/app is not installed/i, t => t('This app is not installed')],
 	[/cannot be made into a dns label/i, t => t('The app\'s name cannot be made into a DNS label')],
 	[/^(.+) is already shared at the same address/i, (t, m) => t('{app} is already shared at the same address', { app: m[1] })],
+	[/^gateway_unsupported$/, t => gatewayUnsupportedText(t)],
 	[/waiting for the master to register/i, t => reasonText('master', t)],
 	[/relay does not support public sharing/i, t => reasonText('relay', t)],
 	[/remote access is off/i, t => reasonText('remote-access', t)],
