@@ -114,4 +114,86 @@ describe('the protection policy form', () => {
 		form({ busy: true })
 		expect(wrapper.findAll('button').find(b => b.text() === 'Save').attributes('disabled')).toBeDefined()
 	})
+
+	it('keeps the box mode when an override holds only rule ids', async () => {
+		form({ box: { ...base(), waf: 'block', rules_off: [920100] }, override: { rules_off: [942100], waf: null } })
+		expect(wrapper.find('.guard-box-entries').text()).toContain('920100')
+		await save()
+		expect(emitted()[0][0]).toMatchObject({ waf: null, rules_off: [942100] })
+	})
+
+	it('refuses a cleared or fractional number and highlights it', async () => {
+		form()
+		await wrapper.find('input[name=rate]').setValue('')
+		await save()
+		expect(emitted()).toBeUndefined()
+		expect(wrapper.find('input[name=rate]').classes()).toContain('is-danger')
+		await wrapper.find('input[name=rate]').setValue('600')
+		await wrapper.find('input[name=ban-scan_404]').setValue('1.5')
+		await save()
+		expect(emitted()).toBeUndefined()
+		expect(wrapper.find('input[name=ban-scan_404]').classes()).toContain('is-danger')
+		expect(wrapper.find('input[name=rate]').classes()).not.toContain('is-danger')
+	})
+
+	it('does not check a list left on the box', async () => {
+		form({ box: base(), override: { allow: ['300.1.1.1'] } })
+		await wrapper.find('input[name=same-lists]').setValue(true)
+		await save()
+		expect(emitted()[0][0]).toMatchObject({ allow: null, block: null })
+	})
+
+	it('says the memory cost only when the mode goes from off to on', async () => {
+		form()
+		await wrapper.find('select[name=waf]').setValue('observe')
+		await wrapper.find('select[name=waf]').setValue('block')
+		expect(wrapper.text()).toContain('about 50 MB')
+		form({ box: { ...base(), waf: 'observe' }, override: { waf: 'block' } })
+		await wrapper.find('select[name=waf]').setValue('observe')
+		expect(wrapper.text()).not.toContain('about 50 MB')
+		await wrapper.find('input[name=same-waf]').setValue(true)
+		expect(wrapper.text()).not.toContain('about 50 MB')
+	})
+
+	it('follows its props while untouched, and keeps an edit in progress', async () => {
+		form()
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 50 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('50')
+		await wrapper.find('input[name=rate]').setValue('70')
+		await wrapper.setProps({ policy: { ...base(), rate_per_min: 90 } })
+		expect(wrapper.find('input[name=rate]').element.value).toBe('70')
+	})
+
+	it('highlights the country select on a countries error', () => {
+		form({ policy: { ...base(), countries: { mode: 'block', list: ['FR'] } }, error: 'bad_policy:countries.list[0]' })
+		expect(wrapper.find('select[name=country-add]').element.parentElement.classList).toContain('is-danger')
+	})
+
+	it.each([
+		['waf', 'select[name=waf]', 'block', { waf: 'block' }],
+		['rules', 'input[name=rule-id]', '942100', { rules_off: [942100] }],
+		['lists', 'textarea[name=allow]', '192.0.2.1', { allow: ['192.0.2.1'], block: [] }],
+		['countries', 'input[name=rate]', null, { countries: { mode: 'block', list: ['FR'] } }],
+		['limit', 'input[name=rate]', '5', { rate_per_min: 5 }],
+		['ban', 'input[name=ban-scan_404]', '7', { ban: expect.objectContaining({ scan_404: 7 }) }],
+	])('goes back to the box value when %s is switched on again', async (b, sel, value, set) => {
+		form({ box: base(), override: null })
+		const sw = () => wrapper.find(`input[name=same-${b}]`)
+		await sw().setValue(false)
+		if (b === 'rules') {
+			await wrapper.find(sel).setValue(value)
+			await wrapper.find('button[name=rule-add]').trigger('click')
+		} else if (b === 'countries') {
+			await wrapper.find('input[value=block][type=radio]').setValue()
+			await wrapper.find('select[name=country-add]').setValue('FR')
+		} else {
+			await wrapper.find(sel).setValue(value)
+		}
+		await save()
+		expect(emitted()[0][0]).toMatchObject(set)
+		await sw().setValue(true)
+		await sw().setValue(false)
+		await save()
+		expect(emitted()[1][0]).toEqual({ waf: null, rules_off: null, allow: null, block: null, countries: null, rate_per_min: null, ban: null, ...Object.fromEntries(Object.entries({ waf: base().waf, rules_off: [], allow: [], block: [], countries: base().countries, rate_per_min: 600, ban: base().ban }).filter(([k]) => k in set)) })
+	})
 })

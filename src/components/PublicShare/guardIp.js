@@ -1,4 +1,4 @@
-// An IPv4 or IPv6 address, or a CIDR, by the core's rule: no zone, no leading zero in an IPv4 octet, and an IPv4-mapped
+// An IPv4 or IPv6 address, or a CIDR, by the core's rule: a bare zoned address is not accepted here (the core takes it; refusing it is safe), no leading zero in an IPv4 octet, and an IPv4-mapped
 // prefix (::ffff:a.b.c.d/n) is refused (a bare mapped address is fine).
 function v4(s) {
 	const p = s.split('.')
@@ -39,7 +39,7 @@ function v6(s) {
 
 export function validAddress(line) {
 	const [addr, bits, ...more] = line.split('/')
-	if (more.length || (bits !== undefined && !/^\d{1,3}$/.test(bits))) {
+	if (more.length || (bits !== undefined && !/^(?:0|[1-9]\d{0,2})$/.test(bits))) {
 		return false
 	}
 	if (v4(addr)) {
