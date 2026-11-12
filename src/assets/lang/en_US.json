@@ -3383,5 +3383,21 @@
   "Missing pages (404)": "Missing pages (404)",
   "Wrong codes": "Wrong codes",
   "within": "within",
-  "minutes": "minutes"
+  "minutes": "minutes",
+  "Events": "Events",
+  "Date": "Date",
+  "Country": "Country",
+  "Until": "Until",
+  "Action": "Action",
+  "All apps": "All apps",
+  "All reasons": "All reasons",
+  "Scan": "Scan",
+  "Request limit": "Request limit",
+  "Access code": "Access code",
+  "Blocklist": "Blocklist",
+  "No events": "No events",
+  "No active bans": "No active bans",
+  "Unban": "Unban",
+  "Always allow this address": "Always allow this address",
+  "Stop applying this rule to {app}": "Stop applying this rule to {app}"
 }

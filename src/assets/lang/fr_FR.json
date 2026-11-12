@@ -3385,5 +3385,21 @@
   "Missing pages (404)": "Pages introuvables (404)",
   "Wrong codes": "Codes erronés",
   "within": "en",
-  "minutes": "minutes"
+  "minutes": "minutes",
+  "Events": "Événements",
+  "Date": "Date",
+  "Country": "Pays",
+  "Until": "Jusqu'à",
+  "Action": "Action",
+  "All apps": "Toutes les apps",
+  "All reasons": "Toutes les raisons",
+  "Scan": "Scan",
+  "Request limit": "Limite de requêtes",
+  "Access code": "Code d'accès",
+  "Blocklist": "Liste de blocage",
+  "No events": "Aucun événement",
+  "No active bans": "Aucun ban en cours",
+  "Unban": "Débannir",
+  "Always allow this address": "Toujours autoriser cette adresse",
+  "Stop applying this rule to {app}": "Ne plus appliquer cette règle à {app}"
 }
