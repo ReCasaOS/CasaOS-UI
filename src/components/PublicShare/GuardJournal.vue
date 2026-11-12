@@ -2,7 +2,7 @@
 	<div class="guard-journal">
 		<b-tabs v-model="tab" :animated="false" size="is-small">
 			<b-tab-item :label="$t('Events')" />
-			<b-tab-item :label="$t('Bans')" />
+			<b-tab-item :label="$t('Active bans')" />
 		</b-tabs>
 
 		<div class="is-flex is-align-items-center mb-2">
@@ -88,7 +88,7 @@ export default {
 	},
 	emits: ['changed'],
 	data() {
-		return { shareGuard, PER, tab: 0, events: [], bans: [], error: '', writeError: '', loading: false, busy: false, current: 1, appFilter: '', reasonFilter: '' }
+		return { shareGuard, PER, tab: 0, events: [], bans: [], error: '', writeError: '', loading: false, busy: false, seq: 0, partial: false, current: 1, appFilter: '', reasonFilter: '' }
 	},
 	computed: {
 		locale() {
@@ -109,6 +109,7 @@ export default {
 	},
 	watch: {
 		tab() {
+			this.writeError = ''
 			this.load()
 		},
 	},
@@ -152,21 +153,30 @@ export default {
 					params.reason = this.reasonFilter
 				}
 			}
+			const seq = ++this.seq
 			this.loading = true
 			try {
 				const list = (await (events ? shareGuardApi.events(params) : shareGuardApi.bans())).data.data
+				if (seq !== this.seq) {
+					return
+				}
 				this.error = ''
 				this[events ? 'events' : 'bans'] = Array.isArray(list) ? list : []
 			} catch (e) {
+				if (seq !== this.seq) {
+					return
+				}
 				this.error = guardErrorText(e, this.$t)
 				this[events ? 'events' : 'bans'] = []
 			} finally {
-				this.loading = false
-				this.current = 1
+				if (seq === this.seq) {
+					this.loading = false
+					this.current = 1
+				}
 			}
 		},
 		canStop(e) {
-			return !!shareGuard.view?.apps?.[e.app]
+			return e.rule > 0 && !!shareGuard.view?.apps?.[e.app]
 		},
 		async stopRule(e) {
 			const a = shareGuard.view?.apps?.[e.app]
@@ -187,13 +197,14 @@ export default {
 			})
 		},
 		async allow(b) {
-			const box = this.boxPolicy || shareGuard.view?.box
+			const box = shareGuard.view?.box || this.boxPolicy
 			if (!box) {
 				return
 			}
 			await this.write(async () => {
 				const allow = box.allow || []
 				await applyGuard(shareGuardApi.setBox({ ...box, allow: allow.includes(b.ip) ? allow : [...allow, b.ip] }))
+				this.partial = true
 				await shareGuardApi.unban(b.key)
 				touchGuard()
 				await this.load()
@@ -202,11 +213,16 @@ export default {
 		async write(fn) {
 			this.busy = true
 			this.writeError = ''
+			this.partial = false
 			try {
 				await fn()
 				this.$emit('changed')
 			} catch (e) {
 				this.writeError = guardErrorText(e, this.$t)
+				// the box was saved before the unban failed: the parent's copy is stale
+				if (this.partial) {
+					this.$emit('changed')
+				}
 			} finally {
 				this.busy = false
 			}

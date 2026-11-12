@@ -97,7 +97,7 @@ describe('the protection journal', () => {
 		await click('.allow')
 		expect(wrapper.find('.message.is-danger').exists()).toBe(true)
 		expect(wrapper.find('.guard-bans tbody tr').exists()).toBe(true)
-		expect(wrapper.emitted('changed')).toBeUndefined()
+		expect(wrapper.emitted('changed')).toHaveLength(1)
 	})
 
 	it('unbans and reloads the bans', async () => {
@@ -122,5 +122,58 @@ describe('the protection journal', () => {
 		await show()
 		expect(wrapper.findAll('.guard-events tbody tr')).toHaveLength(25)
 		expect(wrapper.findAll('.pagination-list a.pagination-link')).toHaveLength(3)
+	})
+
+	it('builds the box from the store, not from an older prop', async () => {
+		shareGuard.view = { ...view(), box: { ...box(), allow: ['192.0.2.1', '198.51.100.7'] } }
+		await show()
+		await wrapper.findAll('[role=tab], .tabs a').at(1).trigger('click')
+		await flushPromises()
+		await click('.allow')
+		expect(shareGuardApi.setBox).toHaveBeenCalledWith({ ...box(), allow: ['192.0.2.1', '198.51.100.7', '203.0.113.9'] })
+	})
+
+	it('tells the parent the box changed even when the unban then fails', async () => {
+		shareGuardApi.unban.mockRejectedValue({ response: { status: 500 } })
+		await show()
+		await wrapper.findAll('[role=tab], .tabs a').at(1).trigger('click')
+		await flushPromises()
+		await click('.allow')
+		expect(wrapper.emitted('changed')).toHaveLength(1)
+	})
+
+	it('does not repeat a rule the override already turns off', async () => {
+		shareGuard.view = view({ waf: null, rules_off: [942100], allow: null, block: null, countries: null, rate_per_min: null, ban: null })
+		await show()
+		await click('.stop-rule')
+		expect(shareGuardApi.setApp.mock.calls[0][2].rules_off).toEqual([942100])
+	})
+
+	it('offers no rule button on a waf event without a rule number', async () => {
+		shareGuardApi.events.mockResolvedValue(answer([ev({ rule: 0 })]))
+		await show()
+		expect(wrapper.find('.stop-rule').exists()).toBe(false)
+	})
+
+	it('unbans an IPv6 /64 with its raw key', async () => {
+		shareGuardApi.bans.mockResolvedValue(answer([ban({ key: '2001:db8::/64', ip: '2001:db8::1' })]))
+		await show()
+		await wrapper.findAll('[role=tab], .tabs a').at(1).trigger('click')
+		await flushPromises()
+		await click('.unban')
+		expect(shareGuardApi.unban).toHaveBeenCalledWith('2001:db8::/64')
+	})
+
+	it('drops an answer older than the latest request', async () => {
+		let late
+		shareGuardApi.events.mockReturnValueOnce(new Promise(ok => (late = ok)))
+		await show()
+		shareGuardApi.events.mockResolvedValue(answer([ev({ path: '/fresh' })]))
+		await wrapper.find('select[name=reason-filter]').setValue('scan')
+		await flushPromises()
+		late(answer([ev({ path: '/stale' })]))
+		await flushPromises()
+		expect(wrapper.text()).toContain('/fresh')
+		expect(wrapper.text()).not.toContain('/stale')
 	})
 })

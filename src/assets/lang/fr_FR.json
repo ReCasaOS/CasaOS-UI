@@ -3401,5 +3401,6 @@
   "No active bans": "Aucun ban en cours",
   "Unban": "Débannir",
   "Always allow this address": "Toujours autoriser cette adresse",
-  "Stop applying this rule to {app}": "Ne plus appliquer cette règle à {app}"
+  "Stop applying this rule to {app}": "Ne plus appliquer cette règle à {app}",
+  "Active bans": "Bans en cours"
 }

@@ -3399,5 +3399,6 @@
   "No active bans": "No active bans",
   "Unban": "Unban",
   "Always allow this address": "Always allow this address",
-  "Stop applying this rule to {app}": "Stop applying this rule to {app}"
+  "Stop applying this rule to {app}": "Stop applying this rule to {app}",
+  "Active bans": "Active bans"
 }
