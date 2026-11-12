@@ -1233,6 +1233,11 @@ export default {
 	}
 }
 
+// the cards' "update" chip sits at z-index 30; the + menu must open above it
+.file-dropdown ::v-deep .dropdown-menu {
+	z-index: 40;
+}
+
 .filters {
 	display: flex;
 	flex-wrap: wrap;
