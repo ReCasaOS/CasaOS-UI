@@ -24,30 +24,14 @@
 					<input v-model="form.apps" class="mr-1" type="checkbox" name="person-app" :value="a">{{ label(a) }}
 				</label>
 			</div>
-			<b-button native-type="submit" rounded size="is-small" type="is-primary" :disabled="busy || !form.name.trim()">{{ $t('Save') }}</b-button>
+			<b-button native-type="submit" rounded size="is-small" type="is-primary" :disabled="busy || !form.name.trim() || (!form.id && !form.apps.length)">{{ $t('Save') }}</b-button>
 			<b-button class="ml-1" rounded size="is-small" :disabled="busy" @click="form = null">{{ $t('Cancel') }}</b-button>
 		</form>
 		<b-button v-else class="mt-1 add-person" outlined rounded size="is-small" :disabled="busy" @click="form = { id: null, name: '', apps: [] }">{{ $t('Add a person') }}</b-button>
-
-		<!-- the code lives in this component only, until the dialog closes -->
-		<div v-if="shown" class="modal is-active code-dialog" role="dialog" aria-modal="true">
-			<div class="modal-background" @click="closeCode"></div>
-			<div class="modal-card">
-				<header class="modal-card-head"><p class="modal-card-title">{{ $t('Code for {name}', { name: shown.name }) }}</p></header>
-				<section class="modal-card-body has-text-centered">
-					<p class="is-size-3 has-text-weight-bold code-value">{{ shown.code }}</p>
-					<b-button class="mt-2 copy-code" size="is-small" @click="copyCode">{{ copied ? $t('Copied') : $t('Copy') }}</b-button>
-					<p class="mt-3 is-size-7">{{ $t('This code will not be shown again.') }}</p>
-				</section>
-				<footer class="modal-card-foot"><b-button class="close-code" type="is-primary" @click="closeCode">{{ $t('Close') }}</b-button></footer>
-			</div>
-		</div>
 	</div>
 </template>
 
 <script>
-import copy from 'clipboard-copy'
-import escape from 'lodash/escape'
 import { guardErrorText } from './guardWords'
 import { appEntry } from './shareWords'
 import { publicShare } from '@/service/publicShare'
@@ -57,8 +41,10 @@ const PER = 25
 
 export default {
 	name: 'SharePeople',
+	// the code of an add or a new code goes up to the section and is kept nowhere here
+	emits: ['code'],
 	data() {
-		return { shareGuard, publicShare, PER, current: 1, form: null, busy: false, error: '', shown: null, copied: false }
+		return { shareGuard, publicShare, PER, current: 1, form: null, busy: false, error: '' }
 	},
 	computed: {
 		people() {
@@ -74,9 +60,11 @@ export default {
 			return [...new Set([...Object.keys(apps).filter(a => apps[a].access === 'code'), ...own.filter(a => apps[a])])]
 		},
 	},
-	beforeUnmount() {
-		this.shown = null
-		clearTimeout(this.copyTimer)
+	watch: {
+		// a delete can leave the page empty
+		people(list) {
+			this.current = Math.max(1, Math.min(this.current, Math.ceil(list.length / PER)))
+		},
 	},
 	methods: {
 		label(name) {
@@ -97,8 +85,7 @@ export default {
 				const shown = await fn()
 				touchGuard()
 				if (shown) {
-					this.shown = shown
-					this.copied = false
+					this.$emit('code', shown)
 				}
 				this.form = null
 				await refreshGuard({ force: true })
@@ -121,7 +108,7 @@ export default {
 		},
 		confirmCode(p) {
 			this.$buefy.dialog.confirm({
-				title: this.$t('New code for {name}?', { name: escape(p.name) }),
+				title: this.$t('New code for {name}?', { name: p.name }),
 				message: this.$t('The old code stops working. The new one is shown once.'),
 				type: 'is-warning',
 				hasIcon: true,
@@ -133,7 +120,7 @@ export default {
 		},
 		confirmDelete(p) {
 			this.$buefy.dialog.confirm({
-				title: this.$t('Delete {name}?', { name: escape(p.name) }),
+				title: this.$t('Delete {name}?', { name: p.name }),
 				message: this.$t('Their code stops working at once.'),
 				type: 'is-danger',
 				hasIcon: true,
@@ -145,19 +132,6 @@ export default {
 					return null
 				}),
 			})
-		},
-		closeCode() {
-			this.shown = null
-		},
-		async copyCode() {
-			try {
-				await copy(this.shown.code)
-				this.copied = true
-				clearTimeout(this.copyTimer)
-				this.copyTimer = setTimeout(() => (this.copied = false), 2000)
-			} catch {
-				this.error = this.$t('This could not be copied')
-			}
 		},
 	},
 }

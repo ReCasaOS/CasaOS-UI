@@ -1,28 +1,43 @@
 <template>
-	<div v-if="visible" class="settings-card share-guard-section">
-		<p class="has-text-weight-medium mb-2">{{ $t('Protection of shared apps') }}</p>
-		<p v-if="!view.supported" class="update-sentence">{{ $t('Update ReCasaOS to protect shared apps') }}</p>
-		<template v-else>
-			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
-			<b-switch :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
+	<div>
+		<div v-if="visible" class="settings-card share-guard-section">
+			<p class="has-text-weight-medium mb-2">{{ $t('Protection of shared apps') }}</p>
+			<p v-if="!view.supported" class="update-sentence">{{ $t('Update ReCasaOS to protect shared apps') }}</p>
+			<template v-else>
+				<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
+				<b-switch :key="switchKey" :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
 
-			<template v-if="view.protection">
-				<p class="has-text-weight-medium mt-3 mb-2">{{ $t('Settings for every shared app') }}</p>
-				<b-message v-if="boxText" class="mb-3" size="is-small" type="is-danger">{{ boxText }}</b-message>
-				<guard-policy-form :policy="view.box" :busy="boxBusy" :error="boxError" @save="saveBox" />
+				<template v-if="view.protection">
+					<p class="has-text-weight-medium mt-3 mb-2">{{ $t('Settings for every shared app') }}</p>
+					<b-message v-if="boxText" class="mb-3" size="is-small" type="is-danger">{{ boxText }}</b-message>
+					<guard-policy-form :policy="view.box" :busy="boxBusy" :error="boxError" @save="saveBox" />
+				</template>
+
+				<share-people class="mt-4" @code="showCode" />
+
+				<template v-if="view.protection">
+					<p class="has-text-weight-medium mt-4 mb-2">{{ $t('Events') }}</p>
+					<guard-journal :app="null" :box-policy="view.box" />
+				</template>
 			</template>
-
-			<share-people class="mt-4" />
-
-			<template v-if="view.protection">
-				<p class="has-text-weight-medium mt-4 mb-2">{{ $t('Events') }}</p>
-				<guard-journal :app="null" :box-policy="view.box" />
-			</template>
-		</template>
+		</div>
+		<!-- outside the section: a failed read of the view must not take the code away before it is seen -->
+		<b-modal v-if="shown" :model-value="true" has-modal-card trap-focus aria-role="dialog" aria-modal @close="closeCode">
+			<div class="modal-card" style="width: auto">
+				<header class="modal-card-head"><p class="modal-card-title">{{ $t('Code for {name}', { name: shown.name }) }}</p></header>
+				<section class="modal-card-body has-text-centered">
+					<p class="is-size-3 has-text-weight-bold code-value">{{ shown.code }}</p>
+					<b-button class="mt-2 copy-code" size="is-small" @click="copyCode">{{ copied ? $t('Copied') : $t('Copy') }}</b-button>
+					<p class="mt-3 is-size-7">{{ $t('This code will not be shown again.') }}</p>
+				</section>
+				<footer class="modal-card-foot"><b-button class="close-code" type="is-primary" @click="closeCode">{{ $t('Close') }}</b-button></footer>
+			</div>
+		</b-modal>
 	</div>
 </template>
 
 <script>
+import copy from 'clipboard-copy'
 import GuardJournal from './GuardJournal.vue'
 import GuardPolicyForm from './GuardPolicyForm.vue'
 import SharePeople from './SharePeople.vue'
@@ -37,7 +52,7 @@ export default {
 	name: 'ShareGuardSection',
 	components: { GuardJournal, GuardPolicyForm, SharePeople },
 	data() {
-		return { shareGuard, publicShare, busy: false, error: '', boxBusy: false, boxError: '', boxText: '' }
+		return { shareGuard, publicShare, busy: false, error: '', boxBusy: false, boxError: '', boxText: '', switchKey: 0, shown: null, copied: false }
 	},
 	computed: {
 		view() {
@@ -50,6 +65,10 @@ export default {
 	mounted() {
 		refreshGuard()
 	},
+	beforeUnmount() {
+		this.shown = null
+		clearTimeout(this.copyTimer)
+	},
 	methods: {
 		toggle(on) {
 			if (!on || this.seen()) {
@@ -61,6 +80,7 @@ export default {
 				hasIcon: true,
 				confirmText: this.$t('Turn on'),
 				cancelText: this.$t('Cancel'),
+				onCancel: () => this.switchKey++,
 				onConfirm: () => {
 					try {
 						localStorage.setItem(SEEN, '1')
@@ -68,6 +88,23 @@ export default {
 					return this.setProtection(true)
 				},
 			})
+		},
+		showCode(shown) {
+			this.shown = shown
+			this.copied = false
+		},
+		closeCode() {
+			this.shown = null
+		},
+		async copyCode() {
+			try {
+				await copy(this.shown.code)
+				this.copied = true
+				clearTimeout(this.copyTimer)
+				this.copyTimer = setTimeout(() => (this.copied = false), 2000)
+			} catch {
+				this.error = this.$t('This could not be copied')
+			}
 		},
 		seen() {
 			try {
@@ -83,6 +120,8 @@ export default {
 				await applyGuard(shareGuardApi.setProtection(on))
 			} catch (e) {
 				this.error = guardErrorText(e, this.$t)
+				// the switch keeps its own value: draw it again from the store
+				this.switchKey++
 			} finally {
 				this.busy = false
 			}

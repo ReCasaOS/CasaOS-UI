@@ -56,19 +56,18 @@ describe('the people with an access code', () => {
 		expect(text).toContain('Never used')
 	})
 
-	it('shows the new code in a dialog, then leaves it nowhere', async () => {
+	it('hands the new code up and keeps it nowhere itself', async () => {
 		await show()
 		await button('Add a person').trigger('click')
 		expect(wrapper.findAll('input[name=person-app]')).toHaveLength(1)
+		expect(button('Save').attributes('disabled')).toBeDefined()
 		await wrapper.find('input[name=person-name]').setValue('Papa')
 		await wrapper.find('input[name=person-app]').setValue(true)
 		await wrapper.find('form').trigger('submit')
 		await flushPromises()
 		expect(shareGuardApi.addPerson).toHaveBeenCalledWith('Papa', ['jellyfin'])
-		expect(wrapper.find('.code-value').text()).toBe(CODE)
-		expect(wrapper.text()).toContain('This code will not be shown again.')
+		expect(wrapper.emitted('code')[0][0]).toEqual({ name: 'Papa', code: CODE })
 		expect(shareGuardApi.view).toHaveBeenCalled()
-		await wrapper.find('.close-code').trigger('click')
 		expect(wrapper.html()).not.toContain(CODE)
 		expect(JSON.stringify(shareGuard)).not.toContain(CODE)
 		expect(JSON.stringify(wrapper.vm.$data)).not.toContain(CODE)
@@ -81,7 +80,7 @@ describe('the people with an access code', () => {
 		expect(document.body.textContent).toContain('The old code stops working')
 		await confirm('New code')
 		expect(shareGuardApi.newCode).toHaveBeenCalledWith('p_1')
-		expect(wrapper.find('.code-value').text()).toBe('WXYZ-2345-6789')
+		expect(wrapper.emitted('code')[0][0]).toEqual({ name: 'Maman', code: 'WXYZ-2345-6789' })
 	})
 
 	it('asks before deleting', async () => {
@@ -100,7 +99,17 @@ describe('the people with an access code', () => {
 		await wrapper.find('form').trigger('submit')
 		await flushPromises()
 		expect(shareGuardApi.updatePerson).toHaveBeenCalledWith('p_1', 'Mamie', ['jellyfin'])
-		expect(wrapper.find('.code-dialog').exists()).toBe(false)
+		expect(wrapper.emitted('code')).toBeUndefined()
+	})
+
+	it('goes back a page when a delete empties the last one', async () => {
+		shareGuard.view = view({ people: Array.from({ length: 26 }, (_, i) => person({ id: `p_${i}`, name: `N${i}` })) })
+		await show()
+		wrapper.vm.current = 2
+		shareGuard.view = view({ people: shareGuard.view.people.slice(0, 25) })
+		await flushPromises()
+		expect(wrapper.vm.current).toBe(1)
+		expect(wrapper.text()).toContain('N0')
 	})
 
 	it('says to protect an app first when none is protected by code', async () => {
@@ -119,6 +128,6 @@ describe('the people with an access code', () => {
 		await wrapper.find('form').trigger('submit')
 		await flushPromises()
 		expect(wrapper.text()).toContain('A name is 1 to 40 characters')
-		expect(wrapper.find('.code-dialog').exists()).toBe(false)
+		expect(wrapper.emitted('code')).toBeUndefined()
 	})
 })

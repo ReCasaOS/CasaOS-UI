@@ -7,6 +7,7 @@ import i18n from '@/plugins/i18n'
 import { publicShare } from '@/service/publicShare'
 import { resetShareGuard, shareGuard, shareGuardApi } from '@/service/shareGuard'
 
+vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 
 const answer = data => ({ data: { data } })
@@ -99,5 +100,41 @@ describe('the protection section', () => {
 		await flushPromises()
 		expect(shareGuardApi.setBox).toHaveBeenCalled()
 		expect(wrapper.find('.guard-policy-form').text()).toContain('Invalid value in the request limit')
+	})
+
+	it('draws the switch off again when the notice is cancelled', async () => {
+		await show()
+		await flip()
+		dialogButton('Cancel').click()
+		await flushPromises()
+		expect(shareGuardApi.setProtection).not.toHaveBeenCalled()
+		expect(wrapper.find('.switch input').element.checked).toBe(false)
+	})
+
+	it('draws the switch off again when turning protection on fails', async () => {
+		localStorage.setItem('share-guard-ddos-seen', '1')
+		shareGuardApi.setProtection.mockRejectedValue({ response: { status: 400, data: { message: 'gateway_unsupported' } } })
+		await show()
+		await flip()
+		expect(wrapper.find('.switch input').element.checked).toBe(false)
+		expect(wrapper.text()).toContain('too old to protect shared apps')
+	})
+
+	it('keeps the new code shown when the read after it fails, and drops it on close', async () => {
+		vi.spyOn(shareGuardApi, 'addPerson').mockResolvedValue(answer({ person: { id: 'p_2', name: 'Papa', apps: ['jellyfin'] }, code: 'ABCD-EFGH-JKMN' }))
+		await show()
+		shareGuardApi.view.mockRejectedValue({ response: { status: 500 } })
+		await wrapper.find('.add-person').trigger('click')
+		await wrapper.find('input[name=person-name]').setValue('Papa')
+		await wrapper.find('input[name=person-app]').setValue(true)
+		await wrapper.find('form').trigger('submit')
+		await flushPromises()
+		expect(wrapper.find('.share-guard-section').exists()).toBe(false)
+		expect(wrapper.find('.code-value').text()).toBe('ABCD-EFGH-JKMN')
+		expect(wrapper.text()).toContain('This code will not be shown again.')
+		await wrapper.find('.close-code').trigger('click')
+		await flushPromises()
+		expect(wrapper.html()).not.toContain('ABCD-EFGH-JKMN')
+		expect(JSON.stringify(shareGuard)).not.toContain('ABCD-EFGH-JKMN')
 	})
 })
