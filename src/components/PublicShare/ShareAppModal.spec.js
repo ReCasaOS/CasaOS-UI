@@ -266,5 +266,33 @@ describe('the share window of an app', () => {
 			await flushPromises()
 			expect(wrapper.find('.share-app-guard').exists()).toBe(false)
 		})
+
+		it('says only people with a code get in, when protected', async () => {
+			guard(gview({ access: 'code' }))
+			await mountIt()
+			expect(wrapper.text()).toContain('Only people with an access code get in.')
+		})
+
+		it('a refused Same as the box keeps Own settings selected', async () => {
+			guard(gview({ override: { waf: 'block' } }, { protection: true }))
+			vi.spyOn(shareGuardApi, 'setApp').mockRejectedValue({ response: { status: 500, data: { message: 'x' } } })
+			await mountIt()
+			await wrapper.findAll('.protection-mode input')[0].setValue(true)
+			await flushPromises()
+			dialogButton('Use the box').click()
+			await flushPromises()
+			expect(wrapper.text()).toContain('Something went wrong')
+			expect(wrapper.findAll('.protection-mode input')[1].element.checked).toBe(true)
+		})
+
+		it('a bad_policy refusal is said above and passed to the form', async () => {
+			guard(gview({ override: { waf: 'block' } }, { protection: true }))
+			await mountIt()
+			vi.spyOn(shareGuardApi, 'setApp').mockRejectedValue({ response: { status: 400, data: { message: 'bad_policy:rate_per_min' } } })
+			wrapper.findComponent({ name: 'GuardPolicyForm' }).vm.$emit('save', { waf: 'block' })
+			await flushPromises()
+			expect(wrapper.text()).toContain('Invalid value in the request limit')
+			expect(wrapper.findComponent({ name: 'GuardPolicyForm' }).props('error')).toBe('bad_policy:rate_per_min')
+		})
 	})
 })

@@ -6,6 +6,7 @@
 			<b-switch :key="`a${key}`" :model-value="protectedByCode" :disabled="busy" @update:model-value="toggle">{{ protectedByCode ? $t('Protected by code') : $t('Open to anyone') }}</b-switch>
 		</div>
 		<template v-if="protectedByCode">
+			<p class="is-size-7 mt-2">{{ $t('Only people with an access code get in.') }}</p>
 			<p class="is-size-7 mt-2 people-line">{{ names.length ? names.join(', ') : $t('No one has access yet.') }}</p>
 			<b-button class="manage-people" size="is-small" type="is-text" @click="$emit('manage')">{{ $t('Manage people') }}</b-button>
 		</template>
@@ -105,12 +106,11 @@ export default {
 				await applyGuard(shareGuardApi.setApp(this.appName, access, override))
 			} catch (e) {
 				const message = e?.response?.data?.message
-				// the form highlights a refused field; any other failure is said above
+				// the form highlights a refused field with the raw message; the sentence is said above in every case
 				if (fromForm && typeof message === 'string' && message.startsWith('bad_policy')) {
 					this.formError = message
-				} else {
-					this.error = guardErrorText(e, this.$t)
 				}
+				this.error = guardErrorText(e, this.$t)
 				// the switch and the radios keep their own value: draw them again from the store
 				this.key++
 			} finally {
