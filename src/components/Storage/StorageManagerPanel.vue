@@ -24,7 +24,8 @@
 								</b-button>
 							</div>
 						</b-tooltip>
-						<b-tooltip :active="unDiskData.length < 2"
+						<!-- where the storage layer answers, pools are made on its Pool tab -->
+						<b-tooltip v-if="!poolView" :active="unDiskData.length < 2"
 							:label="$t('Plug at least two blank drives to make a RAID.')" append-to-body
 							content-class="create-storage-tip" position="is-bottom" type="is-dark">
 							<div class="ml-2">
@@ -278,9 +279,9 @@ export default {
 		unmountedArrays() {
 			return this.raidArrays.filter(array => !this.storageData.some(storage => storage.raid === array))
 		},
-		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet
+		// a SnapRAID storage is made of at least two drives, and only while nothing is merged yet; not where the storage layer makes pools
 		canCreateSnapRaid() {
-			return poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
+			return !this.poolView && poolDisks(this.storageData, this.unDiskData).length >= 2 && !this.mergeConbinationsStorageData.length
 		},
 		// the storages of their own that could hold a SnapRAID parity: mounted, not the system's, not a disk of the merge
 		parityCandidates() {
