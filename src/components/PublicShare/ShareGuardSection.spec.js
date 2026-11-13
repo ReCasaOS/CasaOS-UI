@@ -191,6 +191,50 @@ describe('the relay block', () => {
 		expect(wrapper.find('.relay-block').exists()).toBe(true)
 	})
 
+	it('shows the relay journal tab with box protection off', async () => {
+		shareGuard.view = view({ protection: false, relay: relay() })
+		await show()
+		expect(wrapper.text()).toContain('Cut at the relay')
+	})
+
+	it('shows the relay block when the gateway guard is not supported', async () => {
+		shareGuard.view = view({ supported: false, relay: relay() })
+		await show()
+		expect(wrapper.find('.relay-block').exists()).toBe(true)
+	})
+
+	it('does not talk about the protection of the box in the relay block', async () => {
+		shareGuard.view = view({ relay: relay() })
+		await show()
+		expect(wrapper.find('.relay-block').text()).not.toContain('Protection of the box')
+	})
+
+	it('warns when bans are shared but the relay does not filter', async () => {
+		shareGuard.view = view({ relay: relay({ share_bans: true, filter: false }) })
+		await show()
+		expect(wrapper.find('.relay-block').text()).toContain('turn filtering on to be protected by the community list')
+		shareGuard.view = view({ relay: relay({ share_bans: true, filter: true }) })
+		await flushPromises()
+		expect(wrapper.find('.relay-block').text()).not.toContain('turn filtering on')
+	})
+
+	it('hides the community size when it is 0', async () => {
+		shareGuard.view = view({ relay: relay({ community_size: 0 }) })
+		await show()
+		expect(wrapper.find('.relay-join-card').text()).not.toContain('already blocked')
+	})
+
+	it('says the relay has not taken a saved change yet, and draws the switches from the refreshed view', async () => {
+		shareGuard.view = view({ relay: relay() })
+		shareGuardApi.setRelay.mockRejectedValue({ response: { status: 500, data: { message: 'the change is saved, but the relay has not taken it yet: boom' } } })
+		await show()
+		shareGuardApi.view.mockImplementation(async () => answer(view({ relay: relay({ filter: false }) })))
+		await switches()[0].setValue(false)
+		await flushPromises()
+		expect(wrapper.text()).toContain('Saved; it will reach the relay in a moment.')
+		expect(switches()[0].element.checked).toBe(false)
+	})
+
 	it('testFilterSwitchCallsSetRelay', async () => {
 		shareGuard.view = view({ relay: relay() })
 		await show()

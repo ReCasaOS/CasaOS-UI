@@ -2,7 +2,7 @@
 	<div class="relay-join-card">
 		<p class="_name">{{ $t('Join the community protection') }}</p>
 		<p class="is-size-7 _has-text-gray">{{ $t('Your box sends the relay the addresses it bans: the address, the reason and the app, nothing else. In return, addresses banned by several networks are cut before they reach you.') }}</p>
-		<p class="is-size-7">{{ $t('{n} addresses already blocked by the community', { n: relay.community_size }) }}</p>
+		<p v-if="relay.community_size > 0" class="is-size-7">{{ $t('{n} addresses already blocked by the community', { n: relay.community_size }) }}</p>
 		<p v-if="waves.length > 0" class="is-size-7 relay-waves">{{ $t('These addresses could have been cut at the relay before reaching your box.') }}</p>
 		<b-button class="relay-join" type="is-primary" size="is-small" @click="ask">{{ $t('Join the community protection') }}</b-button>
 		<!-- closing it any way but "I agree" does nothing -->

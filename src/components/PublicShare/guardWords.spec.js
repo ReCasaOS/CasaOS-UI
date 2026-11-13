@@ -41,6 +41,10 @@ describe('the words of the protection', () => {
 	})
 
 	describe('the refusal of a write', () => {
+		it('tells the relay push failure from the gateway one', () => {
+			expect(guardErrorText(err('the change is saved, but the relay has not taken it yet: x', 500), t)).toBe('Saved; it will reach the relay in a moment.')
+			expect(guardErrorText(err('the change is saved, but the gateway failed: x', 500), t)).toBe('Saved; it will reach the box\'s gateway in a moment.')
+		})
 		it('names the field of the core\'s short path', () => {
 			expect(guardErrorText(err('bad_policy:allow[0]'), t)).toContain('the allowed addresses')
 			expect(guardErrorText(err('bad_policy:ban.scan_404'), t)).toContain('the ban thresholds')

@@ -44,7 +44,7 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-const refusal = (extra = {}) => ({ hour: '2026-11-12T10:00:00Z', key: '198.51.100.7', reason: 'external', source: 'FireHOL level 1', count: 12, ...extra })
+const refusal = (extra = {}) => ({ hour: '2026-11-12T10:00:00Z', key: '198.51.100.7/32', reason: 'external', source: 'FireHOL level 1', count: 12, ...extra })
 const relayTab = () => wrapper.findAll('[role=tab], .tabs a').filter(t => t.text().includes('Cut at the relay'))
 async function openRelay() {
 	await relayTab().at(0).trigger('click')
@@ -75,6 +75,7 @@ describe('the relay tab of the journal', () => {
 		expect(shareGuardApi.relayRefusals).toHaveBeenCalledTimes(1)
 		const text = wrapper.find('table.guard-relay').text()
 		expect(text).toContain('198.51.100.7')
+		expect(text).not.toContain('/32')
 		expect(text).toContain('On the list FireHOL level 1')
 		expect(text).toContain('12')
 	})

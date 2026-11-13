@@ -70,7 +70,7 @@
 					</thead>
 					<tbody>
 						<tr v-for="(r, i) in page" :key="`${r.hour}-${r.key}-${r.reason}-${i}`">
-							<td>{{ when(r.hour) }}</td><td class="_ip">{{ r.key }}</td><td>{{ relayReasonText(r, $t) }}</td><td>{{ r.count }}</td>
+							<td>{{ when(r.hour) }}</td><td class="_ip">{{ r.key.replace(/\/32$/, '') }}</td><td>{{ relayReasonText(r, $t) }}</td><td>{{ r.count }}</td>
 						</tr>
 					</tbody>
 				</table>

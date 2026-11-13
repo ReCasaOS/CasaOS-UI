@@ -67,6 +67,9 @@ export function guardErrorText(e, t) {
 	const text = typeof message === 'string' ? message : ''
 	// the core saved the change and will push it to the Gateway again (its message holds a colon)
 	if (e?.response?.status === 500 && text.startsWith('the change is saved')) {
+		if (text.includes('the relay')) {
+			return t('Saved; it will reach the relay in a moment.')
+		}
 		return t('Saved; it will reach the box\'s gateway in a moment.')
 	}
 	const colon = text.indexOf(':')

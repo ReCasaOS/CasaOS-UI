@@ -21,24 +21,24 @@
 				</div>
 			</section>
 
-			<template v-if="view.supported">
-				<section v-if="view.relay && view.relay.supported" class="settings-card relay-block">
-					<b-switch :key="`f${relayKey}`" :model-value="view.relay.filter" :disabled="relayBusy" @update:model-value="setRelay({ filter: $event })">{{ $t('Filtering by the relay') }}</b-switch>
-					<p class="is-size-7 _has-text-gray">{{ $t('The relay cuts addresses known as malicious before they reach your box.') }}</p>
-					<p class="is-size-7 _has-text-gray">{{ view.protection ? $t('Protection of the box is on.') : $t('Protection of the box is off.') }}</p>
-					<b-message v-if="relayError" class="mb-0" size="is-small" type="is-danger">{{ relayError }}</b-message>
-					<template v-if="view.relay.share_bans">
-						<b-switch :key="`s${relayKey}`" :model-value="true" :disabled="relayBusy" @update:model-value="setRelay({ share_bans: $event })">{{ $t('Share my bans') }}</b-switch>
-						<p class="is-size-7">{{ $t('Your reports added {n} addresses to the community list this month', { n: view.relay.contributed_month }) }}</p>
-					</template>
-					<relay-join v-else :relay="view.relay" :waves="view.waves || []" :busy="relayBusy" @join="setRelay({ share_bans: true, consent: true })" />
-				</section>
+			<section v-if="view.relay && view.relay.supported" class="settings-card relay-block">
+				<b-switch :key="`f${relayKey}`" :model-value="view.relay.filter" :disabled="relayBusy" @update:model-value="setRelay({ filter: $event })">{{ $t('Filtering by the relay') }}</b-switch>
+				<p class="is-size-7 _has-text-gray">{{ $t('The relay cuts addresses known as malicious before they reach your box.') }}</p>
+				<b-message v-if="relayError" class="mb-0" size="is-small" type="is-danger">{{ relayError }}</b-message>
+				<template v-if="view.relay.share_bans">
+					<b-switch :key="`s${relayKey}`" :model-value="true" :disabled="relayBusy" @update:model-value="setRelay({ share_bans: $event })">{{ $t('Share my bans') }}</b-switch>
+					<p v-if="!view.relay.filter" class="is-size-7">{{ $t('Your bans are shared, but the relay does not filter your visitors: turn filtering on to be protected by the community list.') }}</p>
+					<p class="is-size-7">{{ $t('Your reports added {n} addresses to the community list this month', { n: view.relay.contributed_month }) }}</p>
+				</template>
+				<relay-join v-else :relay="view.relay" :waves="view.waves || []" :busy="relayBusy" @join="setRelay({ share_bans: true, consent: true })" />
+			</section>
 
+			<template v-if="view.supported">
 				<section class="settings-card p-0">
 					<share-people @code="showCode" />
 				</section>
 
-				<section v-if="view.protection" class="settings-card _journal">
+				<section v-if="view.protection || (view.relay && view.relay.supported)" class="settings-card _journal">
 					<guard-journal :app="null" :title="$t('Events')" :hint="$t('What the protection refused for every shared app, and the addresses banned right now.')" />
 				</section>
 			</template>
