@@ -245,7 +245,7 @@ import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { renderSize } from '@/mixins/file_utils'
 import tipEditorModal from '@/components/Apps/TipEditorModal.vue'
 import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
-import { menuSide } from '@/components/Apps/menuSide'
+import { menuPlace } from '@/components/Apps/menuSide'
 
 // Query parameter carrying the ID of the container a recreate was asked for. The
 // backend copies every query parameter of the request into the properties of the
@@ -617,12 +617,21 @@ export default {
 				this.$nextTick(() => {
 					const menu = this.$refs.dro && this.$refs.dro.$refs.dropdownMenu
 					const trigger = this.$refs.dro && this.$refs.dro.$refs.trigger
-					if (!menu || !trigger || !menu.offsetHeight) {
+					const content = menu && menu.querySelector('.dropdown-content')
+					if (!menu || !trigger || !content) {
+						return
+					}
+					// measure the menu at its natural height, not the one capped on an earlier opening
+					content.style.maxHeight = ''
+					if (!menu.offsetHeight) {
 						return
 					}
 					const rect = trigger.getBoundingClientRect()
 					const horizontal = this.dropdownPosition.split('-')[2]
-					this.dropdownPosition = `is-${menuSide(rect.top, window.innerHeight - rect.bottom, menu.offsetHeight)}-${horizontal}`
+					const { side, maxHeight } = menuPlace(rect.top, window.innerHeight - rect.bottom, menu.offsetHeight)
+					this.dropdownPosition = `is-${side}-${horizontal}`
+					content.style.maxHeight = maxHeight ? `${maxHeight}px` : ''
+					content.style.overflowY = maxHeight ? 'auto' : ''
 				})
 			}
 		},
