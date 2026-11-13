@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionText, countryName, guardErrorText, reasonText } from './guardWords.js'
+import { actionText, countryName, guardErrorText, reasonText, relayReasonText } from './guardWords.js'
 import { shareErrorText } from './shareWords.js'
 
 const t = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, k) => params[k])
@@ -16,6 +16,15 @@ describe('the words of the protection', () => {
 		expect(reasonText({ reason: 'blocklist' }, t)).toBe('Address blocked')
 		expect(reasonText({ reason: 'banned' }, t)).toBe('Banned address')
 		expect(reasonText({ reason: 'other' }, t)).toBe('')
+	})
+
+	it('says why the relay cut an address', () => {
+		expect(relayReasonText({ reason: 'manual' }, t)).toBe('Blocked by the relay operator')
+		expect(relayReasonText({ reason: 'suspended' }, t)).toBe('Shared name suspended')
+		expect(relayReasonText({ reason: 'external', source: 'FireHOL level 1' }, t)).toBe('On the list FireHOL level 1')
+		expect(relayReasonText({ reason: 'community' }, t)).toBe('Community list')
+		expect(relayReasonText({ reason: 'cap' }, t)).toBe('Too many connections')
+		expect(relayReasonText({ reason: 'other' }, t)).toBe('')
 	})
 
 	it('says what was done', () => {

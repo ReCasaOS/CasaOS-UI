@@ -44,6 +44,64 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+const refusal = (extra = {}) => ({ hour: '2026-11-12T10:00:00Z', key: '198.51.100.7', reason: 'external', source: 'FireHOL level 1', count: 12, ...extra })
+const relayTab = () => wrapper.findAll('[role=tab], .tabs a').filter(t => t.text().includes('Cut at the relay'))
+async function openRelay() {
+	await relayTab().at(0).trigger('click')
+	await flushPromises()
+}
+
+describe('the relay tab of the journal', () => {
+	beforeEach(() => {
+		shareGuard.view = { ...view(), relay: { supported: true } }
+		vi.spyOn(shareGuardApi, 'relayRefusals').mockResolvedValue(answer([refusal()]))
+	})
+
+	it('is hidden when the relay is not supported', async () => {
+		shareGuard.view = view()
+		await show()
+		expect(relayTab()).toHaveLength(0)
+	})
+
+	it('is hidden in an app window', async () => {
+		await show({ app: 'jellyfin' })
+		expect(relayTab()).toHaveLength(0)
+	})
+
+	it('reads nothing until it is opened, then lists the refusals', async () => {
+		await show()
+		expect(shareGuardApi.relayRefusals).not.toHaveBeenCalled()
+		await openRelay()
+		expect(shareGuardApi.relayRefusals).toHaveBeenCalledTimes(1)
+		const text = wrapper.find('table.guard-relay').text()
+		expect(text).toContain('198.51.100.7')
+		expect(text).toContain('On the list FireHOL level 1')
+		expect(text).toContain('12')
+	})
+
+	it('reads again on Refresh', async () => {
+		await show()
+		await openRelay()
+		await click('button[name=refresh]')
+		expect(shareGuardApi.relayRefusals).toHaveBeenCalledTimes(2)
+	})
+
+	it('says so when nothing was cut', async () => {
+		shareGuardApi.relayRefusals.mockResolvedValue(answer([]))
+		await show()
+		await openRelay()
+		expect(wrapper.text()).toContain('Nothing was cut at the relay in the last 7 days.')
+		expect(wrapper.find('table.guard-relay').exists()).toBe(false)
+	})
+
+	it('shows an error as the journal does', async () => {
+		shareGuardApi.relayRefusals.mockRejectedValue({ response: { status: 502, data: { message: 'x' } } })
+		await show()
+		await openRelay()
+		expect(wrapper.text()).toContain('Something went wrong')
+	})
+})
+
 describe('the protection journal', () => {
 	it('shows the reason sentence, the flag, the network and the count', async () => {
 		shareGuardApi.events.mockResolvedValue(answer([ev({ count: 50 })]))

@@ -3462,5 +3462,14 @@
   "{app}: {n} addresses banned in 10 minutes": "{app}: {n} addresses banned in 10 minutes",
   "Country filtering of shared apps is not working": "Country filtering of shared apps is not working",
   "Saved; it will reach the box's gateway in a moment.": "Saved; it will reach the box's gateway in a moment.",
-  "Turned off": "Turned off"
+  "Turned off": "Turned off",
+  "Cut at the relay": "Cut at the relay",
+  "Hour": "Hour",
+  "Count": "Count",
+  "Nothing was cut at the relay in the last 7 days.": "Nothing was cut at the relay in the last 7 days.",
+  "Blocked by the relay operator": "Blocked by the relay operator",
+  "Shared name suspended": "Shared name suspended",
+  "On the list {source}": "On the list {source}",
+  "Community list": "Community list",
+  "Too many connections": "Too many connections"
 }

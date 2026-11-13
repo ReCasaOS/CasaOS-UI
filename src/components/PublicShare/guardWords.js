@@ -15,6 +15,18 @@ export function reasonText(event, t, locale) {
 	}
 }
 
+// source is a list name chosen by the relay operator: text only
+export function relayReasonText(r, t) {
+	switch (r?.reason) {
+		case 'manual': return t('Blocked by the relay operator')
+		case 'suspended': return t('Shared name suspended')
+		case 'external': return t('On the list {source}', { source: r.source })
+		case 'community': return t('Community list')
+		case 'cap': return t('Too many connections')
+		default: return ''
+	}
+}
+
 export function actionText(action, t) {
 	switch (action) {
 		case 'blocked': return t('Blocked')

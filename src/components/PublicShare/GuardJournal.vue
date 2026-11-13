@@ -11,6 +11,7 @@
 					{{ $t('Active bans') }}<span v-if="counted.bans" :class="{ 'is-bad': bans.length }" class="_count">{{ shownBans.length }}</span>
 				</template>
 			</b-tab-item>
+			<b-tab-item v-if="relayShown" :label="$t('Cut at the relay')" />
 		</b-tabs>
 
 		<!-- with a title, a head of its own (tile, title, what it is) with the filters and Refresh at the right, above the tabs -->
@@ -42,7 +43,7 @@
 		<b-message v-if="writeError" size="is-small" type="is-danger">{{ writeError }}</b-message>
 		<b-message v-if="error" size="is-small" type="is-danger">{{ error }}</b-message>
 		<template v-else>
-			<p v-if="!rows.length && !loading" class="is-size-7">{{ tab === 0 ? $t('No events') : $t('No active bans') }}</p>
+			<p v-if="!rows.length && !loading" class="is-size-7">{{ emptyText }}</p>
 			<div v-else class="table-container">
 				<table v-if="tab === 0" class="table is-narrow is-fullwidth is-size-7 guard-events">
 					<thead>
@@ -60,6 +61,16 @@
 							<td>
 								<b-button v-if="e.reason === 'waf' && canStop(e)" class="stop-rule" size="is-small" type="is-text" :disabled="busy" @click="stopRule(e)">{{ $t('Stop applying this rule to {app}', { app: e.app }) }}</b-button>
 							</td>
+						</tr>
+					</tbody>
+				</table>
+				<table v-else-if="tab === 2" class="table is-narrow is-fullwidth is-size-7 guard-relay">
+					<thead>
+						<tr><th>{{ $t('Hour') }}</th><th>{{ $t('IP address') }}</th><th>{{ $t('Reason') }}</th><th>{{ $t('Count') }}</th></tr>
+					</thead>
+					<tbody>
+						<tr v-for="(r, i) in page" :key="`${r.hour}-${r.key}-${r.reason}-${i}`">
+							<td>{{ when(r.hour) }}</td><td class="_ip">{{ r.key }}</td><td>{{ relayReasonText(r, $t) }}</td><td>{{ r.count }}</td>
 						</tr>
 					</tbody>
 				</table>
@@ -91,7 +102,7 @@
 
 <script>
 import CountryFlag from './CountryFlag.vue'
-import { actionText, countryName, guardErrorText, reasonText } from './guardWords'
+import { actionText, countryName, guardErrorText, reasonText, relayReasonText } from './guardWords'
 import { applyGuard, refreshGuard, shareGuard, shareGuardApi, touchGuard } from '@/service/shareGuard'
 
 const PER = 25
@@ -108,12 +119,22 @@ export default {
 	},
 	data() {
 		// counted: which list has been read once, so its tab can show how many it holds
-		return { shareGuard, PER, tab: 0, events: [], bans: [], counted: { events: false, bans: false }, error: '', writeError: '', loading: false, busy: false, seq: 0, current: 1, appFilter: '', reasonFilter: '' }
+		return { shareGuard, PER, tab: 0, events: [], bans: [], relay: [], counted: { events: false, bans: false, relay: false }, error: '', writeError: '', loading: false, busy: false, seq: 0, current: 1, appFilter: '', reasonFilter: '' }
 	},
 	computed: {
 		// the bans the tab lists: an app's own when the journal is an app's
 		shownBans() {
 			return this.app ? this.bans.filter(b => b.app === this.app) : this.bans
+		},
+		// the relay's own cuts: for the box, not for one app
+		relayShown() {
+			return !this.app && !!shareGuard.view?.relay?.supported
+		},
+		emptyText() {
+			if (this.tab === 2) {
+				return this.$t('Nothing was cut at the relay in the last 7 days.')
+			}
+			return this.tab === 0 ? this.$t('No events') : this.$t('No active bans')
 		},
 		locale() {
 			return this.$i18n.locale.replace('_', '-')
@@ -127,7 +148,7 @@ export default {
 		},
 		// the bans route has no app parameter: an app's window keeps its own bans
 		rows() {
-			return this.tab === 0 ? this.events : this.shownBans
+			return [this.events, this.shownBans, this.relay][this.tab]
 		},
 		page() {
 			return this.rows.slice((this.current - 1) * PER, this.current * PER)
@@ -144,6 +165,7 @@ export default {
 	},
 	methods: {
 		reasonText,
+		relayReasonText,
 		actionText,
 		reasonLabel(r) {
 			switch (r) {
@@ -168,6 +190,7 @@ export default {
 			return [x.as_org, x.asn > 0 ? `AS${x.asn}` : ''].filter(Boolean).join(' ')
 		},
 		async load() {
+			const name = ['events', 'bans', 'relay'][this.tab]
 			const events = this.tab === 0
 			const params = {}
 			if (events) {
@@ -182,19 +205,19 @@ export default {
 			const seq = ++this.seq
 			this.loading = true
 			try {
-				const list = (await (events ? shareGuardApi.events(params) : shareGuardApi.bans())).data.data
+				const list = (await (events ? shareGuardApi.events(params) : name === 'bans' ? shareGuardApi.bans() : shareGuardApi.relayRefusals())).data.data
 				if (seq !== this.seq) {
 					return
 				}
 				this.error = ''
-				this[events ? 'events' : 'bans'] = Array.isArray(list) ? list : []
-				this.counted[events ? 'events' : 'bans'] = true
+				this[name] = Array.isArray(list) ? list : []
+				this.counted[name] = true
 			} catch (e) {
 				if (seq !== this.seq) {
 					return
 				}
 				this.error = guardErrorText(e, this.$t)
-				this[events ? 'events' : 'bans'] = []
+				this[name] = []
 			} finally {
 				if (seq === this.seq) {
 					this.loading = false
