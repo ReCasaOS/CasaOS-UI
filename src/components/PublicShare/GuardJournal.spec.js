@@ -86,7 +86,10 @@ describe('the relay tab of the journal', () => {
 		await openRelay()
 		const cells = wrapper.findAll('table.guard-relay tbody tr td:nth-child(2)')
 		expect(cells).toHaveLength(2)
-		cells.forEach(c => { expect(c.text()).toBe('Other addresses'); expect(c.classes()).not.toContain('_ip') })
+		for (const c of cells) {
+			expect(c.text()).toBe('Other addresses')
+			expect(c.classes()).not.toContain('_ip')
+		}
 	})
 
 	it('reads again on Refresh', async () => {
