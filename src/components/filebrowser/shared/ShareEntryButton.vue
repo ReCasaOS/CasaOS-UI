@@ -1,24 +1,23 @@
 <template>
 	<div>
 
-		<div :class="{ active }" class="is-flex list-item new-list-item" @click.prevent="$emit('open')">
-
-			<b-tooltip :active="tipVisible" :triggers="[]" always content-class="share-tip" position="is-right">
-				<template #content>
-					<div class="is-flex ">
-						{{ $t('Start sharing your files on the local network.') }}
-						<div class="is-clickable ml-1 is-flex is-align-items-center" @click.stop="hideTip">
-							<b-icon icon="close-xs" pack="casa"></b-icon>
-						</div>
+		<!-- the tip is anchored to the whole row, and drawn outside the sidebar, which would clip it beside the row -->
+		<b-tooltip :active="tipVisible" :triggers="[]" always append-to-body content-class="share-tip" expanded position="is-right">
+			<template #content>
+				<div class="is-flex ">
+					{{ $t('Start sharing your files on the local network.') }}
+					<div class="is-clickable ml-1 is-flex is-align-items-center" @click.stop="hideTip">
+						<b-icon icon="close-xs" pack="casa"></b-icon>
 					</div>
-				</template>
+				</div>
+			</template>
+			<div :class="{ active }" class="is-flex list-item new-list-item" @click.prevent="$emit('open')">
 				<div class="cover mr-2 is-flex-shrink-0 is-flex is-align-items-center none-click">
 					<b-icon icon="share" pack="casa"></b-icon>
 				</div>
-			</b-tooltip>
-			<div><span>{{ $t('Shared') }}</span></div>
-
-		</div>
+				<div><span>{{ $t('Shared') }}</span></div>
+			</div>
+		</b-tooltip>
 
 	</div>
 </template>
