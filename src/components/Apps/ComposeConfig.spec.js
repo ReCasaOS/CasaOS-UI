@@ -355,3 +355,30 @@ services:
 		expect(parsed('install').volumes[0].source).toBe('/DATA/AppData/$AppID/data')
 	})
 })
+
+describe('composeConfig restart policy', () => {
+	const withRestart = restart => `name: jellyfin
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+${restart}`
+	const policy = yamlText => editorModel(yamlText).services.jellyfin.restart
+
+	it('keeps "no" for a service that must run once', () => {
+		expect(policy(withRestart('    restart: "no"'))).toBe('no')
+		expect(emitYaml(editorModel(withRestart('    restart: "no"')), withRestart('    restart: "no"')).services.jellyfin.restart).toBe('no')
+	})
+
+	it('reads an unquoted no, which YAML 1.1 calls false, as "no"', () => {
+		expect(policy(withRestart('    restart: no'))).toBe('no')
+	})
+
+	it('keeps the other policies', () => {
+		expect(policy(withRestart('    restart: always'))).toBe('always')
+		expect(policy(withRestart('    restart: on-failure'))).toBe('on-failure')
+	})
+
+	it('gives a service with no policy the default', () => {
+		expect(policy(withRestart(''))).toBe('unless-stopped')
+	})
+})

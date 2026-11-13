@@ -147,6 +147,9 @@
 
 					<b-field :label="$t('Restart Policy')">
 						<b-select v-model="service.restart" :placeholder="$t('Select')" expanded>
+							<option value="no">
+								no
+							</option>
 							<option value="on-failure">
 								on-failure
 							</option>
@@ -757,10 +760,12 @@ export default {
 			if (composeServicesItemInput.restart !== undefined) {
 				composeServicesItem.restart = composeServicesItemInput.restart
 			}
-			composeServicesItem.restart
-        = composeServicesItem.restart === 'no' || !composeServicesItem.restart
-					? 'unless-stopped'
-					: composeServicesItem.restart
+			// "no" is a policy of its own (a one-shot service), not a missing one; only a service
+			// with nothing set gets the default. YAML 1.1 reads an unquoted `no` as false.
+			if (composeServicesItem.restart === false) {
+				composeServicesItem.restart = 'no'
+			}
+			composeServicesItem.restart = composeServicesItem.restart || 'unless-stopped'
 
 			// command
 			composeServicesItem.command = this.makeArray(composeServicesItemInput.command)
