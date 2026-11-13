@@ -172,3 +172,44 @@ describe('the stub of public sharing', () => {
 		expect(ask('DELETE', '/v1/share/apps', null, state).body.data.apps.some(a => a.shared)).toBe(false)
 	})
 })
+
+describe('the stub of the protection of shared apps', () => {
+	const demo = () => newGridState(true)
+
+	it('lists both apps as shared, and answers the contract example', () => {
+		const state = demo()
+		const shared = ask('GET', '/v1/share', null, state).body.data.apps.filter(a => a.shared).map(a => a.name)
+		const view = ask('GET', '/v1/share/guard', null, state).body.data
+
+		expect(shared).toEqual(['jellyfin', 'nextcloud'])
+		expect(view).toMatchObject({ supported: true, protection: true, reset: false, geo: { country: true }, waves: [{ app: 'jellyfin', bans: 23 }] })
+		expect(view.apps.jellyfin).toMatchObject({ access: 'code', override: { waf: 'observe', rules_off: [942100] }, effective: { waf: 'observe', rules_off: [942100] } })
+		expect(view.apps.nextcloud).toMatchObject({ access: 'open', override: null, effective: { waf: 'block' } })
+		expect(view.people).toMatchObject([{ name: 'Maman', apps: ['jellyfin'] }])
+	})
+
+	it('keeps the writes in memory and refuses what the core refuses', () => {
+		const state = demo()
+
+		expect(ask('PUT', '/v1/share/guard/protection', { on: false }, state).body.data.protection).toBe(false)
+		expect(ask('PUT', '/v1/share/guard/apps/nextcloud', { access: 'code', override: null }, state).body.data.apps.nextcloud.access).toBe('code')
+		expect(ask('PUT', '/v1/share/guard/apps/immich', { access: 'code' }, state).body.message).toBe('not_shared')
+		expect(ask('POST', '/v1/share/guard/people', { name: 'Papa', apps: ['plex'] }, state).body.message).toBe('unknown_app:plex')
+		const added = ask('POST', '/v1/share/guard/people', { name: 'Papa', apps: ['nextcloud'] }, state).body.data
+		expect(added).toMatchObject({ person: { name: 'Papa' }, code: 'ABCD-EFGH-JKMN' })
+		expect(ask('POST', `/v1/share/guard/people/${added.person.id}/code`, null, state).body.data).toEqual({ code: 'ABCD-EFGH-JKMN' })
+		expect(ask('DELETE', `/v1/share/guard/people/${added.person.id}`, null, state).status).toBe(204)
+		expect(ask('GET', '/v1/share/guard', null, state).body.data.people).toHaveLength(1)
+	})
+
+	it('serves the journal and lifts a ban', () => {
+		const state = demo()
+		const events = ask('GET', '/v1/share/guard/events', null, state).body.data
+
+		expect(events.map(e => e.reason)).toEqual(['waf', 'scan', 'country'])
+		expect(events[0]).toMatchObject({ rule: 942100, country: 'FR', asn: 3215, as_org: 'Orange' })
+		expect(ask('GET', '/v1/share/guard/bans', null, state).body.data.map(b => b.key)).toEqual(['198.51.100.7', '2001:db8:1:2::/64'])
+		expect(ask('DELETE', `/v1/share/guard/bans/${encodeURIComponent('2001:db8:1:2::/64')}`, null, state).status).toBe(204)
+		expect(ask('GET', '/v1/share/guard/bans', null, state).body.data).toHaveLength(1)
+	})
+})

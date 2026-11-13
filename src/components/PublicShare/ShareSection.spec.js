@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ShareSection from './ShareSection.vue'
 import i18n from '@/plugins/i18n'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
+import { resetShareGuard, shareGuardApi } from '@/service/shareGuard'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
@@ -39,6 +40,8 @@ describe('the public sharing section', () => {
 		document.body.innerHTML = ''
 		vi.clearAllMocks()
 		show(null, false)
+		resetShareGuard()
+		vi.spyOn(shareGuardApi, 'view').mockResolvedValue({ data: { data: { supported: true } } })
 	})
 	afterEach(() => wrapper?.unmount())
 
@@ -108,6 +111,14 @@ describe('the public sharing section', () => {
 		dialogButton('Stop all sharing').click()
 		await flushPromises()
 		expect(publicShareApi.stopAll).toHaveBeenCalledTimes(1)
+	})
+
+	it('reads the protection again after a stop', async () => {
+		show({ ...base, apps: [JELLY] })
+		await mountIt()
+		await button('Stop sharing').trigger('click')
+		await flushPromises()
+		expect(shareGuardApi.view).toHaveBeenCalledTimes(1)
 	})
 
 	it('shows the certificate and the tunnel', async () => {

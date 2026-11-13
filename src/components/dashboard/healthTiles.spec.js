@@ -197,6 +197,45 @@ describe('attentionItems and the mounts df cannot read', () => {
 	})
 })
 
+describe('attentionItems and the protection of shared apps', () => {
+	const tp = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, name) => params[name])
+	const healthy = { health: 'passed', snapraid: null, backup: { status: 'ok' } }
+	const app = mode => ({ access: 'code', override: null, effective: { countries: { mode } } })
+
+	it('names a ban wave on a shared app, danger, and says nothing without a guard (older core)', () => {
+		const items = attentionItems({ ...healthy, guard: { apps: { jellyfin: app('none') }, waves: [{ app: 'jellyfin', bans: 23 }] } }, tp)
+
+		expect(items).toEqual([{ key: 'share-wave-jellyfin', level: 'danger', text: 'jellyfin: 23 addresses banned in 10 minutes' }])
+		expect(attentionItems({ ...healthy, guard: { waves: [{ app: 'jellyfin', bans: 23 }] } }, tp)).toHaveLength(1)
+		expect(attentionItems({ ...healthy, guard: null }, tp)).toEqual([])
+		expect(attentionItems(healthy, tp)).toEqual([])
+	})
+
+	it('skips a wave on an app that is not shared any more', () => {
+		expect(attentionItems({ ...healthy, guard: { apps: { nextcloud: app('none') }, waves: [{ app: 'jellyfin', bans: 23 }] } }, tp)).toEqual([])
+	})
+
+	it('says the protection settings were reset, danger', () => {
+		expect(attentionItems({ ...healthy, guard: { reset: true } }, tp)).toEqual([expect.objectContaining({ key: 'share-reset', level: 'danger' })])
+		expect(attentionItems({ ...healthy, guard: { reset: false } }, tp)).toEqual([])
+	})
+
+	it('warns of country filtering without data only when protection is on and a country list applies', () => {
+		const view = { protection: true, apps: { jellyfin: app('block') }, geo: { country: false } }
+
+		expect(attentionItems({ ...healthy, guard: view }, tp)).toEqual([{ key: 'share-geo', level: 'warning', text: 'Country filtering of shared apps is not working' }])
+		expect(attentionItems({ ...healthy, guard: { ...view, protection: false } }, tp)).toEqual([])
+		expect(attentionItems({ ...healthy, guard: { ...view, apps: { jellyfin: app('none') } } }, tp)).toEqual([])
+		expect(attentionItems({ ...healthy, guard: { ...view, geo: { country: true } } }, tp)).toEqual([])
+	})
+
+	it('puts the dangers before the warnings', () => {
+		const view = { reset: true, protection: true, apps: { jellyfin: app('allow') }, geo: { country: false } }
+
+		expect(attentionItems({ ...healthy, guard: view }, tp).map(item => item.key)).toEqual(['share-reset', 'share-geo'])
+	})
+})
+
 describe('diskRows', () => {
 	const storages = [
 		{ path: '/dev/sda', disk_name: 'System', disk_model: 'Samsung SSD', children: [{ mount_point: '/', size: '100', used: '40' }] },
