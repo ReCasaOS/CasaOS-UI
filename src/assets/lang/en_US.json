@@ -3012,6 +3012,7 @@
   "Logs go back {n} days, cap reached": "Logs go back {n} days, cap reached",
   "Update this box to read its logs": "Update this box to read its logs",
   "Uninstalled": "Uninstalled",
+  "Show uninstalled apps": "Show uninstalled apps",
   "Catching up…": "Catching up…",
   "Download stopped at {n} lines": "Download stopped at {n} lines",
   "Search the logs": "Search the logs",

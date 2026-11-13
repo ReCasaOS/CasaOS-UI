@@ -17,8 +17,9 @@
 			<div :class="{ 'is-drawer-open': drawer }" class="logs-split">
 				<aside class="logs-side">
 					<p v-if="appsState === 'outdated'" class="logs-note" role="status">{{ $t('Update this box to read its logs') }}</p>
+					<b-checkbox v-if="hasUninstalled" v-model="showUninstalled" class="logs-uninstalled" size="is-small">{{ $t('Show uninstalled apps') }}</b-checkbox>
 					<ul class="logs-apps">
-						<li v-for="app in apps" :key="app.app">
+						<li v-for="app in visibleApps" :key="app.app">
 							<div class="logs-app">
 								<b-checkbox :model-value="selectedApps.includes(app.app)" size="is-small" @update:model-value="toggleApp(app.app, $event)">
 									<span class="logs-app-label">
@@ -147,6 +148,7 @@ export default {
 			boxes: [],
 			box: this.initialBox || null,
 			apps: [],
+			showUninstalled: false,
 			appsState: 'loading',
 			open: {},
 			selectedApps: this.initialApp ? [this.initialApp] : [],
@@ -167,6 +169,13 @@ export default {
 		}
 	},
 	computed: {
+		hasUninstalled() {
+			return this.apps.some(a => a.uninstalled)
+		},
+		// an uninstalled app stays listed when it is selected, or when asked to be shown
+		visibleApps() {
+			return this.showUninstalled ? this.apps : this.apps.filter(a => !a.uninstalled || this.selectedApps.includes(a.app))
+		},
 		filter() {
 			return { stream: this.stream, level: this.level, q: this.q, regex: this.regex }
 		},

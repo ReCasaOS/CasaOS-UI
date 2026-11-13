@@ -113,4 +113,20 @@ describe('the Logs page', () => {
 		expect(stream.props('apps')).toEqual(['plex'])
 		expect(stream.props('focusAt')).toBe('2026-11-06T10:00:00Z')
 	})
+
+	it('hides the uninstalled apps until they are asked for', async () => {
+		fleetApi.status.mockRejectedValue(new Error('down'))
+		logsApi.apps.mockResolvedValue({ ok: true, status: 200, data: [...APPS, { app: 'old', title: { en_us: 'Old' }, icon: null, uninstalled: true, services: [] }] })
+		await mountPage()
+		expect(wrapper.findAll('.logs-apps > li')).toHaveLength(1)
+		await wrapper.find('.logs-uninstalled input').setValue(true)
+		expect(wrapper.findAll('.logs-apps > li')).toHaveLength(2)
+	})
+
+	it('keeps an uninstalled app listed when it was opened on it', async () => {
+		fleetApi.status.mockRejectedValue(new Error('down'))
+		logsApi.apps.mockResolvedValue({ ok: true, status: 200, data: [...APPS, { app: 'old', title: { en_us: 'Old' }, icon: null, uninstalled: true, services: [] }] })
+		await mountPage({ initialApp: 'old' })
+		expect(wrapper.findAll('.logs-apps > li')).toHaveLength(2)
+	})
 })
