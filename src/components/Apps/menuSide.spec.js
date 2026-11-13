@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { menuPlace } from './menuSide'
+import { menuPlace, tipSide } from './menuSide'
 
 describe('menuPlace', () => {
 	it('opens below, uncapped, when the menu fits', () => {
@@ -14,5 +14,16 @@ describe('menuPlace', () => {
 	})
 	it('never caps below a usable height', () => {
 		expect(menuPlace(40, 60, 400).maxHeight).toBe(120)
+	})
+})
+
+describe('tipSide', () => {
+	it('goes below a card near the top and above one near the bottom', () => {
+		expect(tipSide(20, 600)).toBe('is-bottom')
+		expect(tipSide(600, 20)).toBe('is-top')
+	})
+
+	it('is never beside the card, whatever its distance to the left or right edge', () => {
+		expect(['is-top', 'is-bottom']).toContain(tipSide(300, 300))
 	})
 })

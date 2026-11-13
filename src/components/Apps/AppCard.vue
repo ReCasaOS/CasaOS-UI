@@ -1,6 +1,6 @@
 <template>
 	<div :class="{ 'is-compact': compact }" :role="compact ? 'button' : undefined" :tabindex="compact ? 0 : undefined" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
-		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="hover = true">
+		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="onOver">
 		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
 		<span v-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
 		<!-- Action Button Start -->
@@ -147,7 +147,7 @@
 		<div class="blur-background"></div>
 		<div class="cards-content">
 			<!-- Card Content Start -->
-			<b-tooltip :always="isActiveTooltip" :animated="true" :label="tooltipLabel" :triggers="tooltipTriger"
+			<b-tooltip :always="isActiveTooltip" :animated="true" :label="tooltipLabel" :position="tipSide" :triggers="tooltipTriger"
 				animation="fade1" class="in-card" type="is-white">
 				<div class="has-text-centered is-flex is-justify-content-center is-flex-direction-column pt-5 pb-3px img-c">
 					<div class="is-flex is-justify-content-center">
@@ -247,7 +247,7 @@ import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { renderSize } from '@/mixins/file_utils'
 import tipEditorModal from '@/components/Apps/TipEditorModal.vue'
 import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
-import { menuPlace } from '@/components/Apps/menuSide'
+import { menuPlace, tipSide } from '@/components/Apps/menuSide'
 
 // Query parameter carrying the ID of the container a recreate was asked for. The
 // backend copies every query parameter of the request into the properties of the
@@ -313,6 +313,8 @@ export default {
 			// Public. Only changes the state of the card, not the state of the button.
 			isSaving: false,
 			isActiveTooltip: false,
+			// above or below the card, on the side with more room: never beside it, where it hides the next card
+			tipSide: 'is-top',
 			dropdownPosition: 'is-bottom-right',
 			menuMaxHeight: null,
 			// whether AppManagement keeps logs: an older one gets no Logs entry
@@ -481,6 +483,11 @@ export default {
 	},
 
 	methods: {
+		onOver() {
+			this.hover = true
+			const rect = this.$el.getBoundingClientRect()
+			this.tipSide = tipSide(rect.top, window.innerHeight - rect.bottom)
+		},
 		renderSize,
 		handleDorpdownPosition(event) {
 			this.$nextTick(() => {
