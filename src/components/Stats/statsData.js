@@ -68,6 +68,8 @@ export function normalizeItems(raw, source) {
 			memory_used: nonNegative(entry.memory_used),
 			memory_limit: nonNegative(entry.memory_limit),
 			alerts: nonNegative(entry.alerts) ?? 0,
+			// the app was uninstalled: only its history is left
+			removed: entry.removed === true,
 			started_at: Number.isNaN(started) ? null : entry.started_at,
 			detail: Array.from(clean(entry.detail, 800)).slice(0, 200).join('').trim() || null,
 		})

@@ -45,6 +45,8 @@
 						</optgroup>
 					</select>
 
+					<b-checkbox v-if="hasRemoved" v-model="showRemoved" class="stats-removed" size="is-small">{{ $t('Show uninstalled apps') }}</b-checkbox>
+
 					<div v-for="failure in failures" :key="failure.source" class="stats-column-error" role="status">
 						<p>{{ failure.text }}</p>
 						<button class="button is-small is-rounded" type="button" @click="retry(failure.source)">{{ $t('Retry') }}</button>
@@ -201,6 +203,8 @@ export default {
 		return {
 			columns: Object.fromEntries(STATS_SOURCES.map(source => [source, blank()])),
 			selectedKey: '',
+			// the items of uninstalled apps, hidden unless asked for or selected
+			showRemoved: false,
 			// the newest ask of each column: an older answer never replaces a newer one
 			listTicket: Object.fromEntries(STATS_SOURCES.map(source => [source, 0])),
 			ranges: RANGES,
@@ -226,8 +230,14 @@ export default {
 		locale() {
 			return localeTag(this.$i18n.locale)
 		},
+		allItems() {
+			return STATS_SOURCES.flatMap(source => this.columns[source].items)
+		},
+		hasRemoved() {
+			return this.allItems.some(item => item.removed)
+		},
 		groups() {
-			return groupItems(STATS_SOURCES.flatMap(source => this.columns[source].items))
+			return groupItems(this.allItems.filter(item => !item.removed || this.showRemoved || this.keyOf(item) === this.selectedKey))
 		},
 		flat() {
 			return this.groups.flatMap(group => group.items)
@@ -891,6 +901,10 @@ $stats-narrow: 44rem;
 		@container (max-width: #{$stats-narrow}) {
 			grid-template-columns: minmax(0, 1fr);
 		}
+	}
+
+	.stats-removed {
+		margin: 0 0.625rem;
 	}
 
 	.stats-column-error,
