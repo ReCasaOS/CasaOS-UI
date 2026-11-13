@@ -245,6 +245,7 @@ import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { renderSize } from '@/mixins/file_utils'
 import tipEditorModal from '@/components/Apps/TipEditorModal.vue'
 import commonI18n, { ice_i18n } from '@/mixins/base/common-i18n'
+import { menuSide } from '@/components/Apps/menuSide'
 
 // Query parameter carrying the ID of the container a recreate was asked for. The
 // backend copies every query parameter of the request into the properties of the
@@ -619,9 +620,9 @@ export default {
 					if (!menu || !trigger || !menu.offsetHeight) {
 						return
 					}
-					const room = window.innerHeight - trigger.getBoundingClientRect().bottom
+					const rect = trigger.getBoundingClientRect()
 					const horizontal = this.dropdownPosition.split('-')[2]
-					this.dropdownPosition = `is-${room > menu.offsetHeight + 8 ? 'bottom' : 'top'}-${horizontal}`
+					this.dropdownPosition = `is-${menuSide(rect.top, window.innerHeight - rect.bottom, menu.offsetHeight)}-${horizontal}`
 				})
 			}
 		},
