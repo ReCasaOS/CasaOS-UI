@@ -16,7 +16,8 @@
 
 				<!-- A git app no deployment has given a container: its panel, which holds the
 					Repository tab, and deleting it are all there is to do with it. -->
-				<b-dropdown-item v-if="isGitAppWithoutContainer" :focusable="false" aria-role="menu-item" custom>
+				<b-dropdown-item v-if="isGitAppWithoutContainer" :focusable="false" aria-role="menu-item" custom
+					:style="menuStyle">
 					<b-button expanded type="is-text" @click="configApp()">
 						{{ $t('Setting') }}
 					</b-button>
@@ -24,7 +25,8 @@
 						{{ $t('Delete') }}
 					</b-button>
 				</b-dropdown-item>
-				<b-dropdown-item v-else :focusable="false" aria-role="menu-item" custom>
+				<b-dropdown-item v-else :focusable="false" aria-role="menu-item" custom
+					:style="menuStyle">
 					<!-- a container CasaOS did not install has no app to open, start or
 						uninstall: the one thing it can be offered is the recreate below -->
 					<template v-if="!isContainerApp">
@@ -312,12 +314,17 @@ export default {
 			isSaving: false,
 			isActiveTooltip: false,
 			dropdownPosition: 'is-bottom-right',
+			menuMaxHeight: null,
 			// whether AppManagement keeps logs: an older one gets no Logs entry
 			logsAvailable: false,
 		}
 	},
 
 	computed: {
+		// the menu scrolls inside the room it has when it fits neither above nor below the card
+		menuStyle() {
+			return this.menuMaxHeight ? { maxHeight: `${this.menuMaxHeight}px`, overflowY: 'auto' } : null
+		},
 		// where this app answers on the Internet, as the core sends it; '' unless shared
 		publicUrl() {
 			const entry = publicShare.ok ? appEntry(publicShare.status, this.item.name) : null
@@ -613,16 +620,19 @@ export default {
 		setDropState(e) {
 			this.dropState = e
 			if (e) {
-				// the menu grew with logs, backup and sharing entries: measure it rather than guess a height
-				this.$nextTick(() => {
-					const menu = this.$refs.dro && this.$refs.dro.$refs.dropdownMenu
-					const trigger = this.$refs.dro && this.$refs.dro.$refs.trigger
-					const content = menu && menu.querySelector('.dropdown-content')
-					if (!menu || !trigger || !content) {
+				// Buefy shows the menu and places it (from the position prop as it was) after this event:
+				// measure once it is shown, then ask Buefy to place it again. The menu grew with logs,
+				// backup and sharing entries, so measure it rather than guess a height.
+				this.$nextTick(() => setTimeout(async () => {
+					const dro = this.$refs.dro
+					const menu = dro && dro.$refs.dropdownMenu
+					const trigger = dro && dro.$refs.trigger
+					if (!menu || !trigger || !dro.isActive) {
 						return
 					}
 					// measure the menu at its natural height, not the one capped on an earlier opening
-					content.style.maxHeight = ''
+					this.menuMaxHeight = null
+					await this.$nextTick()
 					if (!menu.offsetHeight) {
 						return
 					}
@@ -630,9 +640,11 @@ export default {
 					const horizontal = this.dropdownPosition.split('-')[2]
 					const { side, maxHeight } = menuPlace(rect.top, window.innerHeight - rect.bottom, menu.offsetHeight)
 					this.dropdownPosition = `is-${side}-${horizontal}`
-					content.style.maxHeight = maxHeight ? `${maxHeight}px` : ''
-					content.style.overflowY = maxHeight ? 'auto' : ''
-				})
+					// 8px: the padding of the menu around its item
+					this.menuMaxHeight = maxHeight ? maxHeight - 8 : null
+					await this.$nextTick()
+					dro.updateAppendToBody()
+				}, 0))
 			}
 		},
 
