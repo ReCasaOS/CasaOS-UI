@@ -3466,6 +3466,7 @@
   "Your bans are shared, but the relay does not filter your visitors: turn filtering on to be protected by the community list.": "Vos bans sont partagés, mais le relais ne filtre pas vos visiteurs : activez le filtrage pour être protégé par la liste communautaire.",
   "Turned off": "Désactivées",
   "Cut at the relay": "Coupé au relais",
+  "Other addresses": "Autres adresses",
   "Hour": "Heure",
   "Count": "Nombre",
   "Nothing was cut at the relay in the last 7 days.": "Rien n'a été coupé au relais ces 7 derniers jours.",
