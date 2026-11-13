@@ -192,6 +192,7 @@ function demoGuard() {
 			{ key: '198.51.100.7', ip: '198.51.100.7', country: 'US', asn: 0, as_org: '', app: 'jellyfin', reason: 'scan', since: ago(3), until: ago(-57), strikes: 1 },
 			{ key: '2001:db8:1:2::/64', ip: '2001:db8:1:2::1', country: 'DE', asn: 0, as_org: '', app: 'jellyfin', reason: 'waf', since: ago(8), until: ago(-52), strikes: 2 },
 		],
+		relay: { supported: true, filter: true, share_bans: false, share_bans_at: null, community_size: 1234, contributed_month: 0 },
 		counter: 0,
 	}
 }
@@ -225,11 +226,12 @@ function guardView({ guard, share }) {
 		people: guard.people.map(person => ({ ...person, apps: person.apps.filter(app => share.apps.has(app)) })),
 		geo: guard.geo,
 		waves: guard.waves,
+		relay: guard.relay,
 	}
 }
 
 const CODE = 'ABCD-EFGH-JKMN'
-const GUARD_PATH = /^\/v1\/share\/guard(?:\/(protection|box|apps|people|events|bans)(?:\/([^/]+))?(?:\/(code))?)?$/
+const GUARD_PATH = /^\/v1\/share\/guard(?:\/(protection|box|apps|people|events|bans|relay|relay-refusals)(?:\/([^/]+))?(?:\/(code))?)?$/
 
 function guardRoute(verb, path, query, body, state) {
 	const match = path.match(GUARD_PATH)
@@ -292,6 +294,34 @@ function guardRoute(verb, path, query, body, state) {
 	if (part === 'events' && verb === 'GET') {
 		const rows = guard.events.filter(e => (!query.app || e.app === query.app) && (!query.reason || e.reason === query.reason))
 		return core(rows.slice(0, Number(query.limit) || 200))
+	}
+	if (part === 'relay' && verb === 'PUT') {
+		const { filter, share_bans: shareBans, consent } = body || {}
+		if (filter === undefined && shareBans === undefined) {
+			return shareRefused('bad_request')
+		}
+		if (shareBans === true && consent !== true) {
+			return shareRefused('consent_required')
+		}
+		const relay = guard.relay
+		if (filter !== undefined) {
+			relay.filter = !!filter
+		}
+		if (shareBans !== undefined && !!shareBans !== relay.share_bans) {
+			relay.share_bans = !!shareBans
+			relay.share_bans_at = shareBans ? new Date().toISOString() : null
+			relay.contributed_month = shareBans ? 3 : 0
+		}
+		return view()
+	}
+	if (part === 'relay-refusals' && verb === 'GET') {
+		const hour = hours => ago(hours * 60)
+		return core([
+			{ hour: hour(1), key: '198.51.100.20/32', reason: 'external', source: 'FireHOL level 1', count: 12 },
+			{ hour: hour(3), key: '203.0.113.50/32', reason: 'community', source: 'address', count: 3 },
+			{ hour: hour(6), key: '2001:db8:5::/64', reason: 'manual', source: 'country', count: 1 },
+			{ hour: hour(20), key: '192.0.2.9/32', reason: 'cap', source: 'ip-box', count: 40 },
+		])
 	}
 	if (part === 'bans' && !id && verb === 'GET') {
 		return core(guard.bans)

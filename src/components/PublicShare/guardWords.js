@@ -15,6 +15,18 @@ export function reasonText(event, t, locale) {
 	}
 }
 
+// source is a list name chosen by the relay operator: text only
+export function relayReasonText(r, t) {
+	switch (r?.reason) {
+		case 'manual': return t('Blocked by the relay operator')
+		case 'suspended': return t('Shared name suspended')
+		case 'external': return t('On the list {source}', { source: r.source })
+		case 'community': return t('Community list')
+		case 'cap': return t('Too many connections')
+		default: return ''
+	}
+}
+
 export function actionText(action, t) {
 	switch (action) {
 		case 'blocked': return t('Blocked')
@@ -55,6 +67,9 @@ export function guardErrorText(e, t) {
 	const text = typeof message === 'string' ? message : ''
 	// the core saved the change and will push it to the Gateway again (its message holds a colon)
 	if (e?.response?.status === 500 && text.startsWith('the change is saved')) {
+		if (text.includes('the relay')) {
+			return t('Saved; it will reach the relay in a moment.')
+		}
 		return t('Saved; it will reach the box\'s gateway in a moment.')
 	}
 	const colon = text.indexOf(':')
@@ -70,6 +85,8 @@ export function guardErrorText(e, t) {
 		case 'unknown_app': return arg ? t('{app} is not shared', { app: arg }) : t('This app is not shared')
 		case 'not_shared': return t('This app is not shared')
 		case 'not_found': return t('This person no longer exists')
+		case 'consent_required': return t('Tick the box to agree first.')
+		case 'relay_unsupported': return t('The relay does not offer this yet.')
 		case 'gateway_unsupported': return gatewayUnsupportedText(t)
 		// any other text is never shown raw
 		default: return t('Something went wrong. Try again in a moment.')

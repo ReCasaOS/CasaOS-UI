@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionText, countryName, guardErrorText, reasonText } from './guardWords.js'
+import { actionText, countryName, guardErrorText, reasonText, relayReasonText } from './guardWords.js'
 import { shareErrorText } from './shareWords.js'
 
 const t = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, k) => params[k])
@@ -18,6 +18,15 @@ describe('the words of the protection', () => {
 		expect(reasonText({ reason: 'other' }, t)).toBe('')
 	})
 
+	it('says why the relay cut an address', () => {
+		expect(relayReasonText({ reason: 'manual' }, t)).toBe('Blocked by the relay operator')
+		expect(relayReasonText({ reason: 'suspended' }, t)).toBe('Shared name suspended')
+		expect(relayReasonText({ reason: 'external', source: 'FireHOL level 1' }, t)).toBe('On the list FireHOL level 1')
+		expect(relayReasonText({ reason: 'community' }, t)).toBe('Community list')
+		expect(relayReasonText({ reason: 'cap' }, t)).toBe('Too many connections')
+		expect(relayReasonText({ reason: 'other' }, t)).toBe('')
+	})
+
 	it('says what was done', () => {
 		expect(actionText('blocked', t)).toBe('Blocked')
 		expect(actionText('banned', t)).toBe('Banned')
@@ -32,6 +41,10 @@ describe('the words of the protection', () => {
 	})
 
 	describe('the refusal of a write', () => {
+		it('tells the relay push failure from the gateway one', () => {
+			expect(guardErrorText(err('the change is saved, but the relay has not taken it yet: x', 500), t)).toBe('Saved; it will reach the relay in a moment.')
+			expect(guardErrorText(err('the change is saved, but the gateway failed: x', 500), t)).toBe('Saved; it will reach the box\'s gateway in a moment.')
+		})
 		it('names the field of the core\'s short path', () => {
 			expect(guardErrorText(err('bad_policy:allow[0]'), t)).toContain('the allowed addresses')
 			expect(guardErrorText(err('bad_policy:ban.scan_404'), t)).toContain('the ban thresholds')
