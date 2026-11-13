@@ -60,7 +60,7 @@
 			</template>
 
 			<template v-else>
-				<div v-for="r in banRules" :key="r.n" class="mb-1 is-size-7">
+				<div v-for="r in banRules" :key="r.n" class="is-size-7 _ban">
 					<span class="guard-ban-label">{{ r.label }}</span>
 					<input v-model.number="d.ban[r.n]" class="input is-small" :class="{ 'is-danger': bad(`ban.${r.n}`) }" :name="`ban-${r.n}`" type="number" min="1" style="width: 5rem" :aria-label="r.label" :disabled="same.ban">
 					{{ $t('within') }}
@@ -304,6 +304,19 @@ export default {
 			.checkbox {
 				color: var(--casa-text-hint);
 			}
+		}
+	}
+
+	// a ban rule: its label, how many, "within", how long, "minutes", on one aligned row
+	._ban {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 4.5rem auto 4.5rem auto;
+		gap: 0.375rem 0.5rem;
+		align-items: center;
+		margin-bottom: 0.375rem;
+
+		input {
+			width: 100% !important;
 		}
 	}
 
