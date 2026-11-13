@@ -211,5 +211,10 @@ describe('the stub of the protection of shared apps', () => {
 		expect(ask('GET', '/v1/share/guard/bans', null, state).body.data.map(b => b.key)).toEqual(['198.51.100.7', '2001:db8:1:2::/64'])
 		expect(ask('DELETE', `/v1/share/guard/bans/${encodeURIComponent('2001:db8:1:2::/64')}`, null, state).status).toBe(204)
 		expect(ask('GET', '/v1/share/guard/bans', null, state).body.data).toHaveLength(1)
+		expect(ask('PUT', '/v1/share/guard/relay', {}, state).body.message).toBe('bad_request')
+		expect(ask('PUT', '/v1/share/guard/relay', { share_bans: true }, state).body.message).toBe('consent_required')
+		const relay = ask('PUT', '/v1/share/guard/relay', { share_bans: true, consent: true }, state).body.data.relay
+		expect(relay).toMatchObject({ share_bans: true, contributed_month: 3 })
+		expect(ask('GET', '/v1/share/guard/relay-refusals', null, state).body.data.map(r => r.reason)).toEqual(['external', 'community', 'manual', 'cap'])
 	})
 })
