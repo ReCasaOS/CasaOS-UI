@@ -3015,6 +3015,7 @@
   "Logs go back {n} days, cap reached": "Les journaux remontent à {n} jours, plafond atteint",
   "Update this box to read its logs": "Mettez cette box à jour pour lire ses journaux",
   "Uninstalled": "Désinstallée",
+  "Show uninstalled apps": "Afficher les apps désinstallées",
   "Catching up…": "Rattrapage…",
   "Download stopped at {n} lines": "Téléchargement arrêté à {n} lignes",
   "Search the logs": "Chercher dans les journaux",
