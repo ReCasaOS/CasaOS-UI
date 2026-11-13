@@ -1,30 +1,45 @@
 <template>
-	<div v-if="status && !hidden" class="settings-card share-section">
-		<p class="has-text-weight-medium mb-2">{{ $t('Public sharing') }}</p>
-		<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
-		<p v-if="!status.supported" class="mb-2">{{ reason }}</p>
-		<template v-if="!status.name && status.supported">
-			<p class="mb-1">{{ $t('Choose the name of this box') }}</p>
-			<p class="is-size-7 mb-2">{{ $t('Your apps will answer at https://<app>.<name>.{domain}', { domain: status.domain }) }}</p>
-			<share-name-form />
-		</template>
-		<template v-else-if="status.name">
-			<p class="mb-1">{{ $t('Public name: {name}', { name: status.name }) }}</p>
-			<p class="mb-1">{{ certLine }}</p>
-			<p v-if="tunnelLine" class="mb-2">{{ tunnelLine }}</p>
-			<ul v-if="shared.length">
-				<li v-for="a in shared" :key="a.name" class="mb-2 share-item">
-					<span class="has-text-weight-medium">{{ a.label || a.name }}</span>
-					<a v-if="a.url" class="ml-1" :href="a.url" target="_blank" rel="noopener noreferrer">{{ a.url }}</a>
-					<b-button v-if="a.url" class="ml-1" size="is-small" type="is-text" :aria-label="$t('Copy')" @click="copyValue(a.url)">{{ copied === a.url ? $t('Copied') : $t('Copy') }}</b-button>
-					<b-button class="ml-1" :disabled="busy" size="is-small" type="is-text" @click="stop(a.name)">{{ $t('Stop sharing') }}</b-button>
-					<p v-if="a.error" class="is-size-7 share-error">{{ errorText(a.error) }}</p>
-				</li>
-			</ul>
-			<p v-else class="is-size-7">{{ $t('No app is shared. Share one from its card on the home page.') }}</p>
-			<b-button v-if="shared.length" class="mt-2" :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmStopAll">{{ $t('Stop all sharing') }}</b-button>
-		</template>
-	</div>
+	<section v-if="status && !hidden" class="settings-card p-0 share-section">
+		<div class="_head">
+			<span class="_tile" aria-hidden="true"><b-icon icon="web" /></span>
+			<div class="_text">
+				<p class="_name">{{ $t('Public sharing') }}</p>
+				<p v-if="status.name" class="is-size-7 _has-text-gray">{{ $t('Public name: {name}', { name: status.name }) }}</p>
+			</div>
+			<template v-if="status.name">
+				<span v-if="tunnelLine" class="_chip is-ok">{{ tunnelLine }}</span>
+				<span class="_chip">{{ certLine }}</span>
+			</template>
+		</div>
+		<div class="_body">
+			<b-message v-if="error" class="mb-0" size="is-small" type="is-danger">{{ error }}</b-message>
+			<p v-if="!status.supported">{{ reason }}</p>
+			<template v-if="!status.name && status.supported">
+				<p>{{ $t('Choose the name of this box') }}</p>
+				<p class="is-size-7 _has-text-gray">{{ $t('Your apps will answer at https://<app>.<name>.{domain}', { domain: status.domain }) }}</p>
+				<share-name-form />
+			</template>
+			<template v-else-if="status.name">
+				<!-- one row per shared app: its name, its address, Copy and Stop sharing at the right -->
+				<ul v-if="shared.length" class="_apps">
+					<li v-for="a in shared" :key="a.name" class="share-item">
+						<span class="_app-name">{{ a.label || a.name }}</span>
+						<a v-if="a.url" class="_url" :href="a.url" target="_blank" rel="noopener noreferrer">{{ a.url }}</a>
+						<span class="_actions">
+							<b-button v-if="a.url" rounded size="is-small" :aria-label="$t('Copy')" @click="copyValue(a.url)">{{ copied === a.url ? $t('Copied') : $t('Copy') }}</b-button>
+							<b-button :disabled="busy" rounded size="is-small" @click="stop(a.name)">{{ $t('Stop sharing') }}</b-button>
+						</span>
+						<p v-if="a.error" class="is-size-7 share-error has-text-danger">{{ errorText(a.error) }}</p>
+					</li>
+				</ul>
+				<p v-else class="is-size-7 _has-text-gray">{{ $t('No app is shared. Share one from its card on the home page.') }}</p>
+			</template>
+		</div>
+		<div v-if="status.name && shared.length" class="_foot">
+			<span class="is-size-7 _has-text-gray is-flex-grow-1">{{ $t('The name stays this box\'s when nothing is shared.') }}</span>
+			<b-button :disabled="busy" outlined rounded size="is-small" type="is-danger" @click="confirmStopAll">{{ $t('Stop all sharing') }}</b-button>
+		</div>
+	</section>
 </template>
 
 <script>
@@ -116,14 +131,112 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.share-item {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 0 0.25rem;
-	overflow-wrap: anywhere;
-}
-.share-error {
-	flex-basis: 100%;
+.share-section {
+	._head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+	}
+
+	._tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.75rem;
+		background: rgba($primary, 0.12);
+		color: $primary;
+	}
+
+	._text {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
+
+	._name {
+		font-weight: 600;
+		color: var(--casa-text-strong);
+	}
+
+	._body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.625rem;
+		padding: 0 1rem 0.875rem;
+	}
+
+	._foot {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.625rem 1rem;
+		border-top: 1px solid var(--casa-divider-soft);
+	}
+
+	._chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		height: 1.375rem;
+		padding: 0 0.5625rem;
+		border-radius: 0.6875rem;
+		background: var(--casa-hover-tint);
+		font-size: 0.75rem;
+		font-weight: 600;
+		white-space: nowrap;
+
+		&.is-ok {
+			background: rgba($success, 0.16);
+			color: $success;
+		}
+	}
+
+	._apps {
+		margin: 0;
+		border: 1px solid var(--casa-divider-soft);
+		border-radius: 0.625rem;
+	}
+
+	.share-item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.25rem 0.75rem;
+		min-height: 2.75rem;
+		padding: 0.375rem 0.75rem;
+
+		& + .share-item {
+			border-top: 1px solid var(--casa-divider-soft);
+		}
+	}
+
+	._app-name {
+		flex: 0 0 9rem;
+		font-weight: 500;
+	}
+
+	._url {
+		flex: 1 1 14rem;
+		min-width: 0;
+		overflow-wrap: anywhere;
+		font-family: ui-monospace, sfmono-regular, menlo, consolas, monospace;
+		font-size: 0.8125rem;
+	}
+
+	._actions {
+		display: flex;
+		gap: 0.375rem;
+		margin-left: auto;
+	}
+
+	.share-error {
+		flex-basis: 100%;
+		overflow-wrap: anywhere;
+	}
 }
 </style>
