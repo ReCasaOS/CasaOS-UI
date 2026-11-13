@@ -236,7 +236,7 @@ describe('the share window of an app', () => {
 		it('lists the people of a protected app and links to manage them', async () => {
 			guard(gview({ access: 'code' }, { people: [{ id: 'p1', name: 'Maman', apps: ['jellyfin'] }, { id: 'p2', name: 'Papa', apps: ['other'] }] }))
 			await mountIt()
-			expect(wrapper.find('.people-line').text()).toBe('Maman')
+			expect(wrapper.findAll('.people-line ._person-name').map(n => n.text())).toEqual(['Maman'])
 			const spy = vi.spyOn(wrapper.vm.$buefy.modal, 'open').mockImplementation(() => {})
 			await wrapper.find('.manage-people').trigger('click')
 			await flushPromises()

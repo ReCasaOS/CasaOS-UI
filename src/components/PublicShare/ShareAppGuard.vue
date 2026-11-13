@@ -16,7 +16,10 @@
 			</div>
 			<div v-if="protectedByCode" class="_body _people">
 				<span class="is-size-7 _has-text-gray">{{ $t('People') }}</span>
-				<span class="is-size-7 people-line">{{ names.length ? names.join(', ') : $t('No one has access yet.') }}</span>
+				<span v-if="!people.length" class="is-size-7 people-line">{{ $t('No one has access yet.') }}</span>
+				<span v-else class="people-line">
+					<span v-for="p in people" :key="p.id" class="_person"><span :class="{ 'is-used': p.last_used_at }" class="_dot"></span><span class="_person-name">{{ p.name }}</span><span class="_person-use">· {{ lastUse(p) }}</span></span>
+				</span>
 				<b-button class="manage-people ml-auto" size="is-small" type="is-text" @click="$emit('manage')">{{ $t('Manage people') }}</b-button>
 			</div>
 		</section>
@@ -30,10 +33,10 @@
 						<p class="_name">{{ $t('Protection') }}</p>
 						<p class="is-size-7 _has-text-gray">{{ $t('Firewall, address lists, countries, request limit, bans. A block ticked "Same as the box" follows the box.') }}</p>
 					</div>
-					<div :key="`m${key}`" class="protection-mode">
-						<b-radio :model-value="own ? 'own' : 'same'" native-value="same" :disabled="busy" @update:model-value="setMode">{{ $t('Same as the box') }}</b-radio>
-						<b-radio :model-value="own ? 'own' : 'same'" native-value="own" :disabled="busy" @update:model-value="setMode">{{ $t('Own settings') }}</b-radio>
-					</div>
+					<b-field :key="`m${key}`" class="protection-mode mb-0">
+						<b-radio-button :model-value="own ? 'own' : 'same'" native-value="same" :disabled="busy" size="is-small" type="is-primary" @update:model-value="setMode">{{ $t('Same as the box') }}</b-radio-button>
+						<b-radio-button :model-value="own ? 'own' : 'same'" native-value="own" :disabled="busy" size="is-small" type="is-primary" @update:model-value="setMode">{{ $t('Own settings') }}</b-radio-button>
+					</b-field>
 				</div>
 				<div v-if="own" class="_body">
 					<guard-policy-form :policy="view.box" :box="view.box" :override="app.override" :busy="busy" :error="formError" @save="saveOverride" />
@@ -41,17 +44,8 @@
 			</section>
 
 			<!-- what the protection refused, and who is banned right now -->
-			<section class="settings-card p-0 _journal">
-				<div class="_head">
-					<span class="_tile is-plain" aria-hidden="true"><b-icon icon="format-list-bulleted" /></span>
-					<div class="_text">
-						<p class="_name">{{ $t('Events') }}</p>
-						<p class="is-size-7 _has-text-gray">{{ $t('What the protection refused for this app, and the addresses banned right now.') }}</p>
-					</div>
-				</div>
-				<div class="_body">
-					<guard-journal :app="appName" />
-				</div>
+			<section class="settings-card _journal">
+				<guard-journal :app="appName" :title="$t('Events')" :hint="$t('What the protection refused for this app, and the addresses banned right now.')" />
 			</section>
 		</template>
 	</div>
@@ -85,8 +79,9 @@ export default {
 		protectedByCode() {
 			return this.app?.access === 'code'
 		},
-		names() {
-			return (this.view?.people || []).filter(p => p.apps.includes(this.appName)).map(p => p.name)
+		// the people who have a code for this app
+		people() {
+			return (this.view?.people || []).filter(p => p.apps.includes(this.appName))
 		},
 	},
 	watch: {
@@ -96,6 +91,11 @@ export default {
 		},
 	},
 	methods: {
+		// when the code was last used, in the person's tag
+		lastUse(p) {
+			return p.last_used_at ? this.$t('Last used {date}', { date: new Date(p.last_used_at).toLocaleDateString(this.$i18n.locale.replace('_', '-')) }).toLowerCase() : this.$t('Never used').toLowerCase()
+		},
+
 		toggle(on) {
 			if (!on) {
 				return this.save('open')
@@ -239,9 +239,42 @@ export default {
 	}
 
 	.protection-mode {
-		display: flex;
+		flex-shrink: 0;
+	}
+
+	.people-line {
+		display: inline-flex;
 		flex-wrap: wrap;
-		gap: 0.25rem 1rem;
+		gap: 0.375rem;
+	}
+
+	// a person: a tag with a dot, green once the code has been used
+	._person {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		height: 1.5rem;
+		padding: 0 0.5rem;
+		border-radius: 0.4375rem;
+		background: var(--casa-hover-tint);
+		font-size: 0.75rem;
+		font-weight: 500;
+	}
+
+	._person-use {
+		color: var(--casa-text-hint);
+		font-weight: 400;
+	}
+
+	._dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: rgba(128, 128, 128, 0.5);
+
+		&.is-used {
+			background: $success;
+		}
 	}
 }
 </style>

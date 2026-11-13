@@ -1,11 +1,27 @@
 <template>
-	<div class="guard-journal">
+	<div :class="{ 'is-titled': title }" class="guard-journal">
 		<b-tabs v-model="tab" :animated="false" size="is-small">
-			<b-tab-item :label="$t('Events')" />
-			<b-tab-item :label="$t('Active bans')" />
+			<b-tab-item>
+				<template #header>
+					{{ $t('Events') }}<span v-if="counted.events" class="_count">{{ events.length }}</span>
+				</template>
+			</b-tab-item>
+			<b-tab-item>
+				<template #header>
+					{{ $t('Active bans') }}<span v-if="counted.bans" :class="{ 'is-bad': bans.length }" class="_count">{{ shownBans.length }}</span>
+				</template>
+			</b-tab-item>
 		</b-tabs>
 
-		<div class="is-flex is-align-items-center mb-2">
+		<!-- with a title, a head of its own (tile, title, what it is) with the filters and Refresh at the right, above the tabs -->
+		<div class="_top is-flex is-align-items-center is-flex-wrap-wrap mb-2">
+			<template v-if="title">
+				<span class="_tile" aria-hidden="true"><b-icon icon="format-list-bulleted" /></span>
+				<div class="_text">
+					<p class="_name">{{ title }}</p>
+					<p v-if="hint" class="is-size-7 _has-text-gray">{{ hint }}</p>
+				</div>
+			</template>
 			<template v-if="tab === 0">
 				<div v-if="!app" class="select is-small mr-2">
 					<select v-model="appFilter" name="app-filter" :aria-label="$t('App')" @change="load">
@@ -85,12 +101,20 @@ export default {
 	name: 'GuardJournal',
 	components: { CountryFlag },
 	props: {
+		// a head of its own: the title and what it is, the filters at the right
+		title: { type: String, default: '' },
+		hint: { type: String, default: '' },
 		app: { type: String, default: null },
 	},
 	data() {
-		return { shareGuard, PER, tab: 0, events: [], bans: [], error: '', writeError: '', loading: false, busy: false, seq: 0, current: 1, appFilter: '', reasonFilter: '' }
+		// counted: which list has been read once, so its tab can show how many it holds
+		return { shareGuard, PER, tab: 0, events: [], bans: [], counted: { events: false, bans: false }, error: '', writeError: '', loading: false, busy: false, seq: 0, current: 1, appFilter: '', reasonFilter: '' }
 	},
 	computed: {
+		// the bans the tab lists: an app's own when the journal is an app's
+		shownBans() {
+			return this.app ? this.bans.filter(b => b.app === this.app) : this.bans
+		},
 		locale() {
 			return this.$i18n.locale.replace('_', '-')
 		},
@@ -103,7 +127,7 @@ export default {
 		},
 		// the bans route has no app parameter: an app's window keeps its own bans
 		rows() {
-			return this.tab === 0 ? this.events : this.app ? this.bans.filter(b => b.app === this.app) : this.bans
+			return this.tab === 0 ? this.events : this.shownBans
 		},
 		page() {
 			return this.rows.slice((this.current - 1) * PER, this.current * PER)
@@ -164,6 +188,7 @@ export default {
 				}
 				this.error = ''
 				this[events ? 'events' : 'bans'] = Array.isArray(list) ? list : []
+				this.counted[events ? 'events' : 'bans'] = true
 			} catch (e) {
 				if (seq !== this.seq) {
 					return
@@ -253,6 +278,58 @@ export default {
 			border-color: var(--casa-divider-soft);
 			vertical-align: middle;
 		}
+	}
+
+	// the tabs' counts
+	._count {
+		display: inline-flex;
+		align-items: center;
+		height: 1.125rem;
+		margin-left: 0.375rem;
+		padding: 0 0.375rem;
+		border-radius: 0.5625rem;
+		background: var(--casa-hover-tint);
+		font-size: 0.6875rem;
+		font-weight: 600;
+
+		&.is-bad {
+			background: rgba($danger, 0.16);
+			color: $danger;
+		}
+	}
+
+	// titled: head first, then the tabs, then the table
+	&.is-titled {
+		display: flex;
+		flex-direction: column;
+
+		._top {
+			order: -1;
+			gap: 0.5rem 0.75rem;
+			margin-bottom: 0.75rem !important;
+		}
+	}
+
+	._tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.75rem;
+		background: var(--casa-hover-tint);
+		color: var(--casa-text-hint);
+	}
+
+	._text {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
+
+	._name {
+		font-weight: 600;
+		color: var(--casa-text-strong);
 	}
 
 	// what was done with the request, in a chip the colour of its weight

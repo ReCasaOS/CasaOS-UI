@@ -7,6 +7,7 @@
 				<p class="is-size-7 _has-text-gray">{{ appTitle }}<template v-if="shared"> · <span class="_mono">{{ host }}</span></template></p>
 			</div>
 			<span v-if="status && status.name && !status.reason" :class="shared ? 'is-ok' : ''" class="_chip">{{ shared ? $t('Shared') : $t('Not shared') }}</span>
+			<span v-if="shared && byCode" class="_chip is-warn">{{ $t('Protected by code') }}</span>
 		</header>
 
 		<section class="modal-card-body">
@@ -65,7 +66,7 @@ import ShareAppGuard from './ShareAppGuard.vue'
 import ShareNameForm from './ShareNameForm.vue'
 import { appEntry, certText, reasonText, shareErrorText, sharedApps, tunnelText } from './shareWords'
 import { apply, publicShare, publicShareApi, refresh } from '@/service/publicShare'
-import { refreshGuard } from '@/service/shareGuard'
+import { refreshGuard, shareGuard } from '@/service/shareGuard'
 
 export default {
 	name: 'ShareAppModal',
@@ -100,6 +101,10 @@ export default {
 		},
 		tunnelLine() {
 			return tunnelText(this.status, this.$t)
+		},
+		// the head says it too: only people with a code get in
+		byCode() {
+			return shareGuard.ok && !!shareGuard.view?.supported && shareGuard.view.apps?.[this.appName]?.access === 'code'
 		},
 		// the public host, for the head: the address without its scheme
 		host() {
