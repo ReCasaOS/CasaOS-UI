@@ -136,6 +136,24 @@ describe('the list of the Statistics page', () => {
 		expect(groupTitles()).toEqual(['Containers', 'Virtual Machines'])
 	})
 
+	it('hides the items of uninstalled apps until they are asked for', async () => {
+		const gone = anItem({ id: 'app:old:web:1', name: 'Old', state: 'stopped', removed: true })
+		serve({ ...defaults(), app_management: body([jelly, gone]) })
+		await mountPage()
+		const names = () => [...document.querySelectorAll('.stats-item-name')].map(n => n.textContent)
+		expect(names()).not.toContain('Old')
+		const box = document.querySelector('.stats-removed input')
+		box.click()
+		await flushPromises()
+		expect(names()).toContain('Old')
+	})
+
+	it('shows no switch when no item is of an uninstalled app', async () => {
+		serve({ ...defaults(), app_management: body([jelly]) })
+		await mountPage()
+		expect(document.querySelector('.stats-removed')).toBeNull()
+	})
+
 	it('shows the state word, the processor and the alerts of an item', async () => {
 		serve({ ...defaults(), core: body([{ ...host, alerts: 2, state: 'stopped' }]) })
 		await mountPage()
