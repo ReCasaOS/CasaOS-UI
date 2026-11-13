@@ -70,6 +70,8 @@ export function guardErrorText(e, t) {
 		case 'unknown_app': return arg ? t('{app} is not shared', { app: arg }) : t('This app is not shared')
 		case 'not_shared': return t('This app is not shared')
 		case 'not_found': return t('This person no longer exists')
+		case 'consent_required': return t('Tick the box to agree first.')
+		case 'relay_unsupported': return t('The relay does not offer this yet.')
 		case 'gateway_unsupported': return gatewayUnsupportedText(t)
 		// any other text is never shown raw
 		default: return t('Something went wrong. Try again in a moment.')

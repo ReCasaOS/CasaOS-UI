@@ -22,6 +22,18 @@
 			</section>
 
 			<template v-if="view.supported">
+				<section v-if="view.relay && view.relay.supported" class="settings-card relay-block">
+					<b-switch :key="`f${relayKey}`" :model-value="view.relay.filter" :disabled="relayBusy" @update:model-value="setRelay({ filter: $event })">{{ $t('Filtering by the relay') }}</b-switch>
+					<p class="is-size-7 _has-text-gray">{{ $t('The relay cuts addresses known as malicious before they reach your box.') }}</p>
+					<p class="is-size-7 _has-text-gray">{{ view.protection ? $t('Protection of the box is on.') : $t('Protection of the box is off.') }}</p>
+					<b-message v-if="relayError" class="mb-0" size="is-small" type="is-danger">{{ relayError }}</b-message>
+					<template v-if="view.relay.share_bans">
+						<b-switch :key="`s${relayKey}`" :model-value="true" :disabled="relayBusy" @update:model-value="setRelay({ share_bans: $event })">{{ $t('Share my bans') }}</b-switch>
+						<p class="is-size-7">{{ $t('Your reports added {n} addresses to the community list this month', { n: view.relay.contributed_month }) }}</p>
+					</template>
+					<relay-join v-else :relay="view.relay" :waves="view.waves || []" :busy="relayBusy" @join="setRelay({ share_bans: true, consent: true })" />
+				</section>
+
 				<section class="settings-card p-0">
 					<share-people @code="showCode" />
 				</section>
@@ -50,6 +62,7 @@
 import copy from 'clipboard-copy'
 import GuardJournal from './GuardJournal.vue'
 import GuardPolicyForm from './GuardPolicyForm.vue'
+import RelayJoin from './RelayJoin.vue'
 import SharePeople from './SharePeople.vue'
 import { guardErrorText } from './guardWords'
 import { sharedApps } from './shareWords'
@@ -60,9 +73,9 @@ const SEEN = 'share-guard-ddos-seen'
 
 export default {
 	name: 'ShareGuardSection',
-	components: { GuardJournal, GuardPolicyForm, SharePeople },
+	components: { GuardJournal, GuardPolicyForm, RelayJoin, SharePeople },
 	data() {
-		return { shareGuard, publicShare, busy: false, error: '', boxBusy: false, boxError: '', boxText: '', switchKey: 0, shown: null, copied: false }
+		return { shareGuard, publicShare, busy: false, error: '', boxBusy: false, boxError: '', boxText: '', switchKey: 0, relayBusy: false, relayError: '', relayKey: 0, shown: null, copied: false }
 	},
 	computed: {
 		view() {
@@ -140,6 +153,20 @@ export default {
 				this.redraw()
 			} finally {
 				this.busy = false
+			}
+		},
+		async setRelay(body) {
+			this.relayBusy = true
+			this.relayError = ''
+			try {
+				await applyGuard(shareGuardApi.setRelay(body))
+			} catch (e) {
+				this.relayError = guardErrorText(e, this.$t)
+				// the core may have saved it all the same; draw the switches again from the store
+				await refreshGuard({ force: true })
+				this.relayKey++
+			} finally {
+				this.relayBusy = false
 			}
 		},
 		async saveBox(policy) {
@@ -237,6 +264,14 @@ export default {
 			background: rgba($success, 0.16);
 			color: $success;
 		}
+	}
+
+	.relay-block {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.5rem;
+		padding: 0.875rem 1rem;
 	}
 
 	._sub {
