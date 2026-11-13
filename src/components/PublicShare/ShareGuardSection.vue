@@ -1,24 +1,34 @@
 <template>
 	<div>
-		<div v-if="visible" class="settings-card share-guard-section">
-			<p class="has-text-weight-medium mb-2">{{ $t('Protection of shared apps') }}</p>
-			<p v-if="!view.supported" class="update-sentence">{{ $t('Update ReCasaOS to protect shared apps') }}</p>
-			<template v-else>
-				<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">{{ error }}</b-message>
-				<b-switch ref="protect" :key="switchKey" :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
+		<div v-if="visible" class="share-guard-section">
+			<!-- the protection of every shared app: the switch in the head, the box's settings under it -->
+			<section class="settings-card p-0 _protection">
+				<div class="_head">
+					<span class="_tile" aria-hidden="true"><b-icon icon="shield-check-outline" /></span>
+					<div class="_text">
+						<p class="_name">{{ $t('Protection of shared apps') }}</p>
+						<p class="is-size-7 _has-text-gray">{{ view.supported ? $t('Firewall, address lists, countries, request limit and bans, for every shared app.') : $t('Update ReCasaOS to protect shared apps') }}</p>
+					</div>
+					<b-switch v-if="view.supported" ref="protect" :key="switchKey" :model-value="view.protection" :disabled="busy" @update:model-value="toggle">{{ $t('Protect shared apps') }}</b-switch>
+				</div>
+				<div v-if="view.supported && (error || view.protection)" class="_body">
+					<b-message v-if="error" class="mb-0" size="is-small" type="is-danger">{{ error }}</b-message>
+					<template v-if="view.protection">
+						<p class="_sub">{{ $t('Settings for every shared app') }}</p>
+						<b-message v-if="boxText" class="mb-0" size="is-small" type="is-danger">{{ boxText }}</b-message>
+						<guard-policy-form :policy="view.box" :busy="boxBusy" :error="boxError" @save="saveBox" />
+					</template>
+				</div>
+			</section>
 
-				<template v-if="view.protection">
-					<p class="has-text-weight-medium mt-3 mb-2">{{ $t('Settings for every shared app') }}</p>
-					<b-message v-if="boxText" class="mb-3" size="is-small" type="is-danger">{{ boxText }}</b-message>
-					<guard-policy-form :policy="view.box" :busy="boxBusy" :error="boxError" @save="saveBox" />
-				</template>
+			<template v-if="view.supported">
+				<section class="settings-card p-0">
+					<share-people @code="showCode" />
+				</section>
 
-				<share-people class="mt-4" @code="showCode" />
-
-				<template v-if="view.protection">
-					<p class="has-text-weight-medium mt-4 mb-2">{{ $t('Events') }}</p>
-					<guard-journal :app="null" />
-				</template>
+				<section v-if="view.protection" class="settings-card _journal">
+					<guard-journal :app="null" :title="$t('Events')" :hint="$t('What the protection refused for every shared app, and the addresses banned right now.')" />
+				</section>
 			</template>
 		</div>
 		<!-- outside the section: a failed read of the view must not take the code away before it is seen -->
@@ -154,3 +164,87 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss" scoped>
+.share-guard-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+
+	> .settings-card {
+		margin-bottom: 0;
+	}
+	._head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+	}
+
+	._tile {
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 0.75rem;
+		background: rgba($primary, 0.12);
+		color: $primary;
+	}
+
+	._text {
+		flex: 1 1 14rem;
+		min-width: 0;
+	}
+
+	._name {
+		font-weight: 600;
+		color: var(--casa-text-strong);
+	}
+
+	._body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.625rem;
+		padding: 0 1rem 0.875rem;
+	}
+
+	._foot {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.625rem 1rem;
+		border-top: 1px solid var(--casa-divider-soft);
+	}
+
+	._chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		height: 1.375rem;
+		padding: 0 0.5625rem;
+		border-radius: 0.6875rem;
+		background: var(--casa-hover-tint);
+		font-size: 0.75rem;
+		font-weight: 600;
+		white-space: nowrap;
+
+		&.is-ok {
+			background: rgba($success, 0.16);
+			color: $success;
+		}
+	}
+
+	._sub {
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--casa-text-hint);
+	}
+}
+</style>
