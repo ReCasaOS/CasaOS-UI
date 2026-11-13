@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { menuSide } from './menuSide'
+import { menuPlace } from './menuSide'
 
-describe('menuSide', () => {
-	it('opens below when the menu fits', () => {
-		expect(menuSide(100, 500, 300)).toBe('bottom')
+describe('menuPlace', () => {
+	it('opens below, uncapped, when the menu fits', () => {
+		expect(menuPlace(100, 500, 300)).toEqual({ side: 'bottom', maxHeight: null })
 	})
-	it('opens above when it does not fit below but fits above', () => {
-		expect(menuSide(600, 200, 300)).toBe('top')
+	it('opens above, uncapped, when it only fits above', () => {
+		expect(menuPlace(600, 200, 300)).toEqual({ side: 'top', maxHeight: null })
 	})
-	it('picks the side with more room when it fits on neither', () => {
-		expect(menuSide(150, 250, 400)).toBe('bottom')
-		expect(menuSide(350, 150, 400)).toBe('top')
+	it('picks the side with more room and caps the height when it fits on neither', () => {
+		expect(menuPlace(150, 250, 400)).toEqual({ side: 'bottom', maxHeight: 238 })
+		expect(menuPlace(350, 150, 400)).toEqual({ side: 'top', maxHeight: 338 })
+	})
+	it('never caps below a usable height', () => {
+		expect(menuPlace(40, 60, 400).maxHeight).toBe(120)
 	})
 })
