@@ -11,22 +11,13 @@ vi.mock('@/service/service.js', () => ({ instance: { request: vi.fn() } }))
 let wrapper
 const tip = () => document.body.querySelector('.share-tip')
 
-async function mountButton(customStorage) {
-	wrapper = mount(ShareEntryButton, {
-		attachTo: document.body,
-		global: {
-			plugins: [Buefy, i18n],
-			mocks: { $api: { users: { getCustomStorage: vi.fn().mockResolvedValue({ data: { data: customStorage } }), setCustomStorage: vi.fn() } } },
-		},
-	})
-	await flushPromises()
-	vi.advanceTimersByTime(600)
-	await flushPromises()
+function mountButton() {
+	wrapper = mount(ShareEntryButton, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+	return wrapper
 }
 
 describe('the share entry tip', () => {
 	beforeEach(() => {
-		vi.useFakeTimers()
 		document.body.innerHTML = ''
 		// happy-dom lays nothing out: give the row a place
 		vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 700, bottom: 740, left: 20, right: 200, width: 180, height: 40 })
@@ -34,35 +25,35 @@ describe('the share entry tip', () => {
 	afterEach(() => {
 		wrapper?.unmount()
 		wrapper = null
-		vi.useRealTimers()
 		vi.restoreAllMocks()
 	})
 
-	it('opens beside the row, in the body, on a first visit', async () => {
-		await mountButton(null)
+	it('is not there until the pointer is on the row', () => {
+		mountButton()
+		expect(tip()).toBeNull()
+	})
+
+	it('opens beside the row, in the body, while it is hovered', async () => {
+		mountButton()
+		await wrapper.find('.list-item').trigger('mouseenter')
 		expect(tip()).not.toBeNull()
 		expect(tip().style.left).toBe('208px')
 		expect(tip().style.top).toBe('720px')
 	})
 
-	it('stays away once it was dismissed', async () => {
-		await mountButton({ isInit: true })
+	it('goes when the pointer leaves', async () => {
+		mountButton()
+		await wrapper.find('.list-item').trigger('mouseenter')
+		await wrapper.find('.list-item').trigger('mouseleave')
+		await flushPromises()
 		expect(tip()).toBeNull()
 	})
 
 	it('goes with the component, so closing the window leaves nothing behind', async () => {
-		await mountButton(null)
+		mountButton()
+		await wrapper.find('.list-item').trigger('mouseenter')
 		wrapper.unmount()
 		wrapper = null
 		expect(tip()).toBeNull()
-	})
-
-	it('follows the row when the window is resized', async () => {
-		await mountButton(null)
-		HTMLElement.prototype.getBoundingClientRect.mockReturnValue({ top: 300, bottom: 340, left: 20, right: 260, width: 240, height: 40 })
-		vi.advanceTimersByTime(300)
-		await flushPromises()
-		expect(tip().style.left).toBe('268px')
-		expect(tip().style.top).toBe('320px')
 	})
 })
