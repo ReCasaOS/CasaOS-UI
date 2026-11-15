@@ -51,7 +51,8 @@ export default {
 				this.warnNothingToOpen(appInfo)
 				return
 			}
-			this.hasNewTag(appInfo.name) ? this.firstOpenThirdApp(appInfo) : this.openThirdApp(appInfo)
+			// the launcher starts the app and waits for it: the owner's; an account that cannot write opens the address as it is
+			this.hasNewTag(appInfo.name) && this.$store.getters.canWrite ? this.firstOpenThirdApp(appInfo) : this.openThirdApp(appInfo)
 		},
 		openThirdApp(appInfo) {
 			this.$messageBus('apps_open', appInfo.name)
@@ -76,6 +77,10 @@ export default {
 			}
 		},
 		async openThirdContainerByAppInfo(appInfo) {
+			// starting an app is the owner's
+			if (!this.$store.getters.canWrite) {
+				return
+			}
 			try {
 				await this.$openAPI.appManagement.compose.setComposeAppStatus(appInfo.id, 'start')
 

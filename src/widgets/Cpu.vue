@@ -71,6 +71,8 @@ import RadialBar from '@/components/widgets/RadialBar.vue'
 
 export default {
 	name: 'cpu',
+	// read from the box's own state: only an account that may read the "system" module has this widget
+	module: 'system',
 	icon: 'system-outline',
 	title: 'System Status',
 	initShow: true,
@@ -100,7 +102,11 @@ export default {
 		}
 	},
 	watch: {
-		activeTab: {
+		// a session without the message bus has the box's load read again into the store (Home.vue)
+		'$store.state.hardwareInfo': function (info) {
+			this.updateCharts(info.cpu, info.mem)
+		},
+		'activeTab': {
 			handler(val, oldVal) {
 				if (val === oldVal) {
 					return

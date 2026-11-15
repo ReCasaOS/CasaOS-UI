@@ -55,3 +55,21 @@ describe('changing the password', () => {
 		expect(ctx.goto).toHaveBeenCalledWith(1)
 	})
 })
+
+// The login name of an account is the owner's to choose: the server refuses a user's change of it.
+describe('the login name', () => {
+	it.each([['admin', true], ['user', false]])('is editable by the %s: %s', async (role, editable) => {
+		const { shallowMount } = await import('@vue/test-utils')
+		const user = { id: 2, username: 'ann', role }
+		const wrapper = shallowMount(AccountPanel, {
+			global: {
+				stubs: { VeeForm: { template: '<span><slot :handle-submit="() => {}" /></span>' } },
+				mocks: { $t: key => key, $store: { state: { user }, getters: { canWrite: role === 'admin' } } },
+			},
+		})
+
+		expect(wrapper.text()).toContain('ann')
+		expect(wrapper.findAll('.edit-button').length).toBe(editable ? 3 : 2)
+		wrapper.unmount()
+	})
+})

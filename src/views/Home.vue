@@ -8,11 +8,12 @@
 		<div class="contents  pt-55 contextmenu-canvas" @contextmenu.prevent="openHomeContaxtMenu">
 			<div class="container">
 				<!-- the beta dashboard is opt-in (Settings); the classic one stays the default -->
-				<DashboardBeta v-if="barData.dashboard_beta && !hardwareInfoLoading" @leave="setDashboardBeta(false)" />
+				<!-- keyed by the rights: what a part decided at its creation (its widgets, cards, timers) is decided again when they change -->
+				<DashboardBeta v-if="barData.dashboard_beta && canReadModule('system') && !hardwareInfoLoading" :key="access" @leave="setDashboardBeta(false)" />
 				<div v-else class="columns is-variable is-2">
 					<div class="column is-one-quarter slider-content">
 						<!-- SideBar Start -->
-						<SideBar v-if="!hardwareInfoLoading" @searchBarChange="handleSearchBarChange" />
+						<SideBar v-if="!hardwareInfoLoading" :key="access" @searchBarChange="handleSearchBarChange" />
 						<!-- SideBar End -->
 					</div>
 					<div :class="{ open: sidebarOpen }" class="column is-three-quarters main-content">
@@ -29,14 +30,14 @@
 							<!-- core-service Start -->
 							<section>
 								<transition name="fade">
-									<CoreService />
+									<CoreService v-if="canWrite" />
 								</transition>
 							</section>
 							<!-- core-service End -->
 
 							<!-- Apps Start -->
 							<section>
-								<AppSection />
+								<AppSection :key="access" />
 							</section>
 							<!-- Apps End -->
 
@@ -54,7 +55,7 @@
 		<!-- Content End -->
 
 		<!-- File Panel Start -->
-		<b-modal v-model="isFileActive" :can-cancel="[]" :destroy-on-hide="false" animation="zoom-in" aria-modal
+		<b-modal v-if="canReadModule('files')" v-model="isFileActive" :can-cancel="[]" :destroy-on-hide="false" animation="zoom-in" aria-modal
 			custom-class="file-panel" has-modal-card @after-enter="afterFileEnter">
 			<template #default="props">
 				<FilePanel ref="filePanel" @close="props.close" />
@@ -79,6 +80,11 @@ import { mixin } from '@/mixins/mixin'
 import { FILES_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPreference'
 import events from '@/events/events'
 import { openPage } from '@/router/pageTabs'
+import { createPoller } from '@/components/Stats/poller'
+import { accessOf } from '@/store/confirmRole'
+
+// a session without the message bus (an account of role user with the system right) reads the box's load this often
+const UTILIZATION_POLL_MS = 10000
 
 const wallpaperConfig = 'wallpaper'
 
@@ -114,6 +120,13 @@ export default {
 	},
 
 	computed: {
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
+		// the role and the modules it reads, as one value: the server confirms them after the first render
+		access() {
+			return accessOf(this.$store.getters)
+		},
 		sidebarOpen() {
 			return this.$store.state.sidebarOpen
 		},
@@ -121,8 +134,16 @@ export default {
 			return this.$store.state.searchEngineSwitch
 		},
 	},
+	watch: {
+		// the role and the rights confirmed after the first render: what the dashboard waits for is asked then
+		access() {
+			// the side bar waits again for the box's load when the widgets read it
+			this.hardwareInfoLoading = this.canReadModule('system')
+			this.followUtilization()
+		},
+	},
 	created() {
-		this.getHardwareInfo()
+		this.followUtilization()
 		this.getWallpaperConfig()
 		this.getConfig()
 
@@ -145,12 +166,18 @@ export default {
 		this.$EventBus.$on('casaUI:openStorageManager', () => {
 			this.showStorageManagerPanelModal()
 		})
+		document.addEventListener('visibilitychange', this.onVisibility)
 	},
 	beforeUnmount() {
+		this.utilizationPoller?.stop()
+		document.removeEventListener('visibilitychange', this.onVisibility)
 		window.removeEventListener('resize', this.onResize)
 		this.$EventBus.$off('casaUI:openStorageManager')
 	},
 	methods: {
+		canReadModule(name) {
+			return this.$store.getters.canReadModule(name)
+		},
 
 		/**
 		 * @description: Get CasaOS Configs
@@ -268,8 +295,28 @@ export default {
 		 * @return {*} void
 		 */
 
+		// The owner's widgets follow the message bus after the first read. A user's session has no bus: with the system
+		// right it reads the load again every 10 s while the page is shown, into the store the widgets follow.
+		followUtilization() {
+			this.utilizationPoller?.stop()
+			this.utilizationPoller = null
+			if (this.canWrite || !this.canReadModule('system')) {
+				return this.getHardwareInfo()
+			}
+			this.utilizationPoller = createPoller({ run: () => this.getHardwareInfo(), intervalMs: UTILIZATION_POLL_MS })
+			this.utilizationPoller.start()
+		},
+		onVisibility() {
+			this.utilizationPoller?.visibilityChanged()
+		},
+
 		getHardwareInfo() {
-			this.$api.sys.getUtilization().then((res) => {
+			// the box's load, memory and disks are the "system" module's: the side bar and the dashboard do not wait for them without it
+			if (!this.canReadModule('system')) {
+				this.hardwareInfoLoading = false
+				return
+			}
+			return this.$api.sys.getUtilization().then((res) => {
 				if (res.data.success === 200) {
 					this.hardwareInfoLoading = false
 					this.$store.commit('SET_HARDWARE_INFO', res.data.data)
@@ -294,6 +341,9 @@ export default {
 		},
 
 		async showUpdateCompleteModal() {
+			if (!this.canWrite) {
+				return
+			}
 			await this.$api.users.getLinkAppDetail()
 			const versionRes = await this.$api.sys.getVersion()
 			if (versionRes.data.success == 200) {

@@ -55,7 +55,7 @@ describe('app section opening a git app', () => {
 		const vm = {
 			$messageBus: vi.fn(),
 			$api: { container: { getNetworks: () => Promise.resolve({ data: { data: [] } }) } },
-			$store: { state: { hardwareInfo: { mem: { total: 1 } } } },
+			$store: { state: { hardwareInfo: { mem: { total: 1 } } }, getters: { canWrite: true, canReadModule: () => true } },
 			$openAPI: { appManagement: { compose: { myComposeApp } } },
 			$buefy: { modal: { open } },
 		}
@@ -240,6 +240,9 @@ describe('app section built-in cards', () => {
 			appList: [],
 			getLinkAppList: () => Promise.resolve([]),
 			sortApps: AppSection.methods.sortApps,
+			builtInsOf: AppSection.methods.builtInsOf,
+			canWrite: true,
+			$store: { getters: { canReadModule: () => true } },
 			saveSortIfChanged: vi.fn(),
 			addVmCardWhenThere: vi.fn(),
 			addFleetCardWhenThere: vi.fn(),
@@ -273,6 +276,9 @@ describe('app section built-in cards', () => {
 			cardsProbing: [],
 			getLinkAppList: () => Promise.resolve([]),
 			sortApps: AppSection.methods.sortApps,
+			builtInsOf: AppSection.methods.builtInsOf,
+			canWrite: true,
+			$store: { getters: { canReadModule: () => true } },
 			getList: vi.fn(),
 		}
 		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'onSortEnd']) {
@@ -381,6 +387,9 @@ describe('app section cards whose probes answer one after the other', () => {
 			savedOrder: [],
 			getLinkAppList: () => Promise.resolve([]),
 			sortApps: AppSection.methods.sortApps,
+			builtInsOf: AppSection.methods.builtInsOf,
+			canWrite: true,
+			$store: { getters: { canReadModule: () => true } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: [], savedOrder: [] })
 		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere']) {
@@ -411,6 +420,97 @@ describe('app section cards whose probes answer one after the other', () => {
 		expect(stored.order.indexOf('logs')).toBe(stored.order.indexOf('Statistics') + 1)
 		const names = vm.appList.map(app => app.name)
 		expect(names.indexOf('logs')).toBe(names.indexOf('Statistics') + 1)
+	})
+})
+
+describe('app section when the role changes from owner to plain account', () => {
+	it('drops the Virtual Machines and Fleet cards at the next read, and their tiles and polling with them', async () => {
+		let may = true
+		const vm = {
+			$baseIp: 'localhost',
+			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'jellyfin' }] } }) } },
+			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: [] } } }), setCustomStorage: vi.fn() } },
+			appList: [{ name: 'Virtual Machines' }, { name: 'Fleet' }, { name: 'jellyfin' }],
+			retryCount: 0,
+			appListErrorMessage: '',
+			gridMissing: false,
+			savedOrder: [],
+			getLinkAppList: () => Promise.resolve([]),
+			sortApps: AppSection.methods.sortApps,
+			builtInsOf: AppSection.methods.builtInsOf,
+			get canWrite() { return may },
+			$store: { getters: { canReadModule: () => may } },
+		}
+		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'pollVms'])
+			vm[method] = AppSection.methods[method].bind(vm)
+		vm.vms = [{ name: 'a vm' }]
+
+		may = false
+		await vm.getList()
+		await vm.pollVms()
+
+		const names = vm.appList.map(app => app.name)
+		expect(names).not.toContain('Virtual Machines')
+		expect(names).not.toContain('Fleet')
+		expect(names).toContain('jellyfin')
+		// no card, no tiles, and no read of the machines' list is scheduled
+		expect(vm.vms).toEqual([])
+		expect(listVirtualMachines).not.toHaveBeenCalled()
+		clearTimeout(vm.vmPollTimer)
+	})
+})
+
+// A plain account sees the cards of its rights: the Virtual Machines card with the vm right, never the Fleet card, whose page
+// reads every box through the relay.
+describe('app section of an account of role user', () => {
+	function userSection(rights) {
+		const vm = {
+			$baseIp: 'localhost',
+			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'jellyfin' }] } }) } },
+			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: [] } } }), setCustomStorage: vi.fn() } },
+			appList: [{ name: 'Virtual Machines' }, { name: 'Fleet' }, { name: 'jellyfin' }],
+			retryCount: 0,
+			appListErrorMessage: '',
+			gridMissing: false,
+			savedOrder: [],
+			getLinkAppList: () => Promise.resolve([]),
+			sortApps: AppSection.methods.sortApps,
+			builtInsOf: AppSection.methods.builtInsOf,
+			canWrite: false,
+			$store: { getters: { canReadModule: name => rights.includes(name) } },
+		}
+		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'pollVms'])
+			vm[method] = AppSection.methods[method].bind(vm)
+		return vm
+	}
+
+	afterEach(() => {
+		listVirtualMachines.mockReset()
+	})
+
+	it('with the vm right, keeps the Virtual Machines card and reads its machines, and has no Fleet card even with the fleet right', async () => {
+		listVirtualMachines.mockResolvedValue([{ id: 'a', title: 'Alpha', state: 'running' }])
+		const vm = userSection(['vm', 'fleet'])
+		await vm.getList()
+		await vm.pollVms()
+
+		const names = vm.appList.map(app => app.name)
+		expect(names).toContain('Virtual Machines')
+		expect(names).not.toContain('Fleet')
+		expect(listVirtualMachines).toHaveBeenCalled()
+		clearTimeout(vm.vmPollTimer)
+	})
+
+	it('without the vm right, has no Virtual Machines card and never reads the machines', async () => {
+		const vm = userSection(['storage'])
+		await vm.getList()
+		await vm.pollVms()
+
+		expect(vm.appList.map(app => app.name)).not.toContain('Virtual Machines')
+		expect(listVirtualMachines).not.toHaveBeenCalled()
+		clearTimeout(vm.vmPollTimer)
 	})
 })
 
@@ -536,6 +636,7 @@ describe('app section VM tiles', () => {
 		expect(listVirtualMachines).not.toHaveBeenCalled()
 
 		hide(false)
+		vm.canWrite = true
 		await AppSection.methods.onVisibility.call(vm)
 		expect(listVirtualMachines).toHaveBeenCalledTimes(1)
 		await vi.advanceTimersByTimeAsync(5000)
@@ -694,8 +795,29 @@ describe('app section VM tiles riding out a failed poll', () => {
 		clearTimeout(vm.vmPollTimer)
 	})
 
+	it('reloads its list on the event while mounted, and no more once gone', async () => {
+		const { default: createEventBus } = await import('@/events/eventBus.js')
+		const { default: events } = await import('@/events/events')
+		const bus = createEventBus()
+		const vm = { getList: vi.fn(), isMobile: () => false, $EventBus: bus, pollVms: vi.fn(), onVisibility: vi.fn(), startListTimer: vi.fn(), syncVmCard() {}, syncFleetCard() {} }
+		vm.reloadList = AppSection.methods.reloadList.bind(vm)
+
+		AppSection.created.call(vm)
+		vm.getList.mockClear()
+		bus.$emit(events.RELOAD_APP_LIST)
+		expect(vm.getList).toHaveBeenCalledTimes(1)
+
+		AppSection.beforeUnmount.call(vm)
+		bus.$emit(events.RELOAD_APP_LIST)
+		expect(vm.getList).toHaveBeenCalledTimes(1)
+	})
+
+	it('has no watch of the role: the grid is made again when it changes (keyed by the access)', () => {
+		expect(AppSection.watch.canWrite).toBeUndefined()
+	})
+
 	it('(5) declares its polling state when the grid is made', () => {
-		const vm = { getList: vi.fn(), isMobile: () => false, $EventBus: { $on: vi.fn() }, pollVms: vi.fn(), onVisibility: vi.fn() }
+		const vm = { getList: vi.fn(), isMobile: () => false, $EventBus: { $on: vi.fn() }, pollVms: vi.fn(), onVisibility: vi.fn(), startListTimer: vi.fn() }
 		const added = vi.spyOn(document, 'addEventListener')
 
 		AppSection.created.call(vm)
@@ -935,5 +1057,23 @@ describe('app section logs card', () => {
 		const other = section(['App Store', 'Files'])
 		await AppSection.methods.addLogsCardWhenThere.call(other, [])
 		expect(names(other)).toEqual(['App Store', 'Files'])
+	})
+})
+
+describe('app section reading its lists on a timer', () => {
+	afterEach(() => vi.useRealTimers())
+
+	it('skips a tick while the last read is still on its way, and asks again once it answered', () => {
+		vi.useFakeTimers()
+		const vm = { canWrite: true, getList: vi.fn(), listReading: Date.now(), $store: { getters: { canReadModule: () => false } } }
+		AppSection.methods.startListTimer.call(vm)
+
+		vi.advanceTimersByTime(5000)
+		expect(vm.getList).not.toHaveBeenCalled()
+
+		vm.listReading = 0
+		vi.advanceTimersByTime(5000)
+		expect(vm.getList).toHaveBeenCalledTimes(1)
+		clearInterval(vm.ListRefreshTimer)
 	})
 })

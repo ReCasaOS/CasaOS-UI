@@ -1,13 +1,14 @@
 <template>
 	<!-- Logs on a tab of its own, the whole window -->
 	<div class="logs-tab">
-		<LogsPage :initial-app="query.app" :initial-at="query.at" :initial-box="query.box" @close="close" />
+		<LogsPage :key="access" :initial-app="query.app" :initial-at="query.at" :initial-box="query.box" @close="close" />
 	</div>
 </template>
 
 <script>
 import LogsPage from './LogsPage.vue'
 import { parseQuery } from './logsModel'
+import { accessOf, confirmRole } from '@/store/confirmRole'
 
 export default {
 	name: 'LogsTab',
@@ -15,9 +16,15 @@ export default {
 		LogsPage,
 	},
 	computed: {
+		access() {
+			return accessOf(this.$store.getters)
+		},
 		query() {
 			return parseQuery(this.$route)
 		},
+	},
+	created() {
+		confirmRole(this.$api, this.$store)
 	},
 	mounted() {
 		this.previousTitle = document.title

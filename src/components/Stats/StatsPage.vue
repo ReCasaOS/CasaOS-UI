@@ -63,7 +63,7 @@
 								<span class="stats-kind">{{ kindWord(selected.kind) }}</span>
 								<span class="stats-state">{{ stateWord(selected.state, selected.kind) }}</span>
 								<span v-if="sinceText" class="stats-since">{{ sinceText }}</span>
-								<button class="button is-small is-rounded ml-auto" type="button" @click="openAlerts">{{ $t('Alert settings') }}</button>
+								<button v-if="canWrite" class="button is-small is-rounded ml-auto" type="button" @click="openAlerts">{{ $t('Alert settings') }}</button>
 							</div>
 							<p v-if="detailText" :title="detailText" class="stats-detail">{{ detailText }}</p>
 						</div>
@@ -227,6 +227,10 @@ export default {
 		}
 	},
 	computed: {
+		// the alert settings are written to the box: the owner's
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		locale() {
 			return localeTag(this.$i18n.locale)
 		},
@@ -372,9 +376,17 @@ export default {
 
 		// The three sources at once; the virtual machines only where the module answers.
 		async loadAll() {
-			const virt = hasVirtualMachines().then(there => there ? this.loadColumn('virt_management') : this.markAbsent('virt_management'))
-			await Promise.allSettled([this.loadColumn('app_management'), this.loadColumn('core'), virt])
+			// the box's own and the VMs' figures are the "system" and "vm" modules': an account without them reads the apps' only
+			const virt = this.mayRead('vm')
+				? hasVirtualMachines().then(there => there ? this.loadColumn('virt_management') : this.markAbsent('virt_management'))
+				: this.markAbsent('virt_management')
+			const apps = this.loadColumn('app_management')
+			const core = this.mayRead('system') ? this.loadColumn('core') : this.markAbsent('core')
+			await Promise.allSettled([apps, core, virt])
 			this.reconcile()
+		},
+		mayRead(module) {
+			return this.$store.getters.canReadModule(module)
 		},
 		markAbsent(source) {
 			this.listTicket[source]++

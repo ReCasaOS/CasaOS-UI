@@ -20,7 +20,7 @@ function dashboard() {
 			stubs: { 'HealthStrip': HealthStrip, 'SearchBar': true, 'CoreService': true, 'AppSection': true, 'b-tag': true, 'b-button': true, 'b-icon': true },
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
-				$store: { state: { searchEngineSwitch: false } },
+				$store: { state: { searchEngineSwitch: false }, getters: { canWrite: true, canReadModule: () => true } },
 			},
 		},
 	})

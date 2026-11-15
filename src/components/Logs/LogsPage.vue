@@ -80,7 +80,7 @@
 							<b-button rounded size="is-small" @click="$refs.stream.jumpToNow()">{{ $t('Jump to now') }}</b-button>
 							<b-button rounded size="is-small" @click="$refs.stream.download()">{{ $t('Download') }}</b-button>
 							<b-button rounded size="is-small" @click="$refs.stream.clear()">{{ $t('Clear') }}</b-button>
-							<template v-if="controlled">
+							<template v-if="controlled && canWrite">
 								<b-button :loading="acting === 'restart'" rounded size="is-small" @click="setStatus('restart')">{{ $t('Restart') }}</b-button>
 								<b-button :loading="acting === 'stop'" rounded size="is-small" type="is-danger" @click="setStatus('stop')">{{ $t('Stop') }}</b-button>
 							</template>
@@ -146,7 +146,8 @@ export default {
 			defaultIcon: require('@/assets/img/app/default.svg'),
 			ranges: RANGES,
 			boxes: [],
-			box: this.initialBox || null,
+			// another box is read through the fleet's relay, the owner's: an account that cannot write reads this one
+			box: (this.$store.getters.canWrite && this.initialBox) || null,
 			apps: [],
 			showUninstalled: false,
 			appsState: 'loading',
@@ -185,6 +186,10 @@ export default {
 		selectedApp() {
 			return this.selectedApps.length === 1 ? this.apps.find(a => a.app === this.selectedApps[0]) : null
 		},
+		// Restart and Stop write to the box: the owner's
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		// Restart and Stop are compose routes: a v1 app, whose one service the server names "main", has none
 		controlled() {
 			const app = this.selectedApp
@@ -220,7 +225,9 @@ export default {
 		},
 	},
 	mounted() {
-		listBoxes().catch(() => []).then((boxes) => {
+		// another box's logs come through the fleet's relay, which is the owner's: an account that cannot write sees this box's logs only
+		const boxesRead = !this.$store.getters.canWrite ? Promise.resolve([]) : listBoxes().catch(() => [])
+		boxesRead.then((boxes) => {
 			this.boxes = boxes
 			// a box of the URL this master does not know (an unknown list proves nothing): this box, with the app and the moment kept
 			if (this.box && boxes.length && !boxes.some(b => b.id === this.box)) {

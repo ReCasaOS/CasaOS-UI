@@ -72,7 +72,7 @@
 				</button>
 			</div>
 
-			<b-dropdown animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
+			<b-dropdown v-if="$store.getters.canWrite" animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
 				<template #trigger>
 					<b-icon class="polymorphic is-clickable has-text-grey-100"
 						icon="plus-outline"
@@ -233,6 +233,10 @@ const builtInApplications = [
 
 const isSystemApp = app => app.app_type === 'system'
 
+// how often an account that cannot write reads the lists again, in place of the bus's events
+const USER_REFRESH_MS = 10000
+const OWNER_REFRESH_MS = 5000
+
 // a tile per VM right after the Virtual Machines card, in whichever list has that card
 function withVmTiles(apps, vms) {
 	const at = apps.findIndex(app => app.name === VM_APP_NAME)
@@ -252,6 +256,8 @@ const FILTERS = {
 }
 
 const orderConfig = 'app_order'
+// a read that has not answered after this long no longer holds the next one back
+const LIST_READ_STUCK_MS = 30000
 // the names pinned in the compact grid, in the order they were pinned
 const favoritesConfig = 'app_favorites'
 
@@ -339,6 +345,9 @@ export default {
 		}
 	},
 	computed: {
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		dragOptions() {
 			return {
 				animation: 300,
@@ -434,18 +443,12 @@ export default {
 			this.showInstall(SYNCTHING_STORE_ID)
 		})
 
-		this.$EventBus.$on(events.RELOAD_APP_LIST, () => {
-			this.getList()
-		})
+		this.$EventBus.$on(events.RELOAD_APP_LIST, this.reloadList)
 
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
 		this.$EventBus.$on(events.FLEET_CHANGED, this.syncFleetCard)
 
-		this.ListRefreshTimer = setInterval(() => {
-			this.getList()
-			// the tiles' backup badges: the service reads at most once a minute, whoever asks
-			refreshBackupStatus()
-		}, 5000)
+		this.startListTimer()
 
 		// the VM tiles' polling: plain fields, not data, as nothing is drawn from them
 		this.vmPollStopped = false
@@ -469,6 +472,7 @@ export default {
 	},
 	beforeUnmount() {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
+		this.$EventBus.$off(events.RELOAD_APP_LIST, this.reloadList)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
 		this.$EventBus.$off(events.FLEET_CHANGED, this.syncFleetCard)
 		window.removeEventListener('resize', this.getSkCount)
@@ -485,6 +489,33 @@ export default {
 		this.getSkCount()
 	},
 	methods: {
+		// a method, not an arrow, so the grid that goes takes its listener with it (Home and DashboardBeta key it by the access)
+		reloadList() {
+			this.getList()
+		},
+		// The owner's lists follow the bus and are read every 5 s as well. An account that cannot write has no bus: it reads them
+		// every 10 s, while the page is shown, and at once when it is shown again.
+		startListTimer() {
+			clearInterval(this.ListRefreshTimer)
+			const owner = this.canWrite
+			this.ListRefreshTimer = setInterval(() => {
+				// a read still on its way is not asked again
+				if ((!owner && document.hidden) || Date.now() - this.listReading < LIST_READ_STUCK_MS) {
+					return
+				}
+				this.getList()
+				// the tiles' backup badges: the service reads at most once a minute, whoever asks
+				if (this.$store.getters.canReadModule('backups')) {
+					refreshBackupStatus()
+				}
+			}, owner ? OWNER_REFRESH_MS : USER_REFRESH_MS)
+		},
+
+		// the built-in cards of the rights of the account: the store and the files are not a user's
+		builtInsOf(apps) {
+			return apps.filter(app => (app.name === 'App Store' ? this.canWrite : app.name === 'Files' ? this.$store.getters.canReadModule('files') : true))
+		},
+
 		// silent on failure: no favorites is a fine state, and the grid shows all the same
 		loadFavorites() {
 			this.$api.users.getCustomStorage(favoritesConfig)
@@ -623,6 +654,7 @@ export default {
 		 * @return {*} void
 		 */
 		async getList() {
+			this.listReading = Date.now()
 			try {
 				// a failing grid (Docker not up yet: fresh box, no data disk) must not
 				// hide the built-in and link apps: show those, read the grid again
@@ -664,16 +696,18 @@ export default {
 				// the virtual machines join Files where the module answers. The grid
 				// does not wait for the probe: the card is added when it answers, and a
 				// list read again keeps the card it already shows.
-				const hasVmCard = this.appList.some(app => app.name === VM_APP_NAME)
+				// a card of a module the account may no longer read (the role changed) is dropped here
+				const hasVmCard = this.$store.getters.canReadModule('vm') && this.appList.some(app => app.name === VM_APP_NAME)
 				const vmApps = hasVmCard ? [vmApplication()] : []
-				// the Fleet card the same way, where the core says this box is a master
-				const hasFleetCard = this.appList.some(app => app.name === FLEET_APP_NAME)
+				// the Fleet card the same way, where the core says this box is a master. Its page reads every box through the relay,
+				// which is the owner's: the "fleet" module of an account shows the boxes on the dashboard, not this card
+				const hasFleetCard = this.canWrite && this.appList.some(app => app.name === FLEET_APP_NAME)
 				const fleetApps = hasFleetCard ? [fleetApplication()] : []
 				// the Logs card the same way, where AppManagement keeps logs
 				const hasLogsCard = this.appList.some(app => app.name === LOGS_APP_NAME)
 				const logsApps = hasLogsCard ? [logsApplication()] : []
 				// all app list
-				const casaAppList = concat(builtInApplications, vmApps, fleetApps, logsApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(this.builtInsOf(builtInApplications), vmApps, fleetApps, logsApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -688,10 +722,11 @@ export default {
 				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
-				if (!hasVmCard) {
+				// the cards of the modules the account may read: the others are neither probed nor shown
+				if (!hasVmCard && this.$store.getters.canReadModule('vm')) {
 					this.addVmCardWhenThere(lateSortList)
 				}
-				if (!hasFleetCard) {
+				if (!hasFleetCard && this.canWrite) {
 					this.addFleetCardWhenThere(lateSortList)
 				}
 				if (!hasLogsCard) {
@@ -709,6 +744,8 @@ export default {
 				console.error(error)
 				this.isLoading = true
 				this.retryList()
+			} finally {
+				this.listReading = 0
 			}
 		},
 
@@ -883,6 +920,9 @@ export default {
 				clearTimeout(this.vmPollTimer)
 				return
 			}
+			if (!this.canWrite) {
+				this.getList()
+			}
 			return this.pollVms()
 		},
 
@@ -892,6 +932,10 @@ export default {
 		 * @return {*}
 		 */
 		saveSortData() {
+			// the cards listed before the role is known are a plain account's: the saved order is kept
+			if (this.$store?.state?.user?.role === '') {
+				return
+			}
 			const shown = this.appList.map((item) => {
 				// compose milestone :: name is unique, global index.
 				return item.name
@@ -945,7 +989,7 @@ export default {
 				hasModalCard: true,
 				customClass: 'app-panel',
 				trapFocus: true,
-				canCancel: ['escape'],
+				canCancel: [''], // Escape is the panel's own: it asks before a draft is thrown away
 				scroll: 'keep',
 				animation: 'zoom-in',
 				events: {

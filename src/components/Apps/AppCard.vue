@@ -18,10 +18,10 @@
 					Repository tab, and deleting it are all there is to do with it. -->
 				<b-dropdown-item v-if="isGitAppWithoutContainer" :focusable="false" aria-role="menu-item" custom
 					:style="menuStyle">
-					<b-button expanded type="is-text" @click="configApp()">
+					<b-button v-if="canWrite" expanded type="is-text" @click="configApp()">
 						{{ $t('Setting') }}
 					</b-button>
-					<b-button class="has-text-red" expanded type="is-text" @click="deleteGitAppConfirm">
+					<b-button v-if="canWrite" class="has-text-red" expanded type="is-text" @click="deleteGitAppConfirm">
 						{{ $t('Delete') }}
 					</b-button>
 				</b-dropdown-item>
@@ -34,7 +34,7 @@
 							{{
 								$t('Open') }}
 						</b-button>
-						<b-button v-else expanded tag="a" type="is-text" @click="openApp(item)">
+						<b-button v-else-if="canWrite" expanded tag="a" type="is-text" @click="openApp(item)">
 							{{
 								$t('launch-and-open') }}
 						</b-button>
@@ -42,11 +42,11 @@
 					<b-button v-if="compact && !isContainerApp" expanded type="is-text" @click="toggleFavorite">
 						{{ favorite ? $t('Remove from favorites') : $t('Add to favorites') }}
 					</b-button>
-					<b-button v-if="isV2App" expanded icon-pack="casa" icon-right="question-outline" size="is-16"
+					<b-button v-if="isV2App && canWrite" expanded icon-pack="casa" icon-right="question-outline" size="is-16"
 						type="is-text" @click="openTips(item.name)">
 						{{ $t('Tips') }}
 					</b-button>
-					<b-button v-if="isV2App || isLinkApp" expanded type="is-text" @click="configApp()">
+					<b-button v-if="canWrite && (isV2App || isLinkApp)" expanded type="is-text" @click="configApp()">
 						{{
 							$t('Setting')
 						}}
@@ -54,7 +54,7 @@
 
 					<!-- imported apps too: for those the update is a pull of the tags they already
 						name, which is the only kind of update they can have -->
-					<b-button v-if="isV2App" expanded type="is-text" @click="checkAppVersion(item.name)">
+					<b-button v-if="canWrite && isV2App" expanded type="is-text" @click="checkAppVersion(item.name)">
 						{{
 							$t('Check then update')
 						}}
@@ -63,7 +63,7 @@
 						</b-loading>
 					</b-button>
 
-					<b-button v-if="logsAvailable && (isV2App || isV1App)" expanded type="is-text" @click="showLogs()">
+					<b-button v-if="logsAvailable && (isV2App || (isV1App && canWrite))" expanded type="is-text" @click="showLogs()">
 						{{ $t('Logs') }}
 					</b-button>
 
@@ -74,44 +74,44 @@
 					</b-button>
 
 					<!-- container only, and only one that belongs to no compose project: see canRecreate -->
-					<b-button v-if="canRecreate" :loading="isRecreating" expanded type="is-text"
+					<b-button v-if="canWrite && canRecreate" :loading="isRecreating" expanded type="is-text"
 						@click="recreateConfirm">
 						{{
 							$t('Pull image and recreate')
 						}}
 					</b-button>
 
-					<b-button v-if="isV2App" expanded type="is-text" @click="backupApp()">
+					<b-button v-if="canWrite && isV2App" expanded type="is-text" @click="backupApp()">
 						{{
 							$t('Back up')
 						}}
 					</b-button>
 
-					<b-button v-if="isV2App && publicShare.ok" expanded type="is-text" @click="shareApp()">
+					<b-button v-if="canWrite && isV2App && publicShare.ok" expanded type="is-text" @click="shareApp()">
 						{{
 							$t('Share on the Internet')
 						}}
 					</b-button>
 
-					<b-button v-if="isV1App" expanded type="is-text" @click="exportYAML(item)">
+					<b-button v-if="isV1App && canWrite" expanded type="is-text" @click="exportYAML(item)">
 						{{
 							$t('Export as Compose')
 						}}
 					</b-button>
 
-					<b-button v-if="isV1App" :loading="isRebuilding" expanded type="is-text" @click="rebuild(item)">
+					<b-button v-if="canWrite && isV1App" :loading="isRebuilding" expanded type="is-text" @click="rebuild(item)">
 						{{
 							$t('Rebuild')
 						}}
 					</b-button>
 
-					<b-button v-if="isLinkApp" class="mb-1" expanded type="is-text" @click="uninstallApp(true)">
+					<b-button v-if="canWrite && isLinkApp" class="mb-1" expanded type="is-text" @click="uninstallApp(true)">
 						{{ $t('Delete') }}
 						<b-loading v-model="isUninstalling" :is-full-page="false">
 							<img :src="require('@/assets/img/loading/waiting.svg')" alt="pending" class="ml-4 is-24x24">
 						</b-loading>
 					</b-button>
-					<b-button v-else-if="!isContainerApp" class="has-text-red" expanded type="is-text"
+					<b-button v-else-if="canWrite && !isContainerApp" class="has-text-red" expanded type="is-text"
 						@click="uninstallConfirm">
 						{{ $t('Uninstall') }}
 						<b-loading v-model="isUninstalling" :is-full-page="false">
@@ -119,7 +119,7 @@
 						</b-loading>
 					</b-button>
 
-					<div v-if="!isLinkApp && !isContainerApp" class="gap">
+					<div v-if="canWrite && !isLinkApp && !isContainerApp" class="gap">
 						<div class="columns is-gapless _b-bor is-flex">
 							<div class="column is-flex is-justify-content-center is-align-items-center">
 								<b-button :loading="isRestarting" expanded type="is-text" :disabled="item.status !== 'running'"
@@ -365,6 +365,8 @@ export default {
 				return this.$t('Restarting')
 			} else if (this.isStarting) {
 				return this.$t('updateState')
+			} else if (!this.canWrite && this.item.status !== 'running' && !this.isLinkApp) {
+				return this.$t('{name} is stopped: only the owner can start it.', { name: this.containerName })
 			} else if (this.isRebuilding) {
 				return this.$t('Rebuilding')
 			} else if (this.isCheckThenUpdate) {
@@ -437,6 +439,9 @@ export default {
 		// A container card now always has a menu: even one a compose project owns can
 		// be looked at, which is the whole point of the panel -- the old rule left
 		// those cards with no way to find out what they were.
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		hasActions() {
 			return true
 		},
@@ -474,15 +479,25 @@ export default {
 	},
 
 	created() {
-		// shared and at most once a minute: every card may ask
-		refreshBackupStatus()
-		refreshPublicShare()
+		// shared and at most once a minute: every card may ask, an account that may read these modules
+		if (this.$store.getters.canReadModule('backups')) {
+			refreshBackupStatus()
+		}
+		if (this.$store.getters.canReadModule('share')) {
+			refreshPublicShare()
+		}
 		hasLogs().then((available) => {
 			this.logsAvailable = available
 		})
 	},
 
 	methods: {
+		// the menu may not be there (a card without actions)
+		closeMenu() {
+			if (this.$refs.dro) {
+				this.$refs.dro.isActive = false
+			}
+		},
 		onOver() {
 			this.hover = true
 			const rect = this.$el.getBoundingClientRect()
@@ -499,7 +514,7 @@ export default {
 			})
 		},
 		toggleFavorite() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$emit('toggleFavorite', this.item)
 		},
 		// the menu button has its own click; a card at work is not opened a second time
@@ -518,11 +533,18 @@ export default {
 		 */
 		openApp(item) {
 			if (this.isContainerApp) {
+				// importing a container writes: an account that cannot write is shown what it is
+				if (!this.canWrite) {
+					this.showContainerDetail()
+					return false
+				}
 				this.$emit('importApp', item, false)
 				return false
 			}
 			if (this.isGitAppWithoutContainer) {
-				this.configApp()
+				if (this.canWrite) {
+					this.configApp()
+				}
 				return false
 			}
 			if (item.app_type === 'system') {
@@ -532,9 +554,17 @@ export default {
 				this.removeIdFromSessionStorage(item.name)
 			} else {
 				// type is one of 'official' or 'community'.
-				this.$refs.dro.isActive = false
+				this.closeMenu()
 				if (item.status === 'running') {
 					this.openAppToNewWindow(item)
+				} else if (!this.canWrite) {
+					// starting an app is the owner's: nothing is asked of the box, the card tells it
+					this.$buefy.toast.open({
+						message: escape(this.$t('{name} is stopped: only the owner can start it.', { name: this.containerName })),
+						type: 'is-warning',
+						position: 'is-top',
+						duration: 4000,
+					})
 				} else {
 					this.toggle(item)
 					this.firstOpenThirdApp(item)
@@ -545,7 +575,7 @@ export default {
 		// Where "what is this" and "get rid of it" both live. Docker invented the
 		// name on these cards, so there was nowhere to answer either question.
 		showContainerDetail() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.modal.open({
 				component: ContainerDetailPanel,
 				hasModalCard: true,
@@ -559,7 +589,7 @@ export default {
 		},
 
 		backupApp() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.modal.open({
 				component: BackupAppModal,
 				hasModalCard: true,
@@ -571,7 +601,7 @@ export default {
 		},
 
 		shareApp() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.modal.open({
 				component: ShareAppModal,
 				hasModalCard: true,
@@ -667,7 +697,7 @@ export default {
 			} else if (this.isV1App) {
 				this.restartAppV1()
 			}
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 		},
 
 		restartAppV1() {
@@ -706,7 +736,7 @@ export default {
 		 */
 		uninstallConfirm() {
 			this.$messageBus('apps_uninstall', this.item.name)
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
 				message: this.$t(`Data cannot be recovered after deletion! <br/>Continue on to uninstall this application?<br/>{divS}Delete userdata ( config folder ){divE}`, {
@@ -726,7 +756,7 @@ export default {
 		// A git app with no container goes through its own route, which takes what
 		// CasaOS cloned, built or left behind for it: the compose route knows no such app.
 		deleteGitAppConfirm() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
 				message: escape(this.$t('Delete {name}? What CasaOS cloned, built or started for it goes with it; the repository itself is not touched.', { name: this.containerName })),
@@ -803,7 +833,7 @@ export default {
 		 * @return {*} void
 		 */
 		recreateConfirm() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$buefy.dialog.confirm({
 				title: this.$t('Attention'),
 				message: escape(this.$t('{name} will be stopped and replaced by a new container running the newest image. Its volumes and bind mounts are carried over with the data in them; anything written elsewhere inside the container is lost with it. Its settings are copied from the container as it runs now, and CasaOS keeps no copy of them: this container was imported, not installed by CasaOS. If no newer image is published, nothing is touched.', { name: this.containerName })),
@@ -881,7 +911,7 @@ export default {
 		 * @return {*} void
 		 */
 		updateState() {
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$emit('updateState')
 			this.$EventBus.$emit(events.UPDATE_SYNC_STATUS)
 		},
@@ -894,7 +924,7 @@ export default {
 						'accept': 'application/yaml',
 					},
 				}).then(res => res.data)
-				this.$refs.dro.isActive = false
+				this.closeMenu()
 				this.$buefy.modal.open({
 					component: tipEditorModal,
 					hasModalCard: true,
@@ -919,7 +949,7 @@ export default {
 		 */
 		configApp() {
 			this.$messageBus('apps_setting', this.item.name)
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 			this.$emit('configApp', this.item, this.isV2App)
 		},
 
@@ -938,7 +968,7 @@ export default {
 			} else if (this.isV1App) {
 				this.toggleAppV1(item, status)
 			}
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 		},
 
 		toggleAppV1(item, status) {
@@ -957,7 +987,7 @@ export default {
 				}
 			}).catch((err) => {
 				this.$buefy.toast.open({
-					message: escape(err.response.data.data || err.response.data.message),
+					message: escape(err.response?.data?.data || err.response?.data?.message || err.message || ''),
 					type: 'is-danger',
 					position: 'is-top',
 					duration: 3000,
@@ -972,9 +1002,11 @@ export default {
 				this.updateState()
 				item.status = status
 			}).catch((err) => {
+				// the spinner stops whatever the failure: the bus is not there to say it
+				this.isStarting = false
 				this.$buefy.dialog.alert({
 					title: 'Error',
-					message: escape(err.response.data.data || err.response.data.message),
+					message: escape(err.response?.data?.data || err.response?.data?.message || err.message || ''),
 					type: 'is-danger',
 					ariaRole: 'alertdialog',
 					ariaModal: true,
@@ -1022,7 +1054,7 @@ export default {
 						})
 					}).then(() => {
 						this.isCloning = false
-						this.$refs.dro.isActive = false
+						this.closeMenu()
 					})
 				}
 			}).catch(() => {
@@ -1066,7 +1098,7 @@ export default {
 			}
 			// 4.sockiet :: install-end :: change UI status.
 			// this.isRebuilding = false;
-			this.$refs.dro.isActive = false
+			this.closeMenu()
 		},
 
 		checkAppVersion(name) {
@@ -1093,7 +1125,7 @@ export default {
 					type: 'is-danger',
 				})
 			}).finally(() => {
-				this.$refs.dro.isActive = false
+				this.closeMenu()
 				this.isCheckThenUpdate = false
 			})
 		},

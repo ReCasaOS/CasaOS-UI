@@ -9,13 +9,19 @@ import api from '@/service/api'
 vi.mock('@/store', async () => {
 	const { createStore } = await import('vuex')
 	const { default: mutations } = await import('@/store/mutations')
-	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false, loginStyle: 'classic' }, mutations }) }
+	const { default: getters } = await import('@/store/getters')
+	return { default: createStore({ state: { access_token: '', refresh_token: '', needInitialization: false, loginStyle: 'classic' }, mutations, getters }) }
 })
 vi.mock('@/service/api', () => ({
 	default: { users: { getUserStatus: vi.fn() } },
 }))
 vi.mock('@/views/Login.vue', () => ({ default: { render: () => null } }))
 vi.mock('@/views/Welcome.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/views/Home.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/views/FilesTab.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/components/Stats/StatsTab.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/components/VirtualMachines/VmTab.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/components/Apps/AppPanel.vue', () => ({ default: { render: () => null } }))
 
 function signedIn() {
 	localStorage.setItem('access_token', 'jwt')
@@ -52,6 +58,48 @@ describe('forgetting the session', () => {
 		expect(router.currentRoute.value.path).toBe('/welcome')
 		expect(localStorage.getItem('access_token')).toBeNull()
 		expect(store.state.access_token).toBe('')
+	})
+})
+
+describe('the pages of the owner', () => {
+	beforeEach(() => {
+		store.commit('SET_NEED_INITIALIZATION', false)
+		api.users.getUserStatus.mockResolvedValue({ data: { success: 200, data: { initialized: true } } })
+		signedIn()
+	})
+
+	it.each(['/files', '/appstore', '/terminal', '/vms', '/fleet', '/developmentElement', '/files/', '/FILES'])('sends a plain account from %s back to the dashboard', async (page) => {
+		store.commit('SET_USER', { role: 'user' })
+		await router.push('/')
+		await router.push(page)
+
+		expect(router.currentRoute.value.path).toBe('/')
+	})
+
+	it.each([[''], ['root'], [undefined]])('takes an unknown role (%s) for a plain account', async (role) => {
+		store.commit('SET_USER', { role })
+		await router.push('/')
+		await router.push('/files')
+
+		expect(router.currentRoute.value.path).toBe('/')
+	})
+
+	it('opens the virtual machines to an account with the vm right', async () => {
+		store.commit('SET_USER', { role: 'user', rights: ['vm'] })
+		await router.push('/')
+		await router.push('/vms')
+
+		expect(router.currentRoute.value.path).toBe('/vms')
+	})
+
+	it('lets the owner in, and leaves Statistics and Logs to every account', async () => {
+		store.commit('SET_USER', { role: 'admin' })
+		await router.push('/files')
+		expect(router.currentRoute.value.path).toBe('/files')
+
+		store.commit('SET_USER', { role: 'user' })
+		await router.push('/stats')
+		expect(router.currentRoute.value.path).toBe('/stats')
 	})
 })
 

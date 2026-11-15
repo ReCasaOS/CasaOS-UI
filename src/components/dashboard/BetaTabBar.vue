@@ -26,7 +26,8 @@ export default {
 				{ key: 'apps', label: this.$t('My apps'), icon: ['M4.5 3h4A1.5 1.5 0 0 1 10 4.5v4A1.5 1.5 0 0 1 8.5 10h-4A1.5 1.5 0 0 1 3 8.5v-4A1.5 1.5 0 0 1 4.5 3z', 'M15.5 3h4A1.5 1.5 0 0 1 21 4.5v4a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 14 8.5v-4A1.5 1.5 0 0 1 15.5 3z', 'M4.5 14h4A1.5 1.5 0 0 1 10 15.5v4A1.5 1.5 0 0 1 8.5 21h-4A1.5 1.5 0 0 1 3 19.5v-4A1.5 1.5 0 0 1 4.5 14z', 'M15.5 14h4a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-4a1.5 1.5 0 0 1 1.5-1.5z'], go: () => this.scrollTo('.beta-main') },
 				{ key: 'files', label: this.$t('Files'), icon: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'], go: () => this.homeShowFiles() },
 				{ key: 'settings', label: this.$t('Settings'), icon: ['M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1'], go: this.openSettings },
-			]
+			// the files are the owner's: Home has no file panel for any other account
+			].filter(tab => tab.key !== 'files' || this.$store.getters.canReadModule('files'))
 		},
 	},
 	methods: {
@@ -60,7 +61,8 @@ export default {
 	// under the modals and the open menus
 	z-index: 20;
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-auto-columns: minmax(0, 1fr);
+	grid-auto-flow: column;
 	padding: 0.375rem 0.5rem calc(0.625rem + env(safe-area-inset-bottom));
 	border-top: 1px solid rgba(255, 255, 255, 0.08);
 	background: rgba(11, 18, 32, 0.7);

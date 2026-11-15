@@ -2,6 +2,7 @@
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import i18n from '@/plugins/i18n'
 import Disks from '@/widgets/Disks.vue'
 import DriveItem from '@/components/Storage/DriveItem.vue'
@@ -28,12 +29,14 @@ const cases = [
 	['an older LocalStorage reporting a failure', { health: false }, 'Damaged'],
 ]
 
+// the owner: frees space, opens the Storage manager, reads the arrays
+const owner = { canWrite: true, canReadModule: () => true }
 const danglingImages = vi.fn()
 const pruneDanglingImages = vi.fn()
 const $openAPI = { appManagement: { image: { danglingImages, pruneDanglingImages } } }
 
 function mountWidget(sys_disk) {
-	const $store = { state: { hardwareInfo: { sys_disk: { size: 100, used: 40, ...sys_disk }, sys_usb: [] } } }
+	const $store = { getters: owner, state: { hardwareInfo: { sys_disk: { size: 100, used: 40, ...sys_disk }, sys_usb: [] } } }
 	return mount(Disks, { global: { plugins: [Buefy, i18n], mocks: { $store, $openAPI } } })
 }
 
@@ -145,7 +148,7 @@ describe('reclaimable disk space', () => {
 
 describe('the RAID tag of the storage widget', () => {
 	function mountWith(arrays) {
-		const $store = { state: { hardwareInfo: { sys_disk: { size: 100, used: 40, health: true, smart_status: 'passed' }, sys_usb: [] } } }
+		const $store = { getters: owner, state: { hardwareInfo: { sys_disk: { size: 100, used: 40, health: true, smart_status: 'passed' }, sys_usb: [] } } }
 		const $api = { disks: { raid: vi.fn().mockResolvedValue({ data: { data: arrays } }) } }
 		return mount(Disks, { global: { plugins: [Buefy, i18n], mocks: { $store, $openAPI, $api } } })
 	}
@@ -175,4 +178,45 @@ describe('the RAID tag of the storage widget', () => {
 		expect(older.find('.raid-tag').exists()).toBe(false)
 		older.unmount()
 	})
+})
+
+describe('the storage widget of an account of role user', () => {
+	function mountAs(rights) {
+		const getters = { canWrite: false, canReadModule: name => rights.includes(name) }
+		const $store = { getters, state: { hardwareInfo: { sys_disk: { size: 100, used: 40, health: true, smart_status: 'passed' }, sys_usb: [] } } }
+		const $api = { disks: { raid: vi.fn().mockResolvedValue({ data: { data: [] } }) } }
+		danglingImages.mockReset().mockResolvedValue({ data: { data: { count: 3, size: 10 } } })
+		return { wrapper: mount(Disks, { global: { plugins: [Buefy, i18n], mocks: { $store, $openAPI, $api } } }), $api }
+	}
+
+	it('with the system right alone, reads no array, offers no clean-up and no Storage manager', async () => {
+		const { wrapper, $api } = mountAs(['system'])
+		await flushPromises()
+
+		expect($api.disks.raid).not.toHaveBeenCalled()
+		expect(danglingImages).not.toHaveBeenCalled()
+		expect(wrapper.text()).not.toContain('Old app versions')
+		expect(wrapper.find('.widget-icon-button').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('with the storage right too, reads the arrays', async () => {
+		const { wrapper, $api } = mountAs(['system', 'storage'])
+		await flushPromises()
+
+		expect($api.disks.raid).toHaveBeenCalled()
+		expect(danglingImages).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})
+
+it('follows the disks read again into the store', async () => {
+	danglingImages.mockResolvedValue({ data: { data: { count: 0, size: 0 } } })
+	const $store = reactive({ getters: owner, state: { hardwareInfo: { sys_disk: { size: 100, used: 40, health: true, smart_status: 'passed' }, sys_usb: [] } } })
+	const wrapper = mount(Disks, { global: { plugins: [Buefy, i18n], mocks: { $store, $openAPI } } })
+	await wrapper.vm.$nextTick()
+	$store.state.hardwareInfo = { sys_disk: { size: 100, used: 40, health: false, smart_status: 'failed' }, sys_usb: [] }
+	await wrapper.vm.$nextTick()
+	expect(wrapper.find('.tag').text()).toBe('Damaged')
+	wrapper.unmount()
 })

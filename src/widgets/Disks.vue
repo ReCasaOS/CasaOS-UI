@@ -9,7 +9,7 @@
 					<div class="widget-title is-flex-grow-1">
 						{{ $t('Storage') }}
 					</div>
-					<div class="widget-icon-button is-flex-shrink-0" @click="showDiskManagement">
+					<div v-if="$store.getters.canWrite" class="widget-icon-button is-flex-shrink-0" @click="showDiskManagement">
 						<b-icon icon="settings-outline" pack="casa" size="is-20"></b-icon>
 					</div>
 				</div>
@@ -35,7 +35,7 @@
 						</div>
 						<b-progress :type="getProgressType(totalPercent)" :value="totalPercent" class="mt-2"
 							size="is-small"></b-progress>
-						<div v-if="reclaimable.count > 0" class="is-flex is-align-items-center mt-2">
+						<div v-if="$store.getters.canWrite && reclaimable.count > 0" class="is-flex is-align-items-center mt-2">
 							<p class="has-text-left is-size-14px disk-info is-flex-grow-1">
 								{{ $t('Old app versions: {count}', { count: reclaimable.count }) }}
 								&nbsp;&middot;&nbsp;{{ renderSize(reclaimable.size) }}
@@ -88,6 +88,8 @@ import { mixin } from '@/mixins/mixin'
 
 export default {
 	name: 'disks',
+	// read from the box's own state: only an account that may read the "system" module has this widget; its RAID line is the "storage" module's
+	module: 'system',
 	icon: 'storage-outline',
 	title: 'Storage Status',
 	initShow: true,
@@ -114,9 +116,14 @@ export default {
 	mounted() {
 		this.getDiskInfo(this.$store.state.hardwareInfo.sys_disk)
 		this.usbDisks = this.$store.state.hardwareInfo.sys_usb
-		this.loadReclaimable()
-		this.loadRAID()
-		this.raidTimer = setInterval(this.loadRAID, 60 * 1000)
+		// freeing space is the owner's; the arrays are the "storage" module's
+		if (this.$store.getters.canWrite) {
+			this.loadReclaimable()
+		}
+		if (this.$store.getters.canReadModule('storage')) {
+			this.loadRAID()
+			this.raidTimer = setInterval(this.loadRAID, 60 * 1000)
+		}
 	},
 	beforeUnmount() {
 		clearInterval(this.raidTimer)
@@ -215,6 +222,13 @@ export default {
 				scroll: 'keep',
 				animation: 'zoom-in',
 			})
+		},
+	},
+	watch: {
+		// a session without the message bus has the box's load read again into the store (Home.vue)
+		'$store.state.hardwareInfo': function (info) {
+			this.getDiskInfo(info.sys_disk)
+			this.usbDisks = info.sys_usb
 		},
 	},
 	sockets: {

@@ -75,10 +75,14 @@ export default {
 		}
 	},
 	computed: {
+		// the account's own: the dialog is also mounted without the store's getters (its specs), the owner's then
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
+		// the cards this account has: the App Store and Files are the owner's, as the grid shows them
 		builtins() {
 			const builtins = [
-				{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') },
-				{ id: FILES_LAUNCH_ID, title: this.$t('Files') },
+				...(this.canWrite ? [{ id: APP_STORE_LAUNCH_ID, title: this.$t('App Store') }, { id: FILES_LAUNCH_ID, title: this.$t('Files') }] : []),
 				{ id: STATS_LAUNCH_ID, title: this.$t('Statistics') },
 			]
 			if (this.logsAvailable) {
@@ -94,12 +98,17 @@ export default {
 		},
 	},
 	async mounted() {
-		hasVirtualMachines().then((available) => {
-			this.hasVMs = available
-		})
-		hasFleet().then((master) => {
-			this.isMaster = master
-		})
+		// only the modules the account reads are asked about; the Fleet card is the owner's (its page goes through the relay)
+		if (this.$store.getters.canReadModule('vm')) {
+			hasVirtualMachines().then((available) => {
+				this.hasVMs = available
+			})
+		}
+		if (this.canWrite) {
+			hasFleet().then((master) => {
+				this.isMaster = master
+			})
+		}
 		hasLogs().then((available) => {
 			this.logsAvailable = available
 		})

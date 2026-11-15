@@ -37,7 +37,7 @@
 								@click="openThirdContainerByAppInfo(appDetailData)">
 								{{ $t('launch-and-open') }}
 							</b-button>
-							<b-button v-else
+							<b-button v-else-if="$store.getters.canWrite"
 								class="p-0 custom-install-button"
 								:disabled="unusable"
 								:loading="appDetailData.id === currentInstallId"

@@ -3,13 +3,13 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import BetaTabBar from './BetaTabBar.vue'
 
-function bar() {
+function bar(canReadFiles = true) {
 	const homeShowFiles = vi.fn()
 	const emit = vi.fn()
 	const wrapper = mount(BetaTabBar, {
 		global: {
 			provide: { homeShowFiles },
-			mocks: { $t: key => key, $EventBus: { $emit: emit } },
+			mocks: { $t: key => key, $EventBus: { $emit: emit }, $store: { getters: { canReadModule: name => canReadFiles && name === 'files' } } },
 		},
 	})
 	return { wrapper, homeShowFiles, emit }
@@ -53,5 +53,11 @@ describe('beta tab bar', () => {
 		expect(homeShowFiles).toHaveBeenCalledTimes(1)
 		expect(emit).toHaveBeenCalledWith('casaUI:openSettings')
 		expect(wrapper.find('[aria-current="page"]').text()).toBe('Home')
+	})
+
+	it('has no Files tab for an account without the files', () => {
+		const { wrapper } = bar(false)
+
+		expect(wrapper.findAll('button').map(button => button.text())).toEqual(['Home', 'My apps', 'Settings'])
 	})
 })

@@ -138,9 +138,16 @@ export default {
 		this.uploader.assignBrowse(document.getElementById('upload-wallpaper'), false, true, this.attributes)
 		this.uploader.on('filesSubmitted', () => {
 			this.isUpLoading = true
-			this.$api.sys.getVersion().then(() => {
+			// a call of the account's own first: an expired token is renewed before the upload takes it (the box's version is not the account's to read)
+			this.$api.users.getUserInfo().then(() => {
 				this.uploader.opts.headers.Authorization = this.$store.state.access_token || localStorage.getItem('access_token')
 				this.uploader.upload()
+			}).catch(() => {
+				this.isUpLoading = false
+				this.$buefy.toast.open({
+					message: this.$t('Upload failed, please try again!'),
+					type: 'is-danger',
+				})
 			})
 		})
 		this.uploader.on('fileError', () => {

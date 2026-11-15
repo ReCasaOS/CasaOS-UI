@@ -88,6 +88,10 @@ export default {
 		// so the box asks the app the way the browser does. Anything short of a "no" --
 		// no answer, an AppManagement without the endpoint -- leaves the frame as it is.
 		async check(url) {
+			// the check is a request the box makes to the address: not an account's to ask for
+			if (this.$store?.getters?.canWrite === false) {
+				return
+			}
 			try {
 				const res = await this.$api.webFrame.check(url, window.location.origin)
 				const answer = res.data && res.data.data

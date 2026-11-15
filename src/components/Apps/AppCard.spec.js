@@ -55,7 +55,7 @@ async function card(item, mocks = {}) {
 		global: {
 			plugins: [Buefy, i18n],
 			provide: { homeShowFiles: () => {}, openAppStore: () => {} },
-			mocks: { $baseIp: 'localhost', ...mocks },
+			mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } }, ...mocks },
 		},
 		// the card's menu is rendered with append-to-body, so it lands outside
 		// the wrapper and has to be looked for in the document
@@ -111,6 +111,28 @@ describe('app card update badge', () => {
 		const wrapper = await card({ update_available: true })
 		expect(badges(wrapper)).toEqual(['NEW'])
 		sessionStorage.removeItem('newAppTag')
+		wrapper.unmount()
+	})
+})
+
+describe('app card for an account that cannot manage', () => {
+	it('keeps Open and the read-only entries, and hides everything that changes the box', async () => {
+		const wrapper = await card({ update_available: true }, { $store: { getters: { canWrite: false, canReadModule: () => false } } })
+		const labels = [...document.body.querySelectorAll('button')].map(b => b.textContent.trim())
+		// Open is a link, not a button
+		expect(document.body.textContent).toContain('Open')
+		expect(labels).not.toContain('Tips')
+		for (const hidden of ['Uninstall', 'Delete', 'Setting', 'Check then update', 'Back up'])
+			expect(labels).not.toContain(hidden)
+		expect(document.body.querySelector('.has-text-red')).toBeNull()
+		expect(document.body.querySelector('[class*="shutdown"], .restart-outline')).toBeNull()
+		wrapper.unmount()
+	})
+
+	it('keeps the whole menu for the admin', async () => {
+		const wrapper = await card({}, { $store: { getters: { canWrite: true, canReadModule: () => true } } })
+		const labels = [...document.body.querySelectorAll('button')].map(b => b.textContent.trim())
+		expect(labels).toEqual(expect.arrayContaining(['Setting', 'Uninstall']))
 		wrapper.unmount()
 	})
 })
@@ -685,7 +707,7 @@ describe('the compact card (beta dashboard)', () => {
 			global: {
 				plugins: [Buefy, i18n],
 				provide: { homeShowFiles, openAppStore: () => {} },
-				mocks: { $baseIp: 'localhost' },
+				mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } },
 			},
 			attachTo: document.body,
 		})
@@ -747,7 +769,7 @@ describe('the compact card favorites and subtitle (beta dashboard)', () => {
 			global: {
 				plugins: [Buefy, i18n],
 				provide: { homeShowFiles: () => {}, openAppStore: () => {} },
-				mocks: { $baseIp: 'localhost' },
+				mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } },
 			},
 			attachTo: document.body,
 		})
@@ -873,7 +895,7 @@ describe('the backup badge on the tile', () => {
 		backupStatus.ok = true
 		const wrapper = mount(AppCard, {
 			props: { compact, item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' } } },
-			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost' } },
+			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } } },
 			attachTo: document.body,
 		})
 		await nextTick()

@@ -2,6 +2,7 @@
 import Buefy from 'buefy'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import i18n from '@/plugins/i18n'
 import Cpu from '@/widgets/Cpu.vue'
 
@@ -47,4 +48,16 @@ describe('system status widget', () => {
 		expect(readouts(wrapper)[0]).toBe('12.0W / 55°C')
 		wrapper.unmount()
 	})
+})
+
+// a session without the message bus: Home reads the load again into the store
+it('follows the load read again into the store', async () => {
+	const $store = reactive({ state: { hardwareInfo: { cpu: cpu(0, '0'), mem: { total: 1024, usedPercent: 50 } } } })
+	const $api = { container: { getHardwareUsage: () => new Promise(() => {}) } }
+	const wrapper = mount(Cpu, { global: { plugins: [Buefy, i18n], mocks: { $store, $api, $messageBus: () => {} } } })
+	$store.state.hardwareInfo = { cpu: { ...cpu(0, '0'), percent: 77 }, mem: { total: 1024, usedPercent: 20 } }
+	await wrapper.vm.$nextTick()
+	expect(wrapper.vm.cpuSeries).toBe(77)
+	expect(wrapper.vm.ramSeries).toBe(20)
+	wrapper.unmount()
 })

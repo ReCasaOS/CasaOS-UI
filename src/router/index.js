@@ -61,6 +61,12 @@ async function needInit() {
 	}
 }
 
+// the pages of the owner, by route name (the path matches /files/ and /FILES too): any other account,
+// an unknown role included, that types the address goes back to the dashboard. The VM page is also
+// that of an account with the vm right.
+const OWNER_PAGES = ['Files', 'AppStore', 'Terminal', 'Fleet', 'DevelopmentElement']
+const pageOpen = to => to.name === 'VirtualMachines' ? store.getters.canReadModule('vm') : !OWNER_PAGES.includes(to.name) || store.getters.canWrite
+
 router.beforeEach(async (to, from, next) => {
 	const accessToken = localStorage.getItem('access_token')
 	const requireAuth = to.matched.some(record => record.meta.requireAuth)
@@ -80,6 +86,9 @@ router.beforeEach(async (to, from, next) => {
 				// unconditional next() below. v4 applies only the first call, so
 				// behaviour is unchanged, but it warns `The "next" callback was
 				// called more than once` on every login and logout.
+				if (!pageOpen(to)) {
+					return next('/')
+				}
 				switch (to.path) {
 					case '/login':
 						if (accessToken) {
@@ -89,6 +98,7 @@ router.beforeEach(async (to, from, next) => {
 
 					case '/logout':
 						forgetTokens()
+						store.commit('CLEAR_USER')
 						localStorage.removeItem('wallpaper')
 						localStorage.removeItem('user')
 						// the Terminal's last login is the signed-in person's, not the next one's

@@ -36,7 +36,7 @@ async function panel(answer, props = {}) {
 			mocks: {
 				$t: key => key,
 				$messageBus: () => {},
-				$store: { state: { isMobile: false } },
+				$store: { state: { isMobile: false }, getters: { isAdmin: false, canWrite: true, canReadModule: () => true } },
 				$api: { gitApps: { get }, sys: { hardwareInfo: pending }, container: { getComposeEnv: () => Promise.resolve({ data: 'A=1\n' }) } },
 				$openAPI: { appManagement: { appStore: { composeAppStoreInfoList: pending } } },
 			},
@@ -170,6 +170,35 @@ describe('appPanel and the installs on the message bus', () => {
 		expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'there are ports in use' }))
 		expect(wrapper.vm.errInfo).toEqual(ports)
 		expect(wrapper.vm.currentSlide).toBe(1)
+		wrapper.unmount()
+	})
+})
+
+describe('closing the panel with a draft open', () => {
+	async function dirtyPanel() {
+		const { wrapper } = await panel({})
+		const confirm = vi.spyOn(wrapper.vm.$buefy.dialog, 'confirm').mockImplementation(() => {})
+		return { wrapper, confirm }
+	}
+
+	it('closes at once with nothing to lose', async () => {
+		const { wrapper, confirm } = await dirtyPanel()
+		wrapper.vm.requestClose()
+
+		expect(confirm).not.toHaveBeenCalled()
+		expect(wrapper.emitted('close')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('asks first, closes only on Discard', async () => {
+		const { wrapper, confirm } = await dirtyPanel()
+		wrapper.vm.onEditorState({ canApply: true, isApplying: false, isDirty: true })
+		wrapper.vm.requestClose()
+
+		expect(confirm).toHaveBeenCalledTimes(1)
+		expect(wrapper.emitted('close')).toBeUndefined()
+		confirm.mock.calls[0][0].onConfirm()
+		expect(wrapper.emitted('close')).toHaveLength(1)
 		wrapper.unmount()
 	})
 })

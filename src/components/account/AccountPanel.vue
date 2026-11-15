@@ -33,7 +33,8 @@
 							<div class="has-text-emphasis-02 is-flex-grow-1">
 								{{ userInfo.username }}
 							</div>
-							<div class="edit-button" @click.stop="goto(2);">
+							<!-- the login name of an account is the owner's to choose -->
+							<div v-if="$store.getters.canWrite" class="edit-button" @click.stop="goto(2);">
 								<b-icon class="close-button ml-2 has-text-gray-font" icon="edit-outline" pack="casa" />
 							</div>
 						</div>
@@ -255,9 +256,8 @@ export default {
 			}
 		},
 		setTotp(on) {
-			const user = { ...this.userInfo, totp_enabled: on }
-			this.$store.commit('SET_USER', user)
-			localStorage.setItem('user', JSON.stringify(user))
+			this.$store.commit('SET_TOTP_ENABLED', on)
+			localStorage.setItem('user', JSON.stringify(this.$store.state.user))
 		},
 		onChange({ coordinates, image, canvas }) {
 			this.result = {

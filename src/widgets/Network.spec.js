@@ -2,6 +2,7 @@
 import Buefy from 'buefy'
 import { config, shallowMount } from '@vue/test-utils'
 import { beforeAll, expect, it } from 'vitest'
+import { reactive } from 'vue'
 import Network from './Network.vue'
 
 beforeAll(() => {
@@ -30,4 +31,12 @@ it('mounts the chart only once a sample is in, and feeds it through the series p
 	expect(wrapper.vm.networks[wrapper.vm.networkId].map(s => s.data)).toEqual([['0', '2'], ['0', '4']])
 	expect(wrapper.vm.currentUpSpeed).toBe('2')
 	expect(wrapper.vm.currentDownSpeed).toBe('4')
+})
+
+it('follows the network read again into the store', async () => {
+	const $store = reactive({ state: { hardwareInfo: { net: [{ name: 'eth0' }] } } })
+	const wrapper = shallowMount(Network, { global: { mocks: { $t: key => key, $store } } })
+	$store.state.hardwareInfo = { net: [{ name: 'eth0', bytesSent: 1000, bytesRecv: 2000, time: 10 }] }
+	await wrapper.vm.$nextTick()
+	expect(wrapper.vm.initNetwork).toEqual([{ name: 'eth0', bytesSent: 1000, bytesRecv: 2000, time: 10 }])
 })
