@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 import HealthStrip from './HealthStrip.vue'
 import { openFleet } from '@/components/Fleet/entry'
 import { refreshGuard, shareGuard } from '@/service/shareGuard'
@@ -13,6 +14,8 @@ vi.mock('@/service/shareGuard', async () => {
 })
 vi.mock('@/components/settings/RemoteAccessModal.vue', () => ({ default: { name: 'RemoteAccessModal', render: () => null } }))
 
+// the owner reads every module and opens what a click opens; the store's getters as the strip asks them
+const owner = { canWrite: true, canReadModule: () => true }
 const hardwareInfo = {
 	cpu: { percent: 12.4, temperature: 46, num: 4 },
 	mem: { usedPercent: 49, used: 2 * 1024 ** 3, total: 4 * 1024 ** 3 },
@@ -20,12 +23,12 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ runs = [], getRuns, getSchedules, getRunning, operations, snapraid, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
+function strip({ store, getters = owner, runs = [], getRuns, getSchedules, getRunning, operations, snapraid, unreadable, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
-				$store: { state: { hardwareInfo } },
+				$store: store || { getters, state: { hardwareInfo } },
 				$buefy: buefy,
 				$EventBus: { $emit: emit },
 				$api: {
@@ -40,7 +43,7 @@ function strip({ runs = [], getRuns, getSchedules, getRunning, operations, snapr
 						...(destinations ? { getDestinations: () => Promise.resolve({ data: { data: destinations } }) } : {}),
 						backupSystem,
 					},
-					disks: { snapraid: snapraid || (() => Promise.reject(new Error('404'))) },
+					disks: { snapraid: snapraid || (() => Promise.reject(new Error('404'))), ...(unreadable ? { unreadable } : {}) },
 					// absent on a core that predates the fleet: the panel then has nothing to ask
 					...(fleet ? { fleet: { status: fleet } } : {}),
 				},
@@ -127,7 +130,7 @@ describe('health strip', () => {
 			global: {
 				mocks: {
 					$t: key => key,
-					$store: { state: { hardwareInfo: { ...hardwareInfo, sys_usb: [{ name: 'sdb', model: 'Backup stick', size: 1000, avail: 250 }] } } },
+					$store: { getters: owner, state: { hardwareInfo: { ...hardwareInfo, sys_usb: [{ name: 'sdb', model: 'Backup stick', size: 1000, avail: 250 }] } } },
 					$EventBus: { $emit: vi.fn() },
 					$api: { backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) }, disks: { snapraid: () => Promise.reject(new Error('404')) } },
 				},
@@ -154,7 +157,7 @@ describe('health strip', () => {
 			global: {
 				mocks: {
 					$t: key => key,
-					$store: { state: { hardwareInfo } },
+					$store: { getters: owner, state: { hardwareInfo } },
 					$EventBus: { $emit: vi.fn() },
 					$api: {
 						backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) },
@@ -191,7 +194,7 @@ describe('health strip', () => {
 			global: {
 				mocks: {
 					$t: key => key,
-					$store: { state: { hardwareInfo } },
+					$store: { getters: owner, state: { hardwareInfo } },
 					$EventBus: { $emit: vi.fn() },
 					$api: {
 						backup: { getRuns: () => Promise.resolve({ data: { data: [] } }) },
@@ -233,7 +236,7 @@ describe('health strip', () => {
 			global: {
 				mocks: {
 					$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
-					$store: { state: { hardwareInfo } },
+					$store: { getters: owner, state: { hardwareInfo } },
 					$EventBus: { $emit: vi.fn() },
 					$api: {
 						backup: {
@@ -372,7 +375,7 @@ describe('health strip', () => {
 			global: {
 				mocks: {
 					$t: key => key,
-					$store: { state: { hardwareInfo } },
+					$store: { getters: owner, state: { hardwareInfo } },
 					$EventBus: { $emit: vi.fn() },
 					$api: { backup: { getRuns }, disks: { snapraid: () => Promise.reject(new Error('404')) } },
 				},
@@ -462,6 +465,15 @@ describe('health strip backup somebody stopped', () => {
 		const panel = wrapper.find('.backups')
 		expect(panel.find('.panel-chip').text()).toBe('Stopped from the interface')
 		expect(panel.find('.panel-error').exists()).toBe(false)
+	})
+})
+
+describe('health strip backup that failed, for a user', () => {
+	it('says it failed, without the words of the engine (the box gives a user none)', async () => {
+		const wrapper = strip({ getters: { canWrite: false, canReadModule: () => true }, runs: [{ app: 'happy_rik', destination: 'GDrive', started_at: '2026-11-09T07:00:00Z', error: 'failed' }] })
+		await settle()
+
+		expect(wrapper.find('.backups .panel-error').exists()).toBe(false)
 	})
 })
 
@@ -643,4 +655,80 @@ describe('health strip back up now', () => {
 		expect(backupSystem).toHaveBeenCalledWith('usb', true)
 		expect(toast.mock.calls.at(-1)[0]).toMatchObject({ message: 'a backup is already running', type: 'is-danger' })
 	})
+})
+
+describe('the health strip of an account of role user', () => {
+	// a user: what it reads is the modules of its rights, and a click opens nothing of the owner's
+	const user = rights => ({ canWrite: false, canReadModule: name => rights.includes(name) })
+
+	it('without rights, reads and shows no module, and its tiles open nothing', async () => {
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const snapraid = vi.fn(() => Promise.resolve({ data: { data: null } }))
+		const fleet = vi.fn(() => Promise.resolve({ data: { data: { role: 'none' } } }))
+		const emit = vi.fn()
+		refreshGuard.mockClear()
+		const wrapper = strip({ getters: user([]), getRuns, snapraid, fleet, emit })
+		await settle()
+
+		expect(getRuns).not.toHaveBeenCalled()
+		expect(snapraid).not.toHaveBeenCalled()
+		expect(fleet).not.toHaveBeenCalled()
+		expect(refreshGuard).not.toHaveBeenCalled()
+		expect(wrapper.find('.panel.storage').exists()).toBe(false)
+		expect(wrapper.find('.panel.backups').exists()).toBe(false)
+		expect(wrapper.findAll('.tile').map(tile => tile.find('.tile-label').text())).not.toContain('Backups')
+		expect(wrapper.findAll('.tile.is-clickable')).toHaveLength(0)
+		await wrapper.findAll('.tile')[2].trigger('click')
+		expect(emit).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('with the storage right, reads the storage and shows its card without the button of the owner, and reads no backup', async () => {
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const snapraid = vi.fn(() => Promise.resolve({ data: { data: null } }))
+		const unreadable = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ getters: user(['storage']), getRuns, snapraid, unreadable })
+		await settle()
+
+		expect(snapraid).toHaveBeenCalled()
+		// df runs on every ask of the unreadable mounts: the owner's only
+		expect(unreadable).not.toHaveBeenCalled()
+		expect(getRuns).not.toHaveBeenCalled()
+		expect(wrapper.find('.panel.storage').exists()).toBe(true)
+		expect(wrapper.find('.panel.storage .panel-action').exists()).toBe(false)
+		expect(wrapper.find('.panel.backups').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('reads the unreadable mounts for the owner', async () => {
+		const unreadable = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ unreadable })
+		await settle()
+
+		expect(unreadable).toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('with the backups right, shows the last backup without the buttons of the owner', async () => {
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ getters: user(['backups']), getRuns, destinations: ['nas'] })
+		await settle()
+
+		expect(getRuns).toHaveBeenCalled()
+		expect(wrapper.find('.panel.backups').exists()).toBe(true)
+		expect(wrapper.find('.panel.backups .panel-action').exists()).toBe(false)
+		expect(wrapper.find('.panel.storage').exists()).toBe(false)
+		wrapper.unmount()
+	})
+})
+
+// a session without the message bus: Home reads the load again into the store
+it('follows the load read again into the store', async () => {
+	const store = reactive({ getters: owner, state: { hardwareInfo } })
+	const wrapper = strip({ store })
+	store.state.hardwareInfo = { ...hardwareInfo, cpu: { ...hardwareInfo.cpu, percent: 88 }, mem: { ...hardwareInfo.mem, usedPercent: 7 } }
+	await wrapper.vm.$nextTick()
+	expect(wrapper.vm.cpu.percent).toBe(88)
+	expect(wrapper.vm.mem.usedPercent).toBe(7)
+	wrapper.unmount()
 })

@@ -21,7 +21,7 @@
 				</transition>
 			</section>
 			<section>
-				<CoreService />
+				<CoreService v-if="$store.getters.canWrite" />
 			</section>
 			<section>
 				<AppSection compact system-first />

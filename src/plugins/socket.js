@@ -43,8 +43,9 @@ export function connectBus(store) {
 		socket.io.opts.query = { token: store.state.access_token }
 	})
 
-	store.watch(state => state.access_token, (token) => {
-		if (!token) {
+	// the bus is box-wide and tells every subscriber everything: only the owner's session listens, and only once the role is known
+	store.watch(state => [state.access_token, store.getters.canWrite], ([token, owner]) => {
+		if (!token || !owner) {
 			socket.close()
 			return
 		}

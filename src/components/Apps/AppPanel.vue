@@ -58,7 +58,7 @@
 					</h3>
 				</div>
 				<div class="is-flex is-align-items-center">
-					<b-button v-if="currentSlide == 0"
+					<b-button v-if="currentSlide == 0 && canWrite"
 						:label="$t('Custom Install')"
 						class="mr-2"
 						icon-left="view-grid-plus"
@@ -71,7 +71,7 @@
 						<button class="icon-button mdi mdi-import" type="button" @click="showImportPanel"></button>
 					</b-tooltip>
 
-					<b-tooltip v-if="showTerminalButton"
+					<b-tooltip v-if="showTerminalButton && canWrite"
 						:label="$t('Terminal & Logs')"
 						position="is-bottom"
 						type="is-dark">
@@ -88,10 +88,10 @@
 						class="is-flex is-align-items-center modal-close-container modal-close-container-line">
 						<NewTabButton v-if="state === 'install' && currentSlide === 0"
 							:params="{ store: sidebarOpen ? appDetailData.id : '' }" class="mr-2" page="appstore" />
-						<b-icon class="close-button" icon="close-outline" pack="casa" @click="$emit('close')" />
+						<b-icon class="close-button" icon="close-outline" pack="casa" @click="requestClose" />
 					</div>
 					<div v-else-if="currentSlide === 2" class="is-flex is-align-items-center">
-						<b-icon class="close-button" icon="close-outline" pack="casa" @click="$emit('close')" />
+						<b-icon class="close-button" icon="close-outline" pack="casa" @click="requestClose" />
 					</div>
 				</div>
 			</header>
@@ -145,7 +145,7 @@
 												@click="openThirdContainerByAppInfo(item)">
 												{{ $t('launch-and-open') }}
 											</b-button>
-											<b-button v-else
+											<b-button v-else-if="canWrite"
 												:disabled="!item.architectures?.includes(arch)"
 												:loading="item.id == currentInstallId"
 												rounded
@@ -261,7 +261,8 @@
 								@keyup.enter="counterPatchGetStoreList++" />
 						</transition>
 						<div class="is-flex-grow-1"></div>
-						<AppStoreSourceManagement v-show="searchAndSourcesStatus !== 'showSearch'"
+						<AppStoreSourceManagement v-if="canWrite"
+							v-show="searchAndSourcesStatus !== 'showSearch'"
 							:total-apps="pageList.length"
 							class="ml-2"
 							@refreshAppStore="getStoreList"
@@ -307,7 +308,7 @@
 									@click="openThirdContainerByAppInfo(item)">
 									{{ $t('launch-and-open') }}
 								</b-button>
-								<b-button v-else
+								<b-button v-else-if="canWrite"
 									:disabled="!item.architectures?.includes(arch)"
 									:loading="item.id == currentInstallId"
 									rounded
@@ -374,7 +375,7 @@
 										@click="openThirdContainerByAppInfo(item)">
 										{{ $t('launch-and-open') }}
 									</b-button>
-									<b-button v-else
+									<b-button v-else-if="canWrite"
 										:disabled="!item.architectures?.includes(arch)"
 										:loading="item.id == currentInstallId"
 										rounded
@@ -432,6 +433,13 @@
 						@click="setEditorTab('env')">
 						{{ $t('Environment') }}
 					</b-button>
+					<b-button v-if="isAdmin"
+						:type="editorTab === 'visibility' ? 'is-primary' : 'is-text'"
+						rounded
+						size="is-small"
+						@click="setEditorTab('visibility')">
+						{{ $t('Visibility') }}
+					</b-button>
 					<b-button :type="editorTab === 'containers' ? 'is-primary' : 'is-text'"
 						rounded
 						size="is-small"
@@ -461,6 +469,8 @@
 					:app-id="id"
 					:git-app="gitApp"
 					@change="gitApp = $event" />
+
+				<AppVisibility v-if="isCasa && state == 'update' && editorTab === 'visibility'" :app-id="id" @state="onEditorState" />
 
 				<ContainersTab v-if="isCasa && state == 'update' && editorTab === 'containers'"
 					:app-id="id"
@@ -703,6 +713,7 @@ export default {
 	components: {
 		NewTabButton,
 		AppStoreSourceManagement,
+		AppVisibility: defineAsyncComponent(() => import('@/components/Apps/AppVisibility.vue')),
 		AppDetailInfo,
 		AppSideBar,
 		LottieAnimation,
@@ -897,6 +908,12 @@ export default {
 	},
 
 	computed: {
+		isAdmin() {
+			return this.$store.getters.isAdmin
+		},
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		showImportButton() {
 			return this.currentSlide == 1 && this.state == 'install'
 		},
@@ -1074,6 +1091,7 @@ export default {
 	},
 
 	mounted() {
+		document.addEventListener('keyup', this.onEscape)
 		this.currentSlide === 0
 		&& !this.isMobile
 		&& this.$nextTick().then(() => {
@@ -1804,8 +1822,34 @@ export default {
 			}
 		},
 
+		// The modal that holds the panel does not close on Escape (canCancel is empty): the panel does, and asks first when a
+		// draft is open. With a dialog already open, Escape belongs to the dialog. Outside a modal (the App Store tab) it does nothing.
+		onEscape(event) {
+			if (event.key !== 'Escape' || document.querySelector('.dialog') || !this.$el?.closest?.('.modal')) {
+				return
+			}
+			if (this.editorState.isDirty || this.state === 'install') {
+				this.requestClose()
+			}
+		},
+
 		onEditorState(state) {
 			this.editorState = state
+		},
+
+		// a draft in the open tab (the visibility ticks too) is not thrown away by a click on the cross
+		requestClose() {
+			if (!this.editorState.isDirty) {
+				this.$emit('close')
+				return
+			}
+			this.$buefy.dialog.confirm({
+				message: this.$t('You have unsaved changes. Closing discards them.'),
+				confirmText: this.$t('Discard'),
+				cancelText: this.$t('Cancel'),
+				type: 'is-warning',
+				onConfirm: () => this.$emit('close'),
+			})
 		},
 
 		// Any failure -- a 404, or a service without these routes -- is an app that
@@ -1889,6 +1933,7 @@ export default {
 	},
 
 	unmounted() {
+		document.removeEventListener('keyup', this.onEscape)
 		window.addEventListener('resize', this.setCSSVHVar)
 		clearInterval(this.timer)
 	},

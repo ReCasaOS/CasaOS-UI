@@ -68,11 +68,11 @@
 		</section>
 
 		<footer class="modal-card-foot is-flex is-align-items-center">
-			<b-button :disabled="!detail.id || !!detail.compose_project" :loading="isRemoving" type="is-danger"
+			<b-button v-if="canWrite" :disabled="!detail.id || !!detail.compose_project" :loading="isRemoving" type="is-danger"
 				rounded @click="confirmRemove">
 				{{ $t('Remove') }}
 			</b-button>
-			<span v-if="detail.compose_project" class="has-text-full-03 is-size-7 ml-2">
+			<span v-if="canWrite && detail.compose_project" class="has-text-full-03 is-size-7 ml-2">
 				{{ $t('Part of a compose project — remove the app instead.') }}
 			</span>
 			<div class="is-flex-grow-1"></div>
@@ -97,6 +97,10 @@ export default {
 		return { detail: {}, isLoading: false, isRemoving: false, error: '', showEnv: false }
 	},
 	computed: {
+		// removing a container writes to the box: the owner's
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		networks() {
 			return (this.detail.networks || []).join(', ')
 		},

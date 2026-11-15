@@ -30,7 +30,7 @@ const handwritten = {
 const globals = {
 	plugins: [Buefy, i18n],
 	provide: { homeShowFiles: () => {}, openAppStore: () => {} },
-	mocks: { $baseIp: 'localhost' },
+	mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } },
 }
 
 describe('an app with no x-casaos', () => {

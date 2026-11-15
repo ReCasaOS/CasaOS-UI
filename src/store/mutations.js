@@ -1,3 +1,4 @@
+import { emptyUser } from './state'
 import {
 	APP_LAUNCH_EXCEPTIONS_KEY,
 	APP_LAUNCH_IFRAME_KEY,
@@ -24,8 +25,29 @@ const mutations = {
 		state.refresh_token = token
 	},
 
+	// the server's own answer about the account; an answer without its rights (PUT /v1/users/current) keeps those already known for it
 	SET_USER(state, user) {
-		state.user = user
+		const keep = user && !('rights' in user) && user.id === state.user?.id && Array.isArray(state.user.rights)
+		state.user = keep ? { ...user, rights: state.user.rights } : user
+		state.roleConfirmed = true
+		state.roleFailed = false
+	},
+
+	// a change made here, not the server's word: the role is no more confirmed than it was
+	SET_TOTP_ENABLED(state, on) {
+		state.user = { ...state.user, totp_enabled: on }
+	},
+
+	// the server did not say who this is, asked twice: what waits for it stops waiting
+	SET_ROLE_UNCONFIRMED(state) {
+		state.roleFailed = true
+	},
+
+	// signed out: nobody is known any more
+	CLEAR_USER(state) {
+		state.user = emptyUser()
+		state.roleConfirmed = false
+		state.roleFailed = false
 	},
 
 	SET_INIT_KEY(state, key) {

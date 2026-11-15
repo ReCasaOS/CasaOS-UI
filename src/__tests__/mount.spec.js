@@ -20,6 +20,8 @@ vi.mock('@/assets/lang', () => ({ default: { en_us: { lang_name: 'English' } } }
 
 // lottie-web paints into a canvas the moment it is imported and happy-dom has
 // no 2d context, so the import itself throws. shallowMount stubs the tag anyway.
+// the HTTP client reads its sentences from the i18n plugin, which says so on the console when it is created
+vi.mock('@/plugins/i18n', () => ({ default: { global: { t: key => key } } }))
 vi.mock('lottie-web-vue', () => ({ default: { name: 'lottie-animation', template: '<div/>' } }))
 
 const App = () => import('@/App.vue')
@@ -111,7 +113,7 @@ const mocks = {
 	$wsProtocol: 'ws:',
 	$route: { path: '/', name: 'home', params: {}, query: {}, meta: {} },
 	$router: { push: () => {}, replace: () => {} },
-	$store: { state, getters: {}, commit: () => {}, dispatch: () => Promise.resolve() },
+	$store: { state, getters: { canWrite: true, canReadModule: () => true }, commit: () => {}, dispatch: () => Promise.resolve() },
 }
 
 let problems = []

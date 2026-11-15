@@ -933,3 +933,35 @@ describe('the page opened on a VM', () => {
 		wrapper.unmount()
 	})
 })
+
+// An account that only reads the vm module sees the list and the state, and nothing that changes or opens a VM.
+describe('the virtual machine page of an account that cannot write', () => {
+	let page
+
+	beforeEach(() => {
+		document.body.innerHTML = ''
+		vi.clearAllMocks()
+	})
+	afterEach(() => {
+		page?.wrapper.unmount()
+		page = null
+	})
+
+	it('lists the VMs with their state, without the detail, the new VM and settings buttons, or the ISO files', async () => {
+		page = await mountPage({ vms: [aVm({ title: 'Debian' })], store: { getters: { canWrite: false } } })
+
+		expect(document.querySelector('.vm-item-title').textContent).toBe('Debian')
+		expect(document.querySelector('[title="New virtual machine"]')).toBeNull()
+		expect(document.querySelector('[title="Virtual machine settings"]')).toBeNull()
+		expect(document.querySelector('.vm-detail-pane').children).toHaveLength(0)
+		expect([...document.querySelectorAll('button')].some(b => /Shut down|Start|Console/.test(b.textContent))).toBe(false)
+		expect(vmApi.images).not.toHaveBeenCalled()
+	})
+
+	it('has no button to make one when there is none', async () => {
+		page = await mountPage({ vms: [], store: { getters: { canWrite: false } } })
+
+		expect(document.body.textContent).toContain('No virtual machines yet')
+		expect([...document.querySelectorAll('button')].some(b => b.textContent.includes('New virtual machine'))).toBe(false)
+	})
+})

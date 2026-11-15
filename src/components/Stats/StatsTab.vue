@@ -1,12 +1,13 @@
 <template>
 	<!-- Statistics on a tab of its own, the whole window -->
 	<div class="stats-tab">
-		<StatsPage :initial-item="initialItem" @close="close" />
+		<StatsPage :key="access" :initial-item="initialItem" @close="close" />
 	</div>
 </template>
 
 <script>
 import StatsPage from './StatsPage.vue'
+import { accessOf, confirmRole } from '@/store/confirmRole'
 
 export default {
 	name: 'StatsTab',
@@ -14,11 +15,17 @@ export default {
 		StatsPage,
 	},
 	computed: {
+		access() {
+			return accessOf(this.$store.getters)
+		},
 		// only a string: a repeated parameter arrives as an array
 		initialItem() {
 			const item = this.$route.query.item
 			return typeof item === 'string' ? item : ''
 		},
+	},
+	created() {
+		confirmRole(this.$api, this.$store)
 	},
 	mounted() {
 		this.previousTitle = document.title

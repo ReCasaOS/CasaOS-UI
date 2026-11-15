@@ -19,7 +19,7 @@ const state = { appLaunchInIframe: true }
 function tile(vm, props = {}) {
 	return mount(VmTile, {
 		props: { vm: aVm(vm), ...props },
-		global: { plugins: [i18n], mocks: { $buefy: buefy, $store: { state } } },
+		global: { plugins: [i18n], mocks: { $buefy: buefy, $store: { state, getters: { canWrite: true } } } },
 		attachTo: document.body,
 	})
 }
@@ -99,6 +99,21 @@ describe('the tile of a virtual machine', () => {
 
 		expect(openVmConsole).toHaveBeenCalledWith(buefy, expect.objectContaining({ id: 'vm-1' }))
 		expect(openVirtualMachines).not.toHaveBeenCalled()
+	})
+
+	// the console is the owner's: an account that only reads the vm module gets the list
+	it('opens the Virtual Machines window, not the console, for an account that cannot write', async () => {
+		const wrapper = mount(VmTile, {
+			props: { vm: aVm({ id: 'vm-1', state: 'running' }) },
+			global: { plugins: [i18n], mocks: { $buefy: buefy, $store: { state, getters: { canWrite: false } } } },
+			attachTo: document.body,
+		})
+
+		await wrapper.find('button').trigger('click')
+		await flushPromises()
+
+		expect(openVmConsole).not.toHaveBeenCalled()
+		expect(openVirtualMachines).toHaveBeenCalledWith(buefy, state, 'vm-1')
 	})
 
 	it('opens the console of a paused VM, which the console allows', async () => {

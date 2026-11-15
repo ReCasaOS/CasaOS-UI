@@ -4,9 +4,9 @@
 		<header class="modal-card-head">
 			<div class="is-flex is-align-items-center is-flex-grow-1">
 				<h3 class="title is-header mb-0 mr-2">{{ $t('Virtual Machines') }}</h3>
-				<b-icon v-if="available" class="close-button" icon="plus-outline" pack="casa"
+				<b-icon v-if="available && canWrite" class="close-button" icon="plus-outline" pack="casa"
 					:title="$t('New virtual machine')" @click="create" />
-				<b-icon v-if="available" class="close-button ml-2" icon="cog-outline"
+				<b-icon v-if="available && canWrite" class="close-button ml-2" icon="cog-outline"
 					:title="$t('Virtual machine settings')" @click="openSettings" />
 			</div>
 			<span v-if="available" class="kvm-badge" :class="[host.kvm ? 'is-on' : 'is-off']">
@@ -38,7 +38,7 @@
 				<p class="has-text-full-03 mb-4">
 					{{ $t('Create one from an ISO or a disk image. Put images in /DATA/VM/iso with Files.') }}
 				</p>
-				<b-button rounded type="is-primary" @click="create">{{ $t('New virtual machine') }}</b-button>
+				<b-button v-if="canWrite" rounded type="is-primary" @click="create">{{ $t('New virtual machine') }}</b-button>
 			</div>
 
 			<template v-else-if="vms.length">
@@ -72,7 +72,8 @@
 
 					<!-- detail: the one selected -->
 					<div class="vm-detail-pane">
-						<vm-detail v-if="selected" :key="selected.id" :busy="!!busy[selected.id] || selected.state === 'creating'"
+						<!-- the detail is where a VM is changed, started and opened: an account that only reads the "vm" module has the list -->
+						<vm-detail v-if="selected && canWrite" :key="selected.id" :busy="!!busy[selected.id] || selected.state === 'creating'"
 							:host="host" :images="images" :touch="touch" :vm="selected" @action="onAction" @images-changed="loadImages"
 							@updated="settle" />
 					</div>
@@ -145,6 +146,10 @@ export default {
 		available() {
 			return this.host.libvirt === 'available'
 		},
+		// the page is also mounted without the store (its own specs): the owner's page then
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		// the VM picked in the list, or the first one
 		selected() {
 			return this.vms.find(vm => vm.id === this.selectedId) || this.vms[0] || null
@@ -189,7 +194,10 @@ export default {
 				this.host = res.data.data || {}
 				if (this.available) {
 					await this.refresh()
-					this.loadImages()
+					// the ISO files are for the owner's CD-ROM drive and new VMs
+					if (this.canWrite) {
+						this.loadImages()
+					}
 				}
 			} catch (e) {
 				this.error = e.response?.data?.message || e.message

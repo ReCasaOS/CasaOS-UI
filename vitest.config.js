@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
@@ -12,7 +13,7 @@ const webpackAssetRequire = {
 	name: 'webpack-asset-require',
 	enforce: 'post',
 	transform(code, id) {
-		if (!id.includes('.vue') || !code.includes('require('))
+		if (!id.includes('/src/') || !code.includes('require('))
 			return null
 		return code.replace(
 			/require\(\s*["'`](@\/assets\/[^"'`]+\.(?:svg|png|jpe?g|gif|webp))["'`]\s*\)/g,
@@ -21,8 +22,39 @@ const webpackAssetRequire = {
 	},
 }
 
+// The language files are gathered with webpack's require.context; under vitest the same list comes from import.meta.glob, so a spec
+// can use the real @/plugins/i18n with the real files.
+const langFiles = {
+	name: 'lang-files',
+	enforce: 'pre',
+	transform(code, id) {
+		if (!/[\\/]src[\\/]assets[\\/]lang[\\/]index\.js$/.test(id))
+			return null
+		return `const modules = import.meta.glob('./*.json', { eager: true })
+const langs = {}
+for (const [key, mod] of Object.entries(modules))
+	langs[key.replace('./', '').replace('.json', '').toLowerCase()] = mod.default
+export default langs`
+	},
+}
+
+// SideBar and the widgets' settings list the widgets with require.context too: the same list, as imports of the files there are.
+const widgetFiles = readdirSync(fileURLToPath(new URL('./src/widgets', import.meta.url))).filter(file => file.endsWith('.vue'))
+const widgetsContext = {
+	name: 'widgets-context',
+	enforce: 'post',
+	transform(code) {
+		if (!/require\.context\(\s*['"]@\/widgets['"]/.test(code))
+			return null
+		const imports = widgetFiles.map((file, i) => `import * as __widget${i} from '@/widgets/${file}'`).join(String.fromCharCode(10))
+		const table = widgetFiles.map((file, i) => `'./${file}': __widget${i}`).join(', ')
+		const context = `Object.assign(key => ({ ${table} })[key], { keys: () => ${JSON.stringify(widgetFiles.map(file => `./${file}`))} })`
+		return `${imports}${String.fromCharCode(10)}${code.replace(/require\.context\(\s*['"]@\/widgets['"][^)]*\)/, context)}`
+	},
+}
+
 export default defineConfig({
-	plugins: [vue(), webpackAssetRequire],
+	plugins: [vue(), webpackAssetRequire, langFiles, widgetsContext],
 	resolve: {
 		alias: [
 			// Both of these resolve to a CJS build under the "node" condition, which

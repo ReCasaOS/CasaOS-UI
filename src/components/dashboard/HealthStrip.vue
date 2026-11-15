@@ -49,7 +49,7 @@
 					</div>
 				</section>
 
-				<section class="widget has-text-grey-100 panel storage">
+				<section v-if="mayRead('storage')" class="widget has-text-grey-100 panel storage">
 					<div class="blur-background"></div>
 					<div class="widget-content">
 						<div class="panel-head">
@@ -73,7 +73,7 @@
 								<div class="tile-detail">{{ driveDetail(drive) }}</div>
 							</div>
 						</div>
-						<div class="panel-foot">
+						<div v-if="canWrite" class="panel-foot">
 							<button class="panel-action" type="button" @click="openStorage">
 								<span class="panel-grow">{{ $t('Manage storage') }}</span>
 								<b-icon icon="chevron-right" size="is-small" />
@@ -82,7 +82,7 @@
 					</div>
 				</section>
 
-				<section class="widget has-text-grey-100 panel backups">
+				<section v-if="mayRead('backups')" class="widget has-text-grey-100 panel backups">
 					<div class="blur-background"></div>
 					<div class="widget-content">
 						<div class="panel-head">
@@ -98,7 +98,7 @@
 								<progress v-if="liveFigures.percent !== null" class="progress is-small is-primary my-1" :value="liveFigures.percent" max="100"></progress>
 								<progress v-else class="progress is-small is-primary my-1" max="100"></progress>
 								<p class="tile-detail">{{ liveBackupDetail }}</p>
-								<button class="live-details tile-detail is-underlined" type="button" @click="openBackups('running')">{{ $t('See details') }}</button>
+								<button v-if="canWrite" class="live-details tile-detail is-underlined" type="button" @click="openBackups('running')">{{ $t('See details') }}</button>
 							</template>
 							<p v-else-if="runningBackup" class="tile-detail">
 								{{ $t(runningBackup.restore ? 'Restoring {title}' : 'Backing up {title}', { title: runningBackup.title }) }} · {{ $t('{percent}% done', { percent: runningBackup.percent }) }}
@@ -108,10 +108,10 @@
 								<div>{{ $t('Last: {when}', { when: whenOf(new Date(backup.at)) }) }}</div>
 								<div class="tile-detail">{{ lastBackupDetail }}</div>
 							</div>
-							<p v-if="backup.status === 'failed'" class="panel-error" :title="backup.error">{{ backup.error }}</p>
+							<p v-if="backup.status === 'failed' && canWrite" class="panel-error" :title="backup.error">{{ backup.error }}</p>
 							<p v-if="nextBackup" class="tile-detail">{{ $t('Next: {when}', { when: nextBackup }) }}</p>
 						</div>
-						<div class="panel-foot">
+						<div v-if="canWrite" class="panel-foot">
 							<button v-if="backupDestination" class="panel-action is-primary" type="button" @click="backupNow">{{ $t('Back up') }}</button>
 							<button class="panel-action" type="button" @click="openBackups">
 								<span class="panel-grow">{{ $t('Backups and restore') }}</span>
@@ -121,7 +121,7 @@
 					</div>
 				</section>
 
-				<section v-if="fleet && fleet.total" class="widget has-text-grey-100 panel fleet">
+				<section v-if="mayRead('fleet') && fleet && fleet.total" class="widget has-text-grey-100 panel fleet">
 					<div class="blur-background"></div>
 					<div class="widget-content">
 						<div class="panel-head">
@@ -136,7 +136,8 @@
 								<span class="fleet-state">{{ fleetStateLabel(box.state) }}</span>
 							</li>
 						</ul>
-						<div class="panel-foot">
+						<!-- the Fleet page reads the boxes through the relay: the owner's -->
+						<div v-if="canWrite" class="panel-foot">
 							<button class="fleet-open panel-action" type="button" @click="openFleetPage">
 								<span class="tag is-dark is-rounded">{{ $t('Beta') }}</span>
 								<span class="panel-grow">{{ $t('Open the Fleet page') }}</span>
@@ -413,8 +414,10 @@ export default {
 					level: 'ok',
 					detail: this.speed ? `↑ ${this.renderSize(this.speed.up)}/s` : '',
 				},
-				this.backupTileData(),
 			]
+			if (this.mayRead('backups')) {
+				tiles.push(this.backupTileData())
+			}
 			if (this.raid) {
 				tiles.push({
 					key: 'snapraid',
@@ -426,10 +429,23 @@ export default {
 					onClick: this.openStorage,
 				})
 			}
-			return tiles
+			// what a click opens is the owner's to change
+			return this.canWrite ? tiles : tiles.map(tile => ({ ...tile, onClick: null }))
+		},
+		canWrite() {
+			return this.$store.getters.canWrite
 		},
 	},
 	watch: {
+		// a session without the message bus has the box's load read again into the store (Home.vue)
+		'$store.state.hardwareInfo': function (info) {
+			this.watts = cpuWatts(this.cpu.power, info.cpu?.power)
+			this.cpu = info.cpu || {}
+			this.mem = info.mem || {}
+			this.disk = info.sys_disk || {}
+			this.usb = info.sys_usb || []
+			this.follow(info.net || [])
+		},
 		// the bell of the beta bar counts them
 		// on the count: the list is rebuilt on each refresh
 		'attention.length': {
@@ -498,6 +514,9 @@ export default {
 
 		// a failure opens what it is about: the disks, the backups, the fleet
 		openAttention(item) {
+			if (!this.canWrite) {
+				return
+			}
 			if (item.key === 'backup') {
 				this.openBackups()
 			} else if (item.key.startsWith('fleet_')) {
@@ -645,7 +664,33 @@ export default {
 			}
 		},
 
+		// a module the account may read: the others are neither read nor shown
+		mayRead(module) {
+			return this.$store.getters.canReadModule(module)
+		},
+
 		async refreshSlow() {
+			if (this.mayRead('backups')) {
+				await this.readBackups()
+			}
+			if (this.mayRead('storage')) {
+				await this.readStorage()
+			}
+			// 404 on a core without a fleet, nothing to show on a box that is not a master
+			if (this.mayRead('fleet')) {
+				try {
+					this.fleetState = (await this.$api.fleet.status()).data.data
+				} catch {
+					this.fleetState = null
+				}
+			}
+			// a core without the route leaves the store empty: no item. The sharing is the owner's.
+			if (this.canWrite) {
+				await refreshGuard()
+			}
+		},
+
+		async readBackups() {
 			// an older box answers 404 to either: its tile is then left out
 			try {
 				this.runs = (await this.$api.backup.getRuns()).data.data || []
@@ -669,6 +714,9 @@ export default {
 			} catch {
 				this.operations = []
 			}
+		},
+
+		async readStorage() {
 			try {
 				this.snapraidState = (await this.$api.disks.snapraid()).data.data
 			} catch {
@@ -687,19 +735,15 @@ export default {
 			} catch {
 				this.zfsPools = []
 			}
+			// df runs on every ask of this one: the owner's only
+			if (!this.canWrite) {
+				return
+			}
 			try {
 				this.unreadableMounts = (await this.$api.disks.unreadable()).data.data || []
 			} catch {
 				this.unreadableMounts = []
 			}
-			// 404 on a core without a fleet, nothing to show on a box that is not a master
-			try {
-				this.fleetState = (await this.$api.fleet.status()).data.data
-			} catch {
-				this.fleetState = null
-			}
-			// a core without the route leaves the store empty: no item
-			await refreshGuard()
 		},
 	},
 	sockets: {

@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { ToastProgrammatic } from 'buefy'
 import router from '@/router'
 import store from '@/store'
-// import { ToastProgrammatic as Toast } from 'buefy'
+import i18n from '@/plugins/i18n'
 
 const axiosBaseURL = ``
 
@@ -63,14 +64,46 @@ function logout() {
 // that would never be attempted again, so those requests hung for the lifetime of
 // the page and their callers' error handling never ran. The flag goes back and the
 // queue is turned away, so the next 401 gets a refresh of its own.
-function giveUp() {
+function giveUp(signOut = true) {
 	isRefreshing = false
 
 	const waiting = requests
 	requests = []
 	waiting.forEach(cb => cb(null))
 
-	logout()
+	if (signOut) {
+		logout()
+	}
+}
+
+// What the box says when it refuses on account of the role (the Gateway's INSUFFICIENT_PERMISSIONS) or cannot answer (503): one
+// translated toast, not one per call, and the same sentence for the callers that read the answer's `data` or `message`.
+const FORBIDDEN_CODE = 10011
+const SERVICE_ERROR_CODE = 500
+const TOAST_QUIET_MS = 3000
+const lastToast = {}
+// the export of Buefy is a class: an instance without an app opens a toast outside any component
+const toaster = new ToastProgrammatic()
+
+function refuse(error, sentence) {
+	const now = Date.now()
+	if (!(now - (lastToast[sentence] ?? -Infinity) < TOAST_QUIET_MS)) {
+		lastToast[sentence] = now
+		toaster.open({ message: i18n.global.t(sentence), type: 'is-danger', position: 'is-top', duration: 4000 })
+	}
+	const text = i18n.global.t(sentence)
+	const body = error.response.data && typeof error.response.data === 'object' ? error.response.data : {}
+	error.response.data = { ...body, data: text, message: text }
+}
+
+function explainRefusal(error) {
+	const status = error?.response?.status
+	if (status === 403 && error.response.data?.success === FORBIDDEN_CODE) {
+		refuse(error, 'You do not have the right to do this.')
+	} else if (status === 503 && error.response.data?.success === SERVICE_ERROR_CODE) {
+		// the Gateway's own 503; a service that answers 503 with a reason of its own keeps it for its callers
+		refuse(error, 'The service is temporarily unavailable.')
+	}
 }
 
 instance.interceptors.response.use(
@@ -80,7 +113,8 @@ instance.interceptors.response.use(
 	async (error) => {
 		const originalConfig = error?.config
 		const refresh_token = localStorage.getItem('refresh_token')
-		if (originalConfig.url !== '/users/register' && error?.response?.status === 401) {
+		explainRefusal(error)
+		if (originalConfig?.url !== '/users/register' && error?.response?.status === 401) {
 			// The refresh itself was refused, or a call was refused again with the token it
 			// was replayed with: no newer token is coming. The refresh used to be parked in
 			// its own queue, so it never ended and `isRefreshing` stayed true until the page
@@ -117,7 +151,8 @@ instance.interceptors.response.use(
 					requests.forEach(cb => cb(token))
 					requests = []
 				}).catch((error) => {
-					giveUp()
+					// the box that cannot be reached right now is no reason to sign out: its 503 is told in a toast by the next call
+					giveUp(error?.response?.status !== 503)
 					console.log(error)
 				})
 			}

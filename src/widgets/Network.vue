@@ -56,6 +56,8 @@ import { mixin } from '@/mixins/mixin'
 export default {
 	mixins: [mixin],
 	name: 'network',
+	// read from the box's own state: only an account that may read the "system" module has this widget
+	module: 'system',
 	icon: 'network-outline',
 	title: 'Network Status',
 	initShow: true,
@@ -162,6 +164,11 @@ export default {
 	},
 
 	watch: {
+		// a session without the message bus has the box's load read again into the store (Home.vue)
+		'$store.state.hardwareInfo': function (info) {
+			this.initNetwork = info.net
+			this.buildDatas(info.net)
+		},
 		networkId(val, oldVal) {
 			if (val !== oldVal) {
 				localStorage.setItem('networkId', val)

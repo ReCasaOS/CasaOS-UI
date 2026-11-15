@@ -11,6 +11,9 @@ import { hasVirtualMachines } from '@/components/VirtualMachines/entry'
 import { statsApi } from '@/service/stats'
 import i18n from '@/plugins/i18n'
 
+// the owner's store, as the dashboard gives it to the page
+const OWNER = { state: {}, getters: { canWrite: true, canReadModule: () => true } }
+
 // The English strings, so that what a spec reads is what a person reads.
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/stats', () => ({
@@ -51,7 +54,7 @@ const defaults = () => ({ app_management: body([jelly, plex]), virt_management: 
 
 let wrapper
 async function mountPage(props = {}) {
-	wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+	wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 	await flushPromises()
 	return wrapper
 }
@@ -347,7 +350,7 @@ describe('the refresh of the list', () => {
 	it('goes every 5 s, once at a time, and pauses while hidden', async () => {
 		const slow = deferred()
 		serve({ ...defaults(), core: slow.promise })
-		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 		await tick(0)
 		expect(statsApi.list).toHaveBeenCalledTimes(3)
 		await tick(60000)
@@ -369,7 +372,7 @@ describe('the refresh of the list', () => {
 	})
 
 	it('clears its timer on unmount', async () => {
-		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 		await tick(0)
 		expect(vi.getTimerCount()).toBeGreaterThan(0)
 		wrapper.unmount()
@@ -410,7 +413,7 @@ describe('the header, the periods and the figures', () => {
 
 	const tick = ms => vi.advanceTimersByTimeAsync(ms)
 	async function open(props = {}) {
-		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 		await tick(0)
 		return wrapper
 	}
@@ -731,7 +734,7 @@ describe('the alerts of the page', () => {
 
 	const tick = ms => vi.advanceTimersByTimeAsync(ms)
 	async function open(props = {}) {
-		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		wrapper = mount(StatsPage, { props, attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 		await tick(0)
 		return wrapper
 	}
@@ -877,7 +880,7 @@ describe('the alerts of the page', () => {
 
 		it('closes the dialog at the first Escape and the page at the second', async () => {
 			vi.useRealTimers()
-			host = mount({ render: () => null }, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+			host = mount({ render: () => null }, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 			openStatistics(host.vm.$buefy, { appLaunchInIframe: true, appLaunchExceptions: [] })
 			await vi.waitFor(() => expect(isShown('.stats-page')).toBe(true))
 			await flushPromises()
@@ -1016,7 +1019,7 @@ describe('the charts across a poll of the list', () => {
 	})
 
 	it('are not built again when the list answers with new objects', async () => {
-		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+		wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 		await vi.advanceTimersByTimeAsync(0)
 		const before = wrapper.vm.charts
 		expect(before.length).toBeGreaterThan(0)

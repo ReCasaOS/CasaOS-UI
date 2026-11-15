@@ -7,6 +7,9 @@ import { fleetApi } from '@/service/fleet'
 import { logsApi } from '@/service/logs'
 import i18n from '@/plugins/i18n'
 
+// the owner's store, as the dashboard gives it to the page
+const OWNER = { state: {}, getters: { canWrite: true, canReadModule: () => true } }
+
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 vi.mock('@/service/service.js', () => ({ instance: { request: vi.fn() } }))
 vi.mock('@/service/fleet', () => ({ fleetApi: { status: vi.fn(), relay: vi.fn() } }))
@@ -16,11 +19,11 @@ const BOXES = [{ id: 'b1', name: 'Home', online: true }, { id: 'b2', name: 'Shop
 const APPS = [{ app: 'plex', title: { en_us: 'Plex' }, icon: null, uninstalled: false, services: [{ service: 'plex', container: 'plex', running: true }] }]
 
 let wrapper
-async function mountPage(props = {}) {
+async function mountPage(props = {}, mocks = { $store: OWNER }) {
 	wrapper = mount(LogsPage, {
 		attachTo: document.body,
 		props,
-		global: { plugins: [Buefy, i18n], stubs: { LogStream: true } },
+		global: { plugins: [Buefy, i18n], stubs: { LogStream: true }, mocks },
 	})
 	await flushPromises()
 	return wrapper
@@ -104,6 +107,23 @@ describe('the Logs page', () => {
 		await mountPage({ initialApp: 'nginx' })
 		expect(wrapper.text()).not.toContain('Restart')
 		expect(wrapper.text()).not.toContain('Stop')
+	})
+
+	it('offers no Restart or Stop to an account that cannot write, and does not ask for the boxes of a fleet', async () => {
+		fleetApi.status.mockResolvedValue({ data: { data: { role: 'master', master: { boxes: BOXES } } } })
+		await mountPage({ initialApp: 'plex' }, { $store: { getters: { canWrite: false, canReadModule: () => false } } })
+
+		expect(wrapper.text()).toContain('Plex')
+		expect(wrapper.text()).not.toContain('Restart')
+		expect(wrapper.text()).not.toContain('Stop')
+		expect(fleetApi.status).not.toHaveBeenCalled()
+		expect(boxSelect().exists()).toBe(false)
+	})
+
+	it('reads this box for an account that cannot write, whatever box the address names', async () => {
+		await mountPage({ initialApp: 'plex', initialBox: 'b1' }, { $store: { getters: { canWrite: false, canReadModule: () => false } } })
+
+		expect(wrapper.findComponent({ name: 'LogStream' }).props('box')).toBe(null)
 	})
 
 	it('starts on the app and the moment it was opened for', async () => {

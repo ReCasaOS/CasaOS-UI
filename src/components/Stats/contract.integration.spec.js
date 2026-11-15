@@ -11,6 +11,9 @@ import i18n from '@/plugins/i18n'
 import { instance } from '@/service/service'
 import { statsApi } from '@/service/stats'
 
+// the owner's store, as the dashboard gives it to the page
+const OWNER = { state: {}, getters: { canWrite: true, canReadModule: () => true } }
+
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 // the session store and the router are not under test; the real client and axios instance are
 vi.mock('@/store', () => ({ default: { commit: vi.fn(), state: {} } }))
@@ -39,7 +42,7 @@ function adapter(config) {
 
 let wrapper
 async function mountPage() {
-	wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n] } })
+	wrapper = mount(StatsPage, { attachTo: document.body, global: { plugins: [Buefy, i18n], mocks: { $store: OWNER } } })
 	await flushPromises()
 	await flushPromises()
 	return wrapper

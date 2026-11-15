@@ -174,12 +174,16 @@ describe('socket plugin', () => {
 })
 
 describe('the message bus connection', () => {
-	function storeWith(token) {
+	function storeWith(token, role = 'admin') {
 		return createStore({
-			state: { access_token: token },
+			state: { access_token: token, user: { role } },
+			getters: { canWrite: state => state.user.role === 'admin' },
 			mutations: {
 				SET_ACCESS_TOKEN(state, value) {
 					state.access_token = value
+				},
+				SET_ROLE(state, value) {
+					state.user = { role: value }
 				},
 			},
 		})
@@ -222,6 +226,29 @@ describe('the message bus connection', () => {
 
 		expect(socket.io.opts.query).toEqual({ token: 'jwt-1' })
 		expect(socket.open).toHaveBeenCalledTimes(1)
+	})
+
+	it.each(['user', ''])('never connects for an account of role %j, token or not', async (role) => {
+		const store = storeWith('jwt-1', role)
+		const socket = connectBus(store)
+		store.commit('SET_ACCESS_TOKEN', 'jwt-2')
+		await nextTick()
+
+		expect(socket.open).not.toHaveBeenCalled()
+	})
+
+	it('connects once the role is known to be the owner and closes when it is not', async () => {
+		const store = storeWith('jwt-1', '')
+		const socket = connectBus(store)
+		expect(socket.open).not.toHaveBeenCalled()
+
+		store.commit('SET_ROLE', 'admin')
+		await nextTick()
+		expect(socket.open).toHaveBeenCalledTimes(1)
+
+		store.commit('SET_ROLE', 'user')
+		await nextTick()
+		expect(socket.close).toHaveBeenCalled()
 	})
 
 	it('connects at once when the token is already there', () => {

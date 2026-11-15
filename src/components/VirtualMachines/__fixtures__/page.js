@@ -12,6 +12,9 @@ import { HOST, aVm } from './vm'
 import socketPlugin from '@/plugins/socket'
 import i18n from '@/plugins/i18n'
 
+// the owner's store, as the dashboard gives it to the page
+const OWNER = { state: {}, getters: { canWrite: true, canReadModule: () => true } }
+
 // The message bus' socket, as the plugin only ever uses it: `on` and `off`.
 // `receive` is the bus pushing an event, or the socket connecting.
 export function fakeSocket() {
@@ -65,7 +68,7 @@ export async function openPage(options = {}) {
 	serve(options)
 	const host = mount({ render: () => null }, {
 		attachTo: document.body,
-		global: { plugins: [Buefy, i18n, [socketPlugin, fakeSocket()]], mocks: { $api: fakeApi() } },
+		global: { plugins: [Buefy, i18n, [socketPlugin, fakeSocket()]], mocks: { $api: fakeApi(), $store: OWNER } },
 	})
 	openVirtualMachines(host.vm.$buefy, {})
 	await vi.waitFor(() => expect(isOpen('.vm-page')).toBe(true))
@@ -82,7 +85,8 @@ export async function mountPage(options = {}) {
 	const wrapper = mount(VmPage, {
 		props: options.props,
 		attachTo: document.body,
-		global: { plugins: [Buefy, i18n, [socketPlugin, socket]], mocks: { $api: api } },
+		// options.store: the dashboard's store as the page reads it (the account's role); none is the owner's page
+		global: { plugins: [Buefy, i18n, [socketPlugin, socket]], mocks: { $api: api, $store: options.store || OWNER } },
 	})
 	await flushPromises()
 	// what the message bus pushes

@@ -8,9 +8,14 @@
  */
 
 import { api } from '@/service/service.js'
+import store from '@/store'
 import message_bus from '@/events/message_bus.js'
 
 export default function messageBus(name, params) {
+	// the bus is box-wide: an account that cannot write neither listens to it nor posts to it
+	if (!store.getters.canWrite) {
+		return
+	}
 	if (!params) {
 		params = null
 	}

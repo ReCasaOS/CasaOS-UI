@@ -115,7 +115,8 @@ export default {
 				// the state the tile has
 			}
 			try {
-				if (allowedActions(vm.state).console) {
+				// the console is the owner's: anyone else gets the page, with the list
+				if (this.$store.getters.canWrite && allowedActions(vm.state).console) {
 					openVmConsole(this.$buefy, vm)
 				} else {
 					openVirtualMachines(this.$buefy, this.$store.state, vm.id)

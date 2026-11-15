@@ -207,8 +207,9 @@
 								</div>
 								<!-- Recommended modules Switch End  -->
 
-								<!-- Beta dashboard Switch Start -->
+								<!-- Beta dashboard Switch Start: the dashboard shows the box's state, which a plain account does not read -->
 								<div
+									v-if="$store.getters.canReadModule('system')"
 									class="is-flex is-align-items-center _row _box">
 									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="flask-outline" size="is-20" />
@@ -226,7 +227,7 @@
 								<!-- Beta dashboard Switch End -->
 
 								<!-- Beta login page Switch Start: for the whole box, not this user -->
-								<div
+								<div v-if="$store.getters.canWrite"
 									class="is-flex is-align-items-center _row _box">
 									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="login-variant" size="is-20" />
@@ -246,6 +247,7 @@
 
 								<!-- Terminal full screen Switch Start -->
 								<div
+									v-if="$store.getters.canWrite"
 									class="is-flex is-align-items-center _row _box">
 									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 										<b-icon class="mr-1 ml-2" icon="terminal-outline" pack="casa" size="is-20" />
@@ -283,7 +285,7 @@
 							</div>
 						</div>
 
-						<div class="_settings-column">
+						<div v-if="$store.getters.canWrite" class="_settings-column">
 							<p class="_settings-group">
 								{{ $t("System") }}
 							</p>
@@ -381,6 +383,21 @@
 								</div>
 								<!-- Logs End -->
 
+								<!-- Accounts Start -->
+								<div v-if="$store.getters.isAdmin"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="account-multiple-outline" size="is-20" />
+										{{ $t("Accounts") }}
+									</div>
+									<div class="ml-2">
+										<b-button rounded size="is-small" type="is-dark" @click="showAccounts">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Accounts End -->
+
 								<!-- Fleet Start -->
 								<div v-if="fleetAvailable"
 									class="is-flex is-align-items-center _row _box">
@@ -464,7 +481,7 @@
 							</div>
 						</div>
 
-						<div class="_settings-column">
+						<div v-if="$store.getters.canWrite" class="_settings-column">
 							<p class="_settings-group">
 								{{ $t("Updates") }}
 							</p>
@@ -597,7 +614,7 @@
 					</div>
 
 					<!-- Restart or Shutdown Start -->
-					<div
+					<div v-if="$store.getters.canWrite"
 						class="is-flex is-align-content-center is-justify-content-center _footer mt-4 pl-3 pr-3 pt-2 pb-2">
 						<div class="mr-1 column is-half is-flex is-align-items-center is-justify-content-center hover-effect is-clickable _is-radius _is-normal"
 							@click="power('Restart')">
@@ -619,7 +636,7 @@
 			<!-- Settings Dropmenu End -->
 
 			<!-- Terminal  Start -->
-			<div class="is-flex is-align-items-center ml-3 _fixed-height" @click="showTerminalPanel">
+			<div v-if="$store.getters.canWrite" class="is-flex is-align-items-center ml-3 _fixed-height" @click="showTerminalPanel">
 				<b-tooltip :active="!$store.state.isMobile"
 					:label="$t('Terminal & Logs')"
 					position="is-right"
@@ -716,6 +733,7 @@ export default {
 			timer: 0,
 			// User
 			userInfo: this.$store.state.user,
+			userRetried: false,
 			// System
 			barData: {
 				lang: this.getInitLang(),
@@ -800,6 +818,9 @@ export default {
 		}
 	},
 	computed: {
+		canWrite() {
+			return this.$store.getters.canWrite
+		},
 		sidebarIcon() {
 			return this.$store.state.sidebarOpen ? 'close-outline' : 'menu-outline'
 		},
@@ -836,6 +857,12 @@ export default {
 		},
 	},
 	watch: {
+		// the role confirmed after the first render (nothing stored): the box's state is asked then
+		canWrite(can) {
+			if (can) {
+				this.loadBox()
+			}
+		},
 		'barData.lang': {
 			handler(val, oldValue) {
 				if (val === oldValue) {
@@ -881,20 +908,14 @@ export default {
 	created() {
 		this.barData = this.initBarData
 		// this.getConfig();
-		this.getPort()
 	},
 	mounted() {
-		this.checkVersion()
 		this.getUserInfo()
-		this.getUsbStatus()
-		this.getTelemetry()
-		this.getAutoUpdate()
-		this.getAlerts()
+		// what a `user` session never asks: the box's own settings and state
 		this.getLogs()
-		this.getFleet()
-		this.getModules()
-		this.getOs()
-		this.getHardwareInfo()
+		if (this.canWrite) {
+			this.loadBox()
+		}
 		// the notice's Turn off (CoreService) moves the switch too
 		this.$EventBus.$on(events.TELEMETRY_CHANGED, this.onTelemetryChanged)
 		// the tab bar of the beta dashboard on a phone
@@ -906,6 +927,23 @@ export default {
 	},
 
 	methods: {
+		// the box's settings, versions and probes: the owner's, once
+		loadBox() {
+			if (this.boxLoaded) {
+				return
+			}
+			this.boxLoaded = true
+			this.getPort()
+			this.checkVersion()
+			this.getUsbStatus()
+			this.getTelemetry()
+			this.getAutoUpdate()
+			this.getAlerts()
+			this.getFleet()
+			this.getModules()
+			this.getOs()
+			this.getHardwareInfo()
+		},
 		/*************************************************
 		 * PART 0  Common
 		 **************************************************/
@@ -950,9 +988,11 @@ export default {
 		onOpen(isOpen) {
 			if (isOpen) {
 				this.$store.commit('SET_SIDEBAR_CLOSE')
-				this.checkVersion()
-				// the night may have moved it: waiting, updating, up to date
-				this.getAutoUpdate()
+				if (this.canWrite) {
+					this.checkVersion()
+					// the night may have moved it: waiting, updating, up to date
+					this.getAutoUpdate()
+				}
 			} else {
 				// Reset the text when the Settings layer closes
 				// this.resetPower(true)
@@ -1100,6 +1140,20 @@ export default {
 			return import('@/service/fleet').then(({ fleetApi }) => fleetApi.status()).then(() => {
 				this.fleetAvailable = true
 			}).catch(() => {})
+		},
+
+		showAccounts() {
+			this.$refs.settingsDrop.toggle()
+			return import('./settings/AccountsModal.vue').then(({ default: AccountsModal }) => {
+				this.$buefy.modal.open({
+					component: AccountsModal,
+					hasModalCard: true,
+					trapFocus: true,
+					canCancel: ['escape'],
+					scroll: 'keep',
+					animation: 'zoom-in',
+				})
+			})
 		},
 
 		// The dialog is loaded when opened, for the same reason.
@@ -1451,13 +1505,20 @@ export default {
 		async getUserInfo() {
 			this.userInfo = this.$store.state.user
 			this.$store.commit('SET_SIDEBAR_CLOSE')
-			if (this.$store.state.user.id == 0) {
-				try {
-					const userRes = await this.$api.users.getUserInfo()
-					this.userInfo = userRes.data.data
-					this.$store.commit('SET_USER', this.userInfo)
-				} catch (error) {
-					console.error(error)
+			// always asked: the stored role gets the first render right, the server has the last word
+			try {
+				const userRes = await this.$api.users.getUserInfo()
+				this.userInfo = userRes.data.data
+				this.$store.commit('SET_USER', this.userInfo)
+				localStorage.setItem('user', JSON.stringify(this.userInfo))
+			} catch (error) {
+				console.error(error)
+				// once more shortly after: a role that never arrives would leave the account's own controls guessing
+				if (!this.userRetried) {
+					this.userRetried = true
+					setTimeout(() => this.getUserInfo(), 3000)
+				} else {
+					this.$store.commit('SET_ROLE_UNCONFIRMED')
 				}
 			}
 		},

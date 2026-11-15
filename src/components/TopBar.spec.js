@@ -32,6 +32,14 @@ const source = readFileSync('src/components/TopBar.vue', 'utf8')
 // The settings menu is a Buefy dropdown whose slot a shallow mount never
 // renders, and a full mount of TopBar needs more scaffolding than the row is
 // worth (see __tests__/mount.spec.js), so the template is checked as text.
+// the bar as mounted for the owner: the box's state is asked through loadBox
+function mountBar(vm) {
+	vm.canWrite = true
+	vm.getPort ??= vi.fn()
+	vm.loadBox = TopBar.methods.loadBox
+	TopBar.mounted.call(vm)
+}
+
 describe('top bar settings', () => {
 	it('has no news feed row', () => {
 		expect(source).not.toMatch(/news feed|rss/i)
@@ -110,7 +118,7 @@ describe('the anonymous statistics switch', () => {
 		}))
 		const vm = bar({ getTelemetry }, null)
 
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 		await flushPromises()
 
 		expect(getTelemetry).toHaveBeenCalledTimes(1)
@@ -227,7 +235,7 @@ describe('the automatic update row', () => {
 		const getAutoUpdate = answer(view({ state: 'updating' }))
 		const vm = bar({ getAutoUpdate }, null)
 
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 		await flushPromises()
 		expect(vm.autoUpdate.state).toBe('updating')
 
@@ -427,7 +435,7 @@ describe('the alerts row', () => {
 			onTelemetryChanged: vi.fn(),
 		}
 
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 
 		expect(vm.getAlerts).toHaveBeenCalledTimes(1)
 	})
@@ -523,7 +531,7 @@ describe('the modules row', () => {
 			onTelemetryChanged: vi.fn(),
 		}
 
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 
 		expect(vm.getModules).toHaveBeenCalledTimes(1)
 	})
@@ -597,6 +605,7 @@ describe('the system support badge', () => {
 					$store: {
 						state: { isMobile: false, sidebarOpen: false, notImportList: [], appLaunchInIframe: false, user: { username: 'tester' } },
 						commit: () => {},
+						getters: { isAdmin: true, canWrite: true, canReadModule: () => true },
 					},
 				},
 			},
@@ -859,7 +868,7 @@ describe('the fleet row', () => {
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
 		}
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 		expect(vm.getFleet).toHaveBeenCalledTimes(1)
 	})
 
@@ -931,7 +940,7 @@ describe('the logs row', () => {
 		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
 			vm[name] = vi.fn()
 
-		TopBar.mounted.call(vm)
+		mountBar(vm)
 
 		expect(vm.getLogs).toHaveBeenCalledTimes(1)
 	})

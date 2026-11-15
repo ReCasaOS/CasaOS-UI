@@ -73,8 +73,13 @@ export default {
 						.replace(/\.\w+$/, ''),
 				),
 			)
+			const component = widgetsComponents(fileName).default
+			// a widget of a module the account may not read is neither shown nor offered in the settings
+			if (component.module && !this.$store.getters.canReadModule(component.module)) {
+				return
+			}
 			this.comps.push(componentName)
-			this.apps.push({ app: widgetsComponents(fileName).default })
+			this.apps.push({ app: component })
 		})
 	},
 	mounted() {
@@ -130,6 +135,10 @@ export default {
 		 * @return {*} void
 		 */
 		saveData(data) {
+			// while the role is not known the widgets listed are the ones of a plain account: the owner's saved choice is kept
+			if (this.$store?.state?.user?.role === '') {
+				return
+			}
 			this.$api.users.setCustomStorage(widgetsConfig, data).then((res) => {
 				if (res.data.success === 200) {
 					this.widgetsSettings = res.data.data
@@ -153,7 +162,8 @@ export default {
 			const parentWidth = document.querySelector('.slider-content').offsetWidth
 			this.$nextTick(() => {
 				const padding = ww <= 480 ? 0 : -16
-				this.$refs.sidebar.style.width = `${parentWidth + padding}px`
+				if (this.$refs.sidebar)
+					this.$refs.sidebar.style.width = `${parentWidth + padding}px`
 			})
 		},
 
