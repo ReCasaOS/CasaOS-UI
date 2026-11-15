@@ -52,6 +52,29 @@ describe('opening an app that has no web interface', () => {
 		expect(calls.toasts).toHaveLength(1)
 	})
 
+	// An app behind a reverse proxy names a hostname and nothing else: no port, because
+	// the proxy serves the scheme's own, and no index. That hostname is where it is.
+	it('opens an app that names only a hostname of its own', () => {
+		const { ctx, calls } = harness()
+		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+		ctx.openAppToNewWindow({ name: 'homeassistant', status: 'running', hostname: 'ha.example.org', scheme: 'https', port: '', index: '' })
+
+		expect(calls.toasts).toHaveLength(0)
+		expect(calls.launcher).toHaveLength(1)
+		expect(calls.launcher[0][1].url).toBe('https://ha.example.org')
+		open.mockRestore()
+	})
+
+	it('waits in the launcher for an app that names only a hostname of its own', () => {
+		const { ctx, calls } = harness()
+
+		ctx.firstOpenThirdApp({ name: 'homeassistant', status: 'running', hostname: 'ha.example.org', scheme: 'https', port: '', index: '' })
+
+		expect(calls.toasts).toHaveLength(0)
+		expect(calls.launcher).toHaveLength(1)
+	})
+
 	it('still opens an app that publishes a port', () => {
 		const { ctx, calls } = harness()
 		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
