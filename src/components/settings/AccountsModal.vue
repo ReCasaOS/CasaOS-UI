@@ -250,3 +250,11 @@ export default {
 	},
 }
 </script>
+
+<style lang="scss">
+// the settings menu gives its rows one fixed height (TopBar ._box); an account row also holds its rights
+.accounts-modal ._box {
+	height: auto;
+	min-height: 2.5rem;
+}
+</style>
