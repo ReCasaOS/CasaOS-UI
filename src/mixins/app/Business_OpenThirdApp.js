@@ -30,8 +30,13 @@ export default {
 		// as `http://<the box>` -- the dashboard itself, opened inside the dashboard.
 		// Having nothing to open is an answer, and saying so beats opening the wrong
 		// thing.
+		//
+		// A hostname of its own counts too: an app behind a reverse proxy names one and
+		// leaves the port empty. The box's own address does not, because the grid fills
+		// it in for every app that names none.
 		hasWebUI(appInfo) {
-			return Boolean(appInfo.port || appInfo.index)
+			const ownHostname = appInfo.hostname && appInfo.hostname !== this.$baseIp
+			return Boolean(appInfo.port || appInfo.index || ownHostname)
 		},
 		warnNothingToOpen(appInfo) {
 			this.$buefy.toast.open({
