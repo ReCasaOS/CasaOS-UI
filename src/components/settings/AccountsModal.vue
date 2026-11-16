@@ -84,11 +84,11 @@ const MIN_PASSWORD = 6
 // the rights the box knows (UserService's list), in the order of the screen;
 // help: what the box opens, as the dashboard shows it to such an account
 const MODULES = [
-	{ name: 'storage', label: 'Storage', help: 'The disks and their health, RAID, SnapRAID and ZFS. Shown on the new dashboard, which needs System too.' },
-	{ name: 'vm', label: 'Virtual Machines', help: 'The virtual machines and their state, on their card, and their statistics. Their tiles on the new dashboard need System too. No console, no change.' },
-	{ name: 'backups', label: 'Backups', help: 'The last backup of each app, on its card. The backups card of the new dashboard needs System too. No restore, no keys.' },
-	{ name: 'fleet', label: 'Fleet', help: 'The boxes of the fleet and whether they are online, on the new dashboard, which needs System too. No access to the boxes.' },
-	{ name: 'system', label: 'System', help: 'The load, memory, network and disk space of this box, its statistics and the new dashboard.' },
+	{ name: 'storage', label: 'Storage', help: 'The disks and their health, RAID, SnapRAID and ZFS, on the new dashboard.' },
+	{ name: 'vm', label: 'Virtual Machines', help: 'The virtual machines and their state, on their card and on the new dashboard, and their statistics. No console, no change.' },
+	{ name: 'backups', label: 'Backups', help: 'The last backup of each app, on its card, and the backups card of the new dashboard. No restore, no keys.' },
+	{ name: 'fleet', label: 'Fleet', help: 'The boxes of the fleet and whether they are online, on the new dashboard. No access to the boxes.' },
+	{ name: 'system', label: 'System', help: 'The load, memory, network and disk space of this box, on the widgets and on the new dashboard, and its statistics.' },
 ]
 
 export default {

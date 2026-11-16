@@ -661,7 +661,7 @@ describe('the health strip of an account of role user', () => {
 	// a user: what it reads is the modules of its rights, and a click opens nothing of the owner's
 	const user = rights => ({ canWrite: false, canReadModule: name => rights.includes(name) })
 
-	it('without rights, reads and shows no module, and its tiles open nothing', async () => {
+	it('without rights, reads and shows no module, and has no tile', async () => {
 		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
 		const snapraid = vi.fn(() => Promise.resolve({ data: { data: null } }))
 		const fleet = vi.fn(() => Promise.resolve({ data: { data: { role: 'none' } } }))
@@ -676,10 +676,71 @@ describe('the health strip of an account of role user', () => {
 		expect(refreshGuard).not.toHaveBeenCalled()
 		expect(wrapper.find('.panel.storage').exists()).toBe(false)
 		expect(wrapper.find('.panel.backups').exists()).toBe(false)
-		expect(wrapper.findAll('.tile').map(tile => tile.find('.tile-label').text())).not.toContain('Backups')
+		expect(wrapper.find('.tiles').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('with the system right alone, shows the tiles of the box, which open nothing, and no card of a module', async () => {
+		const emit = vi.fn()
+		const wrapper = strip({ getters: user(['system']), emit })
+		await settle()
+
+		expect(wrapper.findAll('.tile').map(tile => tile.find('.tile-label').text())).toEqual(['CPU', 'Memory', 'Storage', 'Network'])
 		expect(wrapper.findAll('.tile.is-clickable')).toHaveLength(0)
 		await wrapper.findAll('.tile')[2].trigger('click')
 		expect(emit).not.toHaveBeenCalled()
+		expect(wrapper.find('.panel.storage').exists()).toBe(false)
+		expect(wrapper.find('.panel.backups').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	// each card needs its own right and no other: the load of the box is the "system" module's
+	it('with the storage right alone, shows the storage card without the tiles of the box nor a drive made up from its load', async () => {
+		const snapraid = vi.fn(() => Promise.resolve({ data: { data: null } }))
+		const wrapper = strip({ getters: user(['storage']), snapraid })
+		await settle()
+
+		expect(wrapper.find('.panel.storage').exists()).toBe(true)
+		expect(wrapper.find('.tiles').exists()).toBe(false)
+		expect(wrapper.find('.panel.storage').text()).not.toContain('System drive')
+		wrapper.unmount()
+	})
+
+	// such an account never reads the load of the box: its store has none
+	it.each([['storage'], ['backups'], ['fleet'], ['vm']])('with the %s right alone and no load of the box, reports no failure of the system drive', async (right) => {
+		const emit = vi.fn()
+		const snapraid = vi.fn(() => Promise.resolve({ data: { data: null } }))
+		const wrapper = strip({ store: { getters: user([right]), state: { hardwareInfo: {} } }, snapraid, emit })
+		await settle()
+
+		expect(wrapper.find('.attention').text()).toContain('All good')
+		expect(wrapper.findAll('.attention li')).toHaveLength(0)
+		expect(wrapper.text()).not.toContain('Damage')
+		expect(wrapper.text()).not.toContain('NaN')
+		wrapper.unmount()
+	})
+
+	it('with the backups right alone, shows the backups tile and card and no tile of the box', async () => {
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ getters: user(['backups']), getRuns })
+		await settle()
+
+		expect(wrapper.findAll('.tile').map(tile => tile.find('.tile-label').text())).toEqual(['Backups'])
+		expect(wrapper.find('.panel.backups').exists()).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('with the fleet right alone, reads the fleet and shows its card without the button of the owner', async () => {
+		const fleet = vi.fn(() => Promise.resolve({ data: { data: { role: 'master', master: { address: 'https://home.example', boxes: [{ id: 'a', name: 'Home', online: true, last_seen: '2026-11-03T10:00:00Z' }] } } } }))
+		const getRuns = vi.fn(() => Promise.resolve({ data: { data: [] } }))
+		const wrapper = strip({ getters: user(['fleet']), fleet, getRuns })
+		await settle()
+
+		expect(fleet).toHaveBeenCalled()
+		expect(getRuns).not.toHaveBeenCalled()
+		expect(wrapper.find('.panel.fleet').text()).toContain('1 of 1 boxes online')
+		expect(wrapper.find('.panel.fleet .panel-action').exists()).toBe(false)
+		expect(wrapper.find('.tiles').exists()).toBe(false)
 		wrapper.unmount()
 	})
 

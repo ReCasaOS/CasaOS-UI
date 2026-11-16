@@ -328,7 +328,9 @@ describe('the rights of an account', () => {
 		const help = wrapper.findAll('.right-help').map(node => node.text())
 		expect(help).toHaveLength(5)
 		expect(help.join(' ')).toContain('No console')
-		expect(help.filter(text => text.includes('System'))).toHaveLength(4)
+		// each module is shown with its own right: no line sends to another box
+		expect(help.filter(text => text.includes('System'))).toHaveLength(0)
+		expect(help.filter(text => text.includes('new dashboard'))).toHaveLength(5)
 	})
 })
 

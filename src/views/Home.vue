@@ -9,7 +9,7 @@
 			<div class="container">
 				<!-- the beta dashboard is opt-in (Settings); the classic one stays the default -->
 				<!-- keyed by the rights: what a part decided at its creation (its widgets, cards, timers) is decided again when they change -->
-				<DashboardBeta v-if="barData.dashboard_beta && canReadModule('system') && !hardwareInfoLoading" :key="access" @leave="setDashboardBeta(false)" />
+				<DashboardBeta v-if="barData.dashboard_beta && readsAModule && !hardwareInfoLoading" :key="access" @leave="setDashboardBeta(false)" />
 				<div v-else class="columns is-variable is-2">
 					<div class="column is-one-quarter slider-content">
 						<!-- SideBar Start -->
@@ -81,7 +81,7 @@ import { FILES_LAUNCH_ID, builtinOpensInNewTab } from '@/mixins/app/appLaunchPre
 import events from '@/events/events'
 import { openPage } from '@/router/pageTabs'
 import { createPoller } from '@/components/Stats/poller'
-import { accessOf } from '@/store/confirmRole'
+import { accessOf, readsAModule } from '@/store/confirmRole'
 
 // a session without the message bus (an account of role user with the system right) reads the box's load this often
 const UTILIZATION_POLL_MS = 10000
@@ -126,6 +126,9 @@ export default {
 		// the role and the modules it reads, as one value: the server confirms them after the first render
 		access() {
 			return accessOf(this.$store.getters)
+		},
+		readsAModule() {
+			return readsAModule(this.$store.getters)
 		},
 		sidebarOpen() {
 			return this.$store.state.sidebarOpen

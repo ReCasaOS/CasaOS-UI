@@ -193,10 +193,9 @@ describe('the dashboard in the session of an account of role user', () => {
 		await boot()
 
 		expect([...new Set(calls)].filter(call => !allowed(rights).some(rule => rule.test(call)))).toEqual([])
-		// the new dashboard is the "system" module's: without it, only the virtual machines' and the backups' cards are on the grid
-		const shown = rights.includes('system') ? rights : rights.filter(right => right === 'vm' || right === 'backups')
+		// each module is shown with its own right, whatever the others
 		const base = allowed()
-		for (const right of shown) {
+		for (const right of rights) {
 			const own = allowed([right]).filter(rule => !base.some(b => b.source === rule.source))
 			expect(calls.some(call => own.some(rule => rule.test(call))), right).toBe(true)
 		}
