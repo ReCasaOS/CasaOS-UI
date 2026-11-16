@@ -206,6 +206,11 @@
     max-width: calc(100vw - 2rem) !important;
 }
 
+// the card is 66rem by Bulma's rule: in a window narrower than that it stays inside its wrapper
+:where(.modal:not(.dialog)) > .animation-content:where(:has(> .modal-card)) > .modal-card {
+    max-width: 100%;
+}
+
 .terminal-modal {
     .close-container {
         position: absolute;
