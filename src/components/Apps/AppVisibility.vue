@@ -11,7 +11,7 @@
 		</b-message>
 
 		<!-- for every account, the admin included; saved at once, apart from the ticks below -->
-		<div v-if="loaded" class="_row _box mb-4">
+		<div v-if="loaded && dashboardKnown" class="_row _box mb-4">
 			<b-switch v-model="onDashboardHidden" :disabled="savingDashboard" class="hide-from-dashboard" size="is-small" @update:model-value="saveDashboard">
 				{{ $t('Hide from the dashboard') }}
 			</b-switch>
@@ -53,7 +53,7 @@ export default {
 	emits: ['state'],
 	data() {
 		// `saved`: the ids the server holds, to tell an unsaved tick from a saved one
-		return { users: [], hidden: [], saved: [], loaded: false, saving: false, error: '', onDashboardHidden: false, savingDashboard: false }
+		return { users: [], hidden: [], saved: [], loaded: false, saving: false, error: '', onDashboardHidden: false, dashboardKnown: false, savingDashboard: false }
 	},
 	computed: {
 		isAdmin() {
@@ -86,8 +86,11 @@ export default {
 		async load() {
 			this.error = ''
 			try {
-				const [accounts, visibility, dashboard] = await Promise.all([listAccounts(), getVisibility(this.appId), getDashboardHidden(this.appId)])
-				this.onDashboardHidden = dashboard.data.data?.hidden === true
+				const [accounts, visibility, dashboard] = await Promise.all([listAccounts(), getVisibility(this.appId),
+					// an older app service has no such route: the accounts' ticks still load, without the switch
+					getDashboardHidden(this.appId).catch(() => null)])
+				this.dashboardKnown = dashboard !== null
+				this.onDashboardHidden = dashboard?.data.data?.hidden === true
 				this.users = (accounts.data.data || []).filter(a => a.role === 'user')
 				this.saved = visibility.data.data?.hidden_for || []
 				this.hidden = [...this.saved]

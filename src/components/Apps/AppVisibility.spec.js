@@ -215,4 +215,11 @@ describe('the Visibility section, what it says and when', () => {
 		expect(toggle.element.checked).toBe(true)
 		expect(wrapper.text()).toContain('could not be saved')
 	})
+
+	it('still lists the accounts, without the switch, when the app service does not know the dashboard route', async () => {
+		api.getDashboardHidden.mockImplementation(() => Promise.reject(new Error('404')))
+		await open('admin')
+		expect(wrapper.find('.hide-from-dashboard').exists()).toBe(false)
+		expect(wrapper.findAll('.b-checkbox input')).toHaveLength(2)
+	})
 })

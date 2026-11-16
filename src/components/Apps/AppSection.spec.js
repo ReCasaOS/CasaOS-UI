@@ -1077,3 +1077,35 @@ describe('app section reading its lists on a timer', () => {
 		clearInterval(vm.ListRefreshTimer)
 	})
 })
+
+describe('app section and the apps hidden from the dashboard', () => {
+	const jellyfin = { name: 'jellyfin', status: 'running' }
+	const cloudflared = { name: 'cloudflared', status: 'running', hidden_on_dashboard: true }
+	function section(showHidden) {
+		return { systemFirst: false, filter: 'all', vms: [], showHidden, favorites: ['cloudflared', 'jellyfin'], appList: [cloudflared, jellyfin], $t: text => text }
+	}
+	const computed = (name, vm) => (AppSection.computed[name].get || AppSection.computed[name]).call(vm)
+	const names = list => list.map(app => app.name)
+
+	it('leaves them out of the grid, the favorites and the counts, and keeps them in the list', () => {
+		const vm = section(false)
+		expect(names(computed('gridList', vm))).toEqual(['jellyfin'])
+		expect(names(computed('favoriteApps', vm))).toEqual(['jellyfin'])
+		expect(computed('filterOptions', vm).find(option => option.id === 'running').count).toBe(1)
+		expect(names(computed('hiddenApps', vm))).toEqual(['cloudflared'])
+
+		// a drag gives back what was drawn: the hidden app stays in the list, and so in the saved order
+		AppSection.computed.gridList.set.call(vm, [jellyfin])
+		expect(names(vm.appList)).toEqual(['jellyfin', 'cloudflared'])
+	})
+
+	it('draws them when the admin asks, behind a line only the admin gets', () => {
+		const vm = section(true)
+		expect(names(computed('gridList', vm))).toEqual(['cloudflared', 'jellyfin'])
+		expect(computed('filterOptions', vm).find(option => option.id === 'running').count).toBe(2)
+
+		const source = readFileSync('src/components/Apps/AppSection.vue', 'utf8')
+		expect(source).toContain('v-if="$store.getters.isAdmin && hiddenApps.length > 0" class="hidden-apps')
+		expect(source).toContain(`'is-dashboard-hidden': isHiddenApp(item)`)
+	})
+})
