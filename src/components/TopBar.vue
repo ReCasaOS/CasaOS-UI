@@ -207,9 +207,9 @@
 								</div>
 								<!-- Recommended modules Switch End  -->
 
-								<!-- Beta dashboard Switch Start: the dashboard shows the box's state, which a plain account does not read -->
+								<!-- Beta dashboard Switch Start: the dashboard shows the modules, which an account without a right does not read -->
 								<div
-									v-if="$store.getters.canReadModule('system')"
+									v-if="readsAModule"
 									class="is-flex is-align-items-center _row _box">
 									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="flask-outline" size="is-20" />
@@ -710,6 +710,7 @@ import { osBadge } from './settings/osSupport'
 import { powerRefusal } from './settings/osUpgrade'
 import { opensFullScreen, setOpensFullScreen } from './logsAndTerminal/terminalLogin'
 import { mixin } from '@/mixins/mixin'
+import { readsAModule } from '@/store/confirmRole'
 import { readThemePreference, setThemePreference } from '@/mixins/app/themePreference'
 import messages from '@/assets/lang'
 
@@ -820,6 +821,9 @@ export default {
 	computed: {
 		canWrite() {
 			return this.$store.getters.canWrite
+		},
+		readsAModule() {
+			return readsAModule(this.$store.getters)
 		},
 		sidebarIcon() {
 			return this.$store.state.sidebarOpen ? 'close-outline' : 'menu-outline'

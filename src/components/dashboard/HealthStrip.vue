@@ -1,6 +1,6 @@
 <template>
 	<div class="health-strip-beta">
-		<div class="tiles">
+		<div v-if="tiles.length > 0" class="tiles">
 			<!-- a div that acts as a button: a real <button> is not stretched to the row by every browser, and the clickable tiles sat lower -->
 			<div v-for="tile in tiles"
 				:key="tile.key"
@@ -213,8 +213,9 @@ export default {
 		}
 	},
 	computed: {
+		// the health of the system disk comes with the load of the box: without the "system" module there is no reading, not a failure
 		health() {
-			return this.smartHealth(this.disk)
+			return this.mayRead('system') ? this.smartHealth(this.disk) : ''
 		},
 		backup() {
 			return backupTile(this.runs)
@@ -350,7 +351,8 @@ export default {
 					percent: percent(row.used, row.size),
 					detail: `${this.renderSize(row.used)} / ${this.renderSize(row.size)}`,
 				}))
-				: this.utilizationDrives()
+				// the utilization is the "system" module's: without it there is no reading to stand in
+				: (this.mayRead('system') ? this.utilizationDrives() : [])
 			const pools = zfsPoolRows(this.zfsPools).map(pool => ({
 				key: pool.key,
 				name: pool.name,
@@ -372,7 +374,8 @@ export default {
 			const memPercent = Math.round(Number(this.mem.usedPercent) || 0)
 			const diskPercent = percent(this.disk.used, this.disk.size)
 			const temperature = Number(this.cpu.temperature) || 0
-			const tiles = [
+			// the load, the memory, the system disk and the network are the "system" module's
+			const system = [
 				{
 					key: 'cpu',
 					label: 'CPU',
@@ -415,6 +418,7 @@ export default {
 					detail: this.speed ? `↑ ${this.renderSize(this.speed.up)}/s` : '',
 				},
 			]
+			const tiles = this.mayRead('system') ? system : []
 			if (this.mayRead('backups')) {
 				tiles.push(this.backupTileData())
 			}
