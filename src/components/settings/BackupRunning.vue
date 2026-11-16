@@ -3,7 +3,7 @@
 		<div v-for="backup in running.backups" :key="backup.id" class="live-backup mb-4">
 			<div class="is-flex is-align-items-center">
 				<div class="is-flex-grow-1">
-					<b>{{ titleOf(backup.app) }} → {{ backup.destination }}</b>
+					<b>{{ nameOf(backup) }} → {{ backup.destination }}</b>
 					<span class="has-text-grey is-size-7 ml-2">
 						{{ originText(backup.origin) }} · {{ $t('started {when}', { when: whenOf(new Date(backup.started_at)) }) }}
 					</span>
@@ -64,7 +64,7 @@ export default {
 	},
 	emits: ['refresh'],
 	data() {
-		return { titles: {} }
+		return { titles: {}, directions: null }
 	},
 	computed: {
 		// a pass that ended says nothing of what comes next
@@ -73,6 +73,13 @@ export default {
 		},
 	},
 	async mounted() {
+		// best effort too: without the directions every sync gets the warning
+		try {
+			const tasks = await this.$api.sync.getTasks()
+			this.directions = Object.fromEntries((tasks.data.data || []).map(task => [task.name, task.direction]))
+		} catch {
+			// the warning, then
+		}
 		// best effort: without the titles the apps go by their names
 		try {
 			const grid = await this.$openAPI.appGrid.getAppGrid()
@@ -86,6 +93,13 @@ export default {
 	methods: {
 		titleOf(app) {
 			return liveTitle(app, name => this.titles[name] || name, this.$t)
+		},
+		// a sync goes by its task's name; an older back end sends no kind, which is a backup
+		isSync(backup) {
+			return backup.kind === 'sync'
+		},
+		nameOf(backup) {
+			return this.isSync(backup) ? this.$t('Sync: {name}', { name: backup.app }) : this.titleOf(backup.app)
 		},
 		figures(backup) {
 			return liveFigures(backup)
@@ -133,9 +147,17 @@ export default {
 			return parts.join(' · ').replace('✓ · ', '✓ ')
 		},
 		stop(backup) {
-			const title = this.titleOf(backup.app)
+			const sync = this.isSync(backup)
+			const title = sync ? backup.app : this.titleOf(backup.app)
+			let message = sync
+				? this.$t('Stop the sync of {title}? What is already copied stays where it is.', { title })
+				: this.$t('Stop the backup of {title}? What is already copied stays at the destination, incomplete.', { title })
+			// only a two-way task can bring deleted files back; direction unknown: say it
+			if (sync && (!this.directions || this.directions[backup.app] === undefined || this.directions[backup.app] === 'both')) {
+				message += ` ${this.$t('Files deleted since the last pass may come back when it resumes.')}`
+			}
 			this.$buefy.dialog.confirm({
-				message: escape(this.$t('Stop the backup of {title}? What is already copied stays at the destination, incomplete.', { title })),
+				message: escape(message),
 				confirmText: this.$t('Stop'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',

@@ -43,7 +43,7 @@ const pass = {
 	],
 }
 
-function show(running, backup = {}) {
+function show(running, backup = {}, sync = { getTasks: () => Promise.resolve({ data: { data: [] } }) }) {
 	const confirm = vi.fn(options => options.onConfirm())
 	const stopRunning = vi.fn(() => Promise.resolve({ data: {} }))
 	const wrapper = mount(BackupRunning, {
@@ -52,7 +52,7 @@ function show(running, backup = {}) {
 		global: {
 			plugins: [Buefy, i18n],
 			mocks: {
-				$api: { backup: { stopRunning, ...backup } },
+				$api: { backup: { stopRunning, ...backup }, sync },
 				$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'happy_rik', title: { en_us: 'seerr' }, app_type: 'v2app' }] } }) } },
 				$buefy: { toast: { open() {} }, dialog: { confirm } },
 			},
@@ -130,6 +130,49 @@ describe('the running tab', () => {
 
 		expect(wrapper.text()).toContain('Nothing is running any more.')
 		expect(wrapper.find('.pass-next').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	const syncing = { ...seerr, id: 's1', kind: 'sync', app: 'Photos', destination: 'Dropbox' }
+	const tasks = direction => ({ getTasks: () => Promise.resolve({ data: { data: [{ name: 'Photos', direction }] } }) })
+	const warning = 'Files deleted since the last pass may come back when it resumes.'
+
+	it('names a running sync by its task, not by an app', async () => {
+		const { wrapper } = show({ backups: [syncing], passes: [] })
+		await flushPromises()
+
+		expect(wrapper.find('.live-backup b').text()).toBe('Sync: Photos → Dropbox')
+		wrapper.unmount()
+	})
+
+	it('warns before stopping a sync', async () => {
+		const both = show({ backups: [syncing], passes: [] }, {}, tasks('both'))
+		await flushPromises()
+		await both.wrapper.find('.live-stop').trigger('click')
+		expect(both.confirm.mock.calls[0][0].message).toContain(warning)
+		both.wrapper.unmount()
+
+		const one = show({ backups: [syncing], passes: [] }, {}, tasks('upload'))
+		await flushPromises()
+		await one.wrapper.find('.live-stop').trigger('click')
+		expect(one.confirm.mock.calls[0][0].message).not.toContain(warning)
+		one.wrapper.unmount()
+
+		// the tasks could not be read: the warning is said for any sync
+		const unknown = show({ backups: [syncing], passes: [] }, {}, { getTasks: () => Promise.reject(new Error('down')) })
+		await flushPromises()
+		await unknown.wrapper.find('.live-stop').trigger('click')
+		expect(unknown.confirm.mock.calls[0][0].message).toContain(warning)
+		unknown.wrapper.unmount()
+	})
+
+	it('still shows a backup as before when kind is missing', async () => {
+		const { wrapper, confirm } = show({ backups: [seerr], passes: [] })
+		await flushPromises()
+
+		expect(wrapper.find('.live-backup b').text()).toBe('seerr → GDrive')
+		await wrapper.find('.live-stop').trigger('click')
+		expect(confirm.mock.calls[0][0].message).not.toContain(warning)
 		wrapper.unmount()
 	})
 })
