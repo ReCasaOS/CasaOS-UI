@@ -134,7 +134,8 @@ export function handleSync({ method = 'GET', path = '', query = {}, body = null 
 		return ok(['Dropbox', 'S3'])
 	}
 	if (verb === 'GET' && rest === '/backup/running') {
-		return ok({ backups: live(state), passes: [] })
+		// no envelope, as the box answers it
+		return { status: 200, body: { backups: live(state), passes: [] } }
 	}
 	return null
 }
