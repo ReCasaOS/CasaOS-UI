@@ -280,6 +280,7 @@
   "free of {total}": "free of {total}",
   "Members": "Members",
   "Free drive": "Free drive",
+  "In use": "In use",
   "Carries": "Carries",
   "The physical drives of this box, their SMART health and temperature, and what they carry.": "The physical drives of this box, their SMART health and temperature, and what they carry.",
   "No storage is mounted on this array.": "No storage is mounted on this array.",
