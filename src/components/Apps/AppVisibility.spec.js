@@ -8,9 +8,10 @@ import i18n from '@/plugins/i18n'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 
-const api = vi.hoisted(() => ({ listAccounts: vi.fn(), getVisibility: vi.fn(), setVisibility: vi.fn() }))
+const api = vi.hoisted(() => ({ listAccounts: vi.fn(), getVisibility: vi.fn(), setVisibility: vi.fn(), getDashboardHidden: vi.fn(), setDashboardHidden: vi.fn() }))
+const bus = { $emit: vi.fn() }
 vi.mock('@/service/accounts', () => ({ listAccounts: api.listAccounts }))
-vi.mock('@/service/visibility', () => ({ getVisibility: api.getVisibility, setVisibility: api.setVisibility }))
+vi.mock('@/service/visibility', () => ({ getVisibility: api.getVisibility, setVisibility: api.setVisibility, getDashboardHidden: api.getDashboardHidden, setDashboardHidden: api.setDashboardHidden }))
 
 const ok = data => Promise.resolve({ data: { data } })
 const accounts = [
@@ -26,7 +27,7 @@ function open(role, props = {}) {
 		props: { appId: 'jellyfin', ...props },
 		global: {
 			plugins: [Buefy, i18n],
-			mocks: { $store: { state, getters: { isAdmin: getters.isAdmin(state) } } },
+			mocks: { $EventBus: bus, $store: { state, getters: { isAdmin: getters.isAdmin(state) } } },
 		},
 	})
 	return flushPromises()
@@ -37,12 +38,15 @@ describe('the Visibility section of an app', () => {
 		api.listAccounts.mockReset().mockImplementation(() => ok(accounts))
 		api.getVisibility.mockReset().mockImplementation(() => ok({ hidden_for: [3] }))
 		api.setVisibility.mockReset().mockImplementation(() => ok({ hidden_for: [] }))
+		api.getDashboardHidden.mockReset().mockImplementation(() => ok({ hidden: false }))
+		api.setDashboardHidden.mockReset().mockImplementation((app, hidden) => ok({ hidden }))
+		bus.$emit.mockReset()
 	})
 	afterEach(() => wrapper?.unmount())
 
 	it('lists the user accounts as checkboxes, for the admin only', async () => {
 		await open('admin')
-		const boxes = wrapper.findAll('input[type="checkbox"]')
+		const boxes = wrapper.findAll('.b-checkbox input')
 		expect(boxes).toHaveLength(2)
 		expect(wrapper.text()).toContain('ann')
 		expect(wrapper.text()).not.toContain('root')
@@ -52,7 +56,7 @@ describe('the Visibility section of an app', () => {
 
 		for (const role of ['user', '', undefined]) {
 			await open(role)
-			expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+			expect(wrapper.find('.b-checkbox input').exists()).toBe(false)
 			expect(api.getVisibility).toHaveBeenCalledTimes(1)
 			wrapper.unmount()
 		}
@@ -61,13 +65,13 @@ describe('the Visibility section of an app', () => {
 	it('says so when there is no user account, with no checkbox', async () => {
 		api.listAccounts.mockImplementation(() => ok([accounts[0]]))
 		await open('admin')
-		expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+		expect(wrapper.find('.b-checkbox input').exists()).toBe(false)
 		expect(wrapper.find('.no-user-account').exists()).toBe(true)
 	})
 
 	it('saving calls PUT with the checked ids', async () => {
 		await open('admin')
-		await wrapper.findAll('input[type="checkbox"]')[0].setValue(true)
+		await wrapper.findAll('.b-checkbox input')[0].setValue(true)
 		await wrapper.find('button.save-visibility').trigger('click')
 		await flushPromises()
 		expect(api.setVisibility).toHaveBeenCalledWith('jellyfin', [2, 3])
@@ -129,7 +133,7 @@ describe('the Visibility section, what it says and when', () => {
 		await open('admin')
 		expect(wrapper.text()).not.toContain('visible to every account')
 
-		await wrapper.findAll('input[type="checkbox"]')[1].setValue(false)
+		await wrapper.findAll('.b-checkbox input')[1].setValue(false)
 		expect(wrapper.text()).toContain('The app is visible to every account.')
 	})
 
@@ -149,7 +153,7 @@ describe('the Visibility section, what it says and when', () => {
 		const dirty = () => wrapper.emitted('state').at(-1)[0].isDirty
 		expect(dirty()).toBe(false)
 
-		await wrapper.findAll('input[type="checkbox"]')[0].setValue(true)
+		await wrapper.findAll('.b-checkbox input')[0].setValue(true)
 		expect(dirty()).toBe(true)
 
 		api.setVisibility.mockImplementation(() => ok({ hidden_for: [2, 3] }))
@@ -164,14 +168,14 @@ describe('the Visibility section, what it says and when', () => {
 			done = resolve
 		}))
 		await open('admin')
-		await wrapper.findAll('input[type="checkbox"]')[0].setValue(true)
+		await wrapper.findAll('.b-checkbox input')[0].setValue(true)
 		await wrapper.find('button.save-visibility').trigger('click')
 
-		await wrapper.findAll('input[type="checkbox"]')[1].setValue(false)
+		await wrapper.findAll('.b-checkbox input')[1].setValue(false)
 		done({ data: { data: { hidden_for: [2, 3] } } })
 		await flushPromises()
 
-		const boxes = wrapper.findAll('input[type="checkbox"]')
+		const boxes = wrapper.findAll('.b-checkbox input')
 		expect(boxes[0].element.checked).toBe(true)
 		expect(boxes[1].element.checked).toBe(false)
 		// and what was changed since is still unsaved
@@ -189,6 +193,26 @@ describe('the Visibility section, what it says and when', () => {
 		await flushPromises()
 
 		expect(wrapper.text()).not.toContain('could not be read')
-		expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(2)
+		expect(wrapper.findAll('.b-checkbox input')).toHaveLength(2)
+	})
+
+	it('hides the app from the dashboard at once, apart from the ticks, and reloads the list', async () => {
+		await open('admin')
+		const toggle = wrapper.find('.hide-from-dashboard input')
+		expect(toggle.element.checked).toBe(false)
+
+		await toggle.setValue(true)
+		await flushPromises()
+		expect(api.setDashboardHidden).toHaveBeenCalledWith('jellyfin', true)
+		expect(api.setVisibility).not.toHaveBeenCalled()
+		expect(bus.$emit).toHaveBeenCalledWith('reloadAppList')
+		expect(toggle.element.checked).toBe(true)
+
+		// a save the server refuses puts the switch back and says so
+		api.setDashboardHidden.mockImplementation(() => Promise.reject(new Error('500')))
+		await toggle.setValue(false)
+		await flushPromises()
+		expect(toggle.element.checked).toBe(true)
+		expect(wrapper.text()).toContain('could not be saved')
 	})
 })
