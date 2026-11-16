@@ -39,7 +39,7 @@
 					</div>
 				</div>
 				<div class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1 ml-auto">
-					<b-switch :model-value="task.enabled" size="is-small" @update:model-value="toggle(task, $event)">
+					<b-switch :disabled="saving" :model-value="task.enabled" size="is-small" @update:model-value="toggle(task, $event)">
 						{{ $t('Enabled') }}
 					</b-switch>
 					<b-button v-if="!task.needs_first_pass && !task.needs_delete_confirm" :loading="busy === `run:${task.id}`" rounded size="is-small" @click="runNow(task)">
@@ -48,7 +48,7 @@
 					<b-button :disabled="notLoaded" rounded size="is-small" @click="edit(task)">
 						{{ $t('Edit') }}
 					</b-button>
-					<b-button rounded size="is-small" @click="confirmDelete(task)">
+					<b-button :disabled="saving" rounded size="is-small" @click="confirmDelete(task)">
 						{{ $t('Delete') }}
 					</b-button>
 				</div>
@@ -82,6 +82,8 @@ export default {
 			isLoading: false,
 			error: '',
 			busy: '',
+			// one save at a time: the list shown is the one the box was last told
+			saving: false,
 			timer: 0,
 		}
 	},
@@ -92,7 +94,7 @@ export default {
 		},
 		// the dialog saves the whole list: never from one that was not read
 		notLoaded() {
-			return this.isLoading || !!this.error
+			return this.isLoading || !!this.error || this.saving
 		},
 	},
 	mounted() {
@@ -110,11 +112,18 @@ export default {
 
 		// quiet: the periodic read neither flashes the spinner nor wipes a list on a passing failure
 		async load(quiet = false) {
+			if (quiet && this.saving) {
+				return
+			}
 			if (!quiet) {
 				this.isLoading = true
 			}
 			try {
-				this.tasks = (await this.$api.sync.getTasks()).data.data || []
+				const tasks = (await this.$api.sync.getTasks()).data.data || []
+				// an answer that lands while a save is out would show the list from before it
+				if (!this.saving) {
+					this.tasks = tasks
+				}
 				this.error = ''
 			} catch (error) {
 				if (!quiet || !this.tasks.length) {
@@ -129,11 +138,14 @@ export default {
 			// the switch keeps its own state: show the new list at once, put the old one back on a refusal
 			const before = this.tasks
 			this.tasks = tasks
+			this.saving = true
 			try {
 				await this.$api.sync.saveTasks(tasks)
 			} catch (error) {
 				this.tasks = before
 				this.toastError(error)
+			} finally {
+				this.saving = false
 			}
 		},
 

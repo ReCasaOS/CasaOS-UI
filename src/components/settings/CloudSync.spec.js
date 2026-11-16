@@ -144,6 +144,28 @@ describe('the folder sync window', () => {
 		wrapper.unmount()
 	})
 
+	it('takes one save at a time', async () => {
+		let release
+		const saveTasks = vi.fn(() => new Promise(resolve => release = resolve))
+		const getTasks = vi.fn(answer([base, second]))
+		const { wrapper } = await open({ getTasks, saveTasks })
+		vi.useFakeTimers()
+		const cards = () => wrapper.findAll('section.settings-card')
+		await cards()[0].find('input[type=checkbox]').setValue(false)
+		expect(cards()[1].find('input[type=checkbox]').element.disabled).toBe(true)
+		expect(cards()[1].findAll('button').find(b => b.text() === 'Delete').element.disabled).toBe(true)
+		// a poll during the save does not replace the list
+		getTasks.mockClear()
+		await wrapper.vm.load(true)
+		expect(getTasks).not.toHaveBeenCalled()
+		release({ data: { data: [] } })
+		await flushPromises()
+		vi.useRealTimers()
+		expect(cards()[1].find('input[type=checkbox]').element.disabled).toBe(false)
+		expect(cards()[1].findAll('button').find(b => b.text() === 'Delete').element.disabled).toBe(false)
+		wrapper.unmount()
+	})
+
 	it('labels the switch and offers run now only to a task that does not wait for an answer', async () => {
 		const { wrapper } = await open({ getTasks: answer([base, { ...second, needs_first_pass: true }, { ...base, id: 'c', needs_delete_confirm: true }]) })
 		const cards = wrapper.findAll('section.settings-card')
