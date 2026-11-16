@@ -35,7 +35,7 @@
 				</div>
 				<div class="is-flex is-flex-shrink-0 is-flex-direction-column is-justify-content-center mr-2">
 					<span class="is-uppercase _is-text-full-03 _has-text-gray-600">{{
-						renderSize(systemStorage.size - systemStorage.availSize)
+						renderSize(systemStorage.usedSize)
 					}}/{{ renderSize(systemStorage.size) }}</span>
 				</div>
 				<b-checkbox v-model="systemStorageSelected" disabled class="mr-2"></b-checkbox>
@@ -52,8 +52,7 @@
 				</div>
 				<div class="is-flex is-flex-shrink-0 is-flex-direction-column is-justify-content-center mr-2">
 					<span class="is-uppercase _is-text-full-03 _has-text-gray-600">{{
-						renderSize(item.size
-							- item.availSize)
+						renderSize(item.usedSize)
 					}}/{{ renderSize(item.size) }}</span>
 				</div>
 				<b-checkbox v-model="checkBoxGroup" :disabled="item.persistedIn !== 'casaos' || item.isSystem"
@@ -185,6 +184,13 @@ import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
 import cToolTip from '@/components/basicComponents/tooltip/tooltip.vue'
 import { ice_i18n } from '@/mixins/base/common-i18n'
+
+// What the box says is used. Size minus free counts the space ext4 keeps for root as used:
+// 13.68 GB shown for 1.83 GB on a 234 GB system drive (ReCasaOS/CasaOS#155).
+export function usedOf(storage) {
+	const used = Number(storage.used)
+	return storage.used !== '' && storage.used != null && Number.isFinite(used) ? used : storage.size - storage.avail
+}
 
 export default {
 	name: 'MergeStorages',
@@ -336,6 +342,7 @@ export default {
 						uuid: systemStorage.uuid,
 						size: systemStorage.size,
 						availSize: systemStorage.avail,
+						usedSize: usedOf(systemStorage),
 						displayPath: '/var/lib/casaos/files',
 					}
 				: null
@@ -365,6 +372,7 @@ export default {
 					fsType: storage.type,
 					size: storage.size,
 					availSize: storage.avail,
+					usedSize: usedOf(storage),
 					usePercent: 100 - Math.floor(storage.avail * 100 / storage.size),
 					diskName: storage.drive_name,
 					path: storage.path,
@@ -382,6 +390,7 @@ export default {
 					fsType: storage.type,
 					size: storage.size,
 					availSize: storage.avail,
+					usedSize: usedOf(storage),
 					usePercent: 100 - Math.floor(storage.avail * 100 / storage.size),
 					diskName: storage.drive_name,
 					path: storage.path,

@@ -3,7 +3,7 @@ import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import i18n from '@/plugins/i18n'
-import MergeStorages from '@/components/Storage/MergeStorages.vue'
+import MergeStorages, { usedOf } from '@/components/Storage/MergeStorages.vue'
 
 vi.mock('@/assets/lang', async () => ({ default: { en_us: (await import('@/assets/lang/en_US.json')).default } }))
 
@@ -66,5 +66,16 @@ describe('the merged storage outside /DATA', () => {
 		await flushPromises()
 		expect($openAPI.appCompose.setComposeAppStatus.mock.calls).toEqual([['plex', 'stop'], ['plex', 'start']])
 		expect($api.local_storage.updateMergerfsInfo).toHaveBeenCalledWith(expect.objectContaining({ mount_point: '/DATA' }))
+	})
+})
+
+describe('the used space of a storage in the merge window', () => {
+	it('is what the box reports, not size minus free: ext4 keeps space for root', () => {
+		expect(usedOf({ size: '233800000000', avail: '220120000000', used: '1830000000' })).toBe(1830000000)
+	})
+
+	it('falls back to size minus free when the box reports none', () => {
+		expect(usedOf({ size: 4e12, avail: 1e12 })).toBe(3e12)
+		expect(usedOf({ size: 4e12, avail: 1e12, used: '' })).toBe(3e12)
 	})
 })
