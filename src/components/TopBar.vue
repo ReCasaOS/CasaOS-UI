@@ -324,6 +324,21 @@
 								</div>
 								<!-- Backup destinations End -->
 
+								<!-- Folder sync Start -->
+								<div v-if="showFolderSync"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="autorenew" size="is-20" />
+										{{ $t("Folder sync") }}
+									</div>
+									<div class="ml-2">
+										<b-button rounded size="is-small" type="is-dark" @click="showCloudSync">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Folder sync End -->
+
 								<!-- Docker data Start -->
 								<div
 									class="is-flex is-align-items-center _row _box">
@@ -704,6 +719,8 @@ import escape from 'lodash/escape'
 import AccountPanel from './account/AccountPanel.vue'
 import TerminalPanel from './logsAndTerminal/TerminalPanel.vue'
 import BackupDestinations from './settings/BackupDestinations.vue'
+import CloudSync from './settings/CloudSync.vue'
+import { syncAvailable } from './settings/cloudSyncText.js'
 import PortPanel from './settings/PortPanel.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
@@ -779,6 +796,8 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			// false until the box answers; an older one has no sync call and 404s
+			showFolderSync: false,
 			logsAvailable: false,
 			// true once the core answers GET /v1/fleet: a core older than the
 			// feature shows no row.
@@ -950,6 +969,7 @@ export default {
 			this.getTelemetry()
 			this.getAutoUpdate()
 			this.getAlerts()
+			this.getSync()
 			this.getFleet()
 			this.getModules()
 			this.getOs()
@@ -1101,6 +1121,28 @@ export default {
 				canCancel: ['escape'],
 				scroll: 'keep',
 				animation: 'zoom-in',
+			})
+		},
+
+		showCloudSync() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: CloudSync,
+				hasModalCard: true,
+				customClass: 'backup-modal',
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
+		},
+
+		// Asked once, with the box's other probes: only a 404 hides the entry.
+		getSync() {
+			this.$api.sync.getTasks().then(() => {
+				this.showFolderSync = true
+			}).catch((error) => {
+				this.showFolderSync = syncAvailable(error)
 			})
 		},
 

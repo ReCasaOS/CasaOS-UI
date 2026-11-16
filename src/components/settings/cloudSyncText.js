@@ -66,3 +66,8 @@ export function noticeOf(task, t) {
 
 	return null
 }
+
+// The settings entry shows unless the box says it has no such call (an older App Management).
+export function syncAvailable(error) {
+	return error?.response?.status !== 404
+}
