@@ -10,3 +10,8 @@ export const setVisibility = (app, hiddenFor) => api.put(url(app), { hidden_for:
 export const listOrphans = () => api.get('/v2/app_management/visibility-orphans')
 // drops an app's entry: what is left of it is then every account's to see
 export const forgetApp = app => api.delete(url(app))
+
+// whether the dashboard leaves the app's icon out, for every account (admin only): read as res.data.data.hidden
+const dashboardUrl = app => `/v2/app_management/dashboard-hidden/${encodeURIComponent(app)}`
+export const getDashboardHidden = app => api.get(dashboardUrl(app))
+export const setDashboardHidden = (app, hidden) => api.put(dashboardUrl(app), { hidden })

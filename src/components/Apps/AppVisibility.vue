@@ -10,6 +10,16 @@
 			</b-button>
 		</b-message>
 
+		<!-- for every account, the admin included; saved at once, apart from the ticks below -->
+		<div v-if="loaded && dashboardKnown" class="_row _box mb-4">
+			<b-switch v-model="onDashboardHidden" :disabled="savingDashboard" class="hide-from-dashboard" size="is-small" @update:model-value="saveDashboard">
+				{{ $t('Hide from the dashboard') }}
+			</b-switch>
+			<p class="is-size-7 _has-text-gray mt-1">
+				{{ $t('For every account, yours included. The app keeps running; find it again under the app list.') }}
+			</p>
+		</div>
+
 		<p v-if="loaded && !users.length" class="no-user-account is-size-7 _has-text-gray">
 			{{ $t('Create an account to hide this app from it.') }}
 		</p>
@@ -32,7 +42,8 @@
 
 <script>
 import { listAccounts } from '@/service/accounts'
-import { getVisibility, setVisibility } from '@/service/visibility'
+import { getDashboardHidden, getVisibility, setDashboardHidden, setVisibility } from '@/service/visibility'
+import events from '@/events/events'
 
 const sameIds = (a, b) => a.length === b.length && a.every(id => b.includes(id))
 
@@ -42,7 +53,7 @@ export default {
 	emits: ['state'],
 	data() {
 		// `saved`: the ids the server holds, to tell an unsaved tick from a saved one
-		return { users: [], hidden: [], saved: [], loaded: false, saving: false, error: '' }
+		return { users: [], hidden: [], saved: [], loaded: false, saving: false, error: '', onDashboardHidden: false, dashboardKnown: false, savingDashboard: false }
 	},
 	computed: {
 		isAdmin() {
@@ -75,13 +86,31 @@ export default {
 		async load() {
 			this.error = ''
 			try {
-				const [accounts, visibility] = await Promise.all([listAccounts(), getVisibility(this.appId)])
+				const [accounts, visibility, dashboard] = await Promise.all([listAccounts(), getVisibility(this.appId),
+					// an older app service has no such route: the accounts' ticks still load, without the switch
+					getDashboardHidden(this.appId).catch(() => null)])
+				this.dashboardKnown = dashboard !== null
+				this.onDashboardHidden = dashboard?.data.data?.hidden === true
 				this.users = (accounts.data.data || []).filter(a => a.role === 'user')
 				this.saved = visibility.data.data?.hidden_for || []
 				this.hidden = [...this.saved]
 				this.loaded = true
 			} catch {
 				this.error = this.$t('The visibility could not be read')
+			}
+		},
+		async saveDashboard(hidden) {
+			this.savingDashboard = true
+			this.error = ''
+			try {
+				this.onDashboardHidden = (await setDashboardHidden(this.appId, hidden)).data.data?.hidden === true
+				// the tile leaves, or comes back, without a page reload
+				this.$EventBus.$emit(events.RELOAD_APP_LIST)
+			} catch {
+				this.onDashboardHidden = !hidden
+				this.error = this.$t('The visibility could not be saved')
+			} finally {
+				this.savingDashboard = false
 			}
 		},
 		async save() {

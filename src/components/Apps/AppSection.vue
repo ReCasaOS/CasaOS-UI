@@ -116,7 +116,7 @@
 			<!-- App Icon Card Start -->
 			<!-- a VM tile is no handle: it is neither dragged nor dropped on -->
 			<template #item="{ element: item }">
-				<div :id="`app-${item.name}`" :class="item.vmTile ? 'vm-tile-item' : 'handle'">
+				<div :id="`app-${item.name}`" :class="[item.vmTile ? 'vm-tile-item' : 'handle', { 'is-dashboard-hidden': isHiddenApp(item) }]">
 					<vm-tile v-if="item.vmTile" :vm="item.vm"></vm-tile>
 					<app-card v-else :compact="compact" :favorite="isFavorite(item)" :item="item" :memory="memory[item.name] || 0"
 						@toggleFavorite="toggleFavorite"
@@ -133,6 +133,14 @@
 			</div>
 		</div>
 		<!-- App List End -->
+
+		<!-- the apps left out of the dashboard (an app's Settings > Visibility): the admin's way back to them -->
+		<p v-if="$store.getters.isAdmin && hiddenApps.length > 0" class="hidden-apps is-size-7 has-text-sub-04 mt-3">
+			{{ $t('Hidden apps: {n}', { n: hiddenApps.length }) }} ·
+			<button class="hidden-apps-toggle" type="button" @click="showHidden = !showHidden">
+				{{ $t(showHidden ? 'Hide' : 'Show') }}
+			</button>
+		</p>
 
 		<!-- Three groups, because one heading covered three populations and was a
 			wrong instruction for two of them: a container Portainer started is
@@ -170,6 +178,7 @@ import last from 'lodash/last'
 import isEqual from 'lodash/isEqual'
 import escape from 'lodash/escape'
 import { groupLegacyApps } from './legacyApps'
+import { isHiddenApp, shownApps, withHiddenApps } from './dashboardHidden'
 import AppCard from './AppCard.vue'
 import AppCardSkeleton from './AppCardSkeleton.vue'
 import AppPanel from './AppPanel.vue'
@@ -316,6 +325,7 @@ export default {
 		return {
 			user_id: localStorage.getItem('user_id'),
 			appList: [],
+			showHidden: false,
 			oldAppList: [],
 			appConfig: {},
 			drag: false,
@@ -373,7 +383,8 @@ export default {
 		// their card into that row (systemApps).
 		gridList: {
 			get() {
-				const apps = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
+				const all = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
+				const apps = shownApps(all, this.showHidden)
 				if (this.filter !== 'all') {
 					return apps.filter(FILTERS[this.filter])
 				}
@@ -384,7 +395,7 @@ export default {
 					return
 				}
 				const system = this.systemFirst ? this.appList.filter(isSystemApp) : []
-				this.appList = concat(system, list.filter(item => !item.vmTile))
+				this.appList = withHiddenApps(concat(system, list.filter(item => !item.vmTile)), this.appList, this.showHidden)
 			},
 		},
 		// the System row as drawn: the Virtual Machines card is there, so its tiles are too
@@ -393,13 +404,17 @@ export default {
 		},
 		// a pinned app that is gone (uninstalled) is skipped, and forgotten at the next pin
 		favoriteApps() {
-			return this.favorites.map(name => this.appList.find(app => app.name === name && !isSystemApp(app))).filter(Boolean)
+			return shownApps(this.favorites.map(name => this.appList.find(app => app.name === name && !isSystemApp(app))).filter(Boolean), this.showHidden)
 		},
 		favoriteDragOptions() {
 			return { ...this.dragOptions, group: 'favorites', disabled: false }
 		},
+		// the apps the admin left out of the dashboard; only the admin is offered to see them
+		hiddenApps() {
+			return this.appList.filter(isHiddenApp)
+		},
 		filterOptions() {
-			const apps = this.appList.filter(app => !isSystemApp(app))
+			const apps = shownApps(this.appList.filter(app => !isSystemApp(app)), this.showHidden)
 			const labels = { all: 'All', running: 'Running', stopped: 'Stopped', updates: 'Updates' }
 			return Object.keys(FILTERS).map(id => ({
 				id,
@@ -489,6 +504,7 @@ export default {
 		this.getSkCount()
 	},
 	methods: {
+		isHiddenApp,
 		// a method, not an arrow, so the grid that goes takes its listener with it (Home and DashboardBeta key it by the access)
 		reloadList() {
 			this.getList()
@@ -1215,6 +1231,21 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+// an app left out of the dashboard, drawn because the admin asked to see them
+.is-dashboard-hidden {
+	opacity: 0.5;
+}
+
+.hidden-apps-toggle {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
 .app-list {
 	position: relative;
 	display: grid;
