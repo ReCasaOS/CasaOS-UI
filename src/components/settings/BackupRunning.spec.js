@@ -145,6 +145,15 @@ describe('the running tab', () => {
 		wrapper.unmount()
 	})
 
+	it('does not count folders for a sync, which the box sends as 0 of 0', async () => {
+		const { wrapper } = show({ backups: [{ ...syncing, operation: 0, operations: 0 }], passes: [] })
+		await flushPromises()
+
+		expect(wrapper.text()).not.toContain('folder 0 of 0')
+		expect(wrapper.text()).toContain(syncing.source)
+		wrapper.unmount()
+	})
+
 	it('warns before stopping a sync', async () => {
 		const both = show({ backups: [syncing], passes: [] }, {}, tasks('both'))
 		await flushPromises()

@@ -80,8 +80,8 @@ function live(state) {
 			stamp: new Date(startedAt).toISOString(),
 			origin: 'on_demand',
 			started_at: new Date(startedAt).toISOString(),
-			operation: 1,
-			operations: 1,
+			operation: 0,
+			operations: 0,
 			source: task.local_path,
 			stats: { bytes: Math.round(done * totalBytes), total_bytes: totalBytes, files: Math.round(done * 120), total_files: 120, speed: 40 * 1048576, eta: Math.ceil((1 - done) * RUN_MS / 1000), current: `${task.remote_path}/IMG_${String(Math.round(done * 120)).padStart(4, '0')}.jpg` },
 		}

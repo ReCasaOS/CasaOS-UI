@@ -263,6 +263,9 @@ export default {
 		liveBackupTitle() {
 			const app = this.liveBackup.app
 			const heard = this.running[`backup:${app}`]
+			if (this.liveBackup.kind === 'sync') {
+				return this.$t('Sync: {name}', { name: app })
+			}
 
 			return liveTitle(app, name => (heard ? heard.title : name), this.$t)
 		},

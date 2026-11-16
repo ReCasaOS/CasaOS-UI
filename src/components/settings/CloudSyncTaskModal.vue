@@ -77,8 +77,11 @@
 					{{ $t('Both ways, a deletion on one side is always carried to the other; the copy kept below is what protects you.') }}
 				</p>
 				<p v-else-if="!mirrorOn" class="_has-text-gray is-size-7 mt-1">{{ $t('Off: this task never deletes a file.') }}</p>
-				<p v-if="form.direction === 'both'" class="_has-text-gray is-size-7 mt-1">
+				<p v-if="form.direction === 'both' && form.archive" class="_has-text-gray is-size-7 mt-1">
 					{{ $t('At the first pass, when a file differs the box\'s version is kept; the cloud\'s goes to the copies.') }}
+				</p>
+				<p v-else-if="form.direction === 'both'" class="_has-text-gray is-size-7 mt-1">
+					{{ $t('At the first pass, when a file differs the box\'s version is kept; the cloud\'s is lost.') }}
 				</p>
 			</div>
 
@@ -86,7 +89,7 @@
 				<b-switch v-model="form.archive" size="is-small">{{ $t('Keep a copy of what is replaced or deleted') }}</b-switch>
 				<template v-if="form.archive">
 					<p v-for="path in archivePaths" :key="path" class="_has-text-gray is-size-7 mt-1">
-						{{ path }} · {{ $t('for {days} days', { days: form.archive_days }) }}
+						{{ path }} · {{ form.archive_days > 0 ? $t('for {days} days', { days: form.archive_days }) : $t('forever') }}
 					</p>
 				</template>
 				<p v-else-if="mirrorOn" class="has-text-danger is-size-7 mt-1">
@@ -137,6 +140,10 @@ export default {
 			enabled: true,
 			...this.task,
 		}
+		// a stored two-way task is mirrored because the box forces it, not because the user chose it
+		if (form.direction === 'both') {
+			form.mirror = false
+		}
 		return {
 			form,
 			// an hourly task keeps its minute in `at`, as "00:MM"
@@ -161,11 +168,12 @@ export default {
 			const local = String(this.form.local_path).replace(/\/+$/, '')
 			const slash = local.lastIndexOf('/')
 			const paths = []
-			if (this.form.direction !== 'upload') {
+			const remote = String(this.form.remote_path).trim().replace(/\/+$/, '')
+			if (local && this.form.direction !== 'upload') {
 				paths.push(`${local.slice(0, slash)}/.${local.slice(slash + 1)}-archive`)
 			}
-			if (this.form.direction !== 'download') {
-				paths.push(`${String(this.form.remote_path).replace(/\/+$/, '')}-archive`)
+			if (remote && this.form.direction !== 'download') {
+				paths.push(`${remote}-archive`)
 			}
 			return paths
 		},

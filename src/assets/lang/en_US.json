@@ -3514,7 +3514,7 @@
   "deletions are carried over": "deletions are carried over",
   "nothing is ever deleted": "nothing is ever deleted",
   "copies kept {days} days": "copies kept {days} days",
-  "copies kept for ever": "copies kept for ever",
+  "copies kept forever": "copies kept forever",
   "never run": "never run",
   "Last pass failed: {error}": "Last pass failed: {error}",
   "Last pass: {when}": "Last pass: {when}",
@@ -3530,10 +3530,10 @@
   "New task": "New task",
   "Sync tasks could not be loaded: {error}": "Sync tasks could not be loaded: {error}",
   "Run the first pass again?": "Run the first pass again?",
-  "{name} will copy both ways once, from the cloud and from the box, and delete nothing.": "{name} will copy both ways once, from the cloud and from the box, and delete nothing.",
+  "{name} will copy both ways once, from the cloud and from the box, and delete nothing. Files deleted on one side since the last pass will come back.": "{name} will copy both ways once, from the cloud and from the box, and delete nothing. Files deleted on one side since the last pass will come back.",
   "Run the first pass": "Run the first pass",
   "Confirm the deletions?": "Confirm the deletions?",
-  "{name} will delete, on one side, the files that are gone from the other. Check that is what you want: deleted files cannot be brought back unless copies are kept.": "{name} will delete, on one side, the files that are gone from the other. Check that is what you want: deleted files cannot be brought back unless copies are kept.",
+  "{name} will delete, on one side, the files that are gone from the other. Check that this is what you want: deleted files cannot be brought back unless copies are kept.": "{name} will delete, on one side, the files that are gone from the other. Check that this is what you want: deleted files cannot be brought back unless copies are kept.",
   "Delete the files": "Delete the files",
   "Delete this sync task?": "Delete this sync task?",
   "{name} stops syncing. The files on the box and in the cloud are not touched.": "{name} stops syncing. The files on the box and in the cloud are not touched.",
@@ -3560,5 +3560,8 @@
   "Sync: {name}": "Sync: {name}",
   "Stop the sync of {title}? What is already copied stays where it is.": "Stop the sync of {title}? What is already copied stays where it is.",
   "Files deleted since the last pass may come back when it resumes.": "Files deleted since the last pass may come back when it resumes.",
-  "resumed after an interruption": "resumed after an interruption"
+  "resumed after an interruption": "resumed after an interruption",
+  "pass done": "done",
+  "forever": "forever",
+  "At the first pass, when a file differs the box's version is kept; the cloud's is lost.": "At the first pass, when a file differs the box's version is kept; the cloud's is lost."
 }

@@ -39,13 +39,20 @@ describe('the rule of a task', () => {
 		expect(ruleOf({ ...task, mirror: true }, t)).toContain('deletions are carried over')
 	})
 
-	it('says nothing of copies when none are kept, and for ever when the days are zero', () => {
+	it('says nothing of copies when none are kept, and forever when the days are zero', () => {
 		expect(ruleOf({ ...task, archive: false }, t)).not.toContain('copies kept')
-		expect(ruleOf({ ...task, archive_days: 0 }, t)).toContain('copies kept for ever')
+		expect(ruleOf({ ...task, archive_days: 0 }, t)).toContain('copies kept forever')
 	})
 
 	it('reads an hourly task by its minute only', () => {
 		expect(ruleOf({ ...task, every: 'hourly', at: '00:20' }, t)).toMatch(/^Every hour at :20 /)
+	})
+
+	it('names the weekday in the language it is given', () => {
+		const weekly = { ...task, every: 'weekly', weekday: 0 }
+		expect(ruleOf(weekly, t, 'fr-FR')).toContain('dimanche')
+		expect(ruleOf(weekly, t, 'en-US')).toContain('Sunday')
+		expect(ruleOf(weekly, t)).toContain('Sunday')
 	})
 
 	it('names the weekday of a weekly task', () => {
@@ -58,7 +65,11 @@ describe('the last pass of a task', () => {
 	const ran = { ...task, last_run: new Date(2026, 10, 15, 2, 0).toISOString(), last_result: 'ok', last_files: 212, last_bytes: 1.4 * 1024 ** 3 }
 
 	it('says when, how it ended and how much', () => {
-		expect(lastOf(ran, t, now)).toMatch(/^Last pass: yesterday at .+, done, 212 files, 1\.4 GB$/)
+		expect(lastOf(ran, t, now)).toMatch(/^Last pass: yesterday at .+, pass done, 212 files, 1\.4 GB$/)
+	})
+
+	it('leaves the figures out when the box gave none', () => {
+		expect(lastOf({ ...ran, last_files: 0, last_bytes: 0 }, t, now)).toMatch(/^Last pass: yesterday at .+, pass done$/)
 	})
 
 	it('says never run when it has not', () => {

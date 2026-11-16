@@ -87,6 +87,44 @@ describe('the sync task dialog', () => {
 		wrapper.unmount()
 	})
 
+	it('says the cloud version is lost when both ways has no copies', async () => {
+		const { wrapper } = await open({ props: { task: { ...existing, direction: 'both', archive: false } } })
+		expect(wrapper.text()).toContain('the cloud\'s is lost.')
+		expect(wrapper.text()).not.toContain('the cloud\'s goes to the copies.')
+		await wrapper.findAll('input[type=checkbox]')[1].setValue(true)
+		expect(wrapper.text()).toContain('the cloud\'s goes to the copies.')
+		expect(wrapper.text()).not.toContain('the cloud\'s is lost.')
+		wrapper.unmount()
+	})
+
+	it('does not carry deletions over when a two-way task becomes one-way', async () => {
+		const both = { ...existing, direction: 'both', mirror: true }
+		const { wrapper, $api } = await open({ props: { task: both, tasks: [both] } })
+		await wrapper.find('input[type=radio][value=upload]').setValue(true)
+		await button(wrapper, 'Save').trigger('click')
+		await flushPromises()
+		expect($api.sync.saveTasks.mock.calls[0][0][0]).toMatchObject({ direction: 'upload', mirror: false })
+		wrapper.unmount()
+	})
+
+	it('still sends mirror on for a two-way task', async () => {
+		const both = { ...existing, direction: 'both', mirror: true }
+		const { wrapper, $api } = await open({ props: { task: both, tasks: [both] } })
+		await button(wrapper, 'Save').trigger('click')
+		await flushPromises()
+		expect($api.sync.saveTasks.mock.calls[0][0][0]).toMatchObject({ direction: 'both', mirror: true })
+		wrapper.unmount()
+	})
+
+	it('shows no archive path while the folders are empty, and forever when the days are zero', async () => {
+		const { wrapper } = await open()
+		expect(wrapper.text()).not.toContain('-archive')
+		wrapper.unmount()
+		const kept = await open({ props: { task: { ...existing, archive_days: 0 } } })
+		expect(kept.wrapper.text()).toContain('/DATA/.Photos-archive · forever')
+		kept.wrapper.unmount()
+	})
+
 	it('warns when copies are off and deletions are on', async () => {
 		const { wrapper } = await open({ props: { task: { ...existing, archive: false } } })
 		expect(wrapper.text()).toContain('Without copies, up to half of the files can be lost before the task stops.')

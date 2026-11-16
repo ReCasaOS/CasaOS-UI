@@ -26,7 +26,7 @@
 				<div class="_text">
 					<p class="_name">{{ task.name }}</p>
 					<p class="_has-text-gray is-size-7">{{ routeOf(task) }}</p>
-					<p class="_has-text-gray is-size-7">{{ ruleOf(task, $t) }}</p>
+					<p class="_has-text-gray is-size-7">{{ ruleOf(task, $t, locale) }}</p>
 					<p class="_has-text-gray is-size-7">{{ lastOf(task, $t) }}</p>
 					<div v-if="noticeOf(task, $t)" class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1 mt-1">
 						<span class="is-size-7">{{ noticeOf(task, $t).text }}</span>
@@ -39,11 +39,13 @@
 					</div>
 				</div>
 				<div class="is-flex is-align-items-center is-flex-wrap-wrap is-gap-1 ml-auto">
-					<b-switch :model-value="task.enabled" size="is-small" @update:model-value="toggle(task, $event)" />
-					<b-button :loading="busy === `run:${task.id}`" rounded size="is-small" @click="runNow(task)">
+					<b-switch :model-value="task.enabled" size="is-small" @update:model-value="toggle(task, $event)">
+						{{ $t('Enabled') }}
+					</b-switch>
+					<b-button v-if="!task.needs_first_pass && !task.needs_delete_confirm" :loading="busy === `run:${task.id}`" rounded size="is-small" @click="runNow(task)">
 						{{ $t('Run now') }}
 					</b-button>
-					<b-button rounded size="is-small" @click="edit(task)">
+					<b-button :disabled="notLoaded" rounded size="is-small" @click="edit(task)">
 						{{ $t('Edit') }}
 					</b-button>
 					<b-button rounded size="is-small" @click="confirmDelete(task)">
@@ -53,7 +55,7 @@
 			</section>
 		</section>
 		<footer class="modal-card-foot">
-			<b-button rounded size="is-small" type="is-primary" @click="edit(null)">
+			<b-button :disabled="notLoaded" rounded size="is-small" type="is-primary" @click="edit(null)">
 				{{ $t('New task') }}
 			</b-button>
 			<b-button rounded @click="$emit('close')">
@@ -82,6 +84,16 @@ export default {
 			busy: '',
 			timer: 0,
 		}
+	},
+	computed: {
+		// the app's language, as Intl wants it
+		locale() {
+			return this.$i18n.locale.replace('_', '-')
+		},
+		// the dialog saves the whole list: never from one that was not read
+		notLoaded() {
+			return this.isLoading || !!this.error
+		},
 	},
 	mounted() {
 		this.load()
@@ -114,10 +126,13 @@ export default {
 		},
 
 		async save(tasks) {
+			// the switch keeps its own state: show the new list at once, put the old one back on a refusal
+			const before = this.tasks
+			this.tasks = tasks
 			try {
 				await this.$api.sync.saveTasks(tasks)
-				this.tasks = tasks
 			} catch (error) {
+				this.tasks = before
 				this.toastError(error)
 			}
 		},
@@ -145,7 +160,7 @@ export default {
 		confirmFirstPass(task) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Run the first pass again?'),
-				message: escape(this.$t('{name} will copy both ways once, from the cloud and from the box, and delete nothing.', { name: task.name })),
+				message: escape(this.$t('{name} will copy both ways once, from the cloud and from the box, and delete nothing. Files deleted on one side since the last pass will come back.', { name: task.name })),
 				confirmText: this.$t('Run the first pass'),
 				cancelText: this.$t('Cancel'),
 				onConfirm: () => this.act(task, 'firstPass', 'first'),
@@ -155,7 +170,7 @@ export default {
 		confirmDeletes(task) {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Confirm the deletions?'),
-				message: escape(this.$t('{name} will delete, on one side, the files that are gone from the other. Check that is what you want: deleted files cannot be brought back unless copies are kept.', { name: task.name })),
+				message: escape(this.$t('{name} will delete, on one side, the files that are gone from the other. Check that this is what you want: deleted files cannot be brought back unless copies are kept.', { name: task.name })),
 				confirmText: this.$t('Delete the files'),
 				cancelText: this.$t('Cancel'),
 				type: 'is-danger',
@@ -175,6 +190,9 @@ export default {
 		},
 
 		edit(task) {
+			if (this.notLoaded) {
+				return
+			}
 			this.$buefy.modal.open({
 				component: CloudSyncTaskModal,
 				hasModalCard: true,

@@ -21,7 +21,7 @@
 				<span v-for="part in parts(backup)" :key="part"> · {{ part }}</span>
 			</p>
 			<p class="is-size-7 has-text-grey">
-				{{ $t('folder {n} of {total}', { n: backup.operation, total: backup.operations }) }} · {{ backup.source }}
+				<template v-if="!isSync(backup)">{{ $t('folder {n} of {total}', { n: backup.operation, total: backup.operations }) }} · </template>{{ backup.source }}
 			</p>
 			<p v-if="backup.stats && backup.stats.current" class="is-size-7 has-text-grey live-current">{{ backup.stats.current }}</p>
 		</div>

@@ -7,7 +7,7 @@ const FILES = ['cloudSyncText.js', 'CloudSync.vue', 'CloudSyncTaskModal.vue', 'B
 
 // keys that reach `t` as variables, which no regex can see
 const BY_VARIABLE = [
-	'done',
+	'pass done',
 	'stopped',
 	'resumed after an interruption',
 	'Sunday',

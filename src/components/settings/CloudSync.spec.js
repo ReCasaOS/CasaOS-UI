@@ -114,6 +114,54 @@ describe('the folder sync window', () => {
 		wrapper.unmount()
 	})
 
+	it('does not offer a new task while the list is not loaded or failed to load', async () => {
+		const newTask = wrapper => wrapper.findAll('button').find(b => b.text() === 'New task')
+		const pending = await open({ getTasks: () => new Promise(() => {}) })
+		expect(newTask(pending.wrapper).element.disabled).toBe(true)
+		pending.wrapper.unmount()
+
+		const failed = await open({ getTasks: () => Promise.reject(new Error('boom')) })
+		expect(newTask(failed.wrapper).element.disabled).toBe(true)
+		await newTask(failed.wrapper).trigger('click')
+		expect(failed.$buefy.modal.open).not.toHaveBeenCalled()
+		failed.wrapper.unmount()
+
+		const loaded = await open({ getTasks: answer([base]) })
+		expect(newTask(loaded.wrapper).element.disabled).toBe(false)
+		expect(loaded.wrapper.findAll('button').find(b => b.text() === 'Edit').element.disabled).toBe(false)
+		loaded.wrapper.unmount()
+	})
+
+	it('puts the switch back when the box refuses the change', async () => {
+		const saveTasks = vi.fn(() => Promise.reject(new Error('refused')))
+		const { wrapper, $buefy } = await open({ getTasks: answer([base]), saveTasks })
+		const box = wrapper.find('input[type=checkbox]')
+		await box.setValue(false)
+		await flushPromises()
+		expect($buefy.toast.open).toHaveBeenCalled()
+		expect(wrapper.vm.tasks[0].enabled).toBe(true)
+		expect(wrapper.find('input[type=checkbox]').element.checked).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('labels the switch and offers run now only to a task that does not wait for an answer', async () => {
+		const { wrapper } = await open({ getTasks: answer([base, { ...second, needs_first_pass: true }, { ...base, id: 'c', needs_delete_confirm: true }]) })
+		const cards = wrapper.findAll('section.settings-card')
+		expect(cards[0].text()).toContain('Enabled')
+		expect(cards[0].text()).toContain('Run now')
+		expect(cards[1].text()).not.toContain('Run now')
+		expect(cards[2].text()).not.toContain('Run now')
+		wrapper.unmount()
+	})
+
+	it('says deleted files come back before running the first pass again', async () => {
+		const confirm = vi.fn()
+		const { wrapper } = await open({ getTasks: answer([{ ...base, needs_first_pass: true }]) }, { dialog: { confirm } })
+		await wrapper.findAll('button').find(b => b.text() === 'Run the first pass again').trigger('click')
+		expect(confirm.mock.calls[0][0].message).toContain('Files deleted on one side since the last pass will come back.')
+		wrapper.unmount()
+	})
+
 	it('deletes a task by saving the list without it, after a confirmation', async () => {
 		const saveTasks = vi.fn(answer([]))
 		const confirm = vi.fn()
@@ -131,5 +179,8 @@ describe('the settings entry', () => {
 		expect(syncAvailable({ response: { status: 404 } })).toBe(false)
 		expect(syncAvailable({ response: { status: 502 } })).toBe(true)
 		expect(syncAvailable(new Error('network'))).toBe(true)
+		// an older back end's request validator answers an unknown route with a 400
+		expect(syncAvailable({ response: { status: 400, data: { message: 'no matching operation was found' } } })).toBe(false)
+		expect(syncAvailable({ response: { status: 400, data: { message: 'tasks is required' } } })).toBe(true)
 	})
 })
