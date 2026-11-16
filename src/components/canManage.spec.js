@@ -47,7 +47,7 @@ describe('the top bar for an account that cannot manage the box', () => {
 					$t: key => key,
 					$te: () => true,
 					$i18n: { locale: 'en_us' },
-					$api: { sys: never$, users: never$, ...pending('container') },
+					$api: { sys: never$, users: never$, ...pending('container', 'sync') },
 					$EventBus: createEventBus(),
 					$messageBus: () => {},
 					$buefy: { modal: { open: vi.fn() }, toast: { open: vi.fn() } },

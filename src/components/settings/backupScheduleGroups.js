@@ -159,9 +159,9 @@ export function durationText(ms) {
 
 // A moment, the way one says it: today, tomorrow or yesterday with the time, a weekday
 // within the week, the date beyond. `t` is the component's $t, bound.
-export function whenOf(date, t) {
+export function whenOf(date, t, now = new Date()) {
 	const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-	const today = new Date()
+	const today = new Date(now)
 	today.setHours(0, 0, 0, 0)
 	const days = Math.round((new Date(date).setHours(0, 0, 0, 0) - today) / 86400000)
 	if (days === 0) {

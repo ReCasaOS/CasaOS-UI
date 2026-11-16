@@ -114,6 +114,7 @@ describe('the anonymous statistics switch', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getSync: vi.fn(),
 			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
@@ -230,6 +231,7 @@ describe('the automatic update row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getSync: vi.fn(),
 			getLogs: vi.fn(),
 			getOs: vi.fn(),
 		}
@@ -438,6 +440,7 @@ describe('the alerts row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getSync: vi.fn(),
 			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
@@ -534,6 +537,7 @@ describe('the modules row', () => {
 			getAlerts: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
+			getSync: vi.fn(),
 			getLogs: vi.fn(),
 			getOs: vi.fn(),
 			// The rest of mounted(), which this test does not look at.
@@ -613,7 +617,7 @@ describe('the system support badge', () => {
 					$t: key => key,
 					$te: () => true,
 					$i18n: { locale: 'en_us' },
-					$api: { sys },
+					$api: { sys, sync: { getTasks: never } },
 					$EventBus: createEventBus(),
 					$messageBus: () => {},
 					$buefy: { modal: { open }, toast: { open: toast } },
@@ -874,6 +878,7 @@ describe('the fleet row', () => {
 			getModules: vi.fn(),
 			getOs: vi.fn(),
 			getFleet: vi.fn(),
+			getSync: vi.fn(),
 			getLogs: vi.fn(),
 			checkVersion: vi.fn(),
 			getUserInfo: vi.fn(),
@@ -952,7 +957,7 @@ describe('the logs row', () => {
 
 	it('asks when the bar mounts', () => {
 		const vm = { $EventBus: createEventBus() }
-		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
+		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getSync', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
 			vm[name] = vi.fn()
 
 		mountBar(vm)

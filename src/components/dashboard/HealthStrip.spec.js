@@ -422,6 +422,13 @@ describe('health strip backup that runs', () => {
 		expect(open.mock.calls[0][0].props).toEqual({ initialTab: 'running' })
 	})
 
+	it('names a running sync by its task, not as a backup of an app', async () => {
+		const wrapper = strip({ getRunning: runs([{ ...seerr, kind: 'sync', app: 'Photos', destination: 'Dropbox' }]) })
+		await settle()
+
+		expect(wrapper.find('.backups .live-title').text()).toContain('Sync: Photos → Dropbox')
+	})
+
 	it('reads it every five seconds while it runs, then reads the log once it ended', async () => {
 		vi.useFakeTimers()
 		try {

@@ -13,6 +13,7 @@
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { imageKind } from '../../src/components/VirtualMachines/vms.js'
+import { handleSync, newSyncState } from './sync.js'
 
 const GIB = 1073741824
 const ISO_FOLDER = '/DATA/VM/iso'
@@ -127,6 +128,7 @@ export function newGridState(demo = false) {
 		images: [{ path: `${ISO_FOLDER}/alpine-virt-3.20.iso`, name: 'alpine-virt-3.20.iso', kind: 'iso', size_bytes: 64 * 1048576 }],
 		share: demo ? { name: 'mybox', apps: new Set(['jellyfin', 'nextcloud']) } : { name: '', apps: new Set() },
 		guard: demoGuard(),
+		sync: newSyncState(),
 	}
 }
 
@@ -417,6 +419,10 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	const verb = method.toUpperCase()
 	if (path === '/v2/virt_management/images/upload') {
 		return verb === 'PUT' ? upload(query, body, state) : null
+	}
+	const synced = handleSync({ method, path, query, body }, state.sync)
+	if (synced) {
+		return synced
 	}
 	if (path.startsWith('/v1/share')) {
 		return share(verb, path, query, body, state)

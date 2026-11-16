@@ -159,6 +159,11 @@ const backup = {
 		return api.post(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/restic/check`)
 	},
 
+	// The folders one level down a destination's path, for choosing what a sync task copies.
+	getFolders(name, path = '') {
+		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/folders`, { path })
+	},
+
 	getDestinationRuns(name) {
 		return api.get(`${PREFIX}/backup/destinations/${encodeURIComponent(name)}/runs`)
 	},
