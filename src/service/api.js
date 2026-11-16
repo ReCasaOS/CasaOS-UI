@@ -1,6 +1,7 @@
 import appCategories from './appCategories.js'
 import apps from './apps.js'
 import backup from './backup.js'
+import sync from './sync.js'
 import updates from './updates.js'
 import gitApps from './gitApps.js'
 import batch from './batch.js'
@@ -25,6 +26,7 @@ export default {
 	appCategories,
 	apps,
 	backup,
+	sync,
 	updates,
 	gitApps,
 	container,
