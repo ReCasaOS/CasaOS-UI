@@ -255,6 +255,7 @@
   "free of {total}": "libres sur {total}",
   "Members": "Membres",
   "Free drive": "Libre",
+  "In use": "Utilisé",
   "Carries": "Porte",
   "The physical drives of this box, their SMART health and temperature, and what they carry.": "Les disques physiques de la box, leur santé SMART et leur température, et ce qu'ils portent.",
   "No storage is mounted on this array.": "Aucun stockage n'est monté sur cette grappe.",

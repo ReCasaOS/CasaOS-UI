@@ -87,7 +87,8 @@
 									<span>{{ $t('Health') }}</span>
 									<span>{{ $t('Temp') }}</span>
 								</div>
-								<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :item="item"></drive-item>
+								<drive-item v-for="(item, index) in diskData" :key="`disk${index}`" :free="unDiskData.some(drive => drive.path === item.path)" :item="item"
+									:storage-mounts="storageData.filter(storage => storage.disk === item.path).map(storage => storage.mount_point).filter(Boolean)"></drive-item>
 							</div>
 						</b-tab-item>
 						<!-- last, so that the places of the others do not move; only on a box that has a ZFS pool -->

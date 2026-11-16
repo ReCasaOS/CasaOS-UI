@@ -13,10 +13,10 @@
 			<p class="_name">{{ item.model || item.name }}</p>
 			<p class="is-size-7 _has-text-gray">{{ [item.name, item.disk_type, renderSize(item.size)].filter(Boolean).join(' · ') }}</p>
 		</div>
-		<!-- what it carries: where its partitions are mounted, or that it is free -->
+		<!-- what it carries: where its partitions are mounted, or that it is free. A drive that is neither (a member of an array, a system out of sight of lsblk) is in use. -->
 		<p class="_carries is-size-7">
 			<template v-if="mounts.length">{{ mounts.join(', ') }}</template>
-			<span v-else class="_has-text-gray">{{ $t('Free drive') }}</span>
+			<span v-else class="_has-text-gray">{{ free ? $t('Free drive') : $t('In use') }}</span>
 		</p>
 		<p class="_health is-size-7">
 			<span :class="`is-${health}`" class="_dot"></span>
@@ -42,6 +42,16 @@ export default {
 			type: Object,
 			default: null,
 		},
+		// the mount points of the storages on this drive, for a drive whose partitions show none
+		storageMounts: {
+			type: Array,
+			default: () => [],
+		},
+		// the box offers it for a new storage
+		free: {
+			type: Boolean,
+			default: true,
+		},
 	},
 	computed: {
 		health() {
@@ -49,7 +59,8 @@ export default {
 		},
 		// the mount points of its partitions, the ones that are mounted
 		mounts() {
-			return (this.item.children || []).map(part => part.mount_point).filter(point => point && point !== '-')
+			const own = (this.item.children || []).map(part => part.mount_point).filter(point => point && point !== '-')
+			return own.length ? own : this.storageMounts
 		},
 	},
 }
