@@ -57,6 +57,21 @@ describe('an image-managed core', () => {
 		expect(source).toMatch(/v-if="updateInfo.image_managed"[^>]*>\s*\{\{ \$t\("Updated with the system"\) \}\}/)
 	})
 
+	it('the check-for-updates icon asks the box to look now, and a plain check does not', async () => {
+		const getVersion = vi.fn(() => Promise.resolve({ data: { success: 200, data: { current_version: '0.5.154', need_update: true } } }))
+		const vm = { $api: { sys: { getVersion } }, $messageBus: vi.fn() }
+		TopBar.methods.checkVersion.call(vm)
+		expect(getVersion).toHaveBeenLastCalledWith(false)
+		TopBar.methods.checkVersion.call(vm, true)
+		expect(getVersion).toHaveBeenLastCalledWith(true)
+		expect(vm.checkingVersion).toBe(true)
+		await flushPromises()
+		expect(vm.checkingVersion).toBe(false)
+		expect(vm.updateInfo.need_update).toBe(true)
+		expect(source).toMatch(/v-if="!updateInfo.image_managed"[^>]*:label="\$t\('Check for updates'\)"/)
+		expect(source).toMatch(/@click="checkVersion\(true\)"/)
+	})
+
 	it('an older core (no image_managed): the package row and the update row as today', async () => {
 		const vm = { $api: { sys: { getVersion: () => Promise.resolve({ data: { success: 200, data: { current_version: '0.4.81', need_update: false } } }) } }, $messageBus: vi.fn() }
 		TopBar.methods.checkVersion.call(vm)

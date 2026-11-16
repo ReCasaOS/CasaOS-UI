@@ -499,6 +499,12 @@
 										<div class="_has-text-gray">
 											v{{ updateInfo.current_version }}
 										</div>
+										<!-- the box keeps its last look for 20 minutes: this asks again now -->
+										<b-tooltip v-if="!updateInfo.image_managed" :label="$t('Check for updates')" position="is-left" type="is-dark">
+											<button :aria-label="$t('Check for updates')" :disabled="checkingVersion" class="_check-updates ml-1" type="button" @click="checkVersion(true)">
+												<b-icon :custom-class="checkingVersion ? 'mdi-spin' : ''" custom-size="mdi-18px" icon="refresh" />
+											</button>
+										</b-tooltip>
 										<div v-if="updateInfo.need_update" class="ml-2">
 											<b-button rounded size="is-small" type="is-dark" @click="showUpdateModal">
 												{{ $t("Update") }}
@@ -746,6 +752,7 @@ export default {
 				existing_apps_switch: true,
 				dashboard_beta: false,
 			},
+			checkingVersion: false,
 			updateInfo: {
 				current_version: '0',
 				need_update: false,
@@ -1382,14 +1389,17 @@ export default {
 		 * @description: Get Version info
 		 * @return {*} void
 		 */
-		checkVersion() {
-			this.$api.sys.getVersion().then((res) => {
+		checkVersion(refresh = false) {
+			this.checkingVersion = refresh
+			this.$api.sys.getVersion(refresh).then((res) => {
 				if (res.data.success === 200) {
 					this.updateInfo = res.data.data
 					if (res.data.data.need_update) {
 						this.$messageBus('dashboardsetting_versionavailable_show', true.toString())
 					}
 				}
+			}).catch(() => {}).finally(() => {
+				this.checkingVersion = false
 			})
 		},
 
@@ -1940,6 +1950,22 @@ export default {
 	.icon {
 		flex-shrink: 0;
 		color: var(--os-badge-signal);
+	}
+}
+
+// the "check for updates" icon next to the version: a bare button, as quiet as the text around it
+._check-updates {
+	display: flex;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	opacity: 0.6;
+	cursor: pointer;
+
+	&:hover:not(:disabled),
+	&:focus-visible {
+		opacity: 1;
 	}
 }
 

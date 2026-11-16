@@ -23,8 +23,9 @@ const sys = {
 	},
 
 	// check system version
-	getVersion() {
-		return api.get(`${PREFIX}/version`)
+	// refresh: look now, past the 20 minutes the box keeps its last answer
+	getVersion(refresh) {
+		return api.get(`${PREFIX}/version`, refresh ? { refresh: 1 } : undefined)
 	},
 
 	// Hardware Info
