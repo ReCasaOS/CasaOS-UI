@@ -655,7 +655,7 @@ import orderBy from 'lodash/orderBy'
 import debounce from 'lodash/debounce'
 import FileSaver from 'file-saver'
 import { Swiper, SwiperSlide } from 'swiper/vue'
-import { Autoplay, Navigation } from 'swiper/modules'
+import { Navigation } from 'swiper/modules'
 import { Field as VeeField, Form as VeeForm } from 'vee-validate'
 import { parse } from 'yaml'
 import { vOnClickOutside } from '@vueuse/components'
@@ -819,9 +819,8 @@ export default {
 
 			// Featured Swiper
 			featureSwiperOptions: {
-				modules: [Navigation, Autoplay],
+				modules: [Navigation],
 				loop: false,
-				autoplay: true,
 				spaceBetween: 24,
 				navigation: {
 					nextEl: '.swiper-button-next',
