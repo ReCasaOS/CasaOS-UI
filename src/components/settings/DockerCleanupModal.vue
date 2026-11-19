@@ -1,0 +1,314 @@
+<template>
+	<div class="modal-card docker-cleanup touch-targets">
+		<header class="modal-card-head">
+			<h3 class="title is-header">
+				{{ $t('Docker cleanup') }}
+			</h3>
+		</header>
+
+		<section class="modal-card-body">
+			<p class="settings-intro mb-3">
+				{{ $t('What apps left behind on the disk. Installed apps are never touched, stopped ones included.') }}
+			</p>
+
+			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">
+				{{ error }}
+			</b-message>
+			<b-message v-if="done" class="mb-3" data-done size="is-small" type="is-success">
+				{{ done }}
+			</b-message>
+			<b-message v-if="kept.length" class="mb-3" data-kept size="is-small" type="is-warning">
+				<p>{{ $t('Kept, as Docker refused or it is in use again:') }}</p>
+				<p v-for="line in kept" :key="line" class="docker-cleanup__mono">
+					{{ line }}
+				</p>
+			</b-message>
+
+			<p v-if="isLoading && !report" class="is-size-7 _has-text-gray">
+				{{ $t('Docker is measuring. This can take a minute on a box with many images.') }}
+			</p>
+
+			<!-- Old app versions: the images an update replaced -->
+			<div v-if="old" class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="old">
+				<div class="is-flex-grow-1">
+					<div class="has-text-weight-semibold">
+						{{ $t('Old app versions') }}
+					</div>
+					<div class="is-size-7 _has-text-gray">
+						{{ old.count ? $t('Images replaced by an update: {count} · {size}', { count: old.count, size: sizeOf(old.size) }) : $t('Nothing to free.') }}
+					</div>
+				</div>
+				<b-button :disabled="!old.count || !!busy" :loading="busy === 'old'" data-action="free-old" rounded size="is-small" @click="freeOld">
+					{{ $t('Free up') }}
+				</b-button>
+			</div>
+
+			<template v-if="report">
+				<!-- Build cache: nobody's data -->
+				<div class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="cache">
+					<div class="is-flex-grow-1">
+						<div class="has-text-weight-semibold">
+							{{ $t('Build cache') }}
+						</div>
+						<div class="is-size-7 _has-text-gray">
+							{{ report.build_cache ? $t('{size} kept to build faster. Without it, the next build of an app from a repository is slower.', { size: sizeOf(report.build_cache) }) : $t('Nothing to free.') }}
+						</div>
+					</div>
+					<b-button :disabled="!report.build_cache || !!busy" :loading="busy === 'cache'" data-action="free-cache" rounded size="is-small" @click="freeCache">
+						{{ $t('Free up') }}
+					</b-button>
+				</div>
+
+				<b-message v-if="report.held" class="mb-3" data-held size="is-small" type="is-info">
+					{{ $t(heldText) }}
+				</b-message>
+
+				<template v-else>
+					<!-- Images of no installed app -->
+					<div class="settings-card" data-row="images">
+						<div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
+							<div class="is-flex-grow-1">
+								<div class="has-text-weight-semibold">
+									{{ $t('Images of no installed app') }}
+								</div>
+								<div class="is-size-7 _has-text-gray">
+									{{ report.images.length ? $t('Images no container uses: {count} · {size}. An app that needs one again downloads it.', { count: report.images.length, size: sizeOf(total(report.images)) }) : $t('Nothing to free.') }}
+								</div>
+							</div>
+							<b-button v-if="report.images.length" :aria-expanded="open === 'images'" data-action="review-images" rounded size="is-small" @click="review('images')">
+								{{ open === 'images' ? $t('Close') : $t('Review') }}
+							</b-button>
+						</div>
+						<div v-if="open === 'images'" class="mt-2">
+							<div v-for="image in report.images" :key="image.id" class="docker-cleanup__item">
+								<b-checkbox v-model="pickedImages" :native-value="image.id" size="is-small">
+									<span class="docker-cleanup__mono">{{ image.tags.join(', ') }}</span>
+									<span class="is-size-7 _has-text-gray"> · {{ sizeOf(image.size) }} · {{ dayOf(image.created * 1000) }}</span>
+								</b-checkbox>
+							</div>
+							<b-button :disabled="!pickedImages.length || !!busy" :loading="busy === 'images'" class="mt-2" data-action="delete-images" rounded size="is-small"
+								type="is-danger" @click="deleteImages">
+								{{ $t('Delete the ticked images ({count})', { count: pickedImages.length }) }}
+							</b-button>
+						</div>
+					</div>
+
+					<!-- Volumes of no installed app: data, and nothing ticked -->
+					<div class="settings-card" data-row="volumes">
+						<div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
+							<div class="is-flex-grow-1">
+								<div class="has-text-weight-semibold">
+									{{ $t('Volumes of no installed app') }}
+								</div>
+								<div class="is-size-7 _has-text-gray">
+									{{ report.volumes.length ? $t('Volumes no container uses: {count} · {size}. They can hold data you kept when you removed an app.', { count: report.volumes.length, size: sizeOf(total(report.volumes)) }) : $t('Nothing to free.') }}
+								</div>
+							</div>
+							<b-button v-if="report.volumes.length" :aria-expanded="open === 'volumes'" data-action="review-volumes" rounded size="is-small" @click="review('volumes')">
+								{{ open === 'volumes' ? $t('Close') : $t('Review') }}
+							</b-button>
+						</div>
+						<div v-if="open === 'volumes'" class="mt-2">
+							<div v-for="volume in report.volumes" :key="volume.name" class="docker-cleanup__item">
+								<b-checkbox v-model="pickedVolumes" :native-value="volume.name" size="is-small">
+									<span class="docker-cleanup__mono">{{ volume.name }}</span>
+									<span class="is-size-7 _has-text-gray">
+										<template v-if="volume.app"> · {{ $t('made by {app}', { app: volume.app }) }}</template>
+										· {{ volume.size < 0 ? $t('size unknown') : sizeOf(volume.size) }}<template v-if="volume.created"> · {{ dayOf(volume.created) }}</template>
+									</span>
+								</b-checkbox>
+							</div>
+							<b-button :disabled="!pickedVolumes.length || !!busy" :loading="busy === 'volumes'" class="mt-2" data-action="delete-volumes" rounded size="is-small"
+								type="is-danger" @click="deleteVolumes">
+								{{ $t('Delete the ticked volumes ({count})', { count: pickedVolumes.length }) }}
+							</b-button>
+						</div>
+					</div>
+				</template>
+			</template>
+		</section>
+
+		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
+			<b-button :disabled="!!busy" :loading="isLoading" class="mr-auto" data-action="refresh" rounded @click="load">
+				{{ $t('Refresh') }}
+			</b-button>
+			<b-button rounded @click="$emit('close')">
+				{{ $t('Close') }}
+			</b-button>
+		</footer>
+	</div>
+</template>
+
+<script>
+import escape from 'lodash/escape'
+import { renderSize } from '@/mixins/file_utils'
+
+const HELD = {
+	busy: 'An app is being installed, updated, backed up or restored. Images and volumes can be reviewed once it has ended.',
+	unreadable: 'The compose file of an app cannot be read, so what the apps still need cannot be told. No image and no volume is offered until it is fixed.',
+}
+
+export default {
+	name: 'DockerCleanupModal',
+	emits: ['close'],
+	data() {
+		return {
+			// GET /cleanup: { build_cache, images, volumes, held }; null until it answered
+			report: null,
+			// GET /images/dangling: { count, size }; null when that route did not answer
+			old: null,
+			isLoading: false,
+			// the row whose deletion runs: 'old', 'cache', 'images' or 'volumes'
+			busy: '',
+			error: '',
+			done: '',
+			kept: [],
+			// the list that is open, and what is ticked in each
+			open: '',
+			pickedImages: [],
+			pickedVolumes: [],
+		}
+	},
+	computed: {
+		heldText() {
+			return HELD[this.report.held] || HELD.unreadable
+		},
+	},
+	mounted() {
+		this.load()
+	},
+	methods: {
+		sizeOf(bytes) {
+			return renderSize(bytes)
+		},
+
+		dayOf(when) {
+			return new Date(when).toLocaleDateString()
+		},
+
+		// a volume whose driver cannot measure it says -1, which is not a size
+		total(list) {
+			return list.reduce((sum, item) => sum + Math.max(item.size, 0), 0)
+		},
+
+		messageOf(error) {
+			const data = error.response && error.response.data
+			return (data && data.message) || error.message
+		},
+
+		async load() {
+			this.isLoading = true
+			this.error = ''
+			try {
+				const [old, report] = await Promise.all([
+					// its own route, older than this window: without it the row is left out
+					this.$openAPI.appManagement.image.danglingImages().then(res => res.data.data, () => null),
+					this.$api.cleanup.get().then(res => res.data.data),
+				])
+				this.old = old
+				this.report = report
+				// what is ticked is kept only while it is still listed
+				this.pickedImages = this.pickedImages.filter(id => report.images.some(image => image.id === id))
+				this.pickedVolumes = this.pickedVolumes.filter(name => report.volumes.some(volume => volume.name === name))
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.isLoading = false
+			}
+		},
+
+		// Images come ticked: they are downloaded again when needed. Volumes do not: a
+		// volume is data, and each one is a choice.
+		review(what) {
+			this.open = this.open === what ? '' : what
+			if (this.open === 'images')
+				this.pickedImages = this.report.images.map(image => image.id)
+			if (this.open === 'volumes')
+				this.pickedVolumes = []
+		},
+
+		// One deletion at a time; what it freed and what was kept are said, then the
+		// lists are read again.
+		async run(row, call) {
+			this.busy = row
+			this.error = ''
+			this.done = ''
+			this.kept = []
+			try {
+				const result = (await call()).data.data || {}
+				// a deletion the box refused whole freed nothing, and the line below says why
+				if (result.size > 0 || (result.removed || []).length)
+					this.done = this.$t('Freed {size}', { size: renderSize(result.size || 0) })
+				this.kept = Object.entries(result.refused || {}).map(([name, why]) => `${name}: ${why}`)
+			} catch (error) {
+				this.error = this.messageOf(error)
+			} finally {
+				this.busy = ''
+			}
+			await this.load()
+		},
+
+		// Each question is written out in full: Buefy shows a message as HTML, and the
+		// test that guards it reads the options one by one.
+		freeOld() {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Free up {size}', { size: escape(renderSize(this.old.size)) }),
+				message: this.$t('Updating an app leaves the version it replaced on the disk. Deleting those frees the space. No installed app is affected, and nothing has to be downloaded again.'),
+				type: 'is-danger',
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.run('old', () => this.$openAPI.appManagement.image.pruneDanglingImages()),
+			})
+		},
+
+		freeCache() {
+			this.$buefy.dialog.confirm({
+				title: this.$t('Free up {size}', { size: escape(renderSize(this.report.build_cache)) }),
+				message: this.$t('The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.'),
+				type: 'is-danger',
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.run('cache', () => this.$api.cleanup.pruneBuildCache()),
+			})
+		},
+
+		deleteImages() {
+			const names = [...this.pickedImages]
+			this.$buefy.dialog.confirm({
+				title: this.$t('Delete the ticked images ({count})', { count: escape(String(names.length)) }),
+				message: this.$t('No container uses them and no installed app names them. An app that needs one again downloads it.'),
+				type: 'is-danger',
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.run('images', () => this.$api.cleanup.removeImages(names)),
+			})
+		},
+
+		deleteVolumes() {
+			const names = [...this.pickedVolumes]
+			this.$buefy.dialog.confirm({
+				title: this.$t('Delete the ticked volumes ({count})', { count: escape(String(names.length)) }),
+				message: this.$t('A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}', { names: names.map(name => escape(name)).join(', ') }),
+				type: 'is-danger',
+				confirmText: this.$t('Delete'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.run('volumes', () => this.$api.cleanup.removeVolumes(names)),
+			})
+		},
+	},
+}
+</script>
+
+<style lang="scss" scoped>
+.docker-cleanup {
+  &__mono {
+    font-family: 'Monaco', 'Consolas', monospace;
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+
+  &__item {
+    padding: 0.125rem 0;
+  }
+}
+</style>

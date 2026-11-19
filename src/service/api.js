@@ -2,6 +2,7 @@ import appCategories from './appCategories.js'
 import apps from './apps.js'
 import backup from './backup.js'
 import sync from './sync.js'
+import cleanup from './cleanup.js'
 import updates from './updates.js'
 import gitApps from './gitApps.js'
 import batch from './batch.js'
@@ -27,6 +28,7 @@ export default {
 	apps,
 	backup,
 	sync,
+	cleanup,
 	updates,
 	gitApps,
 	container,

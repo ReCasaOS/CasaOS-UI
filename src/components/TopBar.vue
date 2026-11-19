@@ -353,6 +353,20 @@
 									</div>
 								</div>
 								<!-- Docker data End -->
+								<!-- Docker cleanup Start: it deletes, so it is the owner's -->
+								<div v-if="$store.getters.isAdmin"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="broom" size="is-20" />
+										{{ $t("Docker cleanup") }}
+									</div>
+									<div class="ml-2">
+										<b-button rounded size="is-small" type="is-dark" @click="showDockerCleanup">
+											{{ $t("Open") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Docker cleanup End -->
 								<!-- Share accounts Start -->
 								<div
 									class="is-flex is-align-items-center _row _box">
@@ -1081,6 +1095,19 @@ export default {
 
 		toggleSettings() {
 			this.$refs.settingsDrop.toggle()
+		},
+
+		// What apps left behind on the disk, and deleting it.
+		showDockerCleanup() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: defineAsyncComponent(() => import('./settings/DockerCleanupModal.vue')),
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 
 		// Where Docker keeps images, containers and volumes, and moving them.
