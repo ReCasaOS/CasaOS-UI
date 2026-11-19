@@ -28,6 +28,11 @@
 				{{ $t('Docker is measuring. This can take a minute on a box with many images.') }}
 			</p>
 
+			<b-message v-if="report && report.held" class="mb-3" data-held size="is-small" type="is-info">
+				{{ $t(heldText) }}
+				<span v-if="report.detail" class="docker-cleanup__mono">{{ report.detail }}</span>
+			</b-message>
+
 			<!-- Old app versions: the images an update replaced -->
 			<div v-if="old" class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="old">
 				<div class="is-flex-grow-1">
@@ -38,7 +43,7 @@
 						{{ old.count ? $t('Images replaced by an update: {count} · {size}', { count: old.count, size: sizeOf(old.size) }) : $t('Nothing to free.') }}
 					</div>
 				</div>
-				<b-button :disabled="!old.count || !!busy" :loading="busy === 'old'" data-action="free-old" rounded size="is-small" @click="freeOld">
+				<b-button :disabled="!old.count || !!busy || held" :loading="busy === 'old'" data-action="free-old" rounded size="is-small" @click="freeOld">
 					{{ $t('Free up') }}
 				</b-button>
 			</div>
@@ -54,16 +59,12 @@
 							{{ report.build_cache ? $t('{size} kept to build faster. Without it, the next build of an app from a repository is slower.', { size: sizeOf(report.build_cache) }) : $t('Nothing to free.') }}
 						</div>
 					</div>
-					<b-button :disabled="!report.build_cache || !!busy" :loading="busy === 'cache'" data-action="free-cache" rounded size="is-small" @click="freeCache">
+					<b-button :disabled="!report.build_cache || !!busy || held" :loading="busy === 'cache'" data-action="free-cache" rounded size="is-small" @click="freeCache">
 						{{ $t('Free up') }}
 					</b-button>
 				</div>
 
-				<b-message v-if="report.held" class="mb-3" data-held size="is-small" type="is-info">
-					{{ $t(heldText) }}
-				</b-message>
-
-				<template v-else>
+				<template v-if="!held">
 					<!-- Images of no installed app -->
 					<div class="settings-card" data-row="images">
 						<div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
@@ -144,8 +145,8 @@ import escape from 'lodash/escape'
 import { renderSize } from '@/mixins/file_utils'
 
 const HELD = {
-	busy: 'An app is being installed, updated, backed up or restored. Images and volumes can be reviewed once it has ended.',
-	unreadable: 'The compose file of an app cannot be read, so what the apps still need cannot be told. No image and no volume is offered until it is fixed.',
+	busy: 'Something runs on an app: an install, an update, a backup, a restore, a folder sync, or a move of the data of Docker. Nothing is deleted until it has ended.',
+	unreadable: 'What an app still needs cannot be read, so nothing is offered until it is fixed:',
 }
 
 export default {
@@ -167,9 +168,17 @@ export default {
 			open: '',
 			pickedImages: [],
 			pickedVolumes: [],
+			// false until the images were opened once: they come ticked then, and what
+			// the owner unticks stays unticked
+			imagesOpened: false,
 		}
 	},
 	computed: {
+		// true while the box offers nothing: an operation runs, or an app cannot be read
+		held() {
+			return !!(this.report && this.report.held)
+		},
+
 		heldText() {
 			return HELD[this.report.held] || HELD.unreadable
 		},
@@ -221,10 +230,10 @@ export default {
 		// volume is data, and each one is a choice.
 		review(what) {
 			this.open = this.open === what ? '' : what
-			if (this.open === 'images')
+			if (this.open === 'images' && !this.imagesOpened) {
+				this.imagesOpened = true
 				this.pickedImages = this.report.images.map(image => image.id)
-			if (this.open === 'volumes')
-				this.pickedVolumes = []
+			}
 		},
 
 		// One deletion at a time; what it freed and what was kept are said, then the
@@ -234,6 +243,7 @@ export default {
 			this.error = ''
 			this.done = ''
 			this.kept = []
+			let failed = ''
 			try {
 				const result = (await call()).data.data || {}
 				// a deletion the box refused whole freed nothing, and the line below says why
@@ -241,11 +251,14 @@ export default {
 					this.done = this.$t('Freed {size}', { size: renderSize(result.size || 0) })
 				this.kept = Object.entries(result.refused || {}).map(([name, why]) => `${name}: ${why}`)
 			} catch (error) {
-				this.error = this.messageOf(error)
+				failed = this.messageOf(error)
 			} finally {
 				this.busy = ''
 			}
+			// read again first: load() clears the error, and a refusal must stay on screen
 			await this.load()
+			if (failed)
+				this.error = failed
 		},
 
 		// Each question is written out in full: Buefy shows a message as HTML, and the
@@ -253,7 +266,7 @@ export default {
 		freeOld() {
 			this.$buefy.dialog.confirm({
 				title: this.$t('Free up {size}', { size: escape(renderSize(this.old.size)) }),
-				message: this.$t('Updating an app leaves the version it replaced on the disk. Deleting those frees the space. No installed app is affected, and nothing has to be downloaded again.'),
+				message: this.$t('Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.'),
 				type: 'is-danger',
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),

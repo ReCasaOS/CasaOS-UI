@@ -3591,9 +3591,10 @@
   "made by {app}": "made by {app}",
   "size unknown": "size unknown",
   "Delete the ticked volumes ({count})": "Delete the ticked volumes ({count})",
-  "An app is being installed, updated, backed up or restored. Images and volumes can be reviewed once it has ended.": "An app is being installed, updated, backed up or restored. Images and volumes can be reviewed once it has ended.",
-  "The compose file of an app cannot be read, so what the apps still need cannot be told. No image and no volume is offered until it is fixed.": "The compose file of an app cannot be read, so what the apps still need cannot be told. No image and no volume is offered until it is fixed.",
+  "Something runs on an app: an install, an update, a backup, a restore, a folder sync, or a move of the data of Docker. Nothing is deleted until it has ended.": "Something runs on an app: an install, an update, a backup, a restore, a folder sync, or a move of the data of Docker. Nothing is deleted until it has ended.",
+  "What an app still needs cannot be read, so nothing is offered until it is fixed:": "What an app still needs cannot be read, so nothing is offered until it is fixed:",
   "The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.": "The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.",
   "No container uses them and no installed app names them. An app that needs one again downloads it.": "No container uses them and no installed app names them. An app that needs one again downloads it.",
-  "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}": "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}"
+  "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}": "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}",
+  "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.": "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone."
 }

@@ -135,21 +135,25 @@ describe('the Docker cleanup window', () => {
 		wrapper.unmount()
 	})
 
-	it('offers no image and no volume while an app is busy, and still the two safe rows', async () => {
+	it('offers nothing while an app is busy', async () => {
 		const { wrapper } = await open({ get: answer(report({ held: 'busy', images: [], volumes: [] })) })
 
-		expect(wrapper.find('[data-held]').text()).toContain('being installed, updated')
+		expect(wrapper.find('[data-held]').text()).toContain('Something runs on an app')
 		expect(wrapper.find('[data-row="images"]').exists()).toBe(false)
 		expect(wrapper.find('[data-row="volumes"]').exists()).toBe(false)
-		expect(wrapper.find('[data-row="old"]').exists()).toBe(true)
-		expect(wrapper.find('[data-row="cache"]').exists()).toBe(true)
+		// the two other rows are shown and held too: a build uses the cache, and an
+		// install has just pulled an image nothing holds yet
+		expect(wrapper.find('[data-action="free-old"]').attributes('disabled')).toBeDefined()
+		expect(wrapper.find('[data-action="free-cache"]').attributes('disabled')).toBeDefined()
 		wrapper.unmount()
 	})
 
 	it('says so when an app cannot be read', async () => {
-		const { wrapper } = await open({ get: answer(report({ held: 'unreadable', images: [], volumes: [] })) })
+		const { wrapper } = await open({ get: answer(report({ held: 'unreadable', detail: 'compose file of `odd`: yaml', images: [], volumes: [] })) })
 
 		expect(wrapper.find('[data-held]').text()).toContain('cannot be read')
+		// which one, or nobody can mend it
+		expect(wrapper.find('[data-held]').text()).toContain('compose file of `odd`')
 		wrapper.unmount()
 	})
 
@@ -179,6 +183,28 @@ describe('the Docker cleanup window', () => {
 
 		expect(wrapper.text()).toContain('only the owner can do this')
 		expect(wrapper.find('[data-row="cache"]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('keeps the words of a deletion the box refused, through the reload that follows', async () => {
+		const removeImages = vi.fn(() => Promise.reject(Object.assign(new Error('409'), { response: { data: { message: 'busy' } } })))
+		const { wrapper, api } = await open({ removeImages })
+		await click(wrapper, 'review-images')
+		await click(wrapper, 'delete-images')
+
+		expect(api.get).toHaveBeenCalledTimes(2)
+		expect(wrapper.text()).toContain('busy')
+		wrapper.unmount()
+	})
+
+	it('keeps what was unticked when the images are closed and opened again', async () => {
+		const { wrapper } = await open()
+		await click(wrapper, 'review-images')
+		await wrapper.findAll('[data-row="images"] label')[1].trigger('click')
+		await click(wrapper, 'review-images')
+		await click(wrapper, 'review-images')
+
+		expect(wrapper.findAll('[data-row="images"] label').map(box => box.attributes('data-ticked'))).toEqual(['true', 'false'])
 		wrapper.unmount()
 	})
 
