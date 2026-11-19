@@ -14,6 +14,7 @@
 				</b-select>
 			</b-field>
 			<p class="mb-3 is-size-7">
+				{{ $t('An account only reaches the folder it was added with. To sync another folder, add the same account again and leave its folder empty.') }}
 				<a @click="addAccount">{{ $t('Add an account') }}</a>
 			</p>
 

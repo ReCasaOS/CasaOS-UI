@@ -3541,6 +3541,7 @@
   "{name} stops syncing. The files on the box and in the cloud are not touched.": "{name} ne synchronise plus. Les fichiers de la machine et du cloud ne sont pas touchés.",
   "Edit sync task": "Modifier la tâche de synchro",
   "New sync task": "Nouvelle tâche de synchro",
+  "An account only reaches the folder it was added with. To sync another folder, add the same account again and leave its folder empty.": "Un compte n'atteint que le dossier avec lequel il a été ajouté. Pour synchroniser un autre dossier, ajoutez le même compte une seconde fois en laissant son dossier vide.",
   "Folder in the cloud": "Dossier dans le cloud",
   "Browse the cloud": "Parcourir le cloud",
   "This account shows no folder here. An account limited to one folder only sees inside it.": "Ce compte n'affiche aucun dossier ici. Un compte limité à un dossier ne voit que l'intérieur de celui-ci.",

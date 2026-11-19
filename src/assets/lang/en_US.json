@@ -3539,6 +3539,7 @@
   "{name} stops syncing. The files on the box and in the cloud are not touched.": "{name} stops syncing. The files on the box and in the cloud are not touched.",
   "Edit sync task": "Edit sync task",
   "New sync task": "New sync task",
+  "An account only reaches the folder it was added with. To sync another folder, add the same account again and leave its folder empty.": "An account only reaches the folder it was added with. To sync another folder, add the same account again and leave its folder empty.",
   "Folder in the cloud": "Folder in the cloud",
   "Browse the cloud": "Browse the cloud",
   "This account shows no folder here. An account limited to one folder only sees inside it.": "This account shows no folder here. An account limited to one folder only sees inside it.",
