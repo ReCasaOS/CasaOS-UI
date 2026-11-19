@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { containerActions, containerRows, healthCell, pickContainerId, publishedPorts, uptime } from './containerSummary'
+import { appHealthWarning, containerActions, containerRows, healthCell, healthRuns, pickContainerId, publishedPorts, uptime } from './containerSummary'
 
 // A real answer, trimmed to the fields the tab reads: each service holds a LIST of
 // containers, `worker` is scaled to two and `idle` is declared but running nothing.
@@ -187,5 +187,39 @@ describe('what can be done to a container', () => {
 	it('offers nothing while Docker is removing the container', () => {
 		// every button here is a race the caller loses
 		expect(containerActions(row('removing'))).toEqual([])
+	})
+})
+
+describe('appHealthWarning', () => {
+	it('speaks only for a running app whose check is not passing', () => {
+		expect(appHealthWarning({ status: 'running', health: 'unhealthy' }).label).toBe('Unhealthy')
+		expect(appHealthWarning({ status: 'running', health: 'starting' }).label).toBe('Starting up')
+		expect(appHealthWarning({ status: 'running', health: 'healthy' })).toBeNull()
+		// no check at all, and a box too old to send the field
+		expect(appHealthWarning({ status: 'running', health: '' })).toBeNull()
+		expect(appHealthWarning({ status: 'running' })).toBeNull()
+		// a stopped app says stopped, whatever its last verdict was
+		expect(appHealthWarning({ status: 'exited', health: 'unhealthy' })).toBeNull()
+		expect(appHealthWarning(undefined)).toBeNull()
+	})
+})
+
+describe('healthRuns', () => {
+	it('reads each run as passed or failed, with what it printed', () => {
+		const runs = healthRuns([
+			{ started_at: '2026-11-19T18:40:37Z', exit_code: 2, output: 'no response' },
+			{ started_at: '2026-11-19T18:40:07Z', exit_code: 0 },
+		])
+
+		expect(runs.map(run => run.passed)).toEqual([false, true])
+		expect(runs[0].exitCode).toBe(2)
+		expect(runs[0].output).toBe('no response')
+		expect(runs[1].output).toBe('')
+		expect(runs[0].at).not.toBe('')
+	})
+
+	it('has nothing to say of a check that never ran', () => {
+		expect(healthRuns(undefined)).toEqual([])
+		expect(healthRuns([])).toEqual([])
 	})
 })

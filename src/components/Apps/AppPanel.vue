@@ -474,6 +474,8 @@
 
 				<ContainersTab v-if="isCasa && state == 'update' && editorTab === 'containers'"
 					:app-id="id"
+					:can-edit-compose="!gitApp"
+					@compose="setEditorTab('compose')"
 					@open="openServicePanel" />
 
 				<ComposeEditor v-if="isCasa && state == 'update' && editorTab === 'compose' && !gitApp"

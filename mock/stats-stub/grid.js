@@ -87,8 +87,9 @@ function anApp(name, title, port, image) {
 
 const APPS = [
 	anApp('jellyfin', 'Jellyfin', '8096', 'linuxserver/jellyfin:latest'),
-	anApp('nextcloud', 'Nextcloud', '10081', 'nextcloud:latest'),
-	anApp('immich', 'Immich', '2283', 'ghcr.io/immich-app/immich-server:release'),
+	// a health check that has not passed yet, and one that fails: what the card says of each
+	{ ...anApp('nextcloud', 'Nextcloud', '10081', 'nextcloud:latest'), health: 'starting' },
+	{ ...anApp('immich', 'Immich', '2283', 'ghcr.io/immich-app/immich-server:release'), health: 'unhealthy' },
 	anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:latest'),
 ]
 

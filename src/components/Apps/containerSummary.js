@@ -28,6 +28,38 @@ export const CONTAINER_HEALTH = {
 	starting: { label: 'Starting up', type: 'is-warning' },
 }
 
+// What the dashboard says of an app whose check is not passing. A healthy app and an
+// app with no check say nothing: the card already says it runs.
+export function appHealthWarning(item) {
+	if (!item || item.status !== 'running')
+		return null
+	if (item.health === 'unhealthy')
+		return { label: 'Unhealthy', dot: 'is-unhealthy', text: 'has-text-danger' }
+	if (item.health === 'starting')
+		return { label: 'Starting up', dot: 'is-starting', text: 'has-text-warning' }
+
+	return null
+}
+
+/**
+ * The last runs of a health check, as lines to read: when, passed or failed, and
+ * what the command printed (empty for an account that is not the owner).
+ *
+ * @param {object[]} checks `checks` of `GET /compose/{id}/containers/{id}/health`
+ */
+export function healthRuns(checks) {
+	const today = new Date().toDateString()
+	// the time alone for a run of today; a check that runs once a day spreads its last runs over a week
+	const when = at => at.toDateString() === today ? at.toLocaleTimeString() : at.toLocaleString()
+
+	return (checks || []).map(check => ({
+		at: check.started_at ? when(new Date(check.started_at)) : '',
+		passed: check.exit_code === 0,
+		exitCode: check.exit_code,
+		output: check.output || '',
+	}))
+}
+
 // `Created` is when the container was made, which a restart does not change, so
 // Docker's own `Status` line is the only honest source of an uptime here:
 // "Up 3 hours", "Up 2 minutes (healthy)", "Up 5 minutes (Paused)".
@@ -109,13 +141,14 @@ export function containerRows(data) {
 			// here would hide the half of a stack that failed to come up, which is the
 			// one thing someone opens this tab to find out.
 			if (!list || !list.length)
-				return [{ service, name: '', replicas: 0, id: '', image: '', state: 'absent', health: '', uptime: '', ports: [], exitCode: null }]
+				return [{ key: `service:${service}`, service, name: '', replicas: 0, id: '', image: '', state: 'absent', health: '', uptime: '', ports: [], exitCode: null }]
 
 			// Docker answers in no particular order; by name keeps a scaled service's
 			// replicas from swapping rows between two refreshes.
 			return [...list]
 				.sort((a, b) => String(a.Name || a.ID).localeCompare(String(b.Name || b.ID)))
 				.map(container => ({
+					key: container.ID,
 					service,
 					name: container.Name || container.ID,
 					replicas: list.length,

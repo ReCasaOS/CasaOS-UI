@@ -13,7 +13,8 @@
 			{{ error }}
 		</b-message>
 
-		<b-table v-else :data="rows" :loading="isLoading" :mobile-cards="false" class="is-size-7">
+		<b-table v-else :data="rows" :loading="isLoading" :mobile-cards="false" :opened-detailed="opened"
+			:show-detail-icon="false" class="is-size-7" custom-row-key="key" detail-key="key" detailed>
 			<b-table-column v-slot="{ row }" :label="$t('Service')" field="service">
 				<span class="has-text-weight-medium">{{ row.service }}</span>
 				<!-- Almost every service holds a single container and naming it would say
@@ -31,9 +32,15 @@
 			</b-table-column>
 
 			<b-table-column v-slot="{ row }" :label="$t('Health')" field="health">
-				<b-tag v-if="healthOf(row).tag" :type="healthOf(row).tag.type">
-					{{ $t(healthOf(row).tag.label) }}
-				</b-tag>
+				<!-- The chip opens what it stands for: the command, how often it runs and
+					what it last answered. -->
+				<button v-if="healthOf(row).tag" :aria-expanded="isOpen(row)" :title="isOpen(row) ? $t('Hide the health check') : $t('Show the health check')"
+					class="containers-tab__health" data-action="health" type="button" @click="toggle(row)">
+					<b-tag :type="healthOf(row).tag.type">
+						{{ $t(healthOf(row).tag.label) }}
+					</b-tag>
+					<b-icon :icon="isOpen(row) ? 'chevron-up' : 'chevron-down'" custom-size="mdi-18px" />
+				</button>
 				<span v-else class="has-text-full-03">{{ healthOf(row).text ? $t(healthOf(row).text) : '-' }}</span>
 			</b-table-column>
 
@@ -105,6 +112,49 @@
 				</div>
 			</b-table-column>
 
+			<template #detail="{ row }">
+				<div class="containers-tab__check" data-health-detail>
+					<b-message v-if="healthError[row.id]" class="mb-0" size="is-small" type="is-danger">
+						{{ healthError[row.id] }}
+					</b-message>
+					<p v-else-if="!health[row.id]" class="has-text-full-03">
+						{{ $t('Loading…') }}
+					</p>
+					<template v-else>
+						<template v-if="health[row.id].command">
+							<p class="has-text-full-03">
+								{{ $t('Command') }}
+							</p>
+							<p class="containers-tab__mono mb-2">
+								{{ health[row.id].command }}
+							</p>
+						</template>
+						<p class="has-text-full-03 mb-2">
+							{{ timingOf(health[row.id]) }}
+						</p>
+						<p class="has-text-full-03">
+							{{ $t('Last checks') }}
+						</p>
+						<p v-if="!runsOf(row).length" class="has-text-full-03">
+							{{ $t('The check has not run yet.') }}
+						</p>
+						<p v-for="(check, index) in runsOf(row)" :key="index" :class="check.passed ? 'has-text-success' : 'has-text-danger'"
+							class="containers-tab__mono">
+							{{ check.at }} {{ check.passed ? $t('passed') : $t('failed ({code})', { code: check.exitCode }) }}<template v-if="check.output"> — {{ check.output }}</template>
+						</p>
+					</template>
+					<div class="mt-2">
+						<!-- the Compose tab of an app built from a repository only says where its file is edited -->
+						<b-button v-if="canEditCompose" class="mr-1" data-action="edit-check" rounded size="is-small" @click="$emit('compose')">
+							{{ $t('Edit in Compose') }}
+						</b-button>
+						<b-button data-action="check-logs" rounded size="is-small" @click="open(row, 'logs')">
+							{{ $t('Logs') }}
+						</b-button>
+					</div>
+				</div>
+			</template>
+
 			<template #empty>
 				<p class="has-text-centered has-text-full-03 is-size-7 py-4">
 					{{ $t('Docker knows no container for this app.') }}
@@ -116,15 +166,17 @@
 
 <script>
 import escape from 'lodash/escape'
-import { CONTAINER_STATES, containerActions, containerRows, healthCell } from './containerSummary'
+import { CONTAINER_STATES, containerActions, containerRows, healthCell, healthRuns } from './containerSummary'
 import { renderSize } from '@/mixins/file_utils'
 
 export default {
 	name: 'ContainersTab',
 	props: {
 		appId: { type: String, required: true },
+		// false for an app whose compose file is not edited here (built from a repository)
+		canEditCompose: { type: Boolean, default: true },
 	},
-	emits: ['open'],
+	emits: ['open', 'compose'],
 	data() {
 		return {
 			rows: [],
@@ -138,6 +190,11 @@ export default {
 			// for as long as the sample takes, which is most of the time between two.
 			stats: {},
 			statsTimer: null,
+			// the keys of the rows whose health check is open
+			opened: [],
+			// container id -> its health check, as last read; and what went wrong reading it
+			health: {},
+			healthError: {},
 		}
 	},
 	mounted() {
@@ -216,6 +273,46 @@ export default {
 			return CONTAINER_STATES[row.state]
 		},
 
+		isOpen(row) {
+			return this.opened.includes(row.key)
+		},
+
+		toggle(row) {
+			if (this.isOpen(row)) {
+				this.opened = this.opened.filter(key => key !== row.key)
+				return
+			}
+			this.opened = [...this.opened, row.key]
+			this.loadHealth(row)
+		},
+
+		async loadHealth(row) {
+			const { [row.id]: _gone, ...rest } = this.healthError
+			this.healthError = rest
+			try {
+				const res = await this.$api.container.getContainerHealth(this.appId, row.id)
+				this.health = { ...this.health, [row.id]: res.data.data || {} }
+			} catch (error) {
+				const data = error.response && error.response.data
+				this.healthError = { ...this.healthError, [row.id]: (data && data.message) || error.message }
+			}
+		},
+
+		runsOf(row) {
+			return healthRuns(this.health[row.id] && this.health[row.id].checks)
+		},
+
+		// One sentence for the four numbers of a check; the start period only when there is one.
+		timingOf(check) {
+			const words = this.$t('Every {interval} s, {timeout} s allowed per run. Failed runs in a row before it is unhealthy: {retries}.', {
+				interval: check.interval,
+				timeout: check.timeout,
+				retries: check.retries,
+			})
+
+			return check.start_period ? `${words} ${this.$t('Failed runs in the first {start} s do not count.', { start: check.start_period })}` : words
+		},
+
 		healthOf(row) {
 			return healthCell(row)
 		},
@@ -246,6 +343,10 @@ export default {
 				const res = await this.$openAPI.appManagement.compose.composeAppContainers(this.appId)
 				this.rows = containerRows(res.data.data)
 				this.loadStats()
+				// An open check is re-read with its row. It is closed when its container is
+				// gone or stopped: the chip that would close it is no longer drawn.
+				this.opened = this.opened.filter(key => this.rows.some(row => row.key === key && healthCell(row).tag))
+				this.rows.filter(row => this.isOpen(row)).forEach(row => this.loadHealth(row))
 			} catch (error) {
 				const data = error.response && error.response.data
 				this.error = (data && data.message) || error.message
@@ -280,6 +381,21 @@ export default {
 
   &__actions {
     white-space: nowrap;
+  }
+
+  // the chip and its chevron, as one control
+  &__health {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  &__check {
+    padding: 0.25rem 0.5rem;
   }
 }
 </style>

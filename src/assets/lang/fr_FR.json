@@ -3565,5 +3565,14 @@
   "Files deleted since the last pass may come back when it resumes.": "Des fichiers supprimés depuis la dernière passe peuvent réapparaître à la reprise.",
   "resumed after an interruption": "reprise après une interruption",
   "pass done": "terminée",
-  "forever": "pour toujours"
+  "forever": "pour toujours",
+  "Show the health check": "Afficher le contrôle de santé",
+  "Last checks": "Derniers contrôles",
+  "The check has not run yet.": "Le contrôle n'a pas encore tourné.",
+  "passed": "réussi",
+  "failed ({code})": "échoué ({code})",
+  "Edit in Compose": "Modifier dans Compose",
+  "Every {interval} s, {timeout} s allowed per run. Failed runs in a row before it is unhealthy: {retries}.": "Toutes les {interval} s, {timeout} s accordées par contrôle. Échecs d'affilée avant la mauvaise santé : {retries}.",
+  "Hide the health check": "Masquer le contrôle de santé",
+  "Failed runs in the first {start} s do not count.": "Les échecs des {start} premières secondes ne comptent pas."
 }
