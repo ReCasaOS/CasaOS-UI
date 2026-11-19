@@ -130,6 +130,7 @@ export function newGridState(demo = false) {
 		share: demo ? { name: 'mybox', apps: new Set(['jellyfin', 'nextcloud']) } : { name: '', apps: new Set() },
 		guard: demoGuard(),
 		sync: newSyncState(),
+		cleanup: newCleanup(),
 	}
 }
 
@@ -416,6 +417,66 @@ function upload({ name = '', sha256 }, body, state) {
 	return { status: 201, body: { data: kind === 'iso' && !bootable ? { ...image, warning: 'iso_signature_missing' } : image } }
 }
 
+// The Docker cleanup of a box that removed Immich and kept its data: what is deleted leaves
+// the list, and a volume named `busy` is refused as Docker refuses one taken again.
+function cleanup(verb, path, body, state) {
+	const left = state.cleanup
+	const freed = (list, key, names) => {
+		const result = { removed: [], refused: {}, size: 0 }
+		for (const name of names || []) {
+			const item = list.find(candidate => candidate[key] === name)
+			if (!item || name === 'busy') {
+				result.refused[name] = item ? 'volume is in use' : 'not a leftover any more'
+				continue
+			}
+			list.splice(list.indexOf(item), 1)
+			result.removed.push(name)
+			result.size += Math.max(item.size, 0)
+		}
+		return { status: 200, body: { data: result } }
+	}
+	if (verb === 'GET' && path === '/v2/app_management/cleanup') {
+		return { status: 200, body: { data: left } }
+	}
+	if (verb === 'GET' && path === '/v2/app_management/images/dangling') {
+		return { status: 200, body: { data: left.old } }
+	}
+	if (verb === 'DELETE' && path === '/v2/app_management/images/dangling') {
+		const was = left.old
+		left.old = { count: 0, size: 0 }
+		return { status: 200, body: { data: was } }
+	}
+	if (verb === 'DELETE' && path === '/v2/app_management/cleanup/build-cache') {
+		const size = left.build_cache
+		left.build_cache = 0
+		return { status: 200, body: { data: { removed: [], refused: {}, size } } }
+	}
+	if (verb === 'POST' && path === '/v2/app_management/cleanup/images') {
+		return freed(left.images, 'id', body?.names)
+	}
+	if (verb === 'POST' && path === '/v2/app_management/cleanup/volumes') {
+		return freed(left.volumes, 'name', body?.names)
+	}
+	return null
+}
+
+function newCleanup() {
+	return {
+		old: { count: 4, size: 2.1 * GIB },
+		build_cache: 0.85 * GIB,
+		held: '',
+		images: [
+			{ id: 'sha256:1', tags: ['ghcr.io/immich-app/immich-server:v1.118.0'], size: 1.1 * GIB, created: 1760000000 },
+			{ id: 'sha256:2', tags: ['alpine:3.20'], size: 8 * 1024 * 1024, created: 1750000000 },
+		],
+		volumes: [
+			{ name: 'immich_pgdata', app: 'immich', size: 5.2 * GIB, created: '2026-08-02T10:00:00Z' },
+			{ name: 'busy', size: 0.4 * GIB, created: '2026-10-11T10:00:00Z' },
+			{ name: 'scratch', size: -1 },
+		],
+	}
+}
+
 export function handleGrid({ method = 'GET', path = '', query = {}, body = null } = {}, state = newGridState()) {
 	const verb = method.toUpperCase()
 	if (path === '/v2/virt_management/images/upload') {
@@ -465,6 +526,10 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	// the gateway refuses the plain port, as it does a taken one
 	if (verb === 'PUT' && path === '/v1/gateway/httpsport') {
 		return body?.port === '80' ? { status: 200, body: { success: 400, message: 'port 80 is the web UI port' } } : core(body?.port ?? '')
+	}
+	const cleaned = cleanup(verb, path, body, state)
+	if (cleaned) {
+		return cleaned
 	}
 	if (verb !== 'GET') {
 		return null
