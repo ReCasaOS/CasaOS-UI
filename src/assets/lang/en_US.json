@@ -3563,5 +3563,13 @@
   "resumed after an interruption": "resumed after an interruption",
   "pass done": "done",
   "forever": "forever",
-  "At the first pass, when a file differs the box's version is kept; the cloud's is lost.": "At the first pass, when a file differs the box's version is kept; the cloud's is lost."
+  "At the first pass, when a file differs the box's version is kept; the cloud's is lost.": "At the first pass, when a file differs the box's version is kept; the cloud's is lost.",
+  "Show the health check": "Show the health check",
+  "Last checks": "Last checks",
+  "The check has not run yet.": "The check has not run yet.",
+  "passed": "passed",
+  "failed ({code})": "failed ({code})",
+  "Edit in Compose": "Edit in Compose",
+  "Every {interval} s. A run fails after {timeout} s. Unhealthy after {retries} failed runs in a row.": "Every {interval} s. A run fails after {timeout} s. Unhealthy after {retries} failed runs in a row.",
+  "Failed runs in the first {start} s do not count.": "Failed runs in the first {start} s do not count."
 }

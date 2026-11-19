@@ -193,6 +193,13 @@ const container = {
 		return api.get(`${PREFIX2COMPOSE}/${encodeURIComponent(id)}/containers/stats`)
 	},
 
+	// v2:: the health check of ONE container of an app: its command, its timings
+	// and its last runs. The command and its output come back empty for an account
+	// that is not the owner.
+	getContainerHealth(id, containerId) {
+		return api.get(`${PREFIX2COMPOSE}/${encodeURIComponent(id)}/containers/${encodeURIComponent(containerId)}/health`)
+	},
+
 	// v2:: start, stop or restart ONE container of an app, rather than the whole
 	// stack. The body is a bare JSON string, like the app-level status route it
 	// sits beside -- so it is encoded here: handed a plain string, axios would

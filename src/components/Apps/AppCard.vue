@@ -192,8 +192,8 @@
 
 						<!-- beta dashboard: whether the app is up, under its name -->
 						<p v-if="compact && item.app_type !== 'system'" class="one-line app-state">
-							<span :class="item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
-							{{ item.status === 'running' ? $t('Running') : $t('Stopped') }}
+							<span :class="healthWarning ? healthWarning.dot : item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
+							{{ healthWarning ? $t(healthWarning.label) : item.status === 'running' ? $t('Running') : $t('Stopped') }}
 							<template v-if="memory > 0 && item.status === 'running'"> · {{ renderSize(memory) }}</template>
 						</p>
 
@@ -208,6 +208,12 @@
 						<!-- The compose list could not load this container's stack. Saying so, with
 							the loader's words on hover and in the detail panel, turns "why can I not
 							edit it" into something to fix. -->
+						<!-- It runs, and its health check is not passing: without this line an app
+							whose database stopped answering looks like one in good shape. The beta
+							card says it in its state line above. -->
+						<p v-if="!compact && healthWarning" :class="healthWarning.text" class="one-line _facts">
+							{{ $t(healthWarning.label) }}
+						</p>
 						<p v-if="item.compose_load_error" class="one-line has-text-warning _facts" :title="item.compose_load_error">
 							{{ $t('CasaOS cannot read its compose file.') }}
 						</p>
@@ -226,6 +232,7 @@ import FileSaver from 'file-saver'
 import escape from 'lodash/escape'
 import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
+import { appHealthWarning } from './containerSummary'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
 import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
@@ -323,6 +330,10 @@ export default {
 	},
 
 	computed: {
+		// set while the app runs and its health check fails or has not passed yet
+		healthWarning() {
+			return appHealthWarning(this.item)
+		},
 		// the menu scrolls inside the room it has when it fits neither above nor below the card
 		menuStyle() {
 			return this.menuMaxHeight ? { maxHeight: `${this.menuMaxHeight}px`, overflowY: 'auto' } : null
@@ -1655,6 +1666,14 @@ export default {
 
     &.is-stopped {
       background: #9aa4ad;
+    }
+
+    &.is-unhealthy {
+      background: #ff5c5c;
+    }
+
+    &.is-starting {
+      background: #ffb648;
     }
   }
 }
