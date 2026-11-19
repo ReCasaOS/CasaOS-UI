@@ -48,8 +48,12 @@ export function appHealthWarning(item) {
  * @param {object[]} checks `checks` of `GET /compose/{id}/containers/{id}/health`
  */
 export function healthRuns(checks) {
+	const today = new Date().toDateString()
+	// the time alone for a run of today; a check that runs once a day spreads its last runs over a week
+	const when = at => at.toDateString() === today ? at.toLocaleTimeString() : at.toLocaleString()
+
 	return (checks || []).map(check => ({
-		at: check.started_at ? new Date(check.started_at).toLocaleTimeString() : '',
+		at: check.started_at ? when(new Date(check.started_at)) : '',
 		passed: check.exit_code === 0,
 		exitCode: check.exit_code,
 		output: check.output || '',

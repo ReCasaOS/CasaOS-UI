@@ -10,7 +10,7 @@ import i18n from '@/plugins/i18n'
 vi.mock('@/assets/lang', () => ({
 	default: {
 		en_us: Object.fromEntries([
-			'Every {interval} s. A run fails after {timeout} s. Unhealthy after {retries} failed runs in a row.',
+			'Every {interval} s, {timeout} s allowed per run. Failed runs in a row before it is unhealthy: {retries}.',
 			'Failed runs in the first {start} s do not count.',
 			'failed ({code})',
 		].map(key => [key, key])),
@@ -245,7 +245,7 @@ describe('containersTab', () => {
 		expect(getContainerHealth).toHaveBeenCalledWith('jellyfin', 'j1')
 		const detail = wrapper.find('[data-health-detail]')
 		expect(detail.text()).toContain('curl -f http://localhost:8096/health')
-		expect(detail.text()).toContain('Every 30 s. A run fails after 5 s. Unhealthy after 3 failed runs in a row.')
+		expect(detail.text()).toContain('Every 30 s, 5 s allowed per run. Failed runs in a row before it is unhealthy: 3.')
 		// no start period, no sentence about one
 		expect(detail.text()).not.toContain('do not count')
 		expect(detail.text()).toContain('failed (1) — connection refused')
@@ -273,7 +273,7 @@ describe('containersTab', () => {
 		await flushPromises()
 
 		const detail = wrapper.find('[data-health-detail]')
-		expect(detail.text()).not.toContain('Check')
+		expect(detail.text()).not.toContain('Command')
 		expect(detail.text()).toContain('Failed runs in the first 60 s do not count.')
 		wrapper.unmount()
 	})
@@ -309,6 +309,21 @@ describe('containersTab', () => {
 
 		expect(wrapper.find('[data-action="edit-check"]').exists()).toBe(false)
 		expect(wrapper.find('[data-action="check-logs"]').exists()).toBe(true)
+		wrapper.unmount()
+	})
+	it('closes an open health check when its container stops: the chip that closes it is gone', async () => {
+		const { wrapper, composeAppContainers } = await setup()
+		await wrapper.find('[data-action="health"]').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('[data-health-detail]').exists()).toBe(true)
+
+		const stopped = { ...DATA.containers.jellyfin[0], State: 'exited', Status: 'Exited (0) 1 second ago', Health: '' }
+		composeAppContainers.mockResolvedValue({ data: { data: { ...DATA, containers: { ...DATA.containers, jellyfin: [stopped] } } } })
+		await wrapper.vm.load()
+		await flushPromises()
+
+		expect(wrapper.find('[data-action="health"]').exists()).toBe(false)
+		expect(wrapper.find('[data-health-detail]').exists()).toBe(false)
 		wrapper.unmount()
 	})
 })

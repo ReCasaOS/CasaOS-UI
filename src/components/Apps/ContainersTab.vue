@@ -34,7 +34,7 @@
 			<b-table-column v-slot="{ row }" :label="$t('Health')" field="health">
 				<!-- The chip opens what it stands for: the command, how often it runs and
 					what it last answered. -->
-				<button v-if="healthOf(row).tag" :aria-expanded="isOpen(row)" :title="$t('Show the health check')"
+				<button v-if="healthOf(row).tag" :aria-expanded="isOpen(row)" :title="isOpen(row) ? $t('Hide the health check') : $t('Show the health check')"
 					class="containers-tab__health" data-action="health" type="button" @click="toggle(row)">
 					<b-tag :type="healthOf(row).tag.type">
 						{{ $t(healthOf(row).tag.label) }}
@@ -123,7 +123,7 @@
 					<template v-else>
 						<template v-if="health[row.id].command">
 							<p class="has-text-full-03">
-								{{ $t('Check') }}
+								{{ $t('Command') }}
 							</p>
 							<p class="containers-tab__mono mb-2">
 								{{ health[row.id].command }}
@@ -144,7 +144,7 @@
 						</p>
 					</template>
 					<div class="mt-2">
-						<!-- an app built from a repository has no Compose tab to send to -->
+						<!-- the Compose tab of an app built from a repository only says where its file is edited -->
 						<b-button v-if="canEditCompose" class="mr-1" data-action="edit-check" rounded size="is-small" @click="$emit('compose')">
 							{{ $t('Edit in Compose') }}
 						</b-button>
@@ -304,7 +304,7 @@ export default {
 
 		// One sentence for the four numbers of a check; the start period only when there is one.
 		timingOf(check) {
-			const words = this.$t('Every {interval} s. A run fails after {timeout} s. Unhealthy after {retries} failed runs in a row.', {
+			const words = this.$t('Every {interval} s, {timeout} s allowed per run. Failed runs in a row before it is unhealthy: {retries}.', {
 				interval: check.interval,
 				timeout: check.timeout,
 				retries: check.retries,
@@ -343,8 +343,9 @@ export default {
 				const res = await this.$openAPI.appManagement.compose.composeAppContainers(this.appId)
 				this.rows = containerRows(res.data.data)
 				this.loadStats()
-				// an open check is re-read with its row; one whose container is gone is closed
-				this.opened = this.opened.filter(key => this.rows.some(row => row.key === key))
+				// An open check is re-read with its row. It is closed when its container is
+				// gone or stopped: the chip that would close it is no longer drawn.
+				this.opened = this.opened.filter(key => this.rows.some(row => row.key === key && healthCell(row).tag))
 				this.rows.filter(row => this.isOpen(row)).forEach(row => this.loadHealth(row))
 			} catch (error) {
 				const data = error.response && error.response.data
