@@ -167,6 +167,10 @@
 								the image badge, since a failed build matters more than a newer image. -->
 							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
 							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
+							<!-- a newer version of an image pinned to one: said, chosen in the settings -->
+							<CTooltip v-else-if="!compact && newerBadge" :title="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
+								:aria-label="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
+								class="__position __position-wide" :content="newerBadge.tag" data-newer-badge />
 						</div>
 
 						<!-- Loading Bar Start -->
@@ -233,6 +237,7 @@ import escape from 'lodash/escape'
 import { ageKey, containerFacts } from './legacyApps'
 import { gitBadge, withoutContainer } from './gitApps'
 import { appHealthWarning } from './containerSummary'
+import { newerBadgeOf } from './newerTags'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
 import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
@@ -330,6 +335,10 @@ export default {
 	},
 
 	computed: {
+		// the smallest newer version the box found for the app's pinned images
+		newerBadge() {
+			return newerBadgeOf(this.item.newer_tags)
+		},
 		// set while the app runs and its health check fails or has not passed yet
 		healthWarning() {
 			return appHealthWarning(this.item)

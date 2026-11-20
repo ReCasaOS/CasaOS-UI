@@ -90,7 +90,8 @@ const APPS = [
 	// a health check that has not passed yet, and one that fails: what the card says of each
 	{ ...anApp('nextcloud', 'Nextcloud', '10081', 'nextcloud:latest'), health: 'starting' },
 	{ ...anApp('immich', 'Immich', '2283', 'ghcr.io/immich-app/immich-server:release'), health: 'unhealthy' },
-	anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:latest'),
+	// pinned to a version, and the registry holds newer ones
+	{ ...anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:1.40.2'), newer_tags: [{ service: 'plex', image: 'plexinc/pms-docker:1.40.2', current: '1.40.2', patch: '1.40.5', minor: '1.41.3' }] },
 ]
 
 const UTILIZATION = {
