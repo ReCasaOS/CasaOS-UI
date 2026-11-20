@@ -17,9 +17,10 @@ const GRID = [
 
 const answer = data => vi.fn(() => Promise.resolve({ data: { data } }))
 
-async function open({ view = { apps: [], runs: [] }, setAutoUpdate } = {}) {
+async function open({ view = { apps: [], min_days: 3, runs: [] }, setAutoUpdate, setAutoUpdateWait } = {}) {
 	const updates = {
 		autoUpdate: answer(view),
+		setAutoUpdateWait: setAutoUpdateWait || vi.fn(days => Promise.resolve({ data: { data: { ...view, min_days: days } } })),
 		setAutoUpdate: setAutoUpdate || vi.fn((name, on) => Promise.resolve({ data: { data: { apps: on ? [name] : [], next: on ? '2026-11-21T03:00:00Z' : undefined, runs: [] } } })),
 	}
 	const wrapper = mount(AppAutoUpdateModal, {
@@ -32,6 +33,11 @@ async function open({ view = { apps: [], runs: [] }, setAutoUpdate } = {}) {
 			stubs: {
 				'b-button': true,
 				'b-message': { render() { return h('div', this.$slots.default()) } },
+				'b-select': {
+					props: ['modelValue', 'disabled'],
+					emits: ['update:modelValue'],
+					render() { return h('select', { 'value': this.modelValue, 'data-value': String(this.modelValue), 'onChange': event => this.$emit('update:modelValue', Number(event.target.value)) }, this.$slots.default?.()) },
+				},
 				// as Buefy's: it keeps what was clicked, and follows the prop only when it changes
 				'b-switch': {
 					props: ['modelValue', 'disabled'],
@@ -92,11 +98,13 @@ describe('the automatic app updates window', () => {
 	it('says what became of each app the last nights', async () => {
 		const view = {
 			apps: ['immich', 'jellyfin'],
+			min_days: 3,
 			next: '2026-11-21T03:00:00Z',
 			runs: [
 				{ at: '2026-11-20T03:00:05Z', apps: [
 					{ id: 'immich', state: 'failed', message: 'the app did not start' },
 					{ id: 'jellyfin', state: 'updated' },
+					{ id: 'plex', state: 'queued', message: 'waiting: a new version was found on 2026-11-19; applied from 2026-11-22' },
 				] },
 				{ at: '2026-11-19T03:00:05Z', apps: [] },
 			],
@@ -106,6 +114,7 @@ describe('the automatic app updates window', () => {
 		const runs = wrapper.findAll('[data-run]').map(run => run.text())
 		expect(runs[0]).toContain('Immich · Failed — the app did not start')
 		expect(runs[0]).toContain('Jellyfin · Updated')
+		expect(runs[0]).toContain('plex · Waiting — waiting: a new version was found on 2026-11-19; applied from 2026-11-22')
 		expect(runs[1]).toContain('Nothing to do.')
 		expect(wrapper.find('[data-next]').exists()).toBe(true)
 		wrapper.unmount()
@@ -124,6 +133,20 @@ describe('the automatic app updates window', () => {
 		answer({ data: { data: { apps: ['jellyfin'], runs: [] } } })
 		await flushPromises()
 		expect(wrapper.find('[data-app="immich"] button').attributes('disabled')).toBeUndefined()
+		wrapper.unmount()
+	})
+
+	it('shows the wait the box holds, and sets another', async () => {
+		const { wrapper, updates } = await open()
+
+		const select = wrapper.find('[data-action="wait"]')
+		expect(select.attributes('data-value')).toBe('3')
+		expect(select.findAll('option').map(option => option.text())).toEqual(['No wait', '1 day', '3 days', '7 days'])
+		await select.setValue('7')
+		await flushPromises()
+
+		expect(updates.setAutoUpdateWait).toHaveBeenCalledWith(7)
+		expect(wrapper.find('[data-action="wait"]').attributes('data-value')).toBe('7')
 		wrapper.unmount()
 	})
 

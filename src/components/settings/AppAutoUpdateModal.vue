@@ -24,6 +24,22 @@
 					{{ $t('Next night: {date}', { date: whenOf(view.next) }) }}
 				</p>
 
+				<div class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="wait">
+					<div class="is-flex-grow-1">
+						<div class="has-text-weight-semibold">
+							{{ $t('Wait before updating') }}
+						</div>
+						<div class="is-size-7 _has-text-gray">
+							{{ $t('An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.') }}
+						</div>
+					</div>
+					<b-select :disabled="!!saving" :model-value="view.min_days" data-action="wait" size="is-small" @update:model-value="setWait">
+						<option v-for="days in waits" :key="days" :value="days">
+							{{ waitText(days) }}
+						</option>
+					</b-select>
+				</div>
+
 				<div class="settings-card" data-row="apps">
 					<p v-if="!apps.length" class="is-size-7 _has-text-gray">
 						{{ $t('No app can update by itself: apps built from a repository deploy by themselves already.') }}
@@ -75,6 +91,7 @@ const STATES = {
 	updated: 'Updated',
 	current: 'Up to date',
 	failed: 'Failed',
+	queued: 'Waiting',
 }
 
 export default {
@@ -95,6 +112,12 @@ export default {
 		}
 	},
 	computed: {
+		// the choices, and the box's own value when it is none of them
+		waits() {
+			const choices = [0, 1, 3, 7]
+			return choices.includes(this.view.min_days) ? choices : [...choices, this.view.min_days].sort((a, b) => a - b)
+		},
+
 		lastRuns() {
 			return this.view.runs.slice(0, 5)
 		},
@@ -142,6 +165,25 @@ export default {
 				this.error = this.messageOf(error)
 			} finally {
 				this.isLoading = false
+			}
+		},
+
+		waitText(days) {
+			if (days === 0)
+				return this.$t('No wait')
+			return days === 1 ? this.$t('1 day') : this.$t('{days} days', { days })
+		},
+
+		async setWait(days) {
+			this.saving = 'wait'
+			this.error = ''
+			try {
+				this.view = (await this.$api.updates.setAutoUpdateWait(days)).data.data
+			} catch (error) {
+				this.error = this.messageOf(error)
+				this.redraw++
+			} finally {
+				this.saving = ''
 			}
 		},
 

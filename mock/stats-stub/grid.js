@@ -457,7 +457,10 @@ function cleanup(verb, path, body, state) {
 	if (verb === 'POST' && path === '/v2/app_management/cleanup/volumes') {
 		return freed(left.volumes, 'name', body?.names)
 	}
-	if (verb === 'GET' && path === '/v2/app_management/auto-update') {
+	if (path === '/v2/app_management/auto-update' && (verb === 'GET' || verb === 'PUT')) {
+		if (verb === 'PUT') {
+			left.autoUpdate.min_days = body?.min_days ?? left.autoUpdate.min_days
+		}
 		return { status: 200, body: { data: left.autoUpdate } }
 	}
 	const autoUpdate = verb === 'PUT' && path.match(/^\/v2\/app_management\/compose\/([^/]+)\/auto-update$/)
@@ -490,7 +493,8 @@ function newCleanup() {
 		held: '',
 		autoUpdate: {
 			apps: ['jellyfin'],
-			next: '2026-11-21T03:00:00Z',
+			min_days: 3,
+			next: '2026-11-21T02:00:00Z',
 			runs: [{ at: '2026-11-20T03:00:04Z', apps: [{ id: 'jellyfin', state: 'updated' }] }],
 		},
 		schedule: {

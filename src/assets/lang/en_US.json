@@ -3621,5 +3621,10 @@
   "Last nights": "Last nights",
   "No night has run yet.": "No night has run yet.",
   "Nothing to do.": "Nothing to do.",
-  "Updated": "Updated"
+  "Updated": "Updated",
+  "Wait before updating": "Wait before updating",
+  "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.": "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.",
+  "No wait": "No wait",
+  "1 day": "1 day",
+  "{days} days": "{days} days"
 }
