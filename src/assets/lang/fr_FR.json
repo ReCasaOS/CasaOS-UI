@@ -3655,5 +3655,12 @@
   "{name} is already here. Replace it?": "{name} existe déjà ici. Le remplacer ?",
   "Delete the folder {name} and all it holds? This cannot be undone.": "Supprimer le dossier {name} et tout son contenu ? C’est définitif.",
   "Delete {name}? This cannot be undone.": "Supprimer {name} ? C’est définitif.",
-  "The change could not be made.": "La modification n’a pas pu être faite."
+  "The change could not be made.": "La modification n’a pas pu être faite.",
+  "Folders in Files": "Dossiers dans Fichiers",
+  "No folder: Files stays closed to this account.": "Aucun dossier : Fichiers reste fermé à ce compte.",
+  "Access to {path}": "Accès à {path}",
+  "Remove {path}": "Retirer {path}",
+  "Add a folder": "Ajouter un dossier",
+  "This folder is already given, or is inside or around a folder given to this account.": "Ce dossier est déjà donné, ou se trouve dans ou autour d’un dossier donné à ce compte.",
+  "The folders could not be saved": "Les dossiers n’ont pas pu être enregistrés"
 }

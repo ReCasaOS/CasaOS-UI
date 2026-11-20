@@ -16,14 +16,14 @@
 						</span>
 					</div>
 				</b-tooltip>
-				<b-tooltip :label="$t('Cut')" :type="type">
+				<b-tooltip v-if="canChange" :label="$t('Cut')" :type="type">
 					<div class="toolbar-item" @click.stop="move">
 						<span class="has-text-white block">
 							<b-icon icon="sending-files-outline" :size="size" pack="casa"></b-icon>
 						</span>
 					</div>
 				</b-tooltip>
-				<b-tooltip :label="$t('Delete')" :type="type">
+				<b-tooltip v-if="canChange" :label="$t('Delete')" :type="type">
 					<div class="toolbar-item" @click.stop="remove">
 						<span class="has-text-white block">
 							<b-icon icon="trash-outline" :size="size" pack="casa"></b-icon>
@@ -46,6 +46,11 @@
 export default {
 	name: 'operation-toolbar',
 	props: {
+		// what is shown may be changed (an account in a folder it may only read may not)
+		canChange: {
+			type: Boolean,
+			default: true,
+		},
 		modelValue: Boolean,
 	},
 	data() {

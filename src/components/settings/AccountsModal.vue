@@ -39,6 +39,24 @@
 							<p class="right-help is-size-7 _has-text-gray ml-5">{{ $t(m.help) }}</p>
 						</div>
 					</div>
+					<!-- the folders of Files the account reaches, each to read or to read and write; none: no Files -->
+					<div v-if="a.role !== 'admin'" class="ml-2 mt-2 folders" :data-folders="a.id">
+						<p class="is-size-7 has-text-weight-semibold mb-1">{{ $t('Folders in Files') }}</p>
+						<p v-if="!foldersOf(a).length" class="is-size-7 _has-text-gray mb-1">{{ $t('No folder: Files stays closed to this account.') }}</p>
+						<div v-for="f in foldersOf(a)" :key="f.path" class="is-flex is-align-items-center mb-1" :data-folder="f.path">
+							<span class="is-size-7 is-flex-grow-1 folder-path">{{ f.path }}</span>
+							<b-select :disabled="!!savingFolders[a.id]" :model-value="f.write ? 'write' : 'read'" size="is-small"
+								:aria-label="$t('Access to {path}', { path: f.path })" @update:model-value="setFolderWrite(a, f.path, $event === 'write')">
+								<option value="read">{{ $t('Read') }}</option>
+								<option value="write">{{ $t('Read and write') }}</option>
+							</b-select>
+							<b-button :disabled="!!savingFolders[a.id]" class="ml-1 remove-folder" icon-left="close" rounded size="is-small" type="is-text"
+								:aria-label="$t('Remove {path}', { path: f.path })" @click="removeFolder(a, f.path)" />
+						</div>
+						<b-button :disabled="!!savingFolders[a.id]" class="add-folder" icon-left="folder-plus-outline" rounded size="is-small" @click="addFolder(a)">
+							{{ $t('Add a folder') }}
+						</b-button>
+					</div>
 				</div>
 
 				<!-- an uninstalled app keeps its entry, so what it left stays hidden; the owner removes the ones no longer wanted -->
@@ -75,7 +93,8 @@
 
 <script>
 import escape from 'lodash/escape'
-import { createAccount, deleteAccount, listAccounts, setRights } from '@/service/accounts'
+import { createAccount, deleteAccount, listAccounts, setFolders, setRights } from '@/service/accounts'
+import PathPicker from '@/components/VirtualMachines/PathPicker.vue'
 import { forgetApp, listOrphans } from '@/service/visibility'
 
 // the box's own minimum for a password
@@ -95,7 +114,7 @@ export default {
 	name: 'AccountsModal',
 	emits: ['close'],
 	data() {
-		return { accounts: [], orphans: [], username: '', password: '', error: '', saving: false, savingRights: {}, modules: MODULES, rowVersion: {} }
+		return { accounts: [], orphans: [], username: '', password: '', error: '', saving: false, savingRights: {}, savingFolders: {}, modules: MODULES, rowVersion: {} }
 	},
 	computed: {
 		// the stored role opens the screen only once the server has confirmed it
@@ -203,6 +222,54 @@ export default {
 			// the row was drawn again: the keyboard goes back to the box it was on
 			await this.$nextTick()
 			this.$el.querySelector?.(`input[name="right-${account.id}-${name}"]`)?.focus()
+			await this.refresh()
+		},
+		foldersOf(account) {
+			return Array.isArray(account.folders) ? account.folders : []
+		},
+		// one folder, one mode: a folder inside another of the account, or holding one, is refused
+		nested(account, path) {
+			return this.foldersOf(account).some(f => f.path === path || path.startsWith(`${f.path}/`) || f.path.startsWith(`${path}/`))
+		},
+		addFolder(account) {
+			const modal = this.$buefy.modal.open({
+				component: PathPicker,
+				hasModalCard: true,
+				trapFocus: true,
+				props: { folderOnly: true, start: '/DATA' },
+				events: {
+					select: (path) => {
+						modal.close()
+						if (this.nested(account, path)) {
+							this.error = this.$t('This folder is already given, or is inside or around a folder given to this account.')
+							return
+						}
+						this.saveFolders(account, [...this.foldersOf(account), { path, write: false }])
+					},
+				},
+			})
+		},
+		setFolderWrite(account, path, write) {
+			this.saveFolders(account, this.foldersOf(account).map(f => (f.path === path ? { path, write } : f)))
+		},
+		removeFolder(account, path) {
+			this.saveFolders(account, this.foldersOf(account).filter(f => f.path !== path))
+		},
+		// the whole list is sent; the account shows what the server kept
+		async saveFolders(account, folders) {
+			if (this.savingFolders[account.id]) {
+				return
+			}
+			this.savingFolders[account.id] = true
+			this.error = ''
+			try {
+				const saved = (await setFolders(account.id, folders)).data?.data
+				account.folders = Array.isArray(saved) ? saved : folders
+			} catch (e) {
+				this.error = this.reason(e, this.$t('The folders could not be saved'))
+			} finally {
+				this.savingFolders[account.id] = false
+			}
 			await this.refresh()
 		},
 		async create() {

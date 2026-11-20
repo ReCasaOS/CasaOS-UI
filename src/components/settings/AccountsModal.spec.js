@@ -7,7 +7,8 @@ import AccountsModal from './AccountsModal.vue'
 import getters from '@/store/getters'
 import i18n from '@/plugins/i18n'
 
-const api = vi.hoisted(() => ({ listAccounts: vi.fn(), createAccount: vi.fn(), deleteAccount: vi.fn(), setRights: vi.fn() }))
+const api = vi.hoisted(() => ({ listAccounts: vi.fn(), createAccount: vi.fn(), deleteAccount: vi.fn(), setRights: vi.fn(), setFolders: vi.fn() }))
+vi.mock('@/components/VirtualMachines/PathPicker.vue', () => ({ default: { render: () => null } }))
 vi.mock('@/service/accounts', () => api)
 const visibility = vi.hoisted(() => ({ listOrphans: vi.fn(), forgetApp: vi.fn() }))
 vi.mock('@/service/visibility', () => visibility)
@@ -20,6 +21,8 @@ const accounts = [
 
 let wrapper
 let store
+// the folder the picker answers, null for a picker closed without one
+let picked = null
 function open(role, roleConfirmed = true) {
 	const state = reactive({ user: { role }, roleConfirmed })
 	store = state
@@ -29,7 +32,11 @@ function open(role, roleConfirmed = true) {
 			plugins: [Buefy, i18n],
 			mocks: {
 				$store: { state, getters: { get isAdmin() { return getters.isAdmin(state) } } },
-				$buefy: { dialog: { confirm: opts => opts.onConfirm() } },
+				$buefy: { dialog: { confirm: opts => opts.onConfirm() }, modal: { open: (opts) => {
+					if (picked !== null)
+						Promise.resolve().then(() => opts.events.select(picked))
+					return { close() {} }
+				} } },
 			},
 		},
 	})
@@ -355,5 +362,49 @@ describe('the account getters', () => {
 		expect(getters.canWrite(state)).toBe(expected)
 		expect(getters.isAdmin(state)).toBe(expected)
 		expect(getters.canReadModule(state)('files')).toBe(expected)
+	})
+
+	describe('the folders of an account', () => {
+		const withFolders = folders => [accounts[0], { ...accounts[1], folders }]
+		beforeEach(() => {
+			api.setFolders.mockReset().mockImplementation((id, folders) => ok(folders))
+		})
+
+		it('says Files is closed to an account with no folder, and gives one picked, to read', async () => {
+			await open('admin')
+			expect(wrapper.find('[data-folders="2"]').text()).toContain('Files stays closed')
+			expect(wrapper.find('[data-folders="1"]').exists()).toBe(false) // the owner reaches everything
+
+			picked = '/DATA/Kids'
+			await wrapper.find('[data-folders="2"] button.add-folder').trigger('click')
+			await flushPromises()
+			expect(api.setFolders).toHaveBeenCalledWith(2, [{ path: '/DATA/Kids', write: false }])
+		})
+
+		it('lets a folder be written, and takes one away', async () => {
+			api.listAccounts.mockImplementation(() => ok(withFolders([{ path: '/DATA/Kids', write: false }, { path: '/DATA/Media', write: false }])))
+			await open('admin')
+
+			await wrapper.find('[data-folder="/DATA/Kids"] select').setValue('write')
+			await flushPromises()
+			expect(api.setFolders).toHaveBeenLastCalledWith(2, [{ path: '/DATA/Kids', write: true }, { path: '/DATA/Media', write: false }])
+
+			await wrapper.find('[data-folder="/DATA/Media"] button.remove-folder').trigger('click')
+			await flushPromises()
+			expect(api.setFolders).toHaveBeenLastCalledWith(2, [{ path: '/DATA/Kids', write: false }])
+		})
+
+		it('refuses a folder inside or around one already given, before asking the box', async () => {
+			api.listAccounts.mockImplementation(() => ok(withFolders([{ path: '/DATA/Kids', write: true }])))
+			await open('admin')
+
+			for (const path of ['/DATA/Kids', '/DATA/Kids/school', '/DATA']) {
+				picked = path
+				await wrapper.find('[data-folders="2"] button.add-folder').trigger('click')
+				await flushPromises()
+			}
+			expect(api.setFolders).not.toHaveBeenCalled()
+			expect(wrapper.text()).toContain('inside or around')
+		})
 	})
 })

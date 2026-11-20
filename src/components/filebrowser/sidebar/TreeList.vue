@@ -25,7 +25,7 @@
 
 <script>
 import has from 'lodash/has'
-import { homeFolders } from '../fileRoot.js'
+import { accountFolderItems, homeFolders } from '../fileRoot.js'
 import TreeListItem from './TreeListItem.vue'
 import { checkStarred } from './starred.js'
 import { mixin } from '@/mixins/mixin'
@@ -73,6 +73,10 @@ export default {
 		initFolders() {
 			return homeFolders(this.filePanel.rootPath || '/DATA')
 		},
+		// an account sees its folders, in place of Root and the home folders
+		accountItems() {
+			return this.filePanel.accountFolders ? accountFolderItems(this.filePanel.accountFolders.folders) : null
+		},
 	},
 	watch: {
 		'filePanel.fileRootReady': function (ready) {
@@ -104,6 +108,12 @@ export default {
 	},
 	methods: {
 		async getNewList() {
+			if (this.accountItems) {
+				this.rootDataList = []
+				this.dataList = this.accountItems
+				this.refreshStarred()
+				return
+			}
 			const newList = await this.$api.folder.getList(this.rootDataList[0].path)
 			const dataList = await this.$api.folder.getList(this.initFolders[0].path)
 
