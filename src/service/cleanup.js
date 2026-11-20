@@ -20,6 +20,11 @@ const cleanup = {
 	removeVolumes(names) {
 		return api.post(`${PREFIX}/volumes`, { names })
 	},
+
+	// moves aside the folders of apps that are gone; nothing is deleted
+	removeOrphans(names) {
+		return api.post(`${PREFIX}/orphans`, { names })
+	},
 }
 
 export default cleanup

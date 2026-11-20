@@ -33,6 +33,35 @@
 				<span v-if="report.detail" class="docker-cleanup__mono">{{ report.detail }}</span>
 			</b-message>
 
+			<!-- Folders of apps that are gone: shown first, since one of them is the usual
+				reason an app cannot be read -->
+			<div v-if="orphans.length" class="settings-card" data-row="orphans">
+				<div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
+					<div class="is-flex-grow-1">
+						<div class="has-text-weight-semibold">
+							{{ $t('Apps that left a folder behind') }}
+						</div>
+						<div class="is-size-7 _has-text-gray">
+							{{ $t('Folders with no container: {count}. These apps are not on the dashboard, and their folder still keeps their images and volumes out of the lists below.', { count: orphans.length }) }}
+						</div>
+					</div>
+					<b-button :aria-expanded="open === 'orphans'" data-action="review-orphans" rounded size="is-small" @click="review('orphans')">
+						{{ open === 'orphans' ? $t('Close') : $t('Review') }}
+					</b-button>
+				</div>
+				<div v-if="open === 'orphans'" class="mt-2">
+					<div v-for="name in orphans" :key="name" class="docker-cleanup__item">
+						<b-checkbox v-model="pickedOrphans" :native-value="name" size="is-small">
+							<span class="docker-cleanup__mono">{{ name }}</span>
+						</b-checkbox>
+					</div>
+					<b-button :disabled="!pickedOrphans.length || !!busy" :loading="busy === 'orphans'" class="mt-2" data-action="move-orphans" rounded size="is-small"
+						@click="moveOrphans">
+						{{ $t('Move the ticked folders aside ({count})', { count: pickedOrphans.length }) }}
+					</b-button>
+				</div>
+			</div>
+
 			<!-- Old app versions: the images an update replaced -->
 			<div v-if="old" class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="old">
 				<div class="is-flex-grow-1">
@@ -169,6 +198,7 @@ export default {
 			open: '',
 			pickedImages: [],
 			pickedVolumes: [],
+			pickedOrphans: [],
 			// false until the images were opened once: they come ticked then, and what
 			// the owner unticks stays unticked
 			imagesOpened: false,
@@ -178,6 +208,11 @@ export default {
 		// true while the box offers nothing: an operation runs, or an app cannot be read
 		held() {
 			return !!(this.report && this.report.held)
+		},
+
+		// a box older than the row sends no list
+		orphans() {
+			return (this.report && this.report.orphans) || []
 		},
 
 		heldText() {
@@ -220,6 +255,7 @@ export default {
 				// what is ticked is kept only while it is still listed
 				this.pickedImages = this.pickedImages.filter(id => report.images.some(image => image.id === id))
 				this.pickedVolumes = this.pickedVolumes.filter(name => report.volumes.some(volume => volume.name === name))
+				this.pickedOrphans = this.pickedOrphans.filter(name => (report.orphans || []).includes(name))
 			} catch (error) {
 				this.error = this.messageOf(error)
 			} finally {
@@ -239,7 +275,7 @@ export default {
 
 		// One deletion at a time; what it freed and what was kept are said, then the
 		// lists are read again.
-		async run(row, call) {
+		async run(row, call, said) {
 			this.busy = row
 			this.error = ''
 			this.done = ''
@@ -248,7 +284,9 @@ export default {
 			try {
 				const result = (await call()).data.data || {}
 				// a deletion the box refused whole freed nothing, and the line below says why
-				if (result.size > 0 || (result.removed || []).length)
+				if (said && (result.removed || []).length)
+					this.done = said(result)
+				else if (result.size > 0 || (result.removed || []).length)
 					this.done = this.$t('Freed {size}', { size: renderSize(result.size || 0) })
 				this.kept = Object.entries(result.refused || {}).map(([name, why]) => `${name}: ${why}`)
 			} catch (error) {
@@ -295,6 +333,18 @@ export default {
 				confirmText: this.$t('Delete'),
 				cancelText: this.$t('Cancel'),
 				onConfirm: () => this.run('images', () => this.$api.cleanup.removeImages(names)),
+			})
+		},
+
+		moveOrphans() {
+			const names = [...this.pickedOrphans]
+			this.$buefy.dialog.confirm({
+				title: this.$t('Move the ticked folders aside ({count})', { count: escape(String(names.length)) }),
+				message: this.$t('The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}', { names: names.map(name => escape(name)).join(', ') }),
+				type: 'is-warning',
+				confirmText: this.$t('Move aside'),
+				cancelText: this.$t('Cancel'),
+				onConfirm: () => this.run('orphans', () => this.$api.cleanup.removeOrphans(names), result => this.$t('Moved aside: {names}', { names: result.removed.join(', ') })),
 			})
 		},
 

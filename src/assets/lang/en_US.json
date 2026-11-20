@@ -3597,5 +3597,11 @@
   "The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.": "The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.",
   "No container uses them and no installed app names them. An app that needs one again downloads it.": "No container uses them and no installed app names them. An app that needs one again downloads it.",
   "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}": "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}",
-  "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.": "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone."
+  "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.": "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.",
+  "Apps that left a folder behind": "Apps that left a folder behind",
+  "Folders with no container: {count}. These apps are not on the dashboard, and their folder still keeps their images and volumes out of the lists below.": "Folders with no container: {count}. These apps are not on the dashboard, and their folder still keeps their images and volumes out of the lists below.",
+  "Move the ticked folders aside ({count})": "Move the ticked folders aside ({count})",
+  "Move aside": "Move aside",
+  "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}": "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}",
+  "Moved aside: {names}": "Moved aside: {names}"
 }

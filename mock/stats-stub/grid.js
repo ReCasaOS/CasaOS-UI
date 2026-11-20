@@ -457,6 +457,11 @@ function cleanup(verb, path, body, state) {
 	if (verb === 'POST' && path === '/v2/app_management/cleanup/volumes') {
 		return freed(left.volumes, 'name', body?.names)
 	}
+	if (verb === 'POST' && path === '/v2/app_management/cleanup/orphans') {
+		const removed = (body?.names || []).filter(name => left.orphans.includes(name))
+		left.orphans = left.orphans.filter(name => !removed.includes(name))
+		return { status: 200, body: { data: { removed, refused: {}, size: 0 } } }
+	}
 	return null
 }
 
@@ -465,6 +470,8 @@ function newCleanup() {
 		old: { count: 4, size: 2.1 * GIB },
 		build_cache: 0.85 * GIB,
 		held: '',
+		// an app that is gone and left its folder
+		orphans: ['linuxserver-qbittorrent'],
 		images: [
 			{ id: 'sha256:1', tags: ['ghcr.io/immich-app/immich-server:v1.118.0'], size: 1.1 * GIB, created: 1760000000 },
 			{ id: 'sha256:2', tags: ['alpine:3.20'], size: 8 * 1024 * 1024, created: 1750000000 },
