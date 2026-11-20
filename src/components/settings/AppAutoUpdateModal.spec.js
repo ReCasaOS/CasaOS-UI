@@ -71,6 +71,17 @@ describe('the automatic app updates window', () => {
 		wrapper.unmount()
 	})
 
+	it('shows the default icon for an app without one, or whose icon does not load', async () => {
+		const { wrapper } = await open()
+
+		const icon = wrapper.find('[data-app="jellyfin"] [data-icon]')
+		expect(icon.attributes('src')).toBe(wrapper.vm.defaultIcon)
+		icon.element.src = 'https://example.invalid/broken.png'
+		await icon.trigger('error')
+		expect(icon.element.getAttribute('src')).toBe(wrapper.vm.defaultIcon)
+		wrapper.unmount()
+	})
+
 	it('turns an app on, and says the night the box answers', async () => {
 		const { wrapper, updates } = await open()
 

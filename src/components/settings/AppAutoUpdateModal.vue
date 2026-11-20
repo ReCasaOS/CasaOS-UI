@@ -45,7 +45,8 @@
 						{{ $t('No app can update by itself: apps built from a repository deploy by themselves already.') }}
 					</p>
 					<div v-for="app in apps" :key="app.name" class="app-auto-update__app is-flex is-align-items-center" :data-app="app.name">
-						<img v-if="app.icon" :src="app.icon" alt="" class="app-auto-update__icon mr-2">
+						<!-- the card's default icon for an app without one, or whose icon does not load -->
+						<img :src="app.icon || defaultIcon" alt="" class="app-auto-update__icon mr-2" data-icon @error="$event.target.src = defaultIcon">
 						<span class="is-flex-grow-1">{{ app.title }}</span>
 						<b-switch :key="`${app.name}-${redraw}`" :disabled="!!saving" :model-value="isOn(app.name)" size="is-small" @update:model-value="set(app.name, $event)">
 							<span class="is-sr-only">{{ $t('Update {app} automatically', { app: app.title }) }}</span>
@@ -85,6 +86,7 @@
 
 <script>
 import { ice_i18n } from '@/mixins/base/common-i18n'
+import defaultIcon from '@/assets/img/app/default.svg'
 
 // what became of an app, in the words of the "Update every app" window
 const STATES = {
@@ -99,6 +101,7 @@ export default {
 	emits: ['close'],
 	data() {
 		return {
+			defaultIcon,
 			// GET /auto-update: { apps, next, runs }
 			view: null,
 			// the compose apps the night can update: not the ones built from a repository
