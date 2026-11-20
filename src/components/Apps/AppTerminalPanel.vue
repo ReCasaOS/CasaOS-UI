@@ -40,6 +40,10 @@
 							<logs-card ref="logs" :data="logData"></logs-card>
 						</template>
 					</b-tab-item>
+					<!-- the container's own files, read only; mounted the first time it is opened -->
+					<b-tab-item :label="$t('Files')" value="files">
+						<ContainerFiles v-if="filesOpened" :container-id="appid" />
+					</b-tab-item>
 				</b-tabs>
 			</div>
 		</section>
@@ -65,6 +69,7 @@ export default {
 		LogsCard,
 		// loaded when shown: its HTTP client would pull the store into every importer of the app panel
 		LogStream: defineAsyncComponent(() => import('@/components/Logs/LogStream.vue')),
+		ContainerFiles: defineAsyncComponent(() => import('./ContainerFiles.vue')),
 	},
 	data() {
 		return {
@@ -76,6 +81,7 @@ export default {
 			logData: '',
 			timer: '',
 			lines: 1000,
+			filesOpened: this.initialTab === 'files',
 		}
 	},
 	props: {
@@ -137,13 +143,9 @@ export default {
 		},
 		onInput(e) {
 			this.activeTab = e
-			if (e == 'terminal') {
-				this.$refs.terminal.active(true)
-				this.$refs.logs?.active(false)
-			} else {
-				this.$refs.terminal.active(false)
-				this.$refs.logs?.active(true)
-			}
+			this.filesOpened ||= e === 'files'
+			this.$refs.terminal.active(e === 'terminal')
+			this.$refs.logs?.active(e === 'logs')
 		},
 	},
 	unmounted() {
