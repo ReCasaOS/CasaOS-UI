@@ -3614,13 +3614,12 @@
   "automatic": "automatic",
   "failed: {error}": "failed: {error}",
   "Automatic app updates": "Automatic app updates",
-  "Every night at three, the box updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert.": "Every night at three, the box updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert.",
+  "Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.": "Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.",
   "Next night: {date}": "Next night: {date}",
   "No app can update by itself: apps built from a repository deploy by themselves already.": "No app can update by itself: apps built from a repository deploy by themselves already.",
   "Update {app} automatically": "Update {app} automatically",
   "Last nights": "Last nights",
   "No night has run yet.": "No night has run yet.",
   "Nothing to do.": "Nothing to do.",
-  "Updated": "Updated",
-  "Failed, put back": "Failed, put back"
+  "Updated": "Updated"
 }

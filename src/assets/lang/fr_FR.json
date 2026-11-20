@@ -3616,13 +3616,12 @@
   "automatic": "automatique",
   "failed: {error}": "échec : {error}",
   "Automatic app updates": "Mises à jour automatiques des apps",
-  "Every night at three, the box updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert.": "Chaque nuit à trois heures, la box met à jour les apps activées ici, l'une après l'autre, quand elles ont une mise à jour. Une app qui ne redémarre pas est remise sur la version qu'elle avait, et vous recevez une alerte.",
+  "Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.": "Chaque nuit à deux heures, à l'heure de la box, elle met à jour les apps activées ici, l'une après l'autre, quand elles ont une mise à jour. Une app qui ne redémarre pas est remise sur la version qu'elle avait, et vous recevez une alerte. Une app qui échoue deux nuits d'affilée est laissée de côté jusqu'à ce que vous éteigniez puis rallumiez son interrupteur.",
   "Next night: {date}": "Prochaine nuit : {date}",
   "No app can update by itself: apps built from a repository deploy by themselves already.": "Aucune app ne peut se mettre à jour seule : les apps construites depuis un dépôt se déploient déjà d'elles-mêmes.",
   "Update {app} automatically": "Mettre à jour {app} automatiquement",
   "Last nights": "Dernières nuits",
   "No night has run yet.": "Aucune nuit n'a encore tourné.",
   "Nothing to do.": "Rien à faire.",
-  "Updated": "Mise à jour effectuée",
-  "Failed, put back": "Échec, remise en état"
+  "Updated": "Mise à jour effectuée"
 }

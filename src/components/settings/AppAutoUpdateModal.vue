@@ -8,7 +8,7 @@
 
 		<section class="modal-card-body">
 			<p class="settings-intro mb-3">
-				{{ $t('Every night at three, the box updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert.') }}
+				{{ $t('Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.') }}
 			</p>
 
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">
@@ -31,7 +31,7 @@
 					<div v-for="app in apps" :key="app.name" class="app-auto-update__app is-flex is-align-items-center" :data-app="app.name">
 						<img v-if="app.icon" :src="app.icon" alt="" class="app-auto-update__icon mr-2">
 						<span class="is-flex-grow-1">{{ app.title }}</span>
-						<b-switch :disabled="saving === app.name" :model-value="isOn(app.name)" size="is-small" @update:model-value="set(app.name, $event)">
+						<b-switch :key="`${app.name}-${redraw}`" :disabled="!!saving" :model-value="isOn(app.name)" size="is-small" @update:model-value="set(app.name, $event)">
 							<span class="is-sr-only">{{ $t('Update {app} automatically', { app: app.title }) }}</span>
 						</b-switch>
 					</div>
@@ -49,7 +49,7 @@
 							{{ whenOf(run.at) }}
 						</div>
 						<div v-for="entry in run.apps" :key="entry.id" :class="entry.state === 'failed' ? 'has-text-danger' : ''">
-							{{ titleOf(entry.id) }} · {{ $t(stateOf(entry)) }}<template v-if="entry.state === 'failed' && entry.message"> — {{ entry.message }}</template>
+							{{ titleOf(entry.id) }} · {{ $t(stateOf(entry)) }}<template v-if="entry.message"> — {{ entry.message }}</template>
 						</div>
 						<div v-if="!run.apps.length" class="_has-text-gray">
 							{{ $t('Nothing to do.') }}
@@ -74,7 +74,7 @@ import { ice_i18n } from '@/mixins/base/common-i18n'
 const STATES = {
 	updated: 'Updated',
 	current: 'Up to date',
-	failed: 'Failed, put back',
+	failed: 'Failed',
 }
 
 export default {
@@ -87,8 +87,10 @@ export default {
 			// the compose apps the night can update: not the ones built from a repository
 			apps: [],
 			isLoading: false,
-			// the app whose switch is being saved
+			// the app whose switch is being saved: every switch waits for it
 			saving: '',
+			// bumped after a refusal: a switch keeps what was clicked until it is drawn again
+			redraw: 0,
 			error: '',
 		}
 	},
@@ -151,6 +153,7 @@ export default {
 				this.view = (await this.$api.updates.setAutoUpdate(name, on)).data.data
 			} catch (error) {
 				this.error = this.messageOf(error)
+				this.redraw++
 			} finally {
 				this.saving = ''
 			}

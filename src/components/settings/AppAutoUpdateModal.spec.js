@@ -32,10 +32,18 @@ async function open({ view = { apps: [], runs: [] }, setAutoUpdate } = {}) {
 			stubs: {
 				'b-button': true,
 				'b-message': { render() { return h('div', this.$slots.default()) } },
+				// as Buefy's: it keeps what was clicked, and follows the prop only when it changes
 				'b-switch': {
 					props: ['modelValue', 'disabled'],
 					emits: ['update:modelValue'],
-					render() { return h('button', { 'data-on': String(this.modelValue), 'onClick': () => this.$emit('update:modelValue', !this.modelValue) }) },
+					data() { return { on: this.modelValue } },
+					watch: { modelValue(value) { this.on = value } },
+					render() {
+						return h('button', { 'data-on': String(this.on), 'disabled': this.disabled, 'onClick': () => {
+							this.on = !this.on
+							this.$emit('update:modelValue', this.on)
+						} })
+					},
 				},
 			},
 		},
@@ -69,7 +77,7 @@ describe('the automatic app updates window', () => {
 		wrapper.unmount()
 	})
 
-	it('keeps the switch as the box holds it when the box refuses', async () => {
+	it('puts the switch back as the box holds it when the box refuses', async () => {
 		const setAutoUpdate = vi.fn(() => Promise.reject(Object.assign(new Error('404'), { response: { data: { message: '`jellyfin` is not an app the night can update' } } })))
 		const { wrapper } = await open({ setAutoUpdate })
 
@@ -96,15 +104,31 @@ describe('the automatic app updates window', () => {
 		const { wrapper } = await open({ view })
 
 		const runs = wrapper.findAll('[data-run]').map(run => run.text())
-		expect(runs[0]).toContain('Immich · Failed, put back — the app did not start')
+		expect(runs[0]).toContain('Immich · Failed — the app did not start')
 		expect(runs[0]).toContain('Jellyfin · Updated')
 		expect(runs[1]).toContain('Nothing to do.')
 		expect(wrapper.find('[data-next]').exists()).toBe(true)
 		wrapper.unmount()
 	})
 
+	it('holds every switch while one is saved', async () => {
+		let answer
+		const setAutoUpdate = vi.fn(() => new Promise((resolve) => {
+			answer = resolve
+		}))
+		const { wrapper } = await open({ setAutoUpdate })
+
+		await wrapper.find('[data-app="jellyfin"] button').trigger('click')
+		expect(wrapper.find('[data-app="immich"] button').attributes('disabled')).toBeDefined()
+
+		answer({ data: { data: { apps: ['jellyfin'], runs: [] } } })
+		await flushPromises()
+		expect(wrapper.find('[data-app="immich"] button').attributes('disabled')).toBeUndefined()
+		wrapper.unmount()
+	})
+
 	it('has its sentences in English and in French', () => {
-		for (const key of ['Automatic app updates', 'Last nights', 'Next night: {date}', 'Failed, put back', 'No night has run yet.']) {
+		for (const key of ['Automatic app updates', 'Last nights', 'Next night: {date}', 'No night has run yet.']) {
 			expect(en[key], key).toBe(key)
 			expect(fr[key], key).toBeTruthy()
 			expect(fr[key], key).not.toBe(key)
