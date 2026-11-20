@@ -3678,5 +3678,7 @@
   "New network password for {name}": "Nouveau mot de passe réseau de {name}",
   "The network password could not be changed": "Le mot de passe réseau n’a pas pu être changé",
   "Remove the network access of {name}? Its network shares stop opening for it; its folders in Files stay.": "Retirer l’accès réseau de {name} ? Ses partages réseau ne s’ouvrent plus pour lui ; ses dossiers dans Fichiers restent.",
-  "The network access could not be removed": "L’accès réseau n’a pas pu être retiré"
+  "The network access could not be removed": "L’accès réseau n’a pas pu être retiré",
+  "The night's automatic updates, and newer versions of images pinned to one": "Les mises à jour automatiques de la nuit, et les nouvelles versions des images figées sur une version",
+  "What the weekly cleanup freed, or why it failed": "Ce que le nettoyage hebdomadaire a libéré, ou pourquoi il a échoué"
 }
