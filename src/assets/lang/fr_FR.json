@@ -3654,5 +3654,6 @@
   "Name of the new file": "Nom du nouveau fichier",
   "{name} is already here. Replace it?": "{name} existe déjà ici. Le remplacer ?",
   "Delete the folder {name} and all it holds? This cannot be undone.": "Supprimer le dossier {name} et tout son contenu ? C’est définitif.",
-  "Delete {name}? This cannot be undone.": "Supprimer {name} ? C’est définitif."
+  "Delete {name}? This cannot be undone.": "Supprimer {name} ? C’est définitif.",
+  "The change could not be made.": "La modification n’a pas pu être faite."
 }

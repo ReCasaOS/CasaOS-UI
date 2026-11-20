@@ -42,7 +42,7 @@
 					<b-button :disabled="!listed" class="mr-1" icon-left="file-plus-outline" size="is-small" data-new-file @click="newFile">
 						{{ $t('New file') }}
 					</b-button>
-					<b-button :disabled="!listed" class="mr-3" icon-left="upload" size="is-small" data-upload @click="$refs.picker.click()">
+					<b-button :disabled="!listed || !!sending" class="mr-3" icon-left="upload" size="is-small" data-upload @click="$refs.picker.click()">
 						{{ $t('Upload') }}
 					</b-button>
 					<input ref="picker" class="is-hidden" multiple type="file" data-picker @change="upload">
@@ -57,7 +57,7 @@
 			</div>
 
 			<p v-if="error" class="has-text-danger is-size-7 mb-2" data-error>{{ error }}</p>
-			<p v-if="sending" class="is-size-7 mb-2" data-sending>{{ $t('Sending {name}: {percent}%', sending) }}</p>
+			<p v-else-if="sending" class="is-size-7 mb-2" data-sending>{{ $t('Sending {name}: {percent}%', sending) }}</p>
 			<template v-else-if="listed">
 				<!-- what survives an update: a volume keeps its files, the container's own layer does not -->
 				<p v-if="inVolume" class="is-size-7 _has-text-gray mb-2" data-kept>
@@ -182,7 +182,10 @@ export default {
 			if (reading && e?.response?.status === 409)
 				return this.$t('Start the app to see its files.')
 
-			return typeof message === 'string' && message ? message : this.$t('The files could not be read.')
+			if (typeof message === 'string' && message)
+				return message
+
+			return reading ? this.$t('The files could not be read.') : this.$t('The change could not be made.')
 		},
 		async open(path) {
 			// the last folder asked for wins, whichever answer comes back last
@@ -247,11 +250,16 @@ export default {
 			frame.src = containerFiles.downloadUrl(this.containerId, path, this.$store.state.access_token)
 		},
 		async save() {
+			// what is saved, and where: the window may be gone back from in the meantime
+			const { path } = this.viewer
+			const content = this.draft
 			this.saving = true
 			try {
-				await containerFiles.write(this.containerId, this.viewer.path, this.draft, true)
-				this.viewer = { ...this.viewer, content: this.draft }
-				this.draft = null
+				await containerFiles.write(this.containerId, path, content, true)
+				if (this.viewer?.path === path) {
+					this.viewer = { path, content }
+					this.draft = null
+				}
 			} catch (e) {
 				this.toast(this.failure(e, false))
 			} finally {
@@ -303,31 +311,31 @@ export default {
 				}
 			})
 		},
-		// one file after another; a name already taken is replaced only once confirmed
+		// one file after another, into the folder shown when they were picked; a name already
+		// there is asked about before anything is sent
 		async upload(event) {
 			const files = [...(event.target.files || [])]
 			event.target.value = ''
+			if (!files.length || this.sending)
+				return
+			const dir = this.path
+			const taken = new Set(this.entries.map(entry => entry.name))
 			for (const file of files) {
-				const path = this.joinPath(file.name)
-				const send = replace => containerFiles.upload(this.containerId, path, file, replace, (progress) => {
-					this.sending = { name: file.name, percent: progress.total ? Math.round(progress.loaded * 100 / progress.total) : 0 }
-				})
+				const replace = taken.has(file.name)
+				if (replace && !(await this.confirmReplace(file.name)))
+					continue
+				this.sending = { name: file.name, percent: 0 }
 				try {
-					this.sending = { name: file.name, percent: 0 }
-					try {
-						await send(false)
-					} catch (e) {
-						if (e?.response?.status !== 409 || !this.entries.some(entry => entry.name === file.name))
-							throw e
-						if (await this.confirmReplace(file.name))
-							await send(true)
-					}
+					await containerFiles.upload(this.containerId, join(dir, file.name), file, replace, (progress) => {
+						this.sending = { name: file.name, percent: progress.total ? Math.round(progress.loaded * 100 / progress.total) : 0 }
+					})
 				} catch (e) {
 					this.toast(this.failure(e, false))
 				}
 			}
 			this.sending = null
-			await this.open(this.path)
+			if (this.path === dir)
+				await this.open(dir)
 		},
 		confirmReplace(name) {
 			return new Promise((resolve) => {

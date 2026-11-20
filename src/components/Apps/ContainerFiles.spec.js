@@ -173,24 +173,25 @@ describe('the files of a container', () => {
 		expect(toast).toHaveBeenCalled()
 	})
 
-	it('sends a file, and replaces one already there only once confirmed', async () => {
-		const file = new File(['x'], 'run.sh')
-		containerFiles.upload.mockImplementation((id, path, f, replace) => replace
-			? Promise.resolve({})
-			: Promise.reject(Object.assign(new Error('409'), { response: { status: 409, data: { message: 'there is already something of that name' } } })))
+	it('sends files, and asks before sending one whose name is taken', async () => {
+		const taken = new File(['x'], 'run.sh')
+		const fresh = new File(['y'], 'new.txt')
+		containerFiles.upload.mockResolvedValue({})
 		const wrapper = await open()
 		const picker = wrapper.find('[data-picker]')
-		Object.defineProperty(picker.element, 'files', { value: [file], configurable: true })
+		Object.defineProperty(picker.element, 'files', { value: [taken, fresh], configurable: true })
 
 		confirmAnswer = false
 		await picker.trigger('change')
 		await flushPromises()
+		// the taken name is skipped without being sent, the other goes
 		expect(containerFiles.upload).toHaveBeenCalledTimes(1)
+		expect(containerFiles.upload).toHaveBeenCalledWith('c1', '/new.txt', fresh, false, expect.any(Function))
 
 		confirmAnswer = true
 		await picker.trigger('change')
 		await flushPromises()
-		expect(containerFiles.upload).toHaveBeenLastCalledWith('c1', '/run.sh', file, true, expect.any(Function))
+		expect(containerFiles.upload).toHaveBeenCalledWith('c1', '/run.sh', taken, true, expect.any(Function))
 	})
 
 	it('deletes after a confirmation, and offers no delete on a volume', async () => {

@@ -3652,5 +3652,6 @@
   "Name of the new file": "Name of the new file",
   "{name} is already here. Replace it?": "{name} is already here. Replace it?",
   "Delete the folder {name} and all it holds? This cannot be undone.": "Delete the folder {name} and all it holds? This cannot be undone.",
-  "Delete {name}? This cannot be undone.": "Delete {name}? This cannot be undone."
+  "Delete {name}? This cannot be undone.": "Delete {name}? This cannot be undone.",
+  "The change could not be made.": "The change could not be made."
 }
