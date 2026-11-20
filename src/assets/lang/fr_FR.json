@@ -3662,5 +3662,21 @@
   "Remove {path}": "Retirer {path}",
   "Add a folder": "Ajouter un dossier",
   "This folder is already given, or is inside or around a folder given to this account.": "Ce dossier est déjà donné, ou se trouve dans ou autour d’un dossier donné à ce compte.",
-  "The folders could not be saved": "Les dossiers n’ont pas pu être enregistrés"
+  "The folders could not be saved": "Les dossiers n’ont pas pu être enregistrés",
+  "Its folders in Files are ticked, each as it reads or writes there. Folders already shared keep their other accounts; a folder shared for the first time is shared with this account alone.": "Ses dossiers dans Fichiers sont cochés, chacun comme il y lit ou écrit. Un dossier déjà partagé garde ses autres comptes ; un dossier partagé pour la première fois l’est avec ce compte seul.",
+  "Network shares": "Partages réseau",
+  "The account {name} opens network shares with its own password.": "Le compte {name} ouvre les partages réseau avec son propre mot de passe.",
+  "Open its Files folders on the network": "Ouvrir ses dossiers de Fichiers sur le réseau",
+  "Network folders": "Dossiers réseau",
+  "Change network password": "Changer le mot de passe réseau",
+  "Remove network access": "Retirer l’accès réseau",
+  "No network access.": "Pas d’accès réseau.",
+  "Give network access": "Donner l’accès réseau",
+  "This name cannot be a network account: use 1 to 31 lowercase letters, digits, underscores and hyphens, starting with a letter or underscore.": "Ce nom ne peut pas être un compte réseau : 1 à 31 lettres minuscules, chiffres, tirets bas et tirets, commençant par une lettre ou un tiret bas.",
+  "Network password for {name}: the password network shares ask for, apart from the one to sign in.": "Mot de passe réseau de {name} : celui que demandent les partages réseau, distinct de celui de connexion.",
+  "The network access could not be given": "L’accès réseau n’a pas pu être donné",
+  "New network password for {name}": "Nouveau mot de passe réseau de {name}",
+  "The network password could not be changed": "Le mot de passe réseau n’a pas pu être changé",
+  "Remove the network access of {name}? Its network shares stop opening for it; its folders in Files stay.": "Retirer l’accès réseau de {name} ? Ses partages réseau ne s’ouvrent plus pour lui ; ses dossiers dans Fichiers restent.",
+  "The network access could not be removed": "L’accès réseau n’a pas pu être retiré"
 }

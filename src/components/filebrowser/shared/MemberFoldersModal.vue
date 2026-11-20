@@ -10,6 +10,10 @@
 			<p class="has-text-full-03 is-size-7 mb-4">
 				{{ $t('The folders this account can open:') }}
 			</p>
+			<!-- opened from Accounts: the account's folders in Files, ticked with their mode, to review before Save -->
+			<b-message v-if="preset.length" class="mb-4" size="is-small" type="is-info" data-preset>
+				{{ $t('Its folders in Files are ticked, each as it reads or writes there. Folders already shared keep their other accounts; a folder shared for the first time is shared with this account alone.') }}
+			</b-message>
 
 			<b-message v-if="error" class="mb-4" size="is-small" type="is-danger">
 				{{ error }}
@@ -59,6 +63,8 @@ export default {
 	props: {
 		// the share account whose folders these are
 		username: { type: String, required: true },
+		// folders to tick on opening, [{ path, write }]: the account's folders in Files
+		preset: { type: Array, default: () => [] },
 	},
 	emits: ['close', 'saved'],
 	data() {
@@ -113,6 +119,7 @@ export default {
 	async mounted() {
 		await Promise.all([this.loadShares(), this.loadFolders()])
 		this.initial = this.choice
+		this.applyPreset()
 		this.isLoading = false
 	},
 	methods: {
@@ -171,6 +178,18 @@ export default {
 				}
 			})
 			this.folders = folders
+		},
+
+		// The preset folders, ticked with their mode; nothing else is unticked. The choice
+		// differs from what was there, so Save is ready once something is to change.
+		applyPreset() {
+			this.preset.forEach((folder) => {
+				if (!this.rows.some(r => r.path === folder.path)) {
+					this.extra.push(folder.path)
+				}
+				this.selected[folder.path] = true
+				this.access[folder.path] = folder.write ? 'rw' : 'ro'
+			})
 		},
 
 		// A folder deeper down joins the list, ticked; it is shared on Save.

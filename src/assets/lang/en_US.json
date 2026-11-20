@@ -3660,5 +3660,21 @@
   "Remove {path}": "Remove {path}",
   "Add a folder": "Add a folder",
   "This folder is already given, or is inside or around a folder given to this account.": "This folder is already given, or is inside or around a folder given to this account.",
-  "The folders could not be saved": "The folders could not be saved"
+  "The folders could not be saved": "The folders could not be saved",
+  "Its folders in Files are ticked, each as it reads or writes there. Folders already shared keep their other accounts; a folder shared for the first time is shared with this account alone.": "Its folders in Files are ticked, each as it reads or writes there. Folders already shared keep their other accounts; a folder shared for the first time is shared with this account alone.",
+  "Network shares": "Network shares",
+  "The account {name} opens network shares with its own password.": "The account {name} opens network shares with its own password.",
+  "Open its Files folders on the network": "Open its Files folders on the network",
+  "Network folders": "Network folders",
+  "Change network password": "Change network password",
+  "Remove network access": "Remove network access",
+  "No network access.": "No network access.",
+  "Give network access": "Give network access",
+  "This name cannot be a network account: use 1 to 31 lowercase letters, digits, underscores and hyphens, starting with a letter or underscore.": "This name cannot be a network account: use 1 to 31 lowercase letters, digits, underscores and hyphens, starting with a letter or underscore.",
+  "Network password for {name}: the password network shares ask for, apart from the one to sign in.": "Network password for {name}: the password network shares ask for, apart from the one to sign in.",
+  "The network access could not be given": "The network access could not be given",
+  "New network password for {name}": "New network password for {name}",
+  "The network password could not be changed": "The network password could not be changed",
+  "Remove the network access of {name}? Its network shares stop opening for it; its folders in Files stay.": "Remove the network access of {name}? Its network shares stop opening for it; its folders in Files stay.",
+  "The network access could not be removed": "The network access could not be removed"
 }

@@ -19,6 +19,9 @@ const accounts = [
 	{ id: 2, username: 'ann', role: 'user', totp_enabled: false },
 ]
 
+// the share accounts of Samba: ann has one
+const samba = { getUsers: vi.fn(), createUser: vi.fn(), setUserPassword: vi.fn(), deleteUser: vi.fn() }
+let prompted = null
 let wrapper
 let store
 // the folder the picker answers, null for a picker closed without one
@@ -32,7 +35,8 @@ function open(role, roleConfirmed = true) {
 			plugins: [Buefy, i18n],
 			mocks: {
 				$store: { state, getters: { get isAdmin() { return getters.isAdmin(state) } } },
-				$buefy: { dialog: { confirm: opts => opts.onConfirm() }, modal: { open: (opts) => {
+				$api: { samba },
+				$buefy: { dialog: { confirm: opts => opts.onConfirm(), prompt: opts => opts.onConfirm(prompted) }, modal: { open: (opts) => {
 					if (picked !== null)
 						Promise.resolve().then(() => opts.events.select(picked))
 					return { close() {} }
@@ -405,6 +409,62 @@ describe('the account getters', () => {
 			}
 			expect(api.setFolders).not.toHaveBeenCalled()
 			expect(wrapper.text()).toContain('inside or around')
+		})
+	})
+
+	describe('the network shares of an account', () => {
+		beforeEach(() => {
+			samba.getUsers.mockReset().mockImplementation(() => ok([]))
+			samba.createUser.mockReset().mockImplementation(() => ok({}))
+			samba.setUserPassword.mockReset().mockImplementation(() => ok({}))
+			samba.deleteUser.mockReset().mockImplementation(() => ok({}))
+			// fresh rows: another test may have given ann folders on the shared fixture
+			api.listAccounts.mockImplementation(() => ok(accounts.map(a => ({ ...a, folders: [] }))))
+		})
+
+		it('gives an account network access under its name, with a password of its own', async () => {
+			await open('admin')
+			expect(wrapper.find('[data-network="2"]').text()).toContain('No network access.')
+			expect(wrapper.find('[data-network="1"]').exists()).toBe(false)
+
+			prompted = 'net-pass-1'
+			samba.getUsers.mockImplementation(() => ok(['ann']))
+			await wrapper.find('[data-network="2"] button.give-network').trigger('click')
+			await flushPromises()
+			expect(samba.createUser).toHaveBeenCalledWith({ username: 'ann', password: 'net-pass-1' })
+			expect(wrapper.find('[data-network="2"] button.remove-network').exists()).toBe(true)
+		})
+
+		it('changes the network password and removes the access', async () => {
+			samba.getUsers.mockImplementation(() => ok(['ann']))
+			await open('admin')
+
+			prompted = 'other-pass'
+			await wrapper.find('[data-network="2"] button.network-password').trigger('click')
+			await flushPromises()
+			expect(samba.setUserPassword).toHaveBeenCalledWith('ann', 'other-pass')
+
+			await wrapper.find('[data-network="2"] button.remove-network').trigger('click')
+			await flushPromises()
+			expect(samba.deleteUser).toHaveBeenCalledWith('ann')
+		})
+
+		it('offers to open the Files folders on the network only to an account that has some', async () => {
+			samba.getUsers.mockImplementation(() => ok(['ann']))
+			await open('admin')
+			expect(wrapper.find('[data-network="2"] button.use-folders').exists()).toBe(false)
+
+			api.listAccounts.mockImplementation(() => ok([accounts[0], { ...accounts[1], folders: [{ path: '/DATA/Kids', write: true }] }]))
+			await wrapper.vm.refresh()
+			await flushPromises()
+			expect(wrapper.find('[data-network="2"] button.use-folders').exists()).toBe(true)
+		})
+
+		it('says when the name of an account cannot be a network account', async () => {
+			api.listAccounts.mockImplementation(() => ok([accounts[0], { id: 3, username: 'Anne Marie', role: 'user', totp_enabled: false }]))
+			await open('admin')
+			expect(wrapper.find('[data-network="3"]').text()).toContain('cannot be a network account')
+			expect(wrapper.find('[data-network="3"] button.give-network').exists()).toBe(false)
 		})
 	})
 })

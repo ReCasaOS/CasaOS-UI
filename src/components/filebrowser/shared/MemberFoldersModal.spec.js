@@ -6,9 +6,10 @@ vi.mock('@/components/VirtualMachines/PathPicker.vue', () => ({ default: {} }))
 const ok = data => Promise.resolve({ data: { success: 200, data } })
 
 // the dialog of the account anna, on a box with these shares and folders
-function dialog({ setUserShares = vi.fn(() => ok('anna')), createShare = vi.fn(() => ok([])) } = {}) {
+function dialog({ setUserShares = vi.fn(() => ok('anna')), createShare = vi.fn(() => ok([])), preset = [] } = {}) {
 	const vm = {
 		username: 'anna',
+		preset,
 		...MemberFoldersModal.data.call({}),
 		$api: {
 			samba: {
@@ -91,5 +92,21 @@ describe('the folders of a share account', () => {
 		expect(vm.$api.samba.createShare).not.toHaveBeenCalled()
 		expect(vm.error).toContain('at least one account')
 		expect(vm.$emit).not.toHaveBeenCalledWith('close')
+	})
+
+	// opened from Accounts: the account's folders in Files, ticked with their mode
+	it('ticks the folders of Files given to the account, with their mode, and keeps the rest', async () => {
+		const setUserShares = vi.fn(() => ok('anna'))
+		const createShare = vi.fn(() => ok([]))
+		const vm = await opened({ setUserShares, createShare, preset: [{ path: '/DATA/Private', write: true }, { path: '/DATA/Kids', write: false }] })
+
+		expect(vm.selected).toMatchObject({ '/DATA/Media': true, '/DATA/Private': true, '/DATA/Kids': true })
+		expect(vm.access).toMatchObject({ '/DATA/Media': 'ro', '/DATA/Private': 'rw', '/DATA/Kids': 'ro' })
+		expect(vm.canSave).toBe(true)
+
+		await vm.save()
+		// the shares there, the account kept in Media and added to Private; Kids shared with it alone
+		expect(setUserShares).toHaveBeenCalledWith('anna', [{ id: 1, read_only: true }, { id: 2, read_only: false }])
+		expect(createShare).toHaveBeenCalledWith([{ path: '/DATA/Kids', anonymous: false, username: 'anna', members: [{ username: 'anna', read_only: true }], time_machine: false }])
 	})
 })
