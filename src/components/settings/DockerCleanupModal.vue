@@ -59,7 +59,8 @@
 							{{ report.build_cache ? $t('{size} kept to build faster. Without it, the next build of an app from a repository is slower.', { size: sizeOf(report.build_cache) }) : $t('Nothing to free.') }}
 						</div>
 					</div>
-					<b-button :disabled="!report.build_cache || !!busy || held" :loading="busy === 'cache'" data-action="free-cache" rounded size="is-small" @click="freeCache">
+					<!-- the cache holds the data of no app: only a build that runs keeps it, not an app that cannot be read -->
+					<b-button :disabled="!report.build_cache || !!busy || report.held === 'busy'" :loading="busy === 'cache'" data-action="free-cache" rounded size="is-small" @click="freeCache">
 						{{ $t('Free up') }}
 					</b-button>
 				</div>
