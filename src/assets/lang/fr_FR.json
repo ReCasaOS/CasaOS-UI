@@ -3644,5 +3644,15 @@
   "Start the app to see its files.": "Démarrez l’app pour voir ses fichiers.",
   "The files could not be read.": "Les fichiers n’ont pas pu être lus.",
   "Only hidden files here.": "Seulement des fichiers cachés ici.",
-  "Only a running service shows its files.": "Seul un service démarré montre ses fichiers."
+  "Only a running service shows its files.": "Seul un service démarré montre ses fichiers.",
+  "New folder": "Nouveau dossier",
+  "New file": "Nouveau fichier",
+  "Sending {name}: {percent}%": "Envoi de {name} : {percent} %",
+  "Replace": "Remplacer",
+  "A name cannot hold a slash, nor be . or ..": "Un nom ne peut pas contenir de barre oblique, ni être . ou ..",
+  "Name of the new folder": "Nom du nouveau dossier",
+  "Name of the new file": "Nom du nouveau fichier",
+  "{name} is already here. Replace it?": "{name} existe déjà ici. Le remplacer ?",
+  "Delete the folder {name} and all it holds? This cannot be undone.": "Supprimer le dossier {name} et tout son contenu ? C’est définitif.",
+  "Delete {name}? This cannot be undone.": "Supprimer {name} ? C’est définitif."
 }

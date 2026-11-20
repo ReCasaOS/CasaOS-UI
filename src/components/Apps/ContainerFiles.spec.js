@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ContainerFiles from './ContainerFiles.vue'
 import containerFiles from '@/service/containerFiles'
 
-vi.mock('@/service/containerFiles', () => ({ default: { list: vi.fn(), content: vi.fn(), downloadUrl: vi.fn((id, path, token) => `/dl/${id}${path}?token=${token}`) } }))
+vi.mock('@/service/containerFiles', () => ({ default: { list: vi.fn(), content: vi.fn(), mkdir: vi.fn(), write: vi.fn(), upload: vi.fn(), remove: vi.fn(), downloadUrl: vi.fn((id, path, token) => `/dl/${id}${path}?token=${token}`) } }))
 
 const entry = (name, type, extra = {}) => ({ name, type, size: 11, mode: 'rw-r--r--', octal: '644', uid: 0, gid: 0, user: 'root', group: 'root', modified: '2026-11-20T10:00:00Z', ...extra })
 
@@ -15,6 +15,13 @@ const FOLDERS = {
 }
 
 const toast = vi.fn()
+// the dialogs answer at once: a prompt with promptAnswer, a confirm with confirmAnswer
+let promptAnswer = 'new'
+let confirmAnswer = true
+const dialog = {
+	prompt: vi.fn(options => options.onConfirm(promptAnswer)),
+	confirm: vi.fn(options => (confirmAnswer ? options.onConfirm() : options.onCancel?.())),
+}
 
 async function open() {
 	const wrapper = mount(ContainerFiles, {
@@ -22,10 +29,10 @@ async function open() {
 		global: {
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
-				$buefy: { toast: { open: toast } },
+				$buefy: { toast: { open: toast }, dialog },
 				$store: { state: { access_token: 'tok' } },
 			},
-			stubs: { 'b-button': { template: '<button @click="$emit(\'click\')"><slot /></button>' }, 'b-icon': true, 'b-tag': { template: '<span><slot /></span>' }, 'b-loading': true, 'b-checkbox': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)">' } },
+			stubs: { 'b-button': { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' }, 'b-icon': true, 'b-tag': { template: '<span><slot /></span>' }, 'b-loading': true, 'b-checkbox': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)">' } },
 		},
 	})
 	await flushPromises()
@@ -35,6 +42,8 @@ async function open() {
 describe('the files of a container', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		promptAnswer = 'new'
+		confirmAnswer = true
 		containerFiles.list.mockImplementation((id, path) => FOLDERS[path]
 			? Promise.resolve({ data: { data: FOLDERS[path] } })
 			: Promise.reject(Object.assign(new Error('400'), { response: { status: 400, data: { message: 'not a directory' } } })))
@@ -132,5 +141,75 @@ describe('the files of a container', () => {
 		await flushPromises()
 		expect(wrapper.find('[data-empty]').text()).toBe('Only hidden files here.')
 		FOLDERS['/etc-link'].entries = []
+	})
+
+	it('edits a text and saves it over the file', async () => {
+		containerFiles.content.mockResolvedValue({ data: { data: { path: '/run.sh', content: 'echo hi', size: 7 } } })
+		containerFiles.write.mockResolvedValue({})
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="run.sh"] a').trigger('click')
+		await flushPromises()
+		await wrapper.find('[data-edit]').trigger('click')
+		await wrapper.find('[data-draft]').setValue('echo bye')
+		await wrapper.find('[data-save]').trigger('click')
+		await flushPromises()
+		expect(containerFiles.write).toHaveBeenCalledWith('c1', '/run.sh', 'echo bye', true)
+		expect(wrapper.find('[data-text]').text()).toBe('echo bye')
+	})
+
+	it('makes a folder in the folder shown, and refuses a name with a slash', async () => {
+		containerFiles.mkdir.mockResolvedValue({})
+		const wrapper = await open()
+
+		await wrapper.find('[data-new-folder]').trigger('click')
+		await flushPromises()
+		expect(containerFiles.mkdir).toHaveBeenCalledWith('c1', '/new')
+
+		promptAnswer = 'a/b'
+		await wrapper.find('[data-new-folder]').trigger('click')
+		await flushPromises()
+		expect(containerFiles.mkdir).toHaveBeenCalledTimes(1)
+		expect(toast).toHaveBeenCalled()
+	})
+
+	it('sends a file, and replaces one already there only once confirmed', async () => {
+		const file = new File(['x'], 'run.sh')
+		containerFiles.upload.mockImplementation((id, path, f, replace) => replace
+			? Promise.resolve({})
+			: Promise.reject(Object.assign(new Error('409'), { response: { status: 409, data: { message: 'there is already something of that name' } } })))
+		const wrapper = await open()
+		const picker = wrapper.find('[data-picker]')
+		Object.defineProperty(picker.element, 'files', { value: [file], configurable: true })
+
+		confirmAnswer = false
+		await picker.trigger('change')
+		await flushPromises()
+		expect(containerFiles.upload).toHaveBeenCalledTimes(1)
+
+		confirmAnswer = true
+		await picker.trigger('change')
+		await flushPromises()
+		expect(containerFiles.upload).toHaveBeenLastCalledWith('c1', '/run.sh', file, true, expect.any(Function))
+	})
+
+	it('deletes after a confirmation, and offers no delete on a volume', async () => {
+		containerFiles.remove.mockResolvedValue({})
+		const wrapper = await open()
+
+		expect(wrapper.find('[data-entry="config"] [data-delete]').exists()).toBe(false)
+		await wrapper.find('[data-entry="app"] [data-delete]').trigger('click')
+		await flushPromises()
+		expect(dialog.confirm.mock.calls[0][0].message).toContain('and all it holds')
+		expect(containerFiles.remove).toHaveBeenCalledWith('c1', '/app')
+	})
+
+	it('says what the box refused on a change, a busy app included', async () => {
+		containerFiles.remove.mockRejectedValue(Object.assign(new Error('409'), { response: { status: 409, data: { message: '`jellyfin` is busy: update in progress' } } }))
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="run.sh"] [data-delete]').trigger('click')
+		await flushPromises()
+		expect(toast).toHaveBeenCalledWith({ message: '`jellyfin` is busy: update in progress', type: 'is-warning' })
 	})
 })

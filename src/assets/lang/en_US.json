@@ -3642,5 +3642,15 @@
   "Start the app to see its files.": "Start the app to see its files.",
   "The files could not be read.": "The files could not be read.",
   "Only hidden files here.": "Only hidden files here.",
-  "Only a running service shows its files.": "Only a running service shows its files."
+  "Only a running service shows its files.": "Only a running service shows its files.",
+  "New folder": "New folder",
+  "New file": "New file",
+  "Sending {name}: {percent}%": "Sending {name}: {percent}%",
+  "Replace": "Replace",
+  "A name cannot hold a slash, nor be . or ..": "A name cannot hold a slash, nor be . or ..",
+  "Name of the new folder": "Name of the new folder",
+  "Name of the new file": "Name of the new file",
+  "{name} is already here. Replace it?": "{name} is already here. Replace it?",
+  "Delete the folder {name} and all it holds? This cannot be undone.": "Delete the folder {name} and all it holds? This cannot be undone.",
+  "Delete {name}? This cannot be undone.": "Delete {name}? This cannot be undone."
 }
