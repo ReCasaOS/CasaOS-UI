@@ -169,6 +169,7 @@
 							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
 							<!-- a newer version of an image pinned to one: said, chosen in the settings -->
 							<CTooltip v-else-if="!compact && newerBadge" :title="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
+								:aria-label="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
 								class="__position __position-wide" :content="newerBadge.tag" data-newer-badge />
 						</div>
 
@@ -334,7 +335,7 @@ export default {
 	},
 
 	computed: {
-		// the biggest newer version the box found for the app's pinned images
+		// the smallest newer version the box found for the app's pinned images
 		newerBadge() {
 			return newerBadgeOf(this.item.newer_tags)
 		},

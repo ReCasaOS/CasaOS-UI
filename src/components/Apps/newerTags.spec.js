@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { newerBadgeOf, newerVersionsOf } from './newerTags'
+import { newerBadgeOf, newerVersionsOf, repoOf } from './newerTags'
 
 const FOUND = [
 	{ service: 'db', image: 'postgres:16.2', current: '16.2', minor: '16.4', major: '17.0' },
@@ -22,13 +22,25 @@ describe('newerVersionsOf', () => {
 })
 
 describe('newerBadgeOf', () => {
-	it('says the biggest change found, with its image', () => {
-		expect(newerBadgeOf(FOUND)).toEqual({ image: 'postgres:16.2', current: '16.2', tag: '17.0', level: 'major' })
-		expect(newerBadgeOf([FOUND[1]])).toEqual({ image: 'nextcloud:29.0.1', current: '29.0.1', tag: '29.0.7', level: 'patch' })
+	it('says the smallest change found, with its image', () => {
+		expect(newerBadgeOf(FOUND)).toEqual({ image: 'nextcloud:29.0.1', current: '29.0.1', tag: '29.0.7', level: 'patch' })
+		expect(newerBadgeOf([FOUND[0]])).toEqual({ image: 'postgres:16.2', current: '16.2', tag: '16.4', level: 'minor' })
+	})
+
+	it('puts no major version alone on the card', () => {
+		expect(newerBadgeOf([{ service: 'db', image: 'postgres:16.2', current: '16.2', major: '17.0' }])).toBeNull()
 	})
 
 	it('says nothing when nothing was found', () => {
 		expect(newerBadgeOf([])).toBeNull()
 		expect(newerBadgeOf(undefined)).toBeNull()
+	})
+})
+
+describe('repoOf', () => {
+	it('drops the tag, and keeps a registry port', () => {
+		expect(repoOf('postgres:16.2')).toBe('postgres')
+		expect(repoOf('registry.local:5000/team/app:1.2')).toBe('registry.local:5000/team/app')
+		expect(repoOf('registry.local:5000/team/app')).toBe('registry.local:5000/team/app')
 	})
 })

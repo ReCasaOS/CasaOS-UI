@@ -62,7 +62,7 @@
 							</b-dropdown-item>
 							<!-- what the box found in the registry: chosen here, never applied by itself -->
 							<b-dropdown-item v-for="version in newerVersions(key)" :key="`newer-${version.tag}`" :data-newer="version.tag"
-								@click="service.image = `${service.image.split(':')[0]}:${version.tag}`">
+								@click="service.image = `${repoOf(service.image)}:${version.tag}`">
 								{{ version.tag }} ({{ $t(version.label) }})
 							</b-dropdown-item>
 						</b-dropdown>
@@ -215,7 +215,7 @@ import InputGroup from '../forms/InputGroup.vue'
 import EnvInputGroup from '../forms/EnvInputGroup.vue'
 import CommandsInput from '../forms/CommandsInput.vue'
 import Ports from '../forms/Ports.vue'
-import { newerVersionsOf } from './newerTags'
+import { newerVersionsOf, repoOf } from './newerTags'
 import { joinLabels, labelProblems, splitLabels } from './composeLabels'
 import { normalizeVolume, resolveAppID } from './composeVolumes'
 import appInfo from '@/service/appInfo'
@@ -1049,6 +1049,7 @@ export default {
 			return image?.split(':')[0]
 		},
 
+		repoOf,
 		newerVersions(service) {
 			return newerVersionsOf(this.newerTags, service)
 		},

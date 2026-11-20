@@ -27,22 +27,32 @@ export function newerVersionsOf(newerTags, service) {
 }
 
 /**
- * What the card says: one line, the image and the biggest change found, or null.
+ * What the card says: one line, the image and the smallest change found (bug fixes,
+ * else a minor version), or null. A major version alone is not put on the card: it can
+ * change how the app works, and is said in the settings, beside the Tag list.
  *
  * @param {object[]} newerTags `newer_tags` of the app, possibly absent
  * @returns {{image: string, current: string, tag: string, level: string}|null}
  */
 export function newerBadgeOf(newerTags) {
-	let best = null
-	for (const entry of newerTags || []) {
-		for (const [rank, level] of LEVELS.entries()) {
-			if (entry[level.key] && (!best || rank > best.rank))
-				best = { rank, image: entry.image, current: entry.current, tag: entry[level.key], level: level.key }
-		}
+	for (const level of LEVELS.filter(candidate => candidate.key !== 'major')) {
+		const entry = (newerTags || []).find(candidate => candidate[level.key])
+		if (entry)
+			return { image: entry.image, current: entry.current, tag: entry[level.key], level: level.key }
 	}
-	if (!best)
-		return null
-	const { rank: _rank, ...badge } = best
 
-	return badge
+	return null
+}
+
+/**
+ * The repository of an image, without its tag: the last `:` after the last `/`, so a
+ * registry port (`registry:5000/app:1.2`) is kept.
+ *
+ * @param {string} image an image reference
+ * @returns {string}
+ */
+export function repoOf(image) {
+	const colon = image.lastIndexOf(':')
+
+	return colon > image.lastIndexOf('/') ? image.slice(0, colon) : image
 }
