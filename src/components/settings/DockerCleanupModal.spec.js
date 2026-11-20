@@ -154,6 +154,9 @@ describe('the Docker cleanup window', () => {
 		expect(wrapper.find('[data-held]').text()).toContain('cannot be read')
 		// which one, or nobody can mend it
 		expect(wrapper.find('[data-held]').text()).toContain('compose file of `odd`')
+		// the build cache holds the data of no app: it can still be freed
+		expect(wrapper.find('[data-action="free-cache"]').attributes('disabled')).toBeUndefined()
+		expect(wrapper.find('[data-action="free-old"]').attributes('disabled')).toBeDefined()
 		wrapper.unmount()
 	})
 
