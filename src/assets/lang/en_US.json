@@ -3612,5 +3612,19 @@
   "Weekly cleanup": "Weekly cleanup",
   "Images": "Images",
   "automatic": "automatic",
-  "failed: {error}": "failed: {error}"
+  "failed: {error}": "failed: {error}",
+  "Automatic app updates": "Automatic app updates",
+  "Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.": "Every night at two, on the clock of the box, it updates the apps turned on here, one after another, when they have an update. An app that does not start again is put back on the version it ran, and you get an alert. An app that fails two nights in a row is left alone until you turn its switch off and on again.",
+  "Next night: {date}": "Next night: {date}",
+  "No app can update by itself: apps built from a repository deploy by themselves already.": "No app can update by itself: apps built from a repository deploy by themselves already.",
+  "Update {app} automatically": "Update {app} automatically",
+  "Last nights": "Last nights",
+  "No night has run yet.": "No night has run yet.",
+  "Nothing to do.": "Nothing to do.",
+  "Updated": "Updated",
+  "Wait before updating": "Wait before updating",
+  "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.": "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.",
+  "No wait": "No wait",
+  "1 day": "1 day",
+  "{days} days": "{days} days"
 }
