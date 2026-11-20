@@ -457,6 +457,17 @@ function cleanup(verb, path, body, state) {
 	if (verb === 'POST' && path === '/v2/app_management/cleanup/volumes') {
 		return freed(left.volumes, 'name', body?.names)
 	}
+	if (verb === 'GET' && path === '/v2/app_management/auto-update') {
+		return { status: 200, body: { data: left.autoUpdate } }
+	}
+	const autoUpdate = verb === 'PUT' && path.match(/^\/v2\/app_management\/compose\/([^/]+)\/auto-update$/)
+	if (autoUpdate) {
+		const name = decodeURIComponent(autoUpdate[1])
+		const apps = left.autoUpdate.apps.filter(app => app !== name)
+		left.autoUpdate.apps = body?.enabled ? [...apps, name].sort() : apps
+		left.autoUpdate.next = left.autoUpdate.apps.length ? '2026-11-21T03:00:00Z' : undefined
+		return { status: 200, body: { data: left.autoUpdate } }
+	}
 	if (path === '/v2/app_management/cleanup/schedule' && (verb === 'GET' || verb === 'PUT')) {
 		if (verb === 'PUT') {
 			left.schedule.weekly = body?.weekly === true
@@ -477,6 +488,11 @@ function newCleanup() {
 		old: { count: 4, size: 2.1 * GIB },
 		build_cache: 0.85 * GIB,
 		held: '',
+		autoUpdate: {
+			apps: ['jellyfin'],
+			next: '2026-11-21T03:00:00Z',
+			runs: [{ at: '2026-11-20T03:00:04Z', apps: [{ id: 'jellyfin', state: 'updated' }] }],
+		},
 		schedule: {
 			weekly: false,
 			runs: [

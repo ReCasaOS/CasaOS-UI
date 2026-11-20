@@ -19,6 +19,15 @@ const updates = {
 	run() {
 		return api.get(`${PREFIX}/compose/updates/run`)
 	},
+
+	// The apps that update by themselves at night, and the last nights.
+	autoUpdate() {
+		return api.get(`${PREFIX}/auto-update`)
+	},
+
+	setAutoUpdate(id, enabled) {
+		return api.put(`${PREFIX}/compose/${encodeURIComponent(id)}/auto-update`, { enabled })
+	},
 }
 
 export default updates

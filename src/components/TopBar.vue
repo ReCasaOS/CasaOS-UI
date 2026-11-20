@@ -367,6 +367,20 @@
 									</div>
 								</div>
 								<!-- Docker cleanup End -->
+								<!-- Automatic app updates Start: it changes apps by itself, so it is the owner's -->
+								<div v-if="$store.getters.isAdmin"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="update" size="is-20" />
+										{{ $t("Automatic app updates") }}
+									</div>
+									<div class="ml-2">
+										<b-button rounded size="is-small" type="is-dark" @click="showAppAutoUpdate">
+											{{ $t("Open") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Automatic app updates End -->
 								<!-- Share accounts Start -->
 								<div
 									class="is-flex is-align-items-center _row _box">
@@ -1095,6 +1109,19 @@ export default {
 
 		toggleSettings() {
 			this.$refs.settingsDrop.toggle()
+		},
+
+		// The apps that update by themselves at night.
+		showAppAutoUpdate() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: defineAsyncComponent(() => import('./settings/AppAutoUpdateModal.vue')),
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+			})
 		},
 
 		// What apps left behind on the disk, and deleting it.
