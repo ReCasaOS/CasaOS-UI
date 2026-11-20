@@ -3599,5 +3599,11 @@
   "The build cache holds no data of any app. Without it, the next build of an app from a repository is slower.": "Le cache de build ne contient les données d'aucune app. Sans lui, le prochain build d'une app depuis un dépôt est plus lent.",
   "No container uses them and no installed app names them. An app that needs one again downloads it.": "Aucun conteneur ne les utilise et aucune app installée ne les nomme. Une app qui en a de nouveau besoin la retélécharge.",
   "A volume holds data: a database, settings, files. What is deleted here cannot be recovered, and is in no backup made after the app was removed. Volumes to delete: {names}": "Un volume contient des données : une base, des réglages, des fichiers. Ce qui est supprimé ici est irrécupérable, et ne figure dans aucune sauvegarde faite après le retrait de l'app. Volumes à supprimer : {names}",
-  "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.": "Mettre à jour une app laisse sur le disque la version remplacée. Les supprimer libère l'espace. Ce qu'une app installée nomme encore n'est pas touché."
+  "Updating an app leaves the version it replaced on the disk. Deleting those frees the space. What an installed app still names is left alone.": "Mettre à jour une app laisse sur le disque la version remplacée. Les supprimer libère l'espace. Ce qu'une app installée nomme encore n'est pas touché.",
+  "Apps that left a folder behind": "Apps ayant laissé un dossier",
+  "Folders with no container: {count}. These apps are not on the dashboard, and their folder still keeps their images and volumes out of the lists below.": "Dossiers sans conteneur : {count}. Ces apps ne sont pas sur le tableau de bord, et leur dossier garde encore leurs images et leurs volumes hors des listes ci-dessous.",
+  "Move the ticked folders aside ({count})": "Écarter les dossiers cochés ({count})",
+  "Move aside": "Écarter",
+  "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}": "Le dossier d'une app contient son fichier compose, c'est-à-dire ses réglages. Il est déplacé dans apps-removed, à côté du dossier des apps, et non supprimé. Les images et les volumes qu'il gardait pourront ensuite être passés en revue ici. Dossiers à déplacer : {names}",
+  "Moved aside: {names}": "Écartés : {names}"
 }

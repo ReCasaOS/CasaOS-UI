@@ -30,7 +30,7 @@ const freed = (fields = {}) => answer({ removed: [], refused: {}, size: GIB, ...
 // cleanup: the slice of $api.cleanup the test drives. The dialog confirms at once unless told not to.
 async function open(cleanup = {}, { confirms = true, old = { count: 4, size: 2 * GIB } } = {}) {
 	const confirm = vi.fn(options => confirms && options.onConfirm())
-	const api = { get: answer(report()), pruneBuildCache: freed(), removeImages: freed(), removeVolumes: freed(), ...cleanup }
+	const api = { get: answer(report()), pruneBuildCache: freed(), removeImages: freed(), removeVolumes: freed(), removeOrphans: freed({ size: 0, removed: ['gone'] }), ...cleanup }
 	const image = {
 		danglingImages: old ? answer(old) : vi.fn(() => Promise.reject(new Error('404'))),
 		pruneDanglingImages: answer({ count: 4, size: 2 * GIB }),
@@ -208,6 +208,33 @@ describe('the Docker cleanup window', () => {
 		await click(wrapper, 'review-images')
 
 		expect(wrapper.findAll('[data-row="images"] label').map(box => box.attributes('data-ticked'))).toEqual(['true', 'false'])
+		wrapper.unmount()
+	})
+
+	it('shows no folder row on a box that lists none', async () => {
+		const { wrapper } = await open()
+
+		expect(wrapper.find('[data-row="orphans"]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('lists the folders of apps that are gone even when an app cannot be read, and moves the ticked ones aside', async () => {
+		const get = answer(report({ held: 'unreadable', detail: 'compose file of `gone`: yaml', images: [], volumes: [], orphans: ['gone', 'other'] }))
+		const { wrapper, api, confirm } = await open({ get })
+		await click(wrapper, 'review-orphans')
+
+		const boxes = wrapper.findAll('[data-row="orphans"] label')
+		// nothing ticked: each folder is a choice
+		expect(boxes.map(box => box.attributes('data-ticked'))).toEqual(['false', 'false'])
+		await boxes[0].trigger('click')
+		await click(wrapper, 'move-orphans')
+
+		// the question says it is moved, not deleted, and names it
+		expect(confirm.mock.calls[0][0].message).toContain('not deleted')
+		expect(confirm.mock.calls[0][0].message).toContain('gone')
+		expect(api.removeOrphans).toHaveBeenCalledWith(['gone'])
+		// a move frees nothing: it says what moved
+		expect(wrapper.find('[data-done]').text()).toContain('Moved aside: gone')
 		wrapper.unmount()
 	})
 
