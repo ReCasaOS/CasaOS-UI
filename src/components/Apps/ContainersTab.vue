@@ -109,6 +109,16 @@
 							size="is-small"
 							@click="open(row, 'terminal')" />
 					</b-tooltip>
+					<!-- the container's files are read through its running process -->
+					<b-tooltip :label="filesTooltip(row)" position="is-left" type="is-dark">
+						<b-button :disabled="row.state !== 'running'"
+							class="ml-1"
+							data-action="files"
+							icon-left="folder-outline"
+							rounded
+							size="is-small"
+							@click="open(row, 'files')" />
+					</b-tooltip>
 				</div>
 			</b-table-column>
 
@@ -324,6 +334,13 @@ export default {
 				return this.$t('The compose file declares this service, but Docker runs no container for it.')
 
 			return row.state === 'running' ? this.$t('Terminal') : this.$t('Only a running service has a terminal.')
+		},
+
+		filesTooltip(row) {
+			if (!row.id)
+				return this.$t('The compose file declares this service, but Docker runs no container for it.')
+
+			return row.state === 'running' ? this.$t('Files') : this.$t('Only a running service shows its files.')
 		},
 
 		logsTooltip(row) {

@@ -1,0 +1,97 @@
+// @vitest-environment happy-dom
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import ContainerFiles from './ContainerFiles.vue'
+import containerFiles from '@/service/containerFiles'
+
+vi.mock('@/service/containerFiles', () => ({ default: { list: vi.fn(), content: vi.fn(), download: vi.fn() } }))
+vi.mock('file-saver', () => ({ default: { saveAs: vi.fn() } }))
+
+const entry = (name, type, extra = {}) => ({ name, type, size: 11, mode: 'rw-r--r--', octal: '644', uid: 0, gid: 0, user: 'root', group: 'root', modified: '2026-11-20T10:00:00Z', ...extra })
+
+const FOLDERS = {
+	'/': { path: '/', entries: [entry('config', 'dir', { volume: true }), entry('app', 'dir'), entry('.cache', 'dir'), entry('etc-link', 'symlink', { link: '/etc' }), entry('run.sh', 'file')], truncated: false, volumes: ['/config'] },
+	'/config': { path: '/config', entries: [entry('app.yml', 'file')], truncated: false, in_volume: '/config', volumes: ['/config'] },
+	'/etc-link': { path: '/etc-link', entries: [], truncated: false, volumes: ['/config'] },
+}
+
+const toast = vi.fn()
+
+async function open() {
+	const wrapper = mount(ContainerFiles, {
+		props: { containerId: 'c1' },
+		global: {
+			mocks: {
+				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
+				$buefy: { toast: { open: toast } },
+			},
+			stubs: { 'b-button': { template: '<button @click="$emit(\'click\')"><slot /></button>' }, 'b-icon': true, 'b-tag': { template: '<span><slot /></span>' }, 'b-loading': true, 'b-checkbox': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)">' } },
+		},
+	})
+	await flushPromises()
+	return wrapper
+}
+
+describe('the files of a container', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		containerFiles.list.mockImplementation((id, path) => FOLDERS[path]
+			? Promise.resolve({ data: { data: FOLDERS[path] } })
+			: Promise.reject(Object.assign(new Error('400'), { response: { status: 400, data: { message: 'not a directory' } } })))
+	})
+
+	it('lists the top folder, hidden names left out, and says what an update loses', async () => {
+		const wrapper = await open()
+
+		expect(containerFiles.list).toHaveBeenCalledWith('c1', '/')
+		expect(wrapper.findAll('[data-entry]').map(row => row.attributes('data-entry'))).toEqual(['config', 'app', 'etc-link', 'run.sh'])
+		expect(wrapper.find('[data-lost]').exists()).toBe(true)
+		expect(wrapper.find('[data-entry="config"] [data-volume]').exists()).toBe(true)
+		expect(wrapper.find('[data-entry="run.sh"]').text()).toContain('644 rw-r--r--')
+
+		await wrapper.find('[data-hidden]').setValue(true)
+		expect(wrapper.find('[data-entry=".cache"]').exists()).toBe(true)
+	})
+
+	it('opens a folder on a volume, and comes back by the crumbs', async () => {
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="config"] a').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('[data-kept]').text()).toContain('/config')
+		expect(wrapper.findAll('[data-crumb]').map(c => c.attributes('data-crumb'))).toEqual(['/', '/config'])
+
+		await wrapper.find('[data-crumb="/"]').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('[data-entry="app"]').exists()).toBe(true)
+	})
+
+	it('reads a text file, and a link to a folder opens the folder', async () => {
+		containerFiles.content.mockResolvedValue({ data: { data: { path: '/run.sh', content: 'echo hi', size: 7 } } })
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="run.sh"] a').trigger('click')
+		await flushPromises()
+		expect(containerFiles.content).toHaveBeenCalledWith('c1', '/run.sh')
+		expect(wrapper.find('[data-text]').text()).toBe('echo hi')
+
+		await wrapper.find('[data-back]').trigger('click')
+		await wrapper.find('[data-entry="etc-link"] a').trigger('click')
+		await flushPromises()
+		expect(wrapper.findAll('[data-crumb]').map(c => c.attributes('data-crumb'))).toEqual(['/', '/etc-link'])
+	})
+
+	it('says to start a stopped app, and what the box refused', async () => {
+		containerFiles.list.mockRejectedValue({ response: { status: 409, data: { message: 'the app is not running' } } })
+		const wrapper = await open()
+		expect(wrapper.find('[data-error]').text()).toBe('Start the app to see its files.')
+
+		containerFiles.content.mockRejectedValue({ response: { status: 415, data: { message: 'the file is not text: download it instead' } } })
+		containerFiles.list.mockImplementation((id, path) => Promise.resolve({ data: { data: FOLDERS[path] } }))
+		await wrapper.find('[data-refresh]').trigger('click')
+		await flushPromises()
+		await wrapper.find('[data-entry="run.sh"] a').trigger('click')
+		await flushPromises()
+		expect(toast).toHaveBeenCalledWith({ message: 'the file is not text: download it instead', type: 'is-warning' })
+	})
+})

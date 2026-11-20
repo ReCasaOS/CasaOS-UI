@@ -3633,5 +3633,16 @@
   "Minor version": "Version mineure",
   "Major version": "Version majeure",
   "{image}: {tag} is out. Choose it in the Tag list of the settings.": "{image} : {tag} est sortie. Choisissez-la dans la liste Tag des réglages.",
-  "Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works.": "Versions plus récentes de cette image : {list}. Choisissez-en une dans la liste Tag ; une version majeure peut changer le fonctionnement de l'app."
+  "Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works.": "Versions plus récentes de cette image : {list}. Choisissez-en une dans la liste Tag ; une version majeure peut changer le fonctionnement de l'app.",
+  "Hidden files": "Fichiers cachés",
+  "This folder is on {volume}, kept when the app is updated.": "Ce dossier est sur {volume}, gardé quand l’app est mise à jour.",
+  "This folder is in the container itself: what it holds is lost when the app is updated or recreated.": "Ce dossier est dans le conteneur lui-même : son contenu est perdu quand l’app est mise à jour ou recréée.",
+  "Only the first 5000 entries are shown.": "Seules les 5000 premières entrées sont affichées.",
+  "Permissions": "Droits",
+  "Modified": "Modifié",
+  "Download {name}": "Télécharger {name}",
+  "Start the app to see its files.": "Démarrez l’app pour voir ses fichiers.",
+  "The files could not be read.": "Les fichiers n’ont pas pu être lus.",
+  "The file could not be downloaded.": "Le fichier n’a pas pu être téléchargé.",
+  "Only a running service shows its files.": "Seul un service démarré montre ses fichiers."
 }
