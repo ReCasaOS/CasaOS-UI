@@ -457,6 +457,13 @@ function cleanup(verb, path, body, state) {
 	if (verb === 'POST' && path === '/v2/app_management/cleanup/volumes') {
 		return freed(left.volumes, 'name', body?.names)
 	}
+	if (path === '/v2/app_management/cleanup/schedule' && (verb === 'GET' || verb === 'PUT')) {
+		if (verb === 'PUT') {
+			left.schedule.weekly = body?.weekly === true
+			left.schedule.next = left.schedule.weekly ? '2026-11-22T04:00:00Z' : undefined
+		}
+		return { status: 200, body: { data: left.schedule } }
+	}
 	if (verb === 'POST' && path === '/v2/app_management/cleanup/orphans') {
 		const removed = (body?.names || []).filter(name => left.orphans.includes(name))
 		left.orphans = left.orphans.filter(name => !removed.includes(name))
@@ -470,6 +477,13 @@ function newCleanup() {
 		old: { count: 4, size: 2.1 * GIB },
 		build_cache: 0.85 * GIB,
 		held: '',
+		schedule: {
+			weekly: false,
+			runs: [
+				{ at: '2026-11-15T04:00:12Z', what: 'weekly', scheduled: true, count: 4, size: 1.8 * GIB },
+				{ at: '2026-11-11T18:20:00Z', what: 'images', scheduled: false, count: 2, size: 0.6 * GIB },
+			],
+		},
 		// an app that is gone and left its folder
 		orphans: ['linuxserver-qbittorrent'],
 		images: [

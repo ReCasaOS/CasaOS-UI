@@ -30,7 +30,7 @@ const freed = (fields = {}) => answer({ removed: [], refused: {}, size: GIB, ...
 // cleanup: the slice of $api.cleanup the test drives. The dialog confirms at once unless told not to.
 async function open(cleanup = {}, { confirms = true, old = { count: 4, size: 2 * GIB } } = {}) {
 	const confirm = vi.fn(options => confirms && options.onConfirm())
-	const api = { get: answer(report()), pruneBuildCache: freed(), removeImages: freed(), removeVolumes: freed(), removeOrphans: freed({ size: 0, removed: ['gone'] }), ...cleanup }
+	const api = { get: answer(report()), pruneBuildCache: freed(), removeImages: freed(), removeVolumes: freed(), removeOrphans: freed({ size: 0, removed: ['gone'] }), getSchedule: vi.fn(() => Promise.reject(new Error('404'))), setSchedule: answer({ weekly: true, next: '2026-11-22T04:00:00Z', runs: [] }), ...cleanup }
 	const image = {
 		danglingImages: old ? answer(old) : vi.fn(() => Promise.reject(new Error('404'))),
 		pruneDanglingImages: answer({ count: 4, size: 2 * GIB }),
@@ -46,6 +46,11 @@ async function open(cleanup = {}, { confirms = true, old = { count: 4, size: 2 *
 			stubs: {
 				'b-button': { props: ['disabled'], emits: ['click'], render() { return h('button', { disabled: this.disabled, onClick: () => this.$emit('click') }, this.$slots.default?.()) } },
 				'b-message': { render() { return h('div', this.$slots.default()) } },
+				'b-switch': {
+					props: ['modelValue', 'disabled'],
+					emits: ['update:modelValue'],
+					render() { return h('button', { 'data-on': String(this.modelValue), 'disabled': this.disabled, 'onClick': () => this.$emit('update:modelValue', !this.modelValue) }) },
+				},
 				'b-checkbox': {
 					props: ['modelValue', 'nativeValue'],
 					emits: ['update:modelValue'],
@@ -235,6 +240,62 @@ describe('the Docker cleanup window', () => {
 		expect(api.removeOrphans).toHaveBeenCalledWith(['gone'])
 		// a move frees nothing: it says what moved
 		expect(wrapper.find('[data-done]').text()).toContain('Moved aside: gone')
+		wrapper.unmount()
+	})
+
+	it('leaves the weekly card out on a box that does not answer for it', async () => {
+		const { wrapper } = await open()
+
+		expect(wrapper.find('[data-row="weekly"]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows the weekly switch off, with what the last cleanups freed', async () => {
+		const getSchedule = answer({
+			weekly: false,
+			runs: [
+				{ at: '2026-11-15T04:00:10Z', what: 'weekly', scheduled: true, count: 4, size: 2 * GIB },
+				{ at: '2026-11-12T10:00:00Z', what: 'volumes', scheduled: false, count: 1, size: GIB },
+				{ at: '2026-11-08T04:00:10Z', what: 'weekly', scheduled: true, count: 0, size: 0, error: 'compose file of `odd`: yaml' },
+			],
+		})
+		const { wrapper } = await open({ getSchedule })
+
+		const card = wrapper.find('[data-row="weekly"]')
+		expect(card.find('[data-action="weekly"]').attributes('data-on')).toBe('false')
+		// no date for a run nothing has scheduled
+		expect(card.find('[data-next]').exists()).toBe(false)
+		const runs = card.findAll('[data-run]').map(run => run.text())
+		expect(runs[0]).toContain('Weekly cleanup (automatic)')
+		expect(runs[0]).toContain('Freed 2 GB')
+		expect(runs[1]).toContain('Volumes')
+		expect(runs[1]).not.toContain('automatic')
+		expect(runs[2]).toContain('failed: compose file of `odd`')
+		wrapper.unmount()
+	})
+
+	it('turns the weekly cleanup on, and says when the first run is', async () => {
+		const getSchedule = answer({ weekly: false, runs: [] })
+		const { wrapper, api } = await open({ getSchedule })
+
+		await click(wrapper, 'weekly')
+
+		expect(api.setSchedule).toHaveBeenCalledWith(true)
+		expect(wrapper.find('[data-action="weekly"]').attributes('data-on')).toBe('true')
+		expect(wrapper.find('[data-next]').exists()).toBe(true)
+		expect(wrapper.find('[data-row="weekly"]').text()).toContain('Nothing has been freed yet.')
+		wrapper.unmount()
+	})
+
+	it('puts the switch back when the box refuses', async () => {
+		const getSchedule = answer({ weekly: false, runs: [] })
+		const setSchedule = vi.fn(() => Promise.reject(Object.assign(new Error('500'), { response: { data: { message: 'cannot write' } } })))
+		const { wrapper } = await open({ getSchedule, setSchedule })
+
+		await click(wrapper, 'weekly')
+
+		expect(wrapper.find('[data-action="weekly"]').attributes('data-on')).toBe('false')
+		expect(wrapper.text()).toContain('cannot write')
 		wrapper.unmount()
 	})
 

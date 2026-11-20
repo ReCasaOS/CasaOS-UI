@@ -157,6 +157,40 @@
 					</div>
 				</template>
 			</template>
+
+			<!-- The weekly cleanup and what the last cleanups freed. A box older than the
+				switch does not answer for it, and the card is left out. -->
+			<div v-if="schedule" class="settings-card" data-row="weekly">
+				<div class="is-flex is-flex-wrap-wrap is-align-items-center is-gap-1">
+					<div class="is-flex-grow-1">
+						<div class="has-text-weight-semibold">
+							{{ $t('Clean up every week') }}
+						</div>
+						<div class="is-size-7 _has-text-gray">
+							{{ $t('On Sunday night, the box frees the old app versions and the build cache by itself. Images and volumes of no app stay your choice: they are only ever deleted here, after a list.') }}
+						</div>
+						<div v-if="schedule.weekly && schedule.next" class="is-size-7 mt-1" data-next>
+							{{ $t('Next run: {date}', { date: whenOf(schedule.next) }) }}
+						</div>
+					</div>
+					<b-switch :disabled="savingWeekly" :model-value="schedule.weekly" data-action="weekly" size="is-small" @update:model-value="setWeekly">
+						<span class="is-sr-only">{{ $t('Clean up every week') }}</span>
+					</b-switch>
+				</div>
+				<div class="is-size-7 mt-2">
+					<div class="has-text-weight-semibold">
+						{{ $t('Last cleanups') }}
+					</div>
+					<div v-if="!schedule.runs.length" class="_has-text-gray">
+						{{ $t('Nothing has been freed yet.') }}
+					</div>
+					<div v-for="(run, index) in lastRuns" :key="index" :class="run.error ? 'has-text-danger' : '_has-text-gray'" data-run>
+						{{ whenOf(run.at) }} · {{ $t(whatOf(run)) }}<template v-if="run.scheduled"> ({{ $t('automatic') }})</template> ·
+						<template v-if="run.error">{{ $t('failed: {error}', { error: run.error }) }}</template>
+						<template v-else>{{ $t('Freed {size}', { size: sizeOf(run.size) }) }}</template>
+					</div>
+				</div>
+			</div>
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
@@ -173,6 +207,15 @@
 <script>
 import escape from 'lodash/escape'
 import { renderSize } from '@/mixins/file_utils'
+
+// what a run of the history freed, in the words of the rows above
+const RUNS = {
+	weekly: 'Weekly cleanup',
+	old_versions: 'Old app versions',
+	build_cache: 'Build cache',
+	images: 'Images',
+	volumes: 'Volumes',
+}
 
 const HELD = {
 	busy: 'Something runs on an app: an install, an update, a backup, a restore, a folder sync, or a move of the data of Docker. Nothing is deleted until it has ended.',
@@ -199,6 +242,9 @@ export default {
 			pickedImages: [],
 			pickedVolumes: [],
 			pickedOrphans: [],
+			// GET /cleanup/schedule: { weekly, next, runs }; null on a box older than the switch
+			schedule: null,
+			savingWeekly: false,
 			// false until the images were opened once: they come ticked then, and what
 			// the owner unticks stays unticked
 			imagesOpened: false,
@@ -215,6 +261,11 @@ export default {
 			return (this.report && this.report.orphans) || []
 		},
 
+		// the history is short on screen: the last five
+		lastRuns() {
+			return this.schedule.runs.slice(0, 5)
+		},
+
 		heldText() {
 			return HELD[this.report.held] || HELD.unreadable
 		},
@@ -225,6 +276,30 @@ export default {
 	methods: {
 		sizeOf(bytes) {
 			return renderSize(bytes)
+		},
+
+		whenOf(when) {
+			return new Date(when).toLocaleString()
+		},
+
+		whatOf(run) {
+			return RUNS[run.what] || run.what
+		},
+
+		// Optimistic, and put back when the box refuses: the switch must not say on
+		// while nothing is scheduled.
+		async setWeekly(weekly) {
+			const was = this.schedule
+			this.schedule = { ...was, weekly }
+			this.savingWeekly = true
+			try {
+				this.schedule = (await this.$api.cleanup.setSchedule(weekly)).data.data
+			} catch (error) {
+				this.schedule = was
+				this.error = this.messageOf(error)
+			} finally {
+				this.savingWeekly = false
+			}
 		},
 
 		dayOf(when) {
@@ -245,13 +320,16 @@ export default {
 			this.isLoading = true
 			this.error = ''
 			try {
-				const [old, report] = await Promise.all([
+				const [old, report, schedule] = await Promise.all([
 					// its own route, older than this window: without it the row is left out
 					this.$openAPI.appManagement.image.danglingImages().then(res => res.data.data, () => null),
 					this.$api.cleanup.get().then(res => res.data.data),
+					// newer than this window on some boxes: without it the card is left out
+					this.$api.cleanup.getSchedule().then(res => res.data.data, () => null),
 				])
 				this.old = old
 				this.report = report
+				this.schedule = schedule
 				// what is ticked is kept only while it is still listed
 				this.pickedImages = this.pickedImages.filter(id => report.images.some(image => image.id === id))
 				this.pickedVolumes = this.pickedVolumes.filter(name => report.volumes.some(volume => volume.name === name))
