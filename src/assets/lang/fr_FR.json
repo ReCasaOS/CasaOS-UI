@@ -3628,5 +3628,10 @@
   "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.": "Une image publiée cassée est en général remplacée en un ou deux jours. L'attente compte à partir de la nuit qui a trouvé la mise à jour.",
   "No wait": "Aucune attente",
   "1 day": "1 jour",
-  "{days} days": "{days} jours"
+  "{days} days": "{days} jours",
+  "Bug fixes": "Correctifs",
+  "Minor version": "Version mineure",
+  "Major version": "Version majeure",
+  "{image}: {tag} is out. Choose it in the Tag list of the settings.": "{image} : {tag} est sortie. Choisissez-la dans la liste Tag des réglages.",
+  "Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works.": "Versions plus récentes de cette image : {list}. Choisissez-en une dans la liste Tag ; une version majeure peut changer le fonctionnement de l'app."
 }

@@ -1077,6 +1077,8 @@ export default {
 						// settingData: ret.data,
 						settingComposeData: ret.data,
 						repositoryOnly,
+						// the newer versions the box found for its pinned images
+						newerTags: item.newer_tags || [],
 					},
 				})
 			} catch (e) {

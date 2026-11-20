@@ -3626,5 +3626,10 @@
   "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.": "An image published broken is usually replaced within a day or two. The wait counts from the night that first found the update.",
   "No wait": "No wait",
   "1 day": "1 day",
-  "{days} days": "{days} days"
+  "{days} days": "{days} days",
+  "Bug fixes": "Bug fixes",
+  "Minor version": "Minor version",
+  "Major version": "Major version",
+  "{image}: {tag} is out. Choose it in the Tag list of the settings.": "{image}: {tag} is out. Choose it in the Tag list of the settings.",
+  "Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works.": "Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works."
 }

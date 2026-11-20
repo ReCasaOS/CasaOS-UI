@@ -511,6 +511,7 @@
 					:docker-compose-commands="dockerComposeConfig"
 					:err-info="errInfo"
 					:networks="networks"
+					:newer-tags="newerTags"
 					:state="state"
 					:total-memory="totalMemory"
 					@updateDockerComposeCommands="updateDockerComposeCommands"
@@ -755,6 +756,11 @@ export default {
 		// for compose app.
 		settingComposeData: {
 			type: String,
+		},
+		// the newer versions the box found for the app's pinned images (`newer_tags`)
+		newerTags: {
+			type: Array,
+			default: () => [],
 		},
 		// A git app no deployment has given a container: there is no compose app to
 		// set, and the panel is its Repository tab alone.

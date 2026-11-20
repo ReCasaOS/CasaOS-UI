@@ -60,8 +60,16 @@
 								">
 								stable({{ serviceStableVersion }})
 							</b-dropdown-item>
+							<!-- what the box found in the registry: chosen here, never applied by itself -->
+							<b-dropdown-item v-for="version in newerVersions(key)" :key="`newer-${version.tag}`" :data-newer="version.tag"
+								@click="service.image = `${service.image.split(':')[0]}:${version.tag}`">
+								{{ version.tag }} ({{ $t(version.label) }})
+							</b-dropdown-item>
 						</b-dropdown>
 					</b-field>
+					<p v-if="newerVersions(key).length" class="is-size-7 _has-text-gray mb-3" data-newer-hint>
+						{{ $t('Newer versions of this image: {list}. Choose one in the Tag list; a major version can change how the app works.', { list: newerVersions(key).map(version => `${version.tag} (${$t(version.label)})`).join(', ') }) }}
+					</p>
 
 					<VeeField v-slot="{ errors, meta }" :model-value="ice_i18n(configData['x-casaos'].title)" name="composeAppName" rules="required">
 						<b-field :label="`${$t('App Name')} *`" :message="errors" :type="{ 'is-danger': errors[0], 'is-success': meta.valid }">
@@ -207,6 +215,7 @@ import InputGroup from '../forms/InputGroup.vue'
 import EnvInputGroup from '../forms/EnvInputGroup.vue'
 import CommandsInput from '../forms/CommandsInput.vue'
 import Ports from '../forms/Ports.vue'
+import { newerVersionsOf } from './newerTags'
 import { joinLabels, labelProblems, splitLabels } from './composeLabels'
 import { normalizeVolume, resolveAppID } from './composeVolumes'
 import appInfo from '@/service/appInfo'
@@ -320,6 +329,11 @@ export default {
 					ports_in_use: { udp: [], tcp: [] },
 				}
 			},
+		},
+		// the newer versions the box found for the app's pinned images (`newer_tags`)
+		newerTags: {
+			type: Array,
+			default: () => [],
 		},
 	},
 	emits: ['updateDockerComposeServiceName', 'updateDockerComposeCommands', 'updateMainName'],
@@ -1033,6 +1047,10 @@ export default {
 
 		getFirstField(image) {
 			return image?.split(':')[0]
+		},
+
+		newerVersions(service) {
+			return newerVersionsOf(this.newerTags, service)
 		},
 
 		getLateField(image) {
