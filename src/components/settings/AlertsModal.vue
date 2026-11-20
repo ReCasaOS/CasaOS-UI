@@ -165,6 +165,8 @@ export default {
 				{ key: 'apps', label: 'An app operation fails, or an app stops or keeps restarting' },
 				{ key: 'resources', label: 'A container or a virtual machine uses too much processor or memory, or a virtual machine crashes' },
 				{ key: 'fleet', label: 'Fleet' },
+				{ key: 'app-updates', label: 'The night\'s automatic updates, and newer versions of images pinned to one' },
+				{ key: 'cleanup', label: 'What the weekly cleanup freed, or why it failed' },
 			],
 			// the core's bounds
 			thresholds: Array.from({ length: 50 }, (_, i) => 50 + i),
@@ -173,7 +175,7 @@ export default {
 	computed: {
 		// A core older than a category sends no such key: a box for it would be a switch that does nothing.
 		shownCategories() {
-			return this.categories.filter(category => !['resources', 'fleet'].includes(category.key) || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, category.key))
+			return this.categories.filter(category => !['resources', 'fleet', 'app-updates', 'cleanup'].includes(category.key) || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, category.key))
 		},
 		kind() {
 			return ALERT_KINDS.find(kind => kind.id === this.draft.kind)

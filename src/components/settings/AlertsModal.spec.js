@@ -205,6 +205,15 @@ describe('the alerts dialog', () => {
 		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('fleet')
 	})
 
+	it('lists the app updates and cleanup categories only when the core knows them (#170)', async () => {
+		const wrapper = await open({ getAlerts: answer(view({ categories: { 'backups': true, 'disks': true, 'updates': true, 'apps': true, 'fleet': true, 'app-updates': true, 'cleanup': false } })) })
+		expect(rows(wrapper)).toHaveLength(7)
+		expect(wrapper.vm.shownCategories.map(c => c.key)).toEqual(expect.arrayContaining(['app-updates', 'cleanup']))
+		const older = await open({})
+		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('app-updates')
+		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('cleanup')
+	})
+
 	it('sends a category or the threshold alone, and goes back when refused', async () => {
 		const setAlerts = answer({})
 		const wrapper = await open({ setAlerts })
