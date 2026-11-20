@@ -24,7 +24,7 @@
 											{{ $t("Files") }}
 										</h3>
 									</div>
-									<div v-show="hasMergerFunction" class="is-flex-shrink-0 mr-5 is-clickable"
+									<div v-show="hasMergerFunction && !isAccount" class="is-flex-shrink-0 mr-5 is-clickable"
 										@click="showStorageSettingsModal">
 										<b-icon custom-size="mdi-18px" icon="cog-outline"></b-icon>
 									</div>
@@ -36,8 +36,8 @@
 							</div>
 							<!-- Files End -->
 
-							<!-- Mounted Start -->
-							<div class="mounted-section">
+							<!-- Mounted Start: the drives of the box, the owner's -->
+							<div v-if="!isAccount" class="mounted-section">
 								<div class="is-flex is-align-items-center">
 									<div class="is-flex-grow-1">
 										<h3 class="title is-3 mb-0 pb-3 pt-3 has-text-left">
@@ -59,7 +59,8 @@
 						</div>
 
 						<!-- Bottom Action Start -->
-						<div class="bottom-area">
+						<!-- the transfer between devices, the shares and the trash are the owner's -->
+						<div v-if="!isAccount" class="bottom-area">
 							<drop-entry-button :active="pageType == `drop`" :title="$t('FilesDrop')"
 								@open="showDropPage"></drop-entry-button>
 							<share-entry-button :active="pageType == `share`"
@@ -88,7 +89,7 @@
 								</div>
 								<div class="is-flex is-align-items-center">
 									<!-- Paste Button Start -->
-									<b-button v-if="hasPasteData" :label="$t('Paste')" :loading="isPasting" class="mr-3"
+									<b-button v-if="hasPasteData && canChangeHere" :label="$t('Paste')" :loading="isPasting" class="mr-3"
 										icon-left="content-paste" rounded size="is-small" type="is-success"
 										@click="paste('overwrite')" />
 									<!-- Paste Button End -->
@@ -98,7 +99,7 @@
 									<!-- Operation Status End -->
 
 									<!-- Upload Button Start -->
-									<global-action-button @showNewFileModal="showNewFileModal"
+									<global-action-button v-if="canChangeHere" @showNewFileModal="showNewFileModal"
 										@showNewFolderModal="showNewFolderModal"></global-action-button>
 									<!-- Upload Button End -->
 
@@ -154,7 +155,7 @@
 							<!-- List View Start -->
 							<div id="dropTarget" class="is-flex-grow-1 is-flex over is-justify-content-center ">
 								<!-- Drag and Drop Mask Start -->
-								<div v-if="isDragIn"
+								<div v-if="isDragIn && canChangeHere"
 									class="drag-mask is-flex is-align-items-flex-end is-flex-direction-row ">
 									<div class="mb-6">
 										<div class="upload-icon">
@@ -205,7 +206,7 @@
 							<!-- Upload List End -->
 						</uploader>
 						<!-- Toolbar Start -->
-						<operation-toolbar v-model="isToolbarShow" @close="handleClose" @copy="handleCopy"
+						<operation-toolbar v-model="isToolbarShow" :can-change="canChangeHere" @close="handleClose" @copy="handleCopy"
 							@download="handleDownload" @move="handleMove" @remove="handleRemove"></operation-toolbar>
 						<!-- Toolbar End -->
 					</div>
@@ -272,7 +273,7 @@ import GlobalActionButton from './components/GlobalActionButton.vue'
 import MountActionButton from './components/MountActionButton.vue'
 // storage settings requirement document
 import DropEntryButton from './drop/DropEntryButton.vue'
-import { FILE_ROOTS_TIMEOUT_MS, fileRootFrom, withTimeout } from './fileRoot.js'
+import { FILE_ROOTS_TIMEOUT_MS, accountFoldersFrom, canChangeIn, fileRootFrom, withTimeout } from './fileRoot.js'
 import MergeStorages from '@/components/Storage/MergeStorages.vue'
 
 // Drop
@@ -340,6 +341,8 @@ export default {
 			currentItem: null,
 			rootPath: '/DATA',
 			fileRootReady: false,
+			// the folders given to an account and the ones it may write (CasaOS#168); null for the owner
+			accountFolders: null,
 			currentPath: '',
 			currentPathName: '',
 			isViewGird: true,
@@ -375,7 +378,8 @@ export default {
 			testChunks: false,
 			uploadMethod: 'POST',
 			successStatuses: [200, 201, 202, 2002],
-			permanentErrors: [404, 409, 415, 500, 501],
+			// 403: a folder an account may only read, or one it was not given
+			permanentErrors: [403, 404, 409, 415, 500, 501],
 			allowDuplicateUploads: true,
 			headers: {
 				Authorization: this.token,
@@ -389,7 +393,9 @@ export default {
 			// chunkSize: 1024 * 1024 * 1024 * 1024 * 1024,
 			// forceChunkSize: true,
 		}
-		// get merge info
+		// get merge info: the storage settings are the owner's
+		if (!this.$store.getters.canWrite)
+			return
 		try {
 			const hasMergeState = await this.$api.local_storage
 				.getMergerfsInfo()
@@ -401,6 +407,14 @@ export default {
 	},
 
 	computed: {
+		// an account given folders, not the owner: Files shows its folders only
+		isAccount() {
+			return this.accountFolders !== null
+		},
+		// what is shown may be changed: anywhere by the owner, in a writable folder by an account
+		canChangeHere() {
+			return canChangeIn(this.currentPath, this.accountFolders)
+		},
 		viewIcon() {
 			return this.$store.state.isViewGird
 				? 'view-grid-outline'
@@ -581,7 +595,8 @@ export default {
 		async resolveFileRoot() {
 			try {
 				const res = await withTimeout(this.$api.file.getRoots(), FILE_ROOTS_TIMEOUT_MS)
-				this.rootPath = fileRootFrom(res?.data?.data?.roots)
+				this.accountFolders = accountFoldersFrom(res?.data?.data)
+				this.rootPath = this.accountFolders ? (this.accountFolders.folders[0] || '/') : fileRootFrom(res?.data?.data?.roots)
 			} catch {
 				this.rootPath = '/DATA'
 			}

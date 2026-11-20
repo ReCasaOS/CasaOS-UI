@@ -3653,5 +3653,12 @@
   "{name} is already here. Replace it?": "{name} is already here. Replace it?",
   "Delete the folder {name} and all it holds? This cannot be undone.": "Delete the folder {name} and all it holds? This cannot be undone.",
   "Delete {name}? This cannot be undone.": "Delete {name}? This cannot be undone.",
-  "The change could not be made.": "The change could not be made."
+  "The change could not be made.": "The change could not be made.",
+  "Folders in Files": "Folders in Files",
+  "No folder: Files stays closed to this account.": "No folder: Files stays closed to this account.",
+  "Access to {path}": "Access to {path}",
+  "Remove {path}": "Remove {path}",
+  "Add a folder": "Add a folder",
+  "This folder is already given, or is inside or around a folder given to this account.": "This folder is already given, or is inside or around a folder given to this account.",
+  "The folders could not be saved": "The folders could not be saved"
 }

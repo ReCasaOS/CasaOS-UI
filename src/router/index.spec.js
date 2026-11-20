@@ -84,6 +84,18 @@ describe('the pages of the owner', () => {
 		expect(router.currentRoute.value.path).toBe('/')
 	})
 
+	it('opens Files to an account given a folder, and not to one with a right of another name', async () => {
+		store.commit('SET_USER', { role: 'user', folders: [{ path: '/DATA/Kids', write: true }] })
+		await router.push('/')
+		await router.push('/files')
+		expect(router.currentRoute.value.path).toBe('/files')
+
+		store.commit('SET_USER', { role: 'user', rights: ['files'], folders: [] })
+		await router.push('/')
+		await router.push('/files')
+		expect(router.currentRoute.value.path).toBe('/')
+	})
+
 	it('opens the virtual machines to an account with the vm right', async () => {
 		store.commit('SET_USER', { role: 'user', rights: ['vm'] })
 		await router.push('/')

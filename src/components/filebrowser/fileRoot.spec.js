@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileRootFrom, homeFolders, withTimeout } from './fileRoot.js'
+import { accountFolderItems, accountFoldersFrom, canChangeIn, fileRootFrom, homeFolders, withTimeout } from './fileRoot.js'
 
 describe('fileRootFrom', () => {
 	it('returns /DATA when roots is missing, not an array, or empty', () => {
@@ -37,5 +37,28 @@ describe('homeFolders', () => {
 			'/tmp/data/Gallery',
 			'/tmp/data/Media',
 		])
+	})
+})
+
+describe('the folders of an account', () => {
+	it('reads them from the roots answer of an account, and none for the owner', () => {
+		expect(accountFoldersFrom({ roots: ['/DATA'] })).toBeNull()
+		expect(accountFoldersFrom(undefined)).toBeNull()
+		expect(accountFoldersFrom({ roots: ['/DATA/Kids', '/DATA/Media'], writable: ['/DATA/Kids'] }))
+			.toEqual({ folders: ['/DATA/Kids', '/DATA/Media'], writable: ['/DATA/Kids'] })
+	})
+
+	it('lets an account change only what is in a folder it may write', () => {
+		const account = { folders: ['/DATA/Kids', '/DATA/Media'], writable: ['/DATA/Kids'] }
+		expect(canChangeIn('/DATA/Kids', account)).toBe(true)
+		expect(canChangeIn('/DATA/Kids/school', account)).toBe(true)
+		expect(canChangeIn('/DATA/Media', account)).toBe(false)
+		expect(canChangeIn('/DATA/KidsOther', account)).toBe(false)
+		expect(canChangeIn('/', account)).toBe(false)
+		expect(canChangeIn('/anywhere', null)).toBe(true)
+	})
+
+	it('shows each folder by its name in the sidebar', () => {
+		expect(accountFolderItems(['/DATA/Kids']).map(item => [item.name, item.path])).toEqual([['Kids', '/DATA/Kids']])
 	})
 })

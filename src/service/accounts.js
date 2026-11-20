@@ -6,3 +6,5 @@ export const createAccount = (username, password) => api.post('/users', { userna
 export const deleteAccount = id => api.delete(`/users/${encodeURIComponent(id)}`)
 // the modules a user account may read, the whole list: {"rights": []} takes them all away
 export const setRights = (id, rights) => api.put(`/users/${encodeURIComponent(id)}/rights`, { rights })
+// the folders of Files a user account may reach, the whole list ([{path, write}]): {"folders": []} takes them all away
+export const setFolders = (id, folders) => api.put(`/users/${encodeURIComponent(id)}/folders`, { folders })

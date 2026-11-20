@@ -65,7 +65,14 @@ async function needInit() {
 // an unknown role included, that types the address goes back to the dashboard. The VM page is also
 // that of an account with the vm right.
 const OWNER_PAGES = ['Files', 'AppStore', 'Terminal', 'Fleet', 'DevelopmentElement']
-const pageOpen = to => to.name === 'VirtualMachines' ? store.getters.canReadModule('vm') : !OWNER_PAGES.includes(to.name) || store.getters.canWrite
+function pageOpen(to) {
+	if (to.name === 'VirtualMachines')
+		return store.getters.canReadModule('vm')
+	// Files, for an account given folders too (CasaOS#168)
+	if (to.name === 'Files')
+		return store.getters.canReadModule('files')
+	return !OWNER_PAGES.includes(to.name) || store.getters.canWrite
+}
 
 router.beforeEach(async (to, from, next) => {
 	const accessToken = localStorage.getItem('access_token')

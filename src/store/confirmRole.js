@@ -13,7 +13,7 @@ export async function confirmRole(api, store) {
 const MODULES = ['storage', 'vm', 'backups', 'fleet', 'system']
 
 // the role and the modules it reads, as one value: a page keyed by it is drawn again when the server's answer changes them
-export const accessOf = getters => [getters.canWrite, ...MODULES.filter(name => getters.canReadModule(name))].join(':')
+export const accessOf = getters => [getters.canWrite, ...[...MODULES, 'files'].filter(name => getters.canReadModule(name))].join(':')
 
 // the new dashboard shows the modules, each with its own right: an account that reads none has nothing on it
 export const readsAModule = getters => MODULES.some(name => getters.canReadModule(name))

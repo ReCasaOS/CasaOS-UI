@@ -7,7 +7,11 @@
   * Copyright (c) 2022 by IceWhale, All Rights Reserved.
   -->
 <template>
-	<div class="has-text-centered">
+	<!-- a folder an account may only read: nothing to make or send here -->
+	<div v-if="!filePanel.canChangeHere" class="has-text-centered">
+		<h5 class="title is-65">{{ $t('This folder is empty.') }}</h5>
+	</div>
+	<div v-else class="has-text-centered">
 
 		<h5 class="title is-65">{{ $t('Drop your files here to upload') }}</h5>
 		<p class="is-size-7">{{ $t('or') }}</p>
@@ -40,6 +44,8 @@ export default {
 	mixins: [mixin],
 	inject: ['filePanel'],
 	mounted() {
+		if (!this.filePanel.canChangeHere)
+			return
 		this.$nextTick(() => {
 			this.filePanel.uploaderInstance.assignBrowse(document.getElementById('eUpFileBtn'))
 			this.filePanel.uploaderInstance.assignBrowse(document.getElementById('eUpFolderBtn'), true)

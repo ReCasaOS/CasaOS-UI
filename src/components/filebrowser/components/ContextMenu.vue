@@ -6,42 +6,45 @@
 				:position="`is-${verticalPos}-${horizontalPos}`" aria-role="list" class="file-dropdown">
 				<!-- Blank Start -->
 				<template v-if="!showDetail">
-					<b-dropdown-item key="system-context11" aria-role="menuitem" class="is-flex is-align-items-center"
-						@click="$refs.dropDown.toggle(); filePanel.showNewFileModal()">
-						<b-icon class="mr-1" custom-size="mdi-18px" icon="file-plus-outline"></b-icon>
-						{{ $t('New File') }}
-					</b-dropdown-item>
-					<b-dropdown-item key="system-context1" aria-role="menuitem" class="is-flex is-align-items-center"
-						@click="$refs.dropDown.toggle(); filePanel.showNewFolderModal()">
-						<b-icon class="mr-1" custom-size="mdi-18px" icon="folder-plus-outline"></b-icon>
-						{{ $t('New Folder') }}
-					</b-dropdown-item>
+					<!-- in a folder an account may only read: nothing to make, send or paste -->
+					<template v-if="filePanel.canChangeHere">
+						<b-dropdown-item key="system-context11" aria-role="menuitem" class="is-flex is-align-items-center"
+							@click="$refs.dropDown.toggle(); filePanel.showNewFileModal()">
+							<b-icon class="mr-1" custom-size="mdi-18px" icon="file-plus-outline"></b-icon>
+							{{ $t('New File') }}
+						</b-dropdown-item>
+						<b-dropdown-item key="system-context1" aria-role="menuitem" class="is-flex is-align-items-center"
+							@click="$refs.dropDown.toggle(); filePanel.showNewFolderModal()">
+							<b-icon class="mr-1" custom-size="mdi-18px" icon="folder-plus-outline"></b-icon>
+							{{ $t('New Folder') }}
+						</b-dropdown-item>
 
-					<hr class="dropdown-divider">
-					<b-dropdown-item id="upfileBtn" key="system-context2" aria-role="menuitem"
-						class="is-flex is-align-items-center " @click="uploadFile">
-						<b-icon class="mr-1" custom-size="mdi-18px" icon="file-upload-outline"></b-icon>
-						{{ $t('Upload Files') }}
-					</b-dropdown-item>
-					<b-dropdown-item id="upfolderBtn" key="system-context3" aria-role="menuitem"
-						class="is-flex is-align-items-center " @click="uploadFile">
-						<b-icon class="mr-1" custom-size="mdi-18px" icon="folder-upload-outline"></b-icon>
-						{{ $t('Upload Folder') }}
-					</b-dropdown-item>
-					<template v-if="hasPasteData">
-						<b-dropdown-item key="system-context4" aria-role="menuitem" class="is-flex is-align-items-center"
-							@click="paste('overwrite')">
-							<b-icon class="mr-1" custom-size="mdi-18px" icon="content-paste"></b-icon>
-							{{ $t('Paste - Overwrite') }}
+						<hr class="dropdown-divider">
+						<b-dropdown-item id="upfileBtn" key="system-context2" aria-role="menuitem"
+							class="is-flex is-align-items-center " @click="uploadFile">
+							<b-icon class="mr-1" custom-size="mdi-18px" icon="file-upload-outline"></b-icon>
+							{{ $t('Upload Files') }}
 						</b-dropdown-item>
-						<b-dropdown-item key="system-context4-1" aria-role="menuitem" class="is-flex is-align-items-center"
-							@click="paste('skip')">
-							<b-icon class="mr-1" custom-size="mdi-18px" icon="content-paste"></b-icon>
-							{{ $t('Paste - Skip') }}
+						<b-dropdown-item id="upfolderBtn" key="system-context3" aria-role="menuitem"
+							class="is-flex is-align-items-center " @click="uploadFile">
+							<b-icon class="mr-1" custom-size="mdi-18px" icon="folder-upload-outline"></b-icon>
+							{{ $t('Upload Folder') }}
 						</b-dropdown-item>
+						<template v-if="hasPasteData">
+							<b-dropdown-item key="system-context4" aria-role="menuitem" class="is-flex is-align-items-center"
+								@click="paste('overwrite')">
+								<b-icon class="mr-1" custom-size="mdi-18px" icon="content-paste"></b-icon>
+								{{ $t('Paste - Overwrite') }}
+							</b-dropdown-item>
+							<b-dropdown-item key="system-context4-1" aria-role="menuitem" class="is-flex is-align-items-center"
+								@click="paste('skip')">
+								<b-icon class="mr-1" custom-size="mdi-18px" icon="content-paste"></b-icon>
+								{{ $t('Paste - Skip') }}
+							</b-dropdown-item>
+						</template>
+
+						<hr class="dropdown-divider">
 					</template>
-
-					<hr class="dropdown-divider">
 					<b-dropdown-item key="system-context5" aria-role="menuitem" class="is-flex is-align-items-center"
 						@click="$refs.dropDown.toggle(); filePanel.reload()">
 						<b-icon class="mr-1" custom-size="mdi-18px" icon="refresh"></b-icon>
@@ -62,11 +65,11 @@
 						{{ isStarred ? $t('Remove from Starred') : $t('Add to Starred') }}
 					</b-dropdown-item>
 					<hr class="dropdown-divider">
-					<b-dropdown-item v-if="showSingleEdit && !isShared && !isMounted" key="file-context3"
+					<b-dropdown-item v-if="showSingleEdit && !isShared && !isMounted && filePanel.canChangeHere" key="file-context3"
 						aria-role="menuitem" @click="rename">
 						{{ $t('Rename') }}
 					</b-dropdown-item>
-					<b-dropdown-item v-if="!isShared && !isMounted" key="file-context4" aria-role="menuitem"
+					<b-dropdown-item v-if="!isShared && !isMounted && filePanel.canChangeHere" key="file-context4" aria-role="menuitem"
 						@click="operate('move', items)">
 						{{ $t('Cut') }}
 					</b-dropdown-item>
@@ -78,7 +81,7 @@
 						{{ $t('Set as wallpaper') }}
 					</b-dropdown-item>
 
-					<template v-if="item.is_dir">
+					<template v-if="item.is_dir && !filePanel.isAccount">
 						<hr class="dropdown-divider">
 						<b-dropdown-item v-if="!isShared" aria-role="menuitem" @click="shareFoler">
 							{{ $t('Share') }}
@@ -88,7 +91,7 @@
 						</b-dropdown-item>
 					</template>
 
-					<template v-if="!isShared && !isMounted">
+					<template v-if="!isShared && !isMounted && filePanel.canChangeHere">
 						<hr class="dropdown-divider">
 						<b-dropdown-item aria-role="menuitem" class="has-text-danger" @click="remove">
 							{{ $t('Delete') }}
