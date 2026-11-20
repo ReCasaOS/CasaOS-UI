@@ -3643,6 +3643,6 @@
   "Download {name}": "Télécharger {name}",
   "Start the app to see its files.": "Démarrez l’app pour voir ses fichiers.",
   "The files could not be read.": "Les fichiers n’ont pas pu être lus.",
-  "The file could not be downloaded.": "Le fichier n’a pas pu être téléchargé.",
+  "Only hidden files here.": "Seulement des fichiers cachés ici.",
   "Only a running service shows its files.": "Seul un service démarré montre ses fichiers."
 }

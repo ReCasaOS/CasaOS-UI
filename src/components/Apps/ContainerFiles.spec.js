@@ -4,8 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ContainerFiles from './ContainerFiles.vue'
 import containerFiles from '@/service/containerFiles'
 
-vi.mock('@/service/containerFiles', () => ({ default: { list: vi.fn(), content: vi.fn(), download: vi.fn() } }))
-vi.mock('file-saver', () => ({ default: { saveAs: vi.fn() } }))
+vi.mock('@/service/containerFiles', () => ({ default: { list: vi.fn(), content: vi.fn(), downloadUrl: vi.fn((id, path, token) => `/dl/${id}${path}?token=${token}`) } }))
 
 const entry = (name, type, extra = {}) => ({ name, type, size: 11, mode: 'rw-r--r--', octal: '644', uid: 0, gid: 0, user: 'root', group: 'root', modified: '2026-11-20T10:00:00Z', ...extra })
 
@@ -24,6 +23,7 @@ async function open() {
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
 				$buefy: { toast: { open: toast } },
+				$store: { state: { access_token: 'tok' } },
 			},
 			stubs: { 'b-button': { template: '<button @click="$emit(\'click\')"><slot /></button>' }, 'b-icon': true, 'b-tag': { template: '<span><slot /></span>' }, 'b-loading': true, 'b-checkbox': { props: ['modelValue'], emits: ['update:modelValue'], template: '<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)">' } },
 		},
@@ -93,5 +93,44 @@ describe('the files of a container', () => {
 		await wrapper.find('[data-entry="run.sh"] a').trigger('click')
 		await flushPromises()
 		expect(toast).toHaveBeenCalledWith({ message: 'the file is not text: download it instead', type: 'is-warning' })
+	})
+
+	it('downloads through a frame, so the file goes to the disk as it comes', async () => {
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="run.sh"] button').trigger('click')
+		expect(document.getElementById('container-files-download').getAttribute('src')).toBe('/dl/c1/run.sh?token=tok')
+		// a link can be downloaded too: it may point at a file
+		expect(wrapper.find('[data-entry="etc-link"] button').exists()).toBe(true)
+	})
+
+	it('keeps the last folder asked for, whatever answer comes back last', async () => {
+		let slow
+		containerFiles.list.mockImplementation((id, path) => path === '/app'
+			? new Promise((resolve) => { slow = () => resolve({ data: { data: { path: '/app', entries: [], truncated: false, volumes: [] } } }) })
+			: Promise.resolve({ data: { data: FOLDERS[path] } }))
+		const wrapper = await open()
+
+		await wrapper.find('[data-entry="app"] a').trigger('click')
+		await wrapper.find('[data-entry="config"] a').trigger('click')
+		await flushPromises()
+		slow()
+		await flushPromises()
+		expect(wrapper.find('[data-kept]').text()).toContain('/config')
+	})
+
+	it('opens a link to a folder with one call, and says a folder holds only hidden files', async () => {
+		const wrapper = await open()
+		containerFiles.list.mockClear()
+
+		await wrapper.find('[data-entry="etc-link"] a').trigger('click')
+		await flushPromises()
+		expect(containerFiles.list).toHaveBeenCalledTimes(1)
+
+		FOLDERS['/etc-link'].entries = [entry('.env', 'file')]
+		await wrapper.find('[data-refresh]').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('[data-empty]').text()).toBe('Only hidden files here.')
+		FOLDERS['/etc-link'].entries = []
 	})
 })

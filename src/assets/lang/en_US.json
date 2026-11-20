@@ -3641,6 +3641,6 @@
   "Download {name}": "Download {name}",
   "Start the app to see its files.": "Start the app to see its files.",
   "The files could not be read.": "The files could not be read.",
-  "The file could not be downloaded.": "The file could not be downloaded.",
+  "Only hidden files here.": "Only hidden files here.",
   "Only a running service shows its files.": "Only a running service shows its files."
 }

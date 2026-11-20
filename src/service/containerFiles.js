@@ -12,8 +12,9 @@ const containerFiles = {
 		return instance.get(`${base(id)}/content`, { params: { path } })
 	},
 
-	download(id, path) {
-		return instance.get(`${base(id)}/download`, { params: { path }, responseType: 'blob', timeout: 0 })
+	// the browser fetches it itself, to the disk as it comes: the token rides in the query
+	downloadUrl(id, path, token) {
+		return `${base(id)}/download?${new URLSearchParams({ path, token })}`
 	},
 }
 

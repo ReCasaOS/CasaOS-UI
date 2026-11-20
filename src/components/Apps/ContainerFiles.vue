@@ -61,7 +61,9 @@
 						</thead>
 						<tbody>
 							<tr v-if="!shown.length">
-								<td class="_has-text-gray" colspan="6">{{ $t('This folder is empty.') }}</td>
+								<td class="_has-text-gray" colspan="6" data-empty>
+									{{ entries.length ? $t('Only hidden files here.') : $t('This folder is empty.') }}
+								</td>
 							</tr>
 							<tr v-for="entry in shown" :key="entry.name" :data-entry="entry.name">
 								<td class="container-files__name">
@@ -76,7 +78,7 @@
 								<td>{{ entry.user || entry.uid }}:{{ entry.group || entry.gid }}</td>
 								<td>{{ date(entry.modified) }}</td>
 								<td class="has-text-right">
-									<b-button v-if="entry.type === 'file'" :aria-label="$t('Download {name}', { name: entry.name })" icon-left="download"
+									<b-button v-if="entry.type === 'file' || entry.type === 'symlink'" :aria-label="$t('Download {name}', { name: entry.name })" icon-left="download"
 										size="is-small" type="is-text" @click="download(joinPath(entry.name))" />
 								</td>
 							</tr>
@@ -91,7 +93,6 @@
 
 <script>
 import escape from 'lodash/escape'
-import FileSaver from 'file-saver'
 import { crumbsOf, join, parentOf } from './containerPaths'
 import containerFiles from '@/service/containerFiles'
 import { renderSize } from '@/mixins/file_utils'
@@ -126,6 +127,10 @@ export default {
 			return this.showHidden ? this.entries : this.entries.filter(entry => !entry.name.startsWith('.'))
 		},
 	},
+	created() {
+		// not reactive: counts the folders asked for
+		this.asked = 0
+	},
 	mounted() {
 		this.open('/')
 	},
@@ -148,16 +153,22 @@ export default {
 			return typeof message === 'string' && message ? message : this.$t('The files could not be read.')
 		},
 		async open(path) {
+			// the last folder asked for wins, whichever answer comes back last
+			const asked = ++this.asked
 			this.loading = true
 			try {
-				const res = await containerFiles.list(this.containerId, path)
-				const data = res.data.data
-				Object.assign(this, { path: data.path, entries: data.entries, inVolume: data.in_volume || '', truncated: data.truncated, listed: true, error: '' })
+				this.show((await containerFiles.list(this.containerId, path)).data.data, asked)
 			} catch (e) {
-				this.error = this.failure(e)
+				if (asked === this.asked)
+					this.error = this.failure(e)
 			} finally {
-				this.loading = false
+				if (asked === this.asked)
+					this.loading = false
 			}
+		},
+		show(data, asked) {
+			if (asked === this.asked)
+				Object.assign(this, { path: data.path, entries: data.entries, inVolume: data.in_volume || '', truncated: data.truncated, listed: true, error: '' })
 		},
 		// a folder opens; a file or a link to one is read
 		async enter(entry) {
@@ -165,13 +176,16 @@ export default {
 			if (entry.type === 'dir')
 				return this.open(path)
 			if (entry.type === 'symlink') {
+				const asked = ++this.asked
+				this.loading = true
 				try {
-					const res = await containerFiles.list(this.containerId, path)
-					if (res.data.data)
-						return this.open(path)
+					return this.show((await containerFiles.list(this.containerId, path)).data.data, asked)
 				} catch (e) {
 					if (e?.response?.status !== 400)
 						return this.toast(this.failure(e))
+				} finally {
+					if (asked === this.asked)
+						this.loading = false
 				}
 			}
 
@@ -188,13 +202,16 @@ export default {
 				this.loading = false
 			}
 		},
-		async download(path) {
-			try {
-				const res = await containerFiles.download(this.containerId, path)
-				FileSaver.saveAs(res.data, path.split('/').pop())
-			} catch {
-				this.toast(this.$t('The file could not be downloaded.'))
+		// as the Files app does: a hidden frame, so the file goes to the disk as it comes. One
+		// for the page, kept: removing it with the window could stop a download under way.
+		download(path) {
+			let frame = document.getElementById('container-files-download')
+			if (!frame) {
+				frame = Object.assign(document.createElement('iframe'), { id: 'container-files-download' })
+				frame.style.display = 'none'
+				document.body.appendChild(frame)
 			}
+			frame.src = containerFiles.downloadUrl(this.containerId, path, this.$store.state.access_token)
 		},
 		toast(message) {
 			this.$buefy.toast.open({ message: escape(message), type: 'is-warning' })
