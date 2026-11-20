@@ -21,6 +21,15 @@ const cleanup = {
 		return api.post(`${PREFIX}/volumes`, { names })
 	},
 
+	// the weekly switch and the last runs
+	getSchedule() {
+		return api.get(`${PREFIX}/schedule`)
+	},
+
+	setSchedule(weekly) {
+		return api.put(`${PREFIX}/schedule`, { weekly })
+	},
+
 	// moves aside the folders of apps that are gone; nothing is deleted
 	removeOrphans(names) {
 		return api.post(`${PREFIX}/orphans`, { names })

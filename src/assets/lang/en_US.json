@@ -3603,5 +3603,14 @@
   "Move the ticked folders aside ({count})": "Move the ticked folders aside ({count})",
   "Move aside": "Move aside",
   "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}": "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}",
-  "Moved aside: {names}": "Moved aside: {names}"
+  "Moved aside: {names}": "Moved aside: {names}",
+  "Clean up every week": "Clean up every week",
+  "On Sunday night, the box frees the old app versions and the build cache by itself. Images and volumes of no app stay your choice: they are only ever deleted here, after a list.": "On Sunday night, the box frees the old app versions and the build cache by itself. Images and volumes of no app stay your choice: they are only ever deleted here, after a list.",
+  "Next run: {date}": "Next run: {date}",
+  "Last cleanups": "Last cleanups",
+  "Nothing has been freed yet.": "Nothing has been freed yet.",
+  "Weekly cleanup": "Weekly cleanup",
+  "Images": "Images",
+  "automatic": "automatic",
+  "failed: {error}": "failed: {error}"
 }

@@ -3605,5 +3605,14 @@
   "Move the ticked folders aside ({count})": "Écarter les dossiers cochés ({count})",
   "Move aside": "Écarter",
   "The folder of an app holds its compose file, which is its settings. It is moved to apps-removed, beside the folder of the apps, and not deleted. The images and volumes it kept can then be reviewed here. Folders to move: {names}": "Le dossier d'une app contient son fichier compose, c'est-à-dire ses réglages. Il est déplacé dans apps-removed, à côté du dossier des apps, et non supprimé. Les images et les volumes qu'il gardait pourront ensuite être passés en revue ici. Dossiers à déplacer : {names}",
-  "Moved aside: {names}": "Écartés : {names}"
+  "Moved aside: {names}": "Écartés : {names}",
+  "Clean up every week": "Nettoyer chaque semaine",
+  "On Sunday night, the box frees the old app versions and the build cache by itself. Images and volumes of no app stay your choice: they are only ever deleted here, after a list.": "Dans la nuit de dimanche, la box libère d'elle-même les anciennes versions d'apps et le cache de build. Les images et les volumes d'aucune app restent votre choix : ils ne sont supprimés qu'ici, après une liste.",
+  "Next run: {date}": "Prochain passage : {date}",
+  "Last cleanups": "Derniers nettoyages",
+  "Nothing has been freed yet.": "Rien n'a encore été libéré.",
+  "Weekly cleanup": "Nettoyage hebdomadaire",
+  "Images": "Images",
+  "automatic": "automatique",
+  "failed: {error}": "échec : {error}"
 }
