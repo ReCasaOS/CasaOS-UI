@@ -651,6 +651,9 @@
     .tool-bar {
         height: 1.75rem;
         padding: 0 1.5rem;
+        // Above the list's sticky header (z-index 20), so the Sort by menu opens over it.
+        position: relative;
+        z-index: 21;
     }
 
     .scroll-container {
