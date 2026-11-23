@@ -13,6 +13,18 @@ function storedUser() {
 	}
 }
 
+export const FILE_SORT_STORAGE_KEY = 'casaos-filebrowser-sort'
+
+// How Files sorts, as this browser last left it: name A to Z when nothing usable is stored.
+export function savedFileSort() {
+	try {
+		const { sort, order } = JSON.parse(localStorage.getItem(FILE_SORT_STORAGE_KEY))
+		if (['name', 'date', 'size', 'format'].includes(sort) && ['asc', 'desc'].includes(order))
+			return { sort, order }
+	} catch {}
+	return { sort: 'name', order: 'asc' }
+}
+
 export function emptyUser() {
 	return {
 		avatar: '',
@@ -65,6 +77,7 @@ const state = {
 	operateObject: null,
 	currentPath: '',
 	isViewGird: true,
+	...savedFileSort(),
 
 	// Wallpaper
 	wallpaperObject: {

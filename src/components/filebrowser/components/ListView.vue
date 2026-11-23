@@ -20,8 +20,8 @@
 									<div v-if="isMobile ? header.showOnMobile : true" class="th"
 										@click="onHeaderClick(header)">
 										<div class="one-line">{{ $t(header.text) }}</div>
-										<b-icon v-show="sort === header.sort" icon="expand-down" class="is-18 ml-1"
-											custom-size="casa-18px" :class="{ asc: order === 'asc' }">
+										<b-icon v-show="sort === header.sort" :icon="order === 'asc' ? 'menu-up' : 'menu-down'"
+											class="is-18 ml-1" custom-size="casa-18px">
 										</b-icon>
 									</div>
 								</template>

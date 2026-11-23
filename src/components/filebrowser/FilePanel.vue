@@ -143,6 +143,20 @@
 											<b-icon :icon="hiddenFilesIcon" pack="casa"></b-icon>
 										</p>
 									</b-tooltip>
+									<b-dropdown position="is-bottom-left" aria-role="menu" class="mr-3" @update:model-value="pickSort">
+										<template #trigger>
+											<b-tooltip :label="$t('Sort by')" position="is-left" type="is-dark">
+												<p :aria-label="$t('Sort by')" class="is-clickable none-line-height" role="button" tabindex="0">
+													<b-icon icon="sort"></b-icon>
+												</p>
+											</b-tooltip>
+										</template>
+										<b-dropdown-item v-for="option in sortOptions" :key="option.sort" :value="option.sort"
+											:class="{ 'is-active': $store.state.sort === option.sort }" aria-role="menuitem">
+											{{ $t(option.text) }}
+											<span v-if="$store.state.sort === option.sort" class="ml-1">{{ $store.state.order === 'asc' ? '↑' : '↓' }}</span>
+										</b-dropdown-item>
+									</b-dropdown>
 									<b-tooltip :label="$t('Change View')" position="is-left" type="is-dark">
 										<p class="is-clickable none-line-height" role="button" @click="changeView">
 											<b-icon :icon="viewIcon"></b-icon>
@@ -169,7 +183,7 @@
 								<!-- Drag and Drop Mask End -->
 
 								<component :is="listView" ref="listview" :list-data="listData" :is-loading="isLoading"
-									@change="handelListChange" @gotoFolder="getFileList" @reload="reload"
+									@change="handelListChange" @gotoFolder="getFileList" @reload="reload" @reorder="setSort"
 									@showDetailModal="showDetailModal">
 									<empty-holder v-if="isEmpty" @newFile="showNewFileModal"
 										@newFolder="showNewFolderModal"></empty-holder>
@@ -239,7 +253,6 @@
 
 <script>
 import { defineAsyncComponent } from 'vue'
-import orderBy from 'lodash/orderBy'
 import dropRight from 'lodash/dropRight'
 import escape from 'lodash/escape'
 
@@ -279,7 +292,7 @@ import MergeStorages from '@/components/Storage/MergeStorages.vue'
 // Drop
 import events from '@/events/events'
 import VueBreakpointMixin from '@/mixins/breakpoint'
-import { filterHiddenFiles } from '@/mixins/file_utils'
+import { filterHiddenFiles, sortFiles } from '@/mixins/file_utils'
 import { mixin } from '@/mixins/mixin'
 import NewTabButton from '@/components/basicComponents/NewTabButton.vue'
 
@@ -347,6 +360,12 @@ export default {
 			currentPathName: '',
 			isViewGird: true,
 			showHiddenFiles: localStorage.getItem(SHOW_HIDDEN_FILES_STORAGE_KEY) === 'true',
+			sortOptions: [
+				{ sort: 'name', text: 'File name' },
+				{ sort: 'date', text: 'Date Modified' },
+				{ sort: 'size', text: 'Size' },
+				{ sort: 'format', text: 'Type' },
+			],
 			allListData: [],
 			listData: [],
 			selectedArray: [],
@@ -678,6 +697,21 @@ export default {
 		 * @description: Change View List/Gird
 		 * @return {*}
 		 */
+		// Sorts the folder on screen and keeps the choice for the next visit.
+		setSort({ sort, order }) {
+			this.$store.commit('SET_FILE_SORT', { sort, order })
+			this.updateVisibleList()
+		},
+
+		// From the toolbar menu: the field already in use flips its order, another starts A to Z (newest first for dates).
+		pickSort(sort) {
+			const { sort: current, order } = this.$store.state
+			if (sort === current)
+				this.setSort({ sort, order: order === 'asc' ? 'desc' : 'asc' })
+			else
+				this.setSort({ sort, order: sort === 'date' ? 'desc' : 'asc' })
+		},
+
 		changeView() {
 			this.isViewGird = !this.$store.state.isViewGird
 			this.$store.commit('SET_IS_VIEW_GRID', this.isViewGird)
@@ -689,7 +723,7 @@ export default {
 		 */
 		updateVisibleList() {
 			const visibleList = filterHiddenFiles(this.allListData, this.showHiddenFiles)
-			this.listData = orderBy(visibleList, ['is_dir'], ['desc'])
+			this.listData = sortFiles(visibleList, this.$store.state.sort, this.$store.state.order)
 		},
 
 		/**
