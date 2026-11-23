@@ -1,4 +1,4 @@
-import { emptyUser } from './state'
+import { FILE_SORT_STORAGE_KEY, emptyUser } from './state'
 import {
 	APP_LAUNCH_EXCEPTIONS_KEY,
 	APP_LAUNCH_IFRAME_KEY,
@@ -122,6 +122,14 @@ const mutations = {
 
 	SET_IS_VIEW_GRID(state, val) {
 		state.isViewGird = val
+	},
+
+	SET_FILE_SORT(state, { sort, order }) {
+		state.sort = sort
+		state.order = order
+		try {
+			localStorage.setItem(FILE_SORT_STORAGE_KEY, JSON.stringify({ sort, order }))
+		} catch {}
 	},
 
 	SET_OPERATE_OBJECT(state, val) {
