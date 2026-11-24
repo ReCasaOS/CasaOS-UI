@@ -167,6 +167,7 @@ export default {
 				{ key: 'fleet', label: 'Fleet' },
 				{ key: 'app-updates', label: 'The night\'s automatic updates, and newer versions of images pinned to one' },
 				{ key: 'cleanup', label: 'What the weekly cleanup freed, or why it failed' },
+				{ key: 'vulnerabilities', label: 'A critical vulnerability in an app that an update of the app fixes' },
 			],
 			// the core's bounds
 			thresholds: Array.from({ length: 50 }, (_, i) => 50 + i),
@@ -175,7 +176,7 @@ export default {
 	computed: {
 		// A core older than a category sends no such key: a box for it would be a switch that does nothing.
 		shownCategories() {
-			return this.categories.filter(category => !['resources', 'fleet', 'app-updates', 'cleanup'].includes(category.key) || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, category.key))
+			return this.categories.filter(category => !['resources', 'fleet', 'app-updates', 'cleanup', 'vulnerabilities'].includes(category.key) || Object.prototype.hasOwnProperty.call(this.view?.categories || {}, category.key))
 		},
 		kind() {
 			return ALERT_KINDS.find(kind => kind.id === this.draft.kind)

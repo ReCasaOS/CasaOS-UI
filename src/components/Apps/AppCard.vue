@@ -2,7 +2,9 @@
 	<div :class="{ 'is-compact': compact }" :role="compact ? 'button' : undefined" :tabindex="compact ? 0 : undefined" class="common-card is-flex is-align-items-center is-justify-content-center  app-card"
 		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="onOver">
 		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
-		<span v-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
+		<!-- a critical vulnerability the update fixes says more than "an update": it takes its place -->
+		<span v-if="compact && vuln && vuln.actionable && !repoBadge" class="update-chip is-critical">{{ $t('{count} critical · update', { count: vuln.critical }) }}</span>
+		<span v-else-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
 			<b-dropdown ref="dro" :mobile-modal="false" :triggers="['contextmenu', 'click']" animation="fade1"
@@ -65,6 +67,10 @@
 
 					<b-button v-if="logsAvailable && (isV2App || (isV1App && canWrite))" expanded type="is-text" @click="showLogs()">
 						{{ $t('Logs') }}
+					</b-button>
+
+					<b-button v-if="vuln" expanded type="is-text" @click="showSecurity()">
+						{{ $t('Security') }}
 					</b-button>
 
 					<b-button v-if="isContainerApp" expanded type="is-text" @click="showContainerDetail()">
@@ -166,6 +172,8 @@
 							<!-- A git app's state, or its new commits: gitApps.js says which wins. Before
 								the image badge, since a failed build matters more than a newer image. -->
 							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
+							<CTooltip v-else-if="!compact && vuln && vuln.actionable" :title="$t('Critical vulnerabilities that an update of this app fixes. See Security in its menu.')"
+								class="__position __position-wide" :content="$t('{count} critical', { count: vuln.critical })" modal="is-danger" data-vuln-badge />
 							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
 							<!-- a newer version of an image pinned to one: said, chosen in the settings -->
 							<CTooltip v-else-if="!compact && newerBadge" :title="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
@@ -240,9 +248,11 @@ import { appHealthWarning } from './containerSummary'
 import { newerBadgeOf } from './newerTags'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
+import SecurityModal from './SecurityModal.vue'
 import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
 import { appEntry } from '@/components/PublicShare/shareWords'
 import { publicShare, refresh as refreshPublicShare } from '@/service/publicShare'
+import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import BackupBadge from '@/components/backup/BackupBadge.vue'
 import { badgeOfApp } from '@/components/backup/backupStatus'
 import { backupStatus, refresh as refreshBackupStatus } from '@/service/backupStatus'
@@ -338,6 +348,12 @@ export default {
 		// the smallest newer version the box found for the app's pinned images
 		newerBadge() {
 			return newerBadgeOf(this.item.newer_tags)
+		},
+		// What the scan module found in this app's images, null when it scanned none of them or
+		// is not installed. The administrator's only, and an app's only: the module names an
+		// app by its compose project, which a container or a system app of that name is not.
+		vuln() {
+			return this.canWrite && vulnScan.ok && this.item.app_type === 'v2app' ? vulnScan.apps[this.item.name] || null : null
 		},
 		// set while the app runs and its health check fails or has not passed yet
 		healthWarning() {
@@ -506,6 +522,10 @@ export default {
 		if (this.$store.getters.canReadModule('share')) {
 			refreshPublicShare()
 		}
+		// the scan module answers the administrator only; shared, at most once in five minutes
+		if (this.$store.getters.canWrite) {
+			refreshVulnScan()
+		}
 		hasLogs().then((available) => {
 			this.logsAvailable = available
 		})
@@ -634,6 +654,17 @@ export default {
 
 		// The logs keep an app under the name AppManagement gives it: the compose project for a compose app, the
 		// container's name for a v1 app, whose card knows only the container's id.
+		showSecurity() {
+			this.$refs.dro?.toggle?.()
+			this.$buefy.modal.open({
+				component: SecurityModal,
+				hasModalCard: true,
+				trapFocus: true,
+				customClass: 'security-modal',
+				props: { app: this.item.name },
+			})
+		},
+
 		async showLogs() {
 			let app = this.item.name
 			if (this.isV1App) {
@@ -1586,6 +1617,10 @@ export default {
 // beta dashboard: a row, not a square
 .app-card.is-compact {
   // the proposal's chip: the accent of the beta dashboard, over the card's top right corner
+  .update-chip.is-critical {
+    background: #dc2626;
+  }
+
   .update-chip {
     position: absolute;
     top: -0.5rem;
