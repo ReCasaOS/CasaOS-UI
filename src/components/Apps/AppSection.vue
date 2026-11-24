@@ -72,12 +72,22 @@
 				</button>
 			</div>
 
-			<!-- beta dashboard: the order shown (CasaOS#183); only the custom one is dragged -->
-			<b-select v-if="compact" v-model="sort" :aria-label="$t('Sort by')" class="app-sort mr-3" data-app-sort size="is-small">
-				<option v-for="id in sorts" :key="id" :value="id">
-					{{ $t(sortLabels[id]) }}
-				</option>
-			</b-select>
+			<!-- beta dashboard: the order shown (CasaOS#183); only the custom one is dragged. A chip like the
+				filters', opening the dashboard's own menu, as the + beside it -->
+			<b-dropdown v-if="compact" v-model="sort" animation="fade1" aria-role="list" class="file-dropdown app-sort mr-3" data-app-sort position="is-bottom-left">
+				<template #trigger>
+					<button :aria-label="$t('Sort by')" :class="{ 'is-sorted': sort !== 'custom' }" class="filter-chip sort-chip" data-app-sort-trigger type="button">
+						<b-icon custom-size="mdi-14px" icon="sort" />
+						{{ $t(sortLabels[sort]) }}
+					</button>
+				</template>
+				<b-dropdown-item v-for="id in sorts" :key="id" :data-app-sort-option="id" :value="id" aria-role="listitem">
+					<span class="sort-option">
+						{{ $t(sortLabels[id]) }}
+						<b-icon v-if="sort === id" custom-size="mdi-16px" icon="check" />
+					</span>
+				</b-dropdown-item>
+			</b-dropdown>
 
 			<b-dropdown v-if="$store.getters.canWrite" animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
 				<template #trigger>
@@ -1414,5 +1424,25 @@ export default {
 	.filter-count {
 		opacity: 0.7;
 	}
+}
+
+// the sort chip: the filters' outline, its icon and label on one line; outlined brighter once
+// the order is not the custom one, so a sorted grid says it is
+.sort-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	white-space: nowrap;
+
+	&.is-sorted {
+		border-color: rgba(255, 255, 255, 0.7);
+	}
+}
+
+.sort-option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
 }
 </style>
