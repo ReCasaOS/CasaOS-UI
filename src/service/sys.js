@@ -28,6 +28,11 @@ const sys = {
 		return api.get(`${PREFIX}/version`, refresh ? { refresh: 1 } : undefined)
 	},
 
+	// data: { channel: 'release' | 'prerelease' }: what the Update button offers (the night stays on releases)
+	setUpdateChannel(channel) {
+		return api.put(`${PREFIX}/update-channel`, { channel })
+	},
+
 	// Hardware Info
 	hardwareInfo() {
 		return api.get(`${PREFIX}/hardware`)
