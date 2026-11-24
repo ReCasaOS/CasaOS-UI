@@ -1042,7 +1042,7 @@ describe('the version an app runs (CasaOS#179)', () => {
 		wrapper.unmount()
 	})
 
-	it('says it next to Running on the compact card', async () => {
+	it('says it on its own line under Running on the compact card, whole on hover (CasaOS#179)', async () => {
 		const wrapper = mount(AppCard, {
 			props: { item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' }, version: '1.27.2' }, compact: true },
 			global: {
@@ -1052,9 +1052,13 @@ describe('the version an app runs (CasaOS#179)', () => {
 			},
 			attachTo: document.body,
 		})
-		// a browser draws the template's runs of spaces as one
-		expect(wrapper.find('.app-state').text().replace(/\s+/g, ' ')).toContain('Running · 1.27.2')
-		expect(wrapper.findAll('[data-app-version]')).toHaveLength(1)
+		// after the state and the memory, a desktop's narrow tile cut it off
+		expect(wrapper.find('.app-state').text()).not.toContain('1.27.2')
+		const version = wrapper.findAll('[data-app-version]')
+		expect(version).toHaveLength(1)
+		expect(version[0].text()).toBe('1.27.2')
+		expect(version[0].classes()).toContain('app-version')
+		expect(version[0].attributes('title')).toBe('Version: 1.27.2')
 		wrapper.unmount()
 	})
 
