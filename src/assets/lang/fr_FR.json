@@ -3746,7 +3746,7 @@
   "{read} read-only actions, {all} in all.": "{read} actions en lecture seule, {all} au total.",
   "No token yet: no assistant can connect.": "Aucun jeton pour l'instant : aucun assistant ne peut se connecter.",
   "Level": "Niveau",
-  "Created": "Créé",
+  "Created": "Créé le",
   "Last used": "Dernier usage",
   "Never": "Jamais",
   "Revoke": "Révoquer",
@@ -3761,5 +3761,8 @@
   "No more tokens can be created until one is revoked.": "Il n'est plus possible de créer de jeton tant qu'un jeton existant n'est pas révoqué.",
   "Copy it now: it will not be shown again.": "Copiez-le maintenant : il ne sera plus affiché.",
   "A token with this level can change and delete things on this box. A stolen token, or an assistant misled by a booby-trapped text, can erase data. Whether the assistant asks before acting depends on the assistant.": "Un jeton de ce niveau peut modifier et supprimer des choses sur ce serveur. Un jeton volé, ou un assistant trompé par un texte piégé, peut effacer des données. Que l'assistant demande avant d'agir dépend de l'assistant.",
-  "On this address the token travels unencrypted on your network.": "À cette adresse, le jeton circule sans chiffrement sur votre réseau."
+  "On this address the token travels unencrypted on your network.": "À cette adresse, le jeton circule sans chiffrement sur votre réseau.",
+  "Done (token)": "Terminé",
+  "Copied (token)": "Copié",
+  "Revoke {name}": "Révoquer {name}"
 }

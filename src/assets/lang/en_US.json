@@ -3759,5 +3759,8 @@
   "No more tokens can be created until one is revoked.": "No more tokens can be created until one is revoked.",
   "Copy it now: it will not be shown again.": "Copy it now: it will not be shown again.",
   "A token with this level can change and delete things on this box. A stolen token, or an assistant misled by a booby-trapped text, can erase data. Whether the assistant asks before acting depends on the assistant.": "A token with this level can change and delete things on this box. A stolen token, or an assistant misled by a booby-trapped text, can erase data. Whether the assistant asks before acting depends on the assistant.",
-  "On this address the token travels unencrypted on your network.": "On this address the token travels unencrypted on your network."
+  "On this address the token travels unencrypted on your network.": "On this address the token travels unencrypted on your network.",
+  "Done (token)": "Done",
+  "Copied (token)": "Copied",
+  "Revoke {name}": "Revoke {name}"
 }

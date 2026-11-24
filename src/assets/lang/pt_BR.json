@@ -3759,5 +3759,8 @@
   "No more tokens can be created until one is revoked.": "Não é possível criar mais tokens até que um seja revogado.",
   "Copy it now: it will not be shown again.": "Copie agora: ele não será mostrado novamente.",
   "A token with this level can change and delete things on this box. A stolen token, or an assistant misled by a booby-trapped text, can erase data. Whether the assistant asks before acting depends on the assistant.": "Um token deste nível pode alterar e apagar coisas neste servidor. Um token roubado, ou um assistente enganado por um texto armadilhado, pode apagar dados. Se o assistente pergunta antes de agir depende do assistente.",
-  "On this address the token travels unencrypted on your network.": "Neste endereço, o token trafega sem criptografia na sua rede."
+  "On this address the token travels unencrypted on your network.": "Neste endereço, o token trafega sem criptografia na sua rede.",
+  "Done (token)": "Concluído",
+  "Copied (token)": "Copiado",
+  "Revoke {name}": "Revogar {name}"
 }

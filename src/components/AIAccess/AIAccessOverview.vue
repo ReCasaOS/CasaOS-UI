@@ -30,7 +30,13 @@
 					<b-message v-if="revokeError" class="mb-3" data-revoke-error size="is-small" type="is-danger">
 						{{ $t(revokeError) }}
 					</b-message>
-					<p v-if="!tokens.length" class="is-size-7 has-text-full-03" data-empty>
+					<p v-if="tokensError" class="is-size-7 has-text-danger" data-tokens-error>
+						{{ $t('The tokens cannot be read for now.') }}
+						<b-button data-action="retry" rounded size="is-small" @click="loadTokens">
+							{{ $t('Retry') }}
+						</b-button>
+					</p>
+					<p v-else-if="!tokens.length" class="is-size-7 has-text-full-03" data-empty>
 						{{ $t('No token yet: no assistant can connect.') }}
 					</p>
 					<table v-else class="table is-fullwidth is-size-7 ai-access-modal__table">
@@ -40,7 +46,7 @@
 								<th>{{ $t('Level') }}</th>
 								<th>{{ $t('Created') }}</th>
 								<th>{{ $t('Last used') }}</th>
-								<th></th>
+								<th><span class="is-sr-only">{{ $t('Actions') }}</span></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -52,7 +58,7 @@
 								<td>{{ when(token.created) }}</td>
 								<td>{{ when(token.last_used) || $t('Never') }}</td>
 								<td class="has-text-right">
-									<b-button data-action="revoke" rounded size="is-small" type="is-danger is-light" @click="askRevoke(token)">
+									<b-button :aria-label="$t('Revoke {name}', { name: token.name })" data-action="revoke" rounded size="is-small" type="is-danger is-light" @click="askRevoke(token)">
 										{{ $t('Revoke') }}
 									</b-button>
 								</td>
@@ -69,28 +75,28 @@
 					<div class="ai-access-modal__copy mb-3">
 						<input id="ai-access-token" :value="created.token" autocomplete="off" class="input is-small ai-access-modal__mono" data-token readonly type="text" @focus="$event.target.select()">
 						<b-button data-copy="token" rounded size="is-small" @click="copyValue('token', created.token)">
-							{{ copied === 'token' ? $t('Copied') : $t('Copy') }}
+							{{ copied === 'token' ? $t('Copied (token)') : $t('Copy') }}
 						</b-button>
 					</div>
 					<label class="label is-size-7" for="ai-access-command">{{ $t('Command') }}</label>
 					<div class="ai-access-modal__copy mb-3">
 						<input id="ai-access-command" :value="command" class="input is-small ai-access-modal__mono" data-command readonly type="text" @focus="$event.target.select()">
 						<b-button data-copy="command" rounded size="is-small" @click="copyValue('command', command)">
-							{{ copied === 'command' ? $t('Copied') : $t('Copy') }}
+							{{ copied === 'command' ? $t('Copied (token)') : $t('Copy') }}
 						</b-button>
 					</div>
 					<label class="label is-size-7" for="ai-access-url">{{ $t('URL') }}</label>
 					<div class="ai-access-modal__copy mb-3">
 						<input id="ai-access-url" :value="url" class="input is-small ai-access-modal__mono" data-url readonly type="text" @focus="$event.target.select()">
 						<b-button data-copy="url" rounded size="is-small" @click="copyValue('url', url)">
-							{{ copied === 'url' ? $t('Copied') : $t('Copy') }}
+							{{ copied === 'url' ? $t('Copied (token)') : $t('Copy') }}
 						</b-button>
 					</div>
 					<label class="label is-size-7" for="ai-access-header">{{ $t('Header') }}</label>
 					<div class="ai-access-modal__copy mb-3">
 						<input id="ai-access-header" :value="header" class="input is-small ai-access-modal__mono" data-header readonly type="text" @focus="$event.target.select()">
 						<b-button data-copy="header" rounded size="is-small" @click="copyValue('header', header)">
-							{{ copied === 'header' ? $t('Copied') : $t('Copy') }}
+							{{ copied === 'header' ? $t('Copied (token)') : $t('Copy') }}
 						</b-button>
 					</div>
 					<p v-if="plainHttp" class="is-size-7 has-text-danger mb-3" data-http>
@@ -100,7 +106,7 @@
 						{{ $t('This could not be copied') }}
 					</p>
 					<b-button data-action="done" rounded type="is-primary" @click="done">
-						{{ $t('Done') }}
+						{{ $t('Done (token)') }}
 					</b-button>
 				</div>
 
@@ -170,6 +176,8 @@ export default {
 			status: null,
 			tokens: [],
 			error: false,
+			// the list alone could not be read: shown in its card, never in place of the rest of the window
+			tokensError: false,
 			name: '',
 			level: 'read',
 			creating: false,
@@ -202,6 +210,7 @@ export default {
 		header() {
 			return `Authorization: Bearer ${this.created?.token}`
 		},
+		// no escaping: the token is rcm_ + base64url and the origin is the browser's own
 		command() {
 			return `claude mcp add --transport http recasaos ${this.url} --header "${this.header}"`
 		},
@@ -235,8 +244,9 @@ export default {
 			try {
 				const tokens = await mcpApi.tokens()
 				this.tokens = Array.isArray(tokens.data) ? tokens.data : []
+				this.tokensError = false
 			} catch {
-				this.error = true
+				this.tokensError = true
 			}
 		},
 

@@ -18,6 +18,8 @@ vi.mock('clipboard-copy', () => ({ default: vi.fn(() => Promise.resolve()) }))
 vi.mock('@/assets/lang', () => ({
 	default: {
 		en_us: {
+			'Copied (token)': 'Copied',
+			'Revoke {name}': 'Revoke {name}',
 			'{read} read-only actions, {all} in all.': '{read} read-only actions, {all} in all.',
 			'Revoke the token "{name}"? The assistant that uses it can no longer connect.': 'Revoke the token "{name}"? The assistant that uses it can no longer connect.',
 		},
@@ -222,6 +224,44 @@ describe('the AI access window of the box', () => {
 		expect(wrapper.find('[data-limit]').text()).toBe('No more tokens can be created until one is revoked.')
 		expect(wrapper.find('[data-action="create"]').exists()).toBe(false)
 		expect(wrapper.find('[data-field="name"]').exists()).toBe(false)
+	})
+
+	it('keeps the new token on screen when the list cannot be read again, and reads it again on Retry', async () => {
+		mcpApi.create.mockImplementation(() => answer({ ...laptop, token: SECRET }))
+		const wrapper = await open()
+		mcpApi.tokens.mockImplementation(() => refusal(503))
+		await create(wrapper)
+		expect(wrapper.find('[data-error]').exists()).toBe(false)
+		expect(wrapper.find('[data-token]').element.value).toBe(SECRET)
+		expect(wrapper.find('[data-command]').element.value).toContain(SECRET)
+		expect(wrapper.find('[data-tokens-error]').text()).toContain('The tokens cannot be read for now.')
+
+		mcpApi.tokens.mockImplementation(() => answer([laptop, phone]))
+		await wrapper.find('[data-action="retry"]').trigger('click')
+		await flushPromises()
+		expect(wrapper.find('[data-tokens-error]').exists()).toBe(false)
+		expect(wrapper.findAll('[data-token-row]')).toHaveLength(2)
+		expect(wrapper.find('[data-token]').element.value).toBe(SECRET)
+	})
+
+	it('says in the tokens card, not for the window, that the list cannot be read after a revoke', async () => {
+		mcpApi.revoke.mockImplementation(() => Promise.resolve({ status: 204 }))
+		const wrapper = await open()
+		const confirm = vi.spyOn(wrapper.vm.$buefy.dialog, 'confirm').mockImplementation(() => {})
+		await wrapper.find('[data-action="revoke"]').trigger('click')
+		mcpApi.tokens.mockImplementation(() => refusal(503))
+		confirm.mock.calls[0][0].onConfirm()
+		await flushPromises()
+		expect(wrapper.find('[data-error]').exists()).toBe(false)
+		expect(wrapper.find('[data-tokens-error]').exists()).toBe(true)
+		expect(wrapper.find('[data-status]').exists()).toBe(true)
+		expect(wrapper.find('[data-form]').exists()).toBe(true)
+	})
+
+	it('names the token on its Revoke button, and labels the last column', async () => {
+		const wrapper = await open()
+		expect(wrapper.find('[data-action="revoke"]').attributes('aria-label')).toBe('Revoke Laptop')
+		expect(wrapper.find('th .is-sr-only').exists()).toBe(true)
 	})
 
 	it('says so when the module cannot be read', async () => {
