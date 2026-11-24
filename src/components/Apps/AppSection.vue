@@ -936,7 +936,7 @@ export default {
 			})
 		},
 
-		// a save while the grid's apps are missing keeps them (saveSortData, gridMissing)
+		// a save while apps are missing keeps their saved place (saveSortData)
 		addVmCardWhenThere(savedOrder) {
 			return this.probeCard(VM_APP_NAME, hasVirtualMachines).then((available) => {
 				if (available && !this.appList.some(app => app.name === VM_APP_NAME)) {
@@ -1023,12 +1023,13 @@ export default {
 				// compose milestone :: name is unique, global index.
 				return item.name
 			})
-			// apps not shown keep their saved place, behind the app saved before them:
-			// the grid's apps while the grid fails (a drag meanwhile), and a card whose
-			// probe has not answered yet (another card's probe answered first)
-			const probing = this.cardsProbing || []
-			const kept = (this.savedOrder || []).filter(name => this.gridMissing || shown.includes(name) || probing.includes(name))
-			const newList = keepUnshown(shown, kept)
+			// Every app saved and not shown keeps its saved place, behind the app saved before it.
+			// A list can lack apps for a while: the grid failing, a card whose probe has not
+			// answered, a grid read right after an update before every app is back. Dropping
+			// them there lost their place for good, and they came back at the end (CasaOS#183).
+			// shortcut: an uninstalled app's name stays in the order (a few bytes; it goes back
+			// to its place if installed again); prune it if the list ever grows in the hundreds.
+			const newList = keepUnshown(shown, this.savedOrder || [])
 			this.savedOrder = newList
 			const data = {
 				data: newList,
