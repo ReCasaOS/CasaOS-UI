@@ -341,6 +341,36 @@ describe('app section built-in cards', () => {
 		expect(saved.indexOf('jellyfin')).toBe(saved.indexOf('Files') + 1)
 	})
 
+	// CasaOS#183: after an update the grid can answer before every app is back, and a card
+	// can join after another one's save; the saved place of what is missing must survive
+	it('a save from a list that lacks some saved apps keeps them at their place', () => {
+		const setCustomStorage = vi.fn()
+		const vm = {
+			appList: ['App Store', 'Files', 'jellyfin'].map(name => ({ name })),
+			savedOrder: ['App Store', 'syncthing', 'Files', 'Security', 'jellyfin', 'logs'],
+			gridMissing: false,
+			cardsProbing: [],
+			$api: { users: { setCustomStorage } },
+		}
+
+		AppSection.methods.saveSortData.call(vm)
+
+		expect(setCustomStorage).toHaveBeenCalledWith('app_order', { data: ['App Store', 'syncthing', 'Files', 'Security', 'jellyfin', 'logs'] })
+	})
+
+	it('a grid that answers without the apps yet does not lose their order', async () => {
+		hasVirtualMachines.mockResolvedValue(false)
+		const { vm, setCustomStorage } = failingGrid(['App Store', 'syncthing', 'Files', 'jellyfin'])
+		vm.$openAPI.appGrid.getAppGrid = () => Promise.resolve({ data: { data: [] } })
+		await AppSection.methods.getList.call(vm)
+		await vi.waitFor(() => expect(vm.cardsProbing).toEqual([]))
+
+		for (const [, { data }] of setCustomStorage.mock.calls) {
+			expect(data.indexOf('syncthing')).toBe(data.indexOf('App Store') + 1)
+			expect(data.indexOf('jellyfin')).toBe(data.indexOf('Files') + 1)
+		}
+	})
+
 	it('a failure after a good read keeps the apps shown', async () => {
 		const shown = [{ name: 'Files' }, { name: 'jellyfin' }]
 		const { vm } = failingGrid(['Files', 'jellyfin'], shown)
