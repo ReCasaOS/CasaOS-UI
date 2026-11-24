@@ -36,6 +36,11 @@ describe('the footer news settings', () => {
 		expect(wrapper.emitted('close')).toHaveLength(1)
 	})
 
+	it('says why the box could not read a feed', async () => {
+		const wrapper = await open({ getFeeds: answer({ enabled: true, feeds: ['http://192.168.1.5/rss'], items: [], errors: { 'http://192.168.1.5/rss': 'refused: the box reads feeds from the Internet only' } }) })
+		expect(wrapper.find('[data-feeds-error]').text()).toBe('http://192.168.1.5/rss could not be read: refused: the box reads feeds from the Internet only')
+	})
+
 	it('says why the core refused, and stays open', async () => {
 		const setFeeds = vi.fn(() => Promise.reject(Object.assign(new Error('400'), { response: { data: { message: 'invalid feeds settings: "ftp://x" is not an http(s) address' } } })))
 		const wrapper = await open({ setFeeds })

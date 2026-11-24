@@ -44,12 +44,13 @@ export default {
 		clearTimeout(this.loadTimer)
 	},
 	methods: {
+		// after a save: once now, and once more when the box has had time to read a feed just added
 		reload() {
 			clearTimeout(this.loadTimer)
-			this.load()
+			this.load(RETRY_MS)
 		},
-		async load() {
-			let next = RELOAD_MS
+		async load(soon = RELOAD_MS) {
+			let next = soon
 			try {
 				const { enabled, feeds, items } = (await this.$api.sys.getFeeds()).data.data
 				this.items = enabled ? (items || []) : []

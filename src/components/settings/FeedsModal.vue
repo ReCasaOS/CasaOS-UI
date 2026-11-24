@@ -8,7 +8,7 @@
 
 		<section class="modal-card-body">
 			<p class="settings-intro mb-3">
-				{{ $t('Headlines of the RSS or Atom feeds you choose, one at a time at the bottom of the dashboard. The box reads the feeds every 30 minutes.') }}
+				{{ $t('Headlines of the RSS or Atom feeds you choose, one at a time at the bottom of the dashboard. The box reads the feeds every 30 minutes, from the Internet only: not a feed served by the box itself or its own network.') }}
 			</p>
 
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">
@@ -26,6 +26,10 @@
 						<b-input v-model="text" :disabled="saving" data-feeds-text placeholder="https://github.com/ReCasaOS/CasaOS-Install/releases.atom"
 							rows="5" type="textarea" />
 					</b-field>
+					<!-- why the box's last read of a feed failed, as the core says it -->
+					<p v-for="(why, feed) in errors" :key="feed" class="is-size-7 has-text-warning mt-1" data-feeds-error>
+						{{ $t('{feed} could not be read: {error}', { feed, error: why }) }}
+					</p>
 				</div>
 			</template>
 			<b-loading :is-full-page="false" :model-value="!loaded && !error" />
@@ -43,7 +47,7 @@ export default {
 	name: 'FeedsModal',
 	emits: ['close'],
 	data() {
-		return { loaded: false, enabled: false, text: '', saving: false, error: '' }
+		return { loaded: false, enabled: false, text: '', errors: {}, saving: false, error: '' }
 	},
 	mounted() {
 		this.load()
@@ -51,8 +55,9 @@ export default {
 	methods: {
 		async load() {
 			try {
-				const { enabled, feeds } = (await this.$api.sys.getFeeds()).data.data
+				const { enabled, feeds, errors } = (await this.$api.sys.getFeeds()).data.data
 				this.enabled = enabled
+				this.errors = errors || {}
 				this.text = (feeds || []).join('\n')
 				this.loaded = true
 			} catch (error) {
