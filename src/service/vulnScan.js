@@ -11,7 +11,7 @@ const client = () => import('@/service/service.js').then(m => m.instance)
 export const vulnScanApi = {
 	apps: async () => (await client()).get(`${PREFIX}/apps`),
 	app: async name => (await client()).get(`${PREFIX}/apps/${encodeURIComponent(name)}`),
-	status: async () => (await client()).get(`${PREFIX}/status`),
+	status: async opts => (await client()).get(`${PREFIX}/status`, ...(opts ? [opts] : [])),
 	scan: async () => (await client()).post(`${PREFIX}/scan`),
 }
 
