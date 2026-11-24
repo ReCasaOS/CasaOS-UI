@@ -218,3 +218,21 @@ describe('the stub of the protection of shared apps', () => {
 		expect(ask('GET', '/v1/share/guard/relay-refusals', null, state).body.data.map(r => r.reason)).toEqual(['external', 'community', 'manual', 'cap'])
 	})
 })
+
+describe('the stub of the vulnerability scan module', () => {
+	it('lists what the scan found by app, with one app that has something to do', () => {
+		const { status, body } = ask('GET', '/v2/vuln_scan/apps')
+
+		expect(status).toBe(200)
+		expect(body.data.filter(app => app.actionable).map(app => app.app)).toEqual(['jellyfin'])
+		expect(body.data.find(app => app.app === 'jellyfin')).toMatchObject({ critical: 2, high: 1 })
+		expect(body.data.find(app => app.app === 'plex').skipped).toBe('not enough room')
+	})
+
+	it('answers one app, its status and a scan, and 404 for an app it does not know', () => {
+		expect(ask('GET', '/v2/vuln_scan/apps/jellyfin').body.data.images[0].findings).toHaveLength(3)
+		expect(ask('GET', '/v2/vuln_scan/apps/nothing').status).toBe(404)
+		expect(ask('GET', '/v2/vuln_scan/status').body.data).toMatchObject({ running: false })
+		expect(ask('POST', '/v2/vuln_scan/scan').status).toBe(202)
+	})
+})

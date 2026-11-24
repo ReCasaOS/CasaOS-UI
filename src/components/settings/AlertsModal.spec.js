@@ -214,6 +214,14 @@ describe('the alerts dialog', () => {
 		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('cleanup')
 	})
 
+	it('lists the vulnerabilities category only when the core knows it', async () => {
+		const wrapper = await open({ getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true, vulnerabilities: true } })) })
+		expect(rows(wrapper)).toHaveLength(5)
+		expect(wrapper.vm.shownCategories.find(c => c.key === 'vulnerabilities').label).toBe('A critical vulnerability in an app that an update of the app fixes')
+		const older = await open({})
+		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('vulnerabilities')
+	})
+
 	it('sends a category or the threshold alone, and goes back when refused', async () => {
 		const setAlerts = answer({})
 		const wrapper = await open({ setAlerts })

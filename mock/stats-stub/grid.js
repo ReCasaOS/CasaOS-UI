@@ -86,13 +86,37 @@ function anApp(name, title, port, image) {
 }
 
 const APPS = [
-	anApp('jellyfin', 'Jellyfin', '8096', 'linuxserver/jellyfin:latest'),
+	// an update is offered, and the scan module found critical vulnerabilities it fixes
+	{ ...anApp('jellyfin', 'Jellyfin', '8096', 'linuxserver/jellyfin:latest'), update_available: true },
 	// a health check that has not passed yet, and one that fails: what the card says of each
 	{ ...anApp('nextcloud', 'Nextcloud', '10081', 'nextcloud:latest'), health: 'starting' },
 	{ ...anApp('immich', 'Immich', '2283', 'ghcr.io/immich-app/immich-server:release'), health: 'unhealthy' },
 	// pinned to a version, and the registry holds newer ones
 	{ ...anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:1.40.2'), newer_tags: [{ service: 'plex', image: 'plexinc/pms-docker:1.40.2', current: '1.40.2', patch: '1.40.5', minor: '1.41.3' }] },
 ]
+
+// The scan module (ReCasaOS-VulnScan): one app with something to do, one with high
+// vulnerabilities only, one clean, and one whose image holds Java libraries.
+const aFinding = (id, severity, pkg, installed, fixed) => ({ id, package: pkg, installed, fixed, severity, title: `${pkg}: a flaw`, url: `https://avd.aquasec.com/nvd/${id.toLowerCase()}` })
+const VULN_DETAIL = {
+	jellyfin: [{ image_id: 'sha256:5d1c179d8ecf6119caf9b8e0d0a385e45a113ba3c868fd92a2360eb0313f83b4', os_only: false, skipped: '', scanned_at: '2026-11-24T05:30:12Z', findings: [
+		aFinding('CVE-2026-44172', 'CRITICAL', 'libssl3', '3.0.15-1', '3.0.17-1'),
+		aFinding('CVE-2026-49261', 'CRITICAL', 'zlib1g', '1:1.2.13', '1:1.2.13.dfsg-1+deb12u2'),
+		aFinding('CVE-2026-31337', 'HIGH', 'libcurl4', '7.88.1-10', '7.88.1-10+deb12u9'),
+	] }],
+	immich: [{ image_id: 'sha256:a8d02e726bfa4140b4b321efb992086aae098819e8ee5793f5ee462b2f75d447', os_only: true, skipped: '', scanned_at: '2026-11-24T05:31:40Z', findings: [
+		aFinding('CVE-2026-20001', 'HIGH', 'libxml2', '2.9.14', '2.9.14+dfsg-1.3~deb12u3'),
+	] }],
+	nextcloud: [{ image_id: 'sha256:6bee76be921b372f8b452c11321831372a65cab168b57773ee60ca70dc0f3b0e', os_only: false, skipped: '', scanned_at: '2026-11-24T05:32:02Z', findings: [] }],
+	plex: [{ image_id: 'sha256:feb2ab7bd8d0e94446e73eab735cf0cecd00d0319fe2f0e70fdbe321869112f2', os_only: false, skipped: 'not enough room', findings: [] }],
+}
+const VULN_APPS = Object.entries(VULN_DETAIL).map(([app, images]) => {
+	const findings = images.flatMap(image => image.findings)
+	const critical = findings.filter(f => f.severity === 'CRITICAL').length
+	return { app, loose: false, critical, high: findings.length - critical, actionable: critical > 0 && app === 'jellyfin', os_only: images.some(i => i.os_only), skipped: images.find(i => i.skipped)?.skipped || '', scanned_at: images[0].scanned_at }
+})
+const VULN_STATUS = { running: false, last_run: '2026-11-24T05:32:05Z', last_error: '', db_updated_at: '2026-11-23T19:02:50Z' }
+const ONE_VULN_APP = /^\/v2\/vuln_scan\/apps\/([^/]+)$/
 
 const UTILIZATION = {
 	cpu: { percent: 12, num: 4, temperature: 45, model: 'stub', power: { timestamp: '0', value: '0' } },
@@ -573,8 +597,22 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	if (cleaned) {
 		return cleaned
 	}
+	if (verb === 'POST' && path === '/v2/vuln_scan/scan') {
+		return { status: 202, body: { message: 'scan started' } }
+	}
 	if (verb !== 'GET') {
 		return null
+	}
+	if (path === '/v2/vuln_scan/apps') {
+		return { status: 200, body: { data: VULN_APPS } }
+	}
+	if (path === '/v2/vuln_scan/status') {
+		return { status: 200, body: { data: VULN_STATUS } }
+	}
+	const scanned = path.match(ONE_VULN_APP)
+	if (scanned) {
+		const images = VULN_DETAIL[decodeURIComponent(scanned[1])]
+		return images ? { status: 200, body: { data: { app: decodeURIComponent(scanned[1]), images } } } : { status: 404, body: { message: 'no app of that name on this box' } }
 	}
 	if (CORE_GETS[path]) {
 		return CORE_GETS[path]()

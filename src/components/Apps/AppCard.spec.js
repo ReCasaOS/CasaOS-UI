@@ -12,6 +12,8 @@ import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 import BackupBadge from '@/components/backup/BackupBadge.vue'
 import { backupStatus, refresh } from '@/service/backupStatus'
 import { publicShare } from '@/service/publicShare'
+import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
+import SecurityModal from '@/components/Apps/SecurityModal.vue'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
@@ -28,6 +30,12 @@ vi.mock('@/service/publicShare', async () => {
 	return { publicShare: reactive({ status: null, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
 })
 
+// the service reads the scan module's routes: the card is given its answer instead
+vi.mock('@/service/vulnScan', async () => {
+	const { reactive } = await import('vue')
+	return { vulnScan: reactive({ apps: {}, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
+
 // require.context has no Vite equivalent; a near-empty table makes $t return its key.
 // The one entry is the message the update failure needs: $t leaves a MISSING key
 // uninterpolated, which would hide whether the backend's reason reaches the toast.
@@ -40,6 +48,8 @@ vi.mock('@/assets/lang', () => ({
 			'Updating {name} failed: {reason}': 'Updating {name} failed: {reason}',
 			'Backed up {when} to {destination}': 'Backed up {when} to {destination}',
 			'Backup failed: {reason}': 'Backup failed: {reason}',
+			'{count} critical · update': '{count} critical · update',
+			'{count} critical': '{count} critical',
 			'{name} now runs the image that was just pulled.': '{name} now runs the image that was just pulled.',
 			'{name} already runs the newest image, so it was left as it is.': '{name} already runs the newest image, so it was left as it is.',
 			'Could not check whether a newer image exists for {name}. It keeps the image it has.': 'Could not check whether a newer image exists for {name}. It keeps the image it has.',
@@ -77,7 +87,10 @@ afterEach(() => {
 	backupStatus.ok = false
 	publicShare.status = null
 	publicShare.ok = false
+	vulnScan.apps = {}
+	vulnScan.ok = false
 	vi.mocked(refresh).mockClear()
+	vi.mocked(refreshVulnScan).mockClear()
 })
 
 function badges(wrapper) {
@@ -935,5 +948,89 @@ describe('public sharing on the card', () => {
 		expect(wrapper.find('.public-badge').exists()).toBe(false)
 		expect(shareButton()).toBeUndefined()
 		wrapper.unmount()
+	})
+})
+
+describe('app card vulnerability badge', () => {
+	const found = (summary) => {
+		vulnScan.ok = true
+		vulnScan.apps = { syncthing: { critical: 2, high: 5, actionable: true, ...summary } }
+	}
+
+	it('marks an app with a critical vulnerability that an update fixes, in place of the update badge', async () => {
+		found()
+		const classic = await card({ update_available: true })
+		expect(badges(classic)).toEqual(['2 critical'])
+		// red, not the green of an update that is only on offer
+		expect(classic.findAllComponents(cTooltip)[0].props('modal')).toBe('is-danger')
+		classic.unmount()
+
+		const compact = mount(AppCard, {
+			props: { compact: true, item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' }, update_available: true } },
+			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } } },
+			attachTo: document.body,
+		})
+		await nextTick()
+		const chips = compact.findAll('.update-chip')
+		expect(chips).toHaveLength(1)
+		expect(chips[0].text()).toBe('2 critical · update')
+		expect(chips[0].classes()).toContain('is-critical')
+		compact.unmount()
+	})
+
+	it('says nothing on the card when there is nothing to do about what was found', async () => {
+		// high ones only, or critical ones no update fixes: they are in the Security window
+		found({ actionable: false })
+		const wrapper = await card({ update_available: true })
+		expect(badges(wrapper)).toEqual(['Update available'])
+		wrapper.unmount()
+	})
+
+	it('says nothing on a box without the module, or about an app that was not scanned', async () => {
+		const without = await card({})
+		expect(badges(without)).toEqual([])
+		expect(document.body.textContent).not.toContain('Security')
+		without.unmount()
+
+		vulnScan.ok = true
+		vulnScan.apps = { another: { critical: 2, high: 0, actionable: true } }
+		const unscanned = await card({})
+		expect(badges(unscanned)).toEqual([])
+		unscanned.unmount()
+	})
+
+	it('reads the scans for the administrator only', async () => {
+		const admin = await card({})
+		expect(refreshVulnScan).toHaveBeenCalledTimes(1)
+		admin.unmount()
+		vi.mocked(refreshVulnScan).mockClear()
+
+		found()
+		const user = await card({}, { $store: { getters: { canWrite: false, canReadModule: () => true } } })
+		expect(refreshVulnScan).not.toHaveBeenCalled()
+		expect(badges(user)).toEqual([])
+		user.unmount()
+	})
+
+	it('opens the Security window of a scanned app from its menu', async () => {
+		found({ critical: 0, high: 5, actionable: false })
+		const open = vi.fn()
+		const wrapper = await card({})
+		wrapper.vm.$buefy.modal.open = open
+		expect(wrapper.vm.vuln).toMatchObject({ high: 5 })
+		wrapper.vm.showSecurity()
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(open.mock.calls[0][0]).toMatchObject({ component: SecurityModal, hasModalCard: true, customClass: 'security-modal', props: { app: 'syncthing' } })
+		wrapper.unmount()
+	})
+
+	it('reads nothing of a system app or a container that carries an app\'s name', async () => {
+		found()
+		const system = await card({ app_type: 'system' })
+		expect(system.vm.vuln).toBe(null)
+		system.unmount()
+		const container = await card({ app_type: 'container' })
+		expect(container.vm.vuln).toBe(null)
+		container.unmount()
 	})
 })
