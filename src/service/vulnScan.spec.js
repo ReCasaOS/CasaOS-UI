@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { refresh, resetVulnScan, vulnScan, vulnScanApi } from './vulnScan.js'
+import { followRescan, refresh, resetVulnScan, vulnScan, vulnScanApi } from './vulnScan.js'
 import { instance } from '@/service/service.js'
 
 vi.mock('@/service/service.js', () => {
@@ -75,6 +75,85 @@ describe('the vulnerability scans of this box', () => {
 		instance.get.mockImplementation(gone)
 		await refresh({ force: true })
 		expect(vulnScan).toMatchObject({ ok: false, apps: {} })
+	})
+
+	// the module scans by itself when an app runs a new image, a little after the update is over
+	describe('after an app was installed, updated or removed', () => {
+		let lastRun, running, apps
+		const calls = path => instance.get.mock.calls.filter(([url]) => url === path).length
+		beforeEach(async () => {
+			lastRun = '2026-11-24T05:31:00Z'
+			running = false
+			apps = [{ app: 'jellyfin', loose: false, critical: 2, high: 0, actionable: true }]
+			instance.get.mockImplementation(url => body(url.endsWith('/status') ? { running, last_run: lastRun } : apps))
+			await refresh()
+			instance.get.mockClear()
+		})
+
+		it('reads the apps at once, then again when the scan that follows is over', async () => {
+			const done = followRescan()
+			await vi.advanceTimersByTimeAsync(0)
+			expect(calls('/v2/vuln_scan/apps')).toBe(1)
+
+			// the module has not started yet: the old scan is not the one waited for
+			await vi.advanceTimersByTimeAsync(10000)
+			expect(calls('/v2/vuln_scan/apps')).toBe(1)
+
+			running = true
+			await vi.advanceTimersByTimeAsync(10000)
+			expect(calls('/v2/vuln_scan/apps')).toBe(1)
+
+			apps = [{ app: 'jellyfin', loose: false, critical: 0, high: 0, actionable: false }]
+			running = false
+			lastRun = '2026-11-24T06:02:00Z'
+			await vi.advanceTimersByTimeAsync(10000)
+			await done
+			expect(calls('/v2/vuln_scan/apps')).toBe(2)
+			expect(vulnScan.apps.jellyfin).toMatchObject({ critical: 0, actionable: false })
+
+			const asked = calls('/v2/vuln_scan/status')
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(calls('/v2/vuln_scan/status')).toBe(asked)
+		})
+
+		it('gives up after three minutes when no scan follows', async () => {
+			const done = followRescan()
+			await vi.advanceTimersByTimeAsync(180000)
+			await done
+			const asked = calls('/v2/vuln_scan/status')
+			expect(asked).toBeLessThanOrEqual(20)
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(calls('/v2/vuln_scan/status')).toBe(asked)
+			expect(calls('/v2/vuln_scan/apps')).toBe(1)
+		})
+
+		it('waits for a scan that runs, however long a large image takes', async () => {
+			const done = followRescan()
+			running = true
+			await vi.advanceTimersByTimeAsync(10 * 60000)
+			running = false
+			lastRun = '2026-11-24T06:12:00Z'
+			await vi.advanceTimersByTimeAsync(10000)
+			await done
+			expect(calls('/v2/vuln_scan/apps')).toBe(2)
+		})
+
+		it('asks nothing of a box without the module', async () => {
+			resetVulnScan()
+			await followRescan()
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(instance.get).not.toHaveBeenCalled()
+		})
+
+		it('waits once when two apps change one after the other', async () => {
+			followRescan()
+			await vi.advanceTimersByTimeAsync(0)
+			followRescan()
+			await vi.advanceTimersByTimeAsync(0)
+			const asked = calls('/v2/vuln_scan/status')
+			await vi.advanceTimersByTimeAsync(10000)
+			expect(calls('/v2/vuln_scan/status')).toBe(asked + 1)
+		})
 	})
 
 	it('asks for one app by its name, whatever is in it', async () => {

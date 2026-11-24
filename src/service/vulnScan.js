@@ -61,7 +61,42 @@ export function refresh({ force = false } = {}) {
 	return inFlight || Promise.resolve()
 }
 
+const FOLLOW_EVERY = 10000
+const FOLLOW_FOR = 3 * 60000
+let following = 0
+
+// After an app was installed, updated, changed or removed. The module scans by itself when an app
+// runs a new image, once the operation is over: the apps are read at once (an update takes its
+// offer away), then again when a scan newer than the one known has ended. Three minutes at most
+// for it to start: nothing follows a change that kept the images. A newer call takes the wait over.
+export async function followRescan() {
+	if (!vulnScan.ok) {
+		return
+	}
+	const mine = ++following
+	try {
+		const before = (await vulnScanApi.status()).data.data?.last_run
+		await refresh({ force: true })
+		for (let waited = 0; waited < FOLLOW_FOR;) {
+			await new Promise(resolve => setTimeout(resolve, FOLLOW_EVERY))
+			if (mine !== following) {
+				return
+			}
+			const status = (await vulnScanApi.status()).data.data
+			if (!status?.running && status?.last_run !== before) {
+				await refresh({ force: true })
+				return
+			}
+			// a scan that runs is waited for to its end: a large image takes its time
+			waited += status?.running ? 0 : FOLLOW_EVERY
+		}
+	} catch {
+		// the module stopped answering: the next read says so
+	}
+}
+
 export function resetVulnScan() {
+	following++
 	readAt = Number.NEGATIVE_INFINITY
 	inFlight = null
 	vulnScan.apps = {}

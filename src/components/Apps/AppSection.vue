@@ -194,7 +194,7 @@ import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
 import { SECURITY_APP_NAME, forgetSecurity, hasSecurity, securityApplication } from '@/components/Security/entry'
-import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
+import { followRescan, refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -1206,7 +1206,9 @@ export default {
 		},
 	},
 	sockets: {
+		// the scan module scans the images an app just started to run: see vulnScan.followRescan
 		'app:install-end': function () {
+			followRescan()
 			this.getList().then(() => {
 				this.scrollToNewApp()
 			})
@@ -1217,6 +1219,7 @@ export default {
 			})
 		},
 		'app:uninstall-end': function () {
+			followRescan()
 			this.getList()
 		},
 		'app:apply-changes-error': function (res) {
@@ -1228,6 +1231,7 @@ export default {
 			const title = ice_i18n(languages)
 			// toast info
 			this.messageBusToast(`${title} is OK`, 'is-success')
+			followRescan()
 
 			// business :: Tagging of new app / scrollIntoView
 			this.addIdToSessionStorage(res.Properties['app:name'])
@@ -1255,6 +1259,7 @@ export default {
 			// pull found rather than what ended up installed, so a pull that landed
 			// on a recreate that then failed used to reload the grid and call it done.
 			if (data.Properties['app:updated'] === 'true') {
+				followRescan()
 				// business :: Tagging of new app / scrollIntoView
 				this.addIdToSessionStorage(data.Properties['app:name'])
 
