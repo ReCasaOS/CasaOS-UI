@@ -91,9 +91,8 @@
 </template>
 
 <script>
-import { refresh, vulnScan, vulnScanApi } from '@/service/vulnScan'
-
-const POLL_MS = 5000
+import scanRun from '@/components/Security/scanRun'
+import { vulnScan, vulnScanApi } from '@/service/vulnScan'
 
 const NOTES = {
 	'not enough room': 'This image was not scanned: there is not enough room on the disk.',
@@ -102,6 +101,8 @@ const NOTES = {
 
 export default {
 	name: 'SecurityModal',
+
+	mixins: [scanRun],
 
 	props: {
 		// the app's name, which is its compose project
@@ -113,10 +114,6 @@ export default {
 	data() {
 		return {
 			detail: null,
-			status: null,
-			error: false,
-			scanning: false,
-			timer: null,
 		}
 	},
 
@@ -139,10 +136,6 @@ export default {
 
 	created() {
 		this.load()
-	},
-
-	beforeUnmount() {
-		clearTimeout(this.timer)
 	},
 
 	methods: {
@@ -170,43 +163,6 @@ export default {
 			} catch {
 				this.error = true
 			}
-		},
-
-		async scan() {
-			this.scanning = true
-			try {
-				await vulnScanApi.scan()
-			} catch (e) {
-				// 409: a scan runs already, the night's or another window's: wait for that one
-				if (e?.response?.status !== 409) {
-					this.scanning = false
-					this.error = true
-					return
-				}
-			}
-			this.wait()
-		},
-
-		// asks every five seconds until the scan is over, then reads what it found
-		wait() {
-			this.scanning = true
-			clearTimeout(this.timer)
-			this.timer = setTimeout(async () => {
-				try {
-					const status = (await vulnScanApi.status()).data.data
-					if (status?.running) {
-						this.wait()
-						return
-					}
-				} catch {
-					this.scanning = false
-					this.error = true
-					return
-				}
-				this.scanning = false
-				refresh({ force: true })
-				this.load()
-			}, POLL_MS)
 		},
 	},
 }

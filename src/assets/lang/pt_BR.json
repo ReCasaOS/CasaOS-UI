@@ -3699,5 +3699,15 @@
   "Severity": "Gravidade",
   "Critical": "Crítica",
   "Scan now": "Verificar agora",
+  "The images of your apps are checked for known vulnerabilities every night. An app is flagged when an update of it fixes a critical one.": "As imagens dos seus apps são verificadas todas as noites em busca de vulnerabilidades conhecidas. Um app é sinalizado quando uma atualização corrige uma vulnerabilidade crítica.",
+  "{count} high": "{count} altas",
+  "Nothing found": "Nada encontrado",
+  "A scan is running.": "Uma verificação está em andamento.",
+  "The first scan is running. It can take several minutes.": "A primeira verificação está em andamento. Pode levar vários minutos.",
+  "No scan has run yet.": "Nenhuma verificação foi feita ainda.",
+  "Some apps have a critical vulnerability that an update fixes.": "Alguns apps têm uma vulnerabilidade crítica que uma atualização corrige.",
+  "No app needs an update for a critical vulnerability.": "Nenhum app precisa de atualização por causa de uma vulnerabilidade crítica.",
+  "Apps to update: {count}": "Apps para atualizar: {count}",
+  "Vulnerability scan": "Verificação de vulnerabilidades",
   "A critical vulnerability in an app that an update of the app fixes": "Uma vulnerabilidade crítica em um app, que uma atualização do app corrige"
 }
