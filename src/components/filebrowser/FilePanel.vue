@@ -85,7 +85,10 @@
 									<sidebar-menu-button></sidebar-menu-button>
 									<!-- SideBar Button End -->
 									<file-breadcrumb v-if="!isMobile"></file-breadcrumb>
-									<!-- <b-input placeholder="Search in folder..." size="is-small" rounded></b-input> -->
+									<!-- the search by name (CasaOS#184), the owner's: Enter searches this folder and below, Ctrl+K comes here -->
+									<b-input v-if="!isAccount && !isMobile" ref="searchInput" v-model="searchText" :aria-label="$t('Search in this folder')"
+										:placeholder="$t('Search in this folder')" class="files-search ml-2" data-files-search icon="magnify" rounded
+										size="is-small" @keydown.enter.prevent="runSearch(false)" @keydown.esc.prevent="clearSearch" />
 								</div>
 								<div class="is-flex is-align-items-center">
 									<!-- Paste Button Start -->
@@ -119,6 +122,15 @@
 							</header>
 
 							<!-- Header End -->
+
+							<!-- what the search found, and where: the list below is its hits until a folder is opened -->
+							<div v-if="search" class="search-bar is-flex is-align-items-center mt-2 is-size-14px" data-search-bar>
+								<span class="is-flex-grow-1">
+									{{ $t(search.truncated ? 'The first {n} results for "{q}" in {path}' : '{n} results for "{q}" in {path}', { n: search.count, q: search.query, path: search.path }) }}
+								</span>
+								<a v-if="search.path !== '/'" class="mr-3" data-search-everywhere role="button" @click="runSearch(true)">{{ $t('Search everywhere') }}</a>
+								<a data-search-clear role="button" @click="clearSearch">{{ $t('Close') }}</a>
+							</div>
 
 							<!-- Tool Bar Start -->
 							<div v-if="allListData.length > 0" class="tool-bar is-flex mb-2 mt-2 is-flex-shrink-0">
@@ -346,6 +358,9 @@ export default {
 	},
 	data() {
 		return {
+			// the search typed, and what it found: { query, path, count, truncated }, null while the folder is shown
+			searchText: '',
+			search: null,
 			// the room left where the folder shown is: { text, title }, null while unknown
 			space: null,
 			spaceRead: 0,
@@ -524,6 +539,7 @@ export default {
 		this.isSideBarOpen = !this.isMobile
 
 		document.addEventListener('contextmenu', this.hideContextMenu)
+		document.addEventListener('keydown', this.onSearchKey)
 		this.$EventBus.$on(events.GOTO, (event) => {
 			this.getFileList(event.path)
 		})
@@ -536,6 +552,7 @@ export default {
 		this.openFirstFolder()
 	},
 	unmounted() {
+		document.removeEventListener('keydown', this.onSearchKey)
 		this.isUnmounted = true
 		this.$EventBus.$off(events.SHOW_FILES_SIDEBAR, this.handleShowSideBar)
 		this.$EventBus.$off(events.HIDE_FILES_SIDEBAR, this.handleHideSideBar)
@@ -656,6 +673,7 @@ export default {
 		 * @return {*}
 		 */
 		getFileList(path) {
+			this.search = null
 			this.isLoading = true
 			// path = path.replace("//", "/")
 			this.pageType = 'file'
@@ -696,6 +714,53 @@ export default {
 				})
 
 			this.hideMobileSidebar()
+		},
+
+		// Searches the folder shown and below, or every root ("/") when everywhere; its hits take the
+		// list's place until a folder is opened or the search is closed.
+		runSearch(everywhere) {
+			const query = this.searchText.trim()
+			if (query.length < 2) {
+				return
+			}
+			const path = everywhere ? '/' : this.$store.state.currentPath
+			this.isLoading = true
+			return this.$api.file.search(path, query).then((res) => {
+				const { content, truncated } = res.data.data
+				this.allListData = (content || []).map(item => ({
+					date: item.date,
+					isSelected: false,
+					is_dir: item.is_dir,
+					name: item.name,
+					path: item.path,
+					size: item.size,
+					extensions: item.extensions,
+				}))
+				this.search = { query, path, count: this.allListData.length, truncated }
+				this.updateVisibleList()
+				this.handelListChange(this.listData)
+				this.errorMsg = ''
+				this.isEmpty = true
+			}).catch((error) => {
+				this.$buefy.toast.open({ message: this.$t('The search failed: {error}', { error: escape(error?.response?.data?.message || error.message) }), type: 'is-danger' })
+			}).finally(() => {
+				this.isLoading = false
+			})
+		},
+
+		clearSearch() {
+			this.searchText = ''
+			if (this.search) {
+				this.getFileList(this.$store.state.currentPath)
+			}
+		},
+
+		// Ctrl+K (Cmd+K on a Mac) goes to the search while a folder is shown
+		onSearchKey(event) {
+			if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === 'k' && this.pageType === 'file' && this.$refs.searchInput) {
+				event.preventDefault()
+				this.$refs.searchInput.focus()
+			}
 		},
 
 		// The free and total space of the file system the folder is on. The owner's only (an account is
@@ -1314,6 +1379,17 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.files-search {
+	max-width: 16rem;
+}
+
+.search-bar {
+	gap: 0.5rem;
+	padding: 0.25rem 0.5rem;
+	border-radius: 0.5rem;
+	background: rgba(127, 127, 127, 0.12);
+}
+
 .full-screen {
 	position: absolute;
 	width: 100%;

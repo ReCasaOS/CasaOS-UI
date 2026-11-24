@@ -43,6 +43,11 @@ const file = {
 		})
 	},
 
+	// the files and folders whose name holds q under path (CasaOS#184): { content, truncated }
+	search(path, q) {
+		return api.get(`${PREFIX}/search`, { path, q })
+	},
+
 	// the trash of every disk: { items, size, retention_days }
 	trash() {
 		return api.get(`${PREFIX}/trash`)
