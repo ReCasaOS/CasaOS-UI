@@ -11,6 +11,11 @@ import { api } from './service.js'
 const PREFIX = '/disks'
 const disks = {
 
+	// The free and used bytes of the file system a path is on (LocalStorage): { path, free, used }.
+	size(path) {
+		return api.get(`${PREFIX}/size`, { path })
+	},
+
 	// get disk list
 	getDiskList(data) {
 		return api.get(`${PREFIX}`, data)

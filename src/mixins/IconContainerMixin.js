@@ -1,4 +1,5 @@
 import has from 'lodash/has'
+import { fileBadge } from '@/components/filebrowser/filesLot'
 
 export default {
 	props: {
@@ -31,6 +32,10 @@ export default {
 		},
 		isSvg() {
 			return this.getFileExt(this.item) === 'svg'
+		},
+		// the file's type on its icon (CasaOS#184); not over a thumbnail, which says it already
+		badge() {
+			return this.showThumb ? '' : fileBadge(this.item)
 		},
 	},
 	watch: {
