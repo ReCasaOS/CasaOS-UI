@@ -272,6 +272,7 @@ import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/e
 import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
 import { SECURITY_APP_NAME, openSecurity } from '@/components/Security/entry'
+import { AI_ACCESS_APP_NAME, openAIAccess } from '@/components/AIAccess/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -708,6 +709,9 @@ export default {
 					break
 				case SECURITY_APP_NAME:
 					openSecurity(this.$buefy)
+					break
+				case AI_ACCESS_APP_NAME:
+					openAIAccess(this.$buefy)
 					break
 				default:
 					break
