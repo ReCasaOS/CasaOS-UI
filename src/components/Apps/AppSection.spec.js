@@ -5,6 +5,7 @@ import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '
 import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { hasLogs } from '@/components/Logs/entry'
 import { forgetSecurity, hasSecurity } from '@/components/Security/entry'
+import { forgetAIAccess, hasAIAccess } from '@/components/AIAccess/entry'
 import { followRescan, refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
@@ -34,6 +35,12 @@ vi.mock('@/components/Security/entry', () => ({
 	hasSecurity: vi.fn(() => Promise.resolve(false)),
 	forgetSecurity: vi.fn(),
 	securityApplication: () => ({ name: 'Security' }),
+}))
+vi.mock('@/components/AIAccess/entry', () => ({
+	AI_ACCESS_APP_NAME: 'AIAccess',
+	hasAIAccess: vi.fn(() => Promise.resolve(false)),
+	forgetAIAccess: vi.fn(),
+	aiAccessApplication: () => ({ name: 'AIAccess' }),
 }))
 vi.mock('@/service/vulnScan', async () => {
 	const { reactive } = await import('vue')
@@ -260,6 +267,7 @@ describe('app section built-in cards', () => {
 			addFleetCardWhenThere: vi.fn(),
 			addLogsCardWhenThere: vi.fn(),
 			addSecurityCardWhenThere: vi.fn(),
+			addAIAccessCardWhenThere: vi.fn(),
 		}
 		await AppSection.methods.getList.call(vm)
 		const names = vm.appList.map(app => app.name)
@@ -294,7 +302,7 @@ describe('app section built-in cards', () => {
 			$store: { getters: { canReadModule: () => true } },
 			getList: vi.fn(),
 		}
-		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'onSortEnd']) {
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'addAIAccessCardWhenThere', 'onSortEnd']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, toast, setCustomStorage }
@@ -435,7 +443,7 @@ describe('app section cards whose probes answer one after the other', () => {
 			$store: { getters: { canReadModule: () => true } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: [], savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere']) {
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'addAIAccessCardWhenThere']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, stored, setCustomStorage }
@@ -485,7 +493,7 @@ describe('app section when the role changes from owner to plain account', () => 
 			$store: { getters: { canReadModule: () => may } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'pollVms'])
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'addAIAccessCardWhenThere', 'pollVms'])
 			vm[method] = AppSection.methods[method].bind(vm)
 		vm.vms = [{ name: 'a vm' }]
 
@@ -524,7 +532,7 @@ describe('app section of an account of role user', () => {
 			$store: { getters: { canReadModule: name => rights.includes(name) } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'pollVms'])
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'addAIAccessCardWhenThere', 'pollVms'])
 			vm[method] = AppSection.methods[method].bind(vm)
 		return vm
 	}
@@ -1275,5 +1283,95 @@ describe('app section security card', () => {
 		vulnScan.apps = { a: { actionable: true }, b: { actionable: false }, c: { actionable: true } }
 		expect(AppSection.methods.systemSubtitle.call(vm, { name: 'Security' })).toBe('Apps to update: 2')
 		vulnScan.apps = {}
+	})
+})
+
+// The AI access card is there only where the MCP module answers, and for the owner alone.
+describe('app section AI access card', () => {
+	function section(names, canWrite = true) {
+		const vm = { appList: names.map(name => ({ name })), cardsProbing: [], saveSortData: vi.fn(), canWrite }
+		vm.sortApps = AppSection.methods.sortApps.bind(vm)
+		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		vm.probeCard = AppSection.methods.probeCard.bind(vm)
+		return vm
+	}
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('is there only where the module answers, at its saved place', async () => {
+		hasAIAccess.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files', 'jellyfin'])
+		await AppSection.methods.addAIAccessCardWhenThere.call(vm, ['App Store', 'Files', 'AIAccess', 'jellyfin'])
+		expect(names(vm)).toEqual(['App Store', 'Files', 'AIAccess', 'jellyfin'])
+
+		hasAIAccess.mockResolvedValue(false)
+		const other = section(['App Store', 'Files'])
+		await AppSection.methods.addAIAccessCardWhenThere.call(other, [])
+		expect(names(other)).toEqual(['App Store', 'Files'])
+	})
+
+	it('comes when the module is installed and goes when it is removed', async () => {
+		hasAIAccess.mockResolvedValue(true)
+		const vm = section(['App Store', 'jellyfin'])
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(forgetAIAccess).toHaveBeenCalled()
+		expect(names(vm)).toContain('AIAccess')
+
+		hasAIAccess.mockResolvedValue(false)
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(names(vm)).toEqual(['App Store', 'jellyfin'])
+	})
+
+	it('asks a module that did not answer again a minute later, its saved place kept', async () => {
+		vi.useFakeTimers()
+		try {
+			hasAIAccess.mockResolvedValueOnce(null).mockResolvedValueOnce(true)
+			const vm = section(['App Store', 'Files', 'jellyfin'])
+			vm.addAIAccessCardWhenThere = AppSection.methods.addAIAccessCardWhenThere.bind(vm)
+			await vm.addAIAccessCardWhenThere(['App Store', 'Files', 'AIAccess', 'jellyfin'])
+			expect(names(vm)).toEqual(['App Store', 'Files', 'jellyfin'])
+			expect(vm.saveSortData).not.toHaveBeenCalled()
+
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(names(vm)).toEqual(['App Store', 'Files', 'AIAccess', 'jellyfin'])
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('leaves no retry running once the section is gone', async () => {
+		vi.useFakeTimers()
+		try {
+			hasAIAccess.mockResolvedValue(null)
+			const vm = section(['App Store'])
+			vm.addAIAccessCardWhenThere = AppSection.methods.addAIAccessCardWhenThere.bind(vm)
+			await vm.addAIAccessCardWhenThere([])
+			expect(vi.getTimerCount()).toBe(1)
+			vm.unmounting = true
+			clearTimeout(vm.aiAccessRetry)
+			expect(vi.getTimerCount()).toBe(0)
+			await vm.addAIAccessCardWhenThere([])
+			expect(vi.getTimerCount()).toBe(0)
+		} finally {
+			hasAIAccess.mockResolvedValue(false)
+			vi.useRealTimers()
+		}
+	})
+
+	it('keeps its card when a change of modules gets no answer', async () => {
+		hasAIAccess.mockResolvedValue(true)
+		const vm = section(['App Store', 'jellyfin'])
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(names(vm)).toContain('AIAccess')
+		hasAIAccess.mockResolvedValue(null)
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(names(vm)).toContain('AIAccess')
+	})
+
+	it('is not asked for an account that is not the administrator', async () => {
+		hasAIAccess.mockClear()
+		const vm = section(['App Store'], false)
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(hasAIAccess).not.toHaveBeenCalled()
+		expect(names(vm)).toEqual(['App Store'])
 	})
 })

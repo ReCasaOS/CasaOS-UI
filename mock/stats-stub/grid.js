@@ -148,6 +148,59 @@ const CUSTOM = /^\/v1\/users\/current\/custom\/([^/]+)$/
 const ONE_VM = /^\/v2\/virt_management\/vms\/([^/]+)$/
 
 // `demo`: a box already sharing jellyfin and nextcloud (the dev server's); the specs start from a box that shares nothing
+// The MCP module (ReCasaOS-MCP): two tokens, one of them never used. It answers plain JSON, not
+// the core's envelope. Create a token named `stuck` to try a revocation that cannot be saved;
+// 20 tokens (create 18) show the limit; revoke both to see the empty list.
+const MCP_MAX_TOKENS = 20
+const MCP_ZERO_TIME = '0001-01-01T00:00:00Z'
+const MCP_TOKEN = /^\/v2\/mcp\/tokens\/([^/]+)$/
+
+function newMcp() {
+	return {
+		serial: 0,
+		tokens: [
+			{ id: 'a1b2c3d4', name: 'Laptop', account: 1, level: 'read', created: '2026-11-24T10:00:00Z', last_used: MCP_ZERO_TIME },
+			{ id: 'e5f6a7b8', name: 'Phone', account: 1, level: 'full', created: '2026-11-20T08:00:00Z', last_used: '2026-11-23T09:30:00Z' },
+		],
+	}
+}
+
+function mcp(verb, path, body, state) {
+	const mine = state.mcp
+	if (verb === 'GET' && path === '/v2/mcp/status') {
+		return { status: 200, body: { version: '0.1.0', endpoint: '/v2/mcp/server', lan_url: 'http://192.168.1.20/v2/mcp/server', actions: { read: 58, secret: 22, change: 61, danger: 29 }, unclassified: 0, tokens: mine.tokens.length } }
+	}
+	if (path === '/v2/mcp/tokens' && verb === 'GET') {
+		return { status: 200, body: mine.tokens }
+	}
+	if (path === '/v2/mcp/tokens' && verb === 'POST') {
+		const name = typeof body?.name === 'string' ? body.name : ''
+		const level = body?.level ?? 'read'
+		if (!name.trim() || [...name].length > 60 || !['read', 'full'].includes(level)) {
+			return { status: 400, body: { message: 'the name must have 1 to 60 printable characters and the level be read or full' } }
+		}
+		if (mine.tokens.length >= MCP_MAX_TOKENS) {
+			return { status: 409, body: { message: 'there are already 20 tokens: revoke one first' } }
+		}
+		const token = { id: `t${String(++mine.serial).padStart(7, '0')}`, name, account: 1, level, created: new Date().toISOString(), last_used: MCP_ZERO_TIME }
+		mine.tokens.push(token)
+		return { status: 201, body: { token: `rcm_${'x'.repeat(43)}`, ...token } }
+	}
+	const one = path.match(MCP_TOKEN)
+	if (one && verb === 'DELETE') {
+		const token = mine.tokens.find(t => t.id === decodeURIComponent(one[1]))
+		if (!token) {
+			return { status: 404, body: { message: 'no token of that id' } }
+		}
+		if (token.name === 'stuck') {
+			return { status: 500, body: { message: 'the revocation could not be saved: the token still works' } }
+		}
+		mine.tokens = mine.tokens.filter(t => t !== token)
+		return { status: 204, body: null }
+	}
+	return null
+}
+
 export function newGridState(demo = false) {
 	return {
 		custom: new Map(),
@@ -156,6 +209,7 @@ export function newGridState(demo = false) {
 		guard: demoGuard(),
 		sync: newSyncState(),
 		cleanup: newCleanup(),
+		mcp: newMcp(),
 	}
 }
 
@@ -611,6 +665,9 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 			state.feeds = { ...state.feeds, enabled: !!body?.enabled, feeds: body?.feeds || [] }
 		}
 		return core(state.feeds)
+	}
+	if (path.startsWith('/v2/mcp/')) {
+		return mcp(verb, path, body, state)
 	}
 	if (verb === 'POST' && path === '/v2/vuln_scan/scan') {
 		return { status: 202, body: { message: 'scan started' } }

@@ -212,6 +212,7 @@ import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
 import { SECURITY_APP_NAME, forgetSecurity, hasSecurity, securityApplication } from '@/components/Security/entry'
+import { AI_ACCESS_APP_NAME, aiAccessApplication, forgetAIAccess, hasAIAccess } from '@/components/AIAccess/entry'
 import { followRescan, refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
@@ -263,6 +264,8 @@ const builtInApplications = [
 const isSystemApp = app => app.app_type === 'system'
 // how long a Security card whose module did not answer waits before it is asked again
 const SECURITY_RETRY_MS = 60000
+// the same wait for the AI access card
+const AI_ACCESS_RETRY_MS = 60000
 
 // how often an account that cannot write reads the lists again, in place of the bus's events
 const USER_REFRESH_MS = 10000
@@ -499,6 +502,7 @@ export default {
 
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncSecurityCard)
+		this.$EventBus.$on(events.MODULES_CHANGED, this.syncAIAccessCard)
 		this.$EventBus.$on(events.FLEET_CHANGED, this.syncFleetCard)
 
 		this.startListTimer()
@@ -528,12 +532,14 @@ export default {
 		this.$EventBus.$off(events.RELOAD_APP_LIST, this.reloadList)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncSecurityCard)
+		this.$EventBus.$off(events.MODULES_CHANGED, this.syncAIAccessCard)
 		this.$EventBus.$off(events.FLEET_CHANGED, this.syncFleetCard)
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
 		this.unmounting = true
 		clearTimeout(this.securityRetry)
+		clearTimeout(this.aiAccessRetry)
 
 		this.vmPollStopped = true
 		clearTimeout(this.vmPollTimer)
@@ -770,8 +776,11 @@ export default {
 				// the Security card the same way, where the vulnerability scan module answers; its routes are the administrator's
 				const hasSecurityCard = this.canWrite && this.appList.some(app => app.name === SECURITY_APP_NAME)
 				const securityApps = hasSecurityCard ? [securityApplication()] : []
+				// the AI access card the same way, where the MCP module answers; its routes are the administrator's
+				const hasAIAccessCard = this.canWrite && this.appList.some(app => app.name === AI_ACCESS_APP_NAME)
+				const aiAccessApps = hasAIAccessCard ? [aiAccessApplication()] : []
 				// all app list
-				const casaAppList = concat(this.builtInsOf(builtInApplications), vmApps, fleetApps, logsApps, securityApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(this.builtInsOf(builtInApplications), vmApps, fleetApps, logsApps, securityApps, aiAccessApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -783,7 +792,7 @@ export default {
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME)) && (hasSecurityCard || !lateSortList.includes(SECURITY_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME)) && (hasSecurityCard || !lateSortList.includes(SECURITY_APP_NAME)) && (hasAIAccessCard || !lateSortList.includes(AI_ACCESS_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				// the cards of the modules the account may read: the others are neither probed nor shown
@@ -798,6 +807,9 @@ export default {
 				}
 				if (!hasSecurityCard && this.canWrite) {
 					this.addSecurityCardWhenThere(lateSortList)
+				}
+				if (!hasAIAccessCard && this.canWrite) {
+					this.addAIAccessCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -953,6 +965,39 @@ export default {
 					this.appList = this.appList.filter(app => app.name !== SECURITY_APP_NAME)
 				}
 				return refreshVulnScan({ force: true })
+			})
+		},
+
+		// Adds the AI access card at its saved place once the MCP module answers. A module that did
+		// not answer is asked again a minute later, its saved place kept meanwhile (as the Security card).
+		addAIAccessCardWhenThere(savedOrder) {
+			clearTimeout(this.aiAccessRetry)
+			return this.probeCard(AI_ACCESS_APP_NAME, hasAIAccess).then((available) => {
+				if (available && !this.appList.some(app => app.name === AI_ACCESS_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, aiAccessApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (available === null && !this.unmounting) {
+					this.aiAccessRetry = setTimeout(() => this.addAIAccessCardWhenThere(savedOrder), AI_ACCESS_RETRY_MS)
+				} else if (!available && savedOrder.includes(AI_ACCESS_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
+		},
+
+		// A module was installed or removed: the AI access card comes or goes without a reload.
+		syncAIAccessCard() {
+			if (!this.canWrite) {
+				return Promise.resolve()
+			}
+			forgetAIAccess()
+			return hasAIAccess().then((available) => {
+				const has = this.appList.some(app => app.name === AI_ACCESS_APP_NAME)
+				if (available && !has) {
+					this.appList = this.sortApps(concat(this.appList, aiAccessApplication()), [])
+				} else if (available === false && has) {
+					// a module that did not answer for now keeps its card
+					this.appList = this.appList.filter(app => app.name !== AI_ACCESS_APP_NAME)
+				}
 			})
 		},
 

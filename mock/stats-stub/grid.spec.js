@@ -236,3 +236,36 @@ describe('the stub of the vulnerability scan module', () => {
 		expect(ask('POST', '/v2/vuln_scan/scan').status).toBe(202)
 	})
 })
+
+describe('the stub of the MCP module', () => {
+	it('lists two tokens, one never used, and counts them in its status', () => {
+		const state = newGridState()
+		expect(ask('GET', '/v2/mcp/status', null, state).body).toMatchObject({ endpoint: '/v2/mcp/server', lan_url: 'http://192.168.1.20/v2/mcp/server', tokens: 2 })
+		const tokens = ask('GET', '/v2/mcp/tokens', null, state).body
+		expect(tokens.map(t => t.name)).toEqual(['Laptop', 'Phone'])
+		expect(tokens[0].last_used).toBe('0001-01-01T00:00:00Z')
+	})
+
+	it('creates a token with a fake secret, refuses a bad name or level, and refuses the twenty-first', () => {
+		const state = newGridState()
+		const { status, body } = ask('POST', '/v2/mcp/tokens', { name: 'Desktop' }, state)
+		expect(status).toBe(201)
+		expect(body).toMatchObject({ name: 'Desktop', level: 'read', token: expect.stringMatching(/^rcm_.{43}$/) })
+		expect(ask('GET', '/v2/mcp/tokens', null, state).body.every(t => !('token' in t))).toBe(true)
+		expect(ask('POST', '/v2/mcp/tokens', { name: '' }, state).status).toBe(400)
+		expect(ask('POST', '/v2/mcp/tokens', { name: 'x', level: 'root' }, state).status).toBe(400)
+		for (let i = 0; i < 17; i++) {
+			expect(ask('POST', '/v2/mcp/tokens', { name: `t${i}` }, state).status).toBe(201)
+		}
+		expect(ask('POST', '/v2/mcp/tokens', { name: 'one more' }, state).status).toBe(409)
+	})
+
+	it('revokes a token, answers 404 for an unknown one, and cannot save the revocation of one named stuck', () => {
+		const state = newGridState()
+		expect(ask('DELETE', '/v2/mcp/tokens/a1b2c3d4', null, state).status).toBe(204)
+		expect(ask('DELETE', '/v2/mcp/tokens/a1b2c3d4', null, state).status).toBe(404)
+		const { body } = ask('POST', '/v2/mcp/tokens', { name: 'stuck' }, state)
+		expect(ask('DELETE', `/v2/mcp/tokens/${body.id}`, null, state).status).toBe(500)
+		expect(ask('GET', '/v2/mcp/tokens', null, state).body.map(t => t.name)).toEqual(['Phone', 'stuck'])
+	})
+})

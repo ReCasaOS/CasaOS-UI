@@ -1,0 +1,12 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<rect width="64" height="64" rx="12" fill="url(#ai_access_bg)"/>
+	<path d="M16 18H48C50.2 18 52 19.8 52 22V38C52 40.2 50.2 42 48 42H33L23 51V42H16C13.800 42 12 40.200 12 38V22C12 19.800 13.800 18 16 18Z" fill="#253240"/>
+	<path d="M32 23L34.500 29.500L41 32L34.500 34.500L32 41L29.500 34.500L23 32L29.500 29.500L32 23Z" fill="#3DD26B"/>
+	<defs>
+		<linearGradient id="ai_access_bg" x1="32" y1="0" x2="32" y2="64" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#F7FAFC"/>
+			<stop offset="0.885" stop-color="#E7ECF2"/>
+			<stop offset="1" stop-color="#DADFE6"/>
+		</linearGradient>
+	</defs>
+</svg>
