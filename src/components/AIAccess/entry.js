@@ -12,17 +12,22 @@ export const AI_ACCESS_APP_NAME = 'AIAccess'
 
 let probe = null
 
-// Whether the module answers through the gateway. Asked once, until a module is installed or
-// removed (forgetAIAccess). Its routes are the administrator's: ask for that account only.
+// a module that does not answer within this is asked again later (AppSection), not waited for
+const PROBE_MS = 15000
+
+// Whether the module answers through the gateway: true, false where it is plainly not there
+// (404), null where it did not answer for now (a refusal, a 5xx, no answer in time). Asked
+// once, until a module is installed or removed (forgetAIAccess); a null is asked again next
+// time. Its routes are the administrator's: ask for that account only.
 export function hasAIAccess() {
 	if (!probe) {
 		// the HTTP client is loaded here, not at the top: the app grid imports this file
-		probe = import('@/service/mcp').then(({ mcpApi }) => mcpApi.status()).then(() => true).catch((e) => {
-			// asked again next time unless the module is plainly not there
-			if (e.response?.status !== 404) {
-				probe = null
+		probe = import('@/service/mcp').then(({ mcpApi }) => mcpApi.status({ timeout: PROBE_MS })).then(() => true).catch((e) => {
+			if (e.response?.status === 404) {
+				return false
 			}
-			return false
+			probe = null
+			return null
 		})
 	}
 	return probe

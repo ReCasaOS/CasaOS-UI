@@ -14,6 +14,8 @@ describe('the tokens of the MCP module', () => {
 		await mcpApi.status()
 		await mcpApi.tokens()
 		expect(instance.get.mock.calls).toEqual([['/v2/mcp/status'], ['/v2/mcp/tokens']])
+		await mcpApi.status({ timeout: 15000 })
+		expect(instance.get).toHaveBeenLastCalledWith('/v2/mcp/status', { timeout: 15000 })
 	})
 
 	it('creates a token with the name and the level it is given', async () => {

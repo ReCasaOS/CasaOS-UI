@@ -1321,6 +1321,52 @@ describe('app section AI access card', () => {
 		expect(names(vm)).toEqual(['App Store', 'jellyfin'])
 	})
 
+	it('asks a module that did not answer again a minute later, its saved place kept', async () => {
+		vi.useFakeTimers()
+		try {
+			hasAIAccess.mockResolvedValueOnce(null).mockResolvedValueOnce(true)
+			const vm = section(['App Store', 'Files', 'jellyfin'])
+			vm.addAIAccessCardWhenThere = AppSection.methods.addAIAccessCardWhenThere.bind(vm)
+			await vm.addAIAccessCardWhenThere(['App Store', 'Files', 'AIAccess', 'jellyfin'])
+			expect(names(vm)).toEqual(['App Store', 'Files', 'jellyfin'])
+			expect(vm.saveSortData).not.toHaveBeenCalled()
+
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(names(vm)).toEqual(['App Store', 'Files', 'AIAccess', 'jellyfin'])
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('leaves no retry running once the section is gone', async () => {
+		vi.useFakeTimers()
+		try {
+			hasAIAccess.mockResolvedValue(null)
+			const vm = section(['App Store'])
+			vm.addAIAccessCardWhenThere = AppSection.methods.addAIAccessCardWhenThere.bind(vm)
+			await vm.addAIAccessCardWhenThere([])
+			expect(vi.getTimerCount()).toBe(1)
+			vm.unmounting = true
+			clearTimeout(vm.aiAccessRetry)
+			expect(vi.getTimerCount()).toBe(0)
+			await vm.addAIAccessCardWhenThere([])
+			expect(vi.getTimerCount()).toBe(0)
+		} finally {
+			hasAIAccess.mockResolvedValue(false)
+			vi.useRealTimers()
+		}
+	})
+
+	it('keeps its card when a change of modules gets no answer', async () => {
+		hasAIAccess.mockResolvedValue(true)
+		const vm = section(['App Store', 'jellyfin'])
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(names(vm)).toContain('AIAccess')
+		hasAIAccess.mockResolvedValue(null)
+		await AppSection.methods.syncAIAccessCard.call(vm)
+		expect(names(vm)).toContain('AIAccess')
+	})
+
 	it('is not asked for an account that is not the administrator', async () => {
 		hasAIAccess.mockClear()
 		const vm = section(['App Store'], false)

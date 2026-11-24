@@ -7,7 +7,7 @@ const PREFIX = '/v2/mcp'
 const client = () => import('@/service/service.js').then(m => m.instance)
 
 export const mcpApi = {
-	status: async () => (await client()).get(`${PREFIX}/status`),
+	status: async opts => (await client()).get(`${PREFIX}/status`, ...(opts ? [opts] : [])),
 	tokens: async () => (await client()).get(`${PREFIX}/tokens`),
 	// the answer carries the token itself, which is never returned again
 	create: async (name, level) => (await client()).post(`${PREFIX}/tokens`, { name, level }),

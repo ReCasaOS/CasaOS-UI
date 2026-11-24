@@ -264,6 +264,8 @@ const builtInApplications = [
 const isSystemApp = app => app.app_type === 'system'
 // how long a Security card whose module did not answer waits before it is asked again
 const SECURITY_RETRY_MS = 60000
+// the same wait for the AI access card
+const AI_ACCESS_RETRY_MS = 60000
 
 // how often an account that cannot write reads the lists again, in place of the bus's events
 const USER_REFRESH_MS = 10000
@@ -537,6 +539,7 @@ export default {
 		clearInterval(this.ListRefreshTimer)
 		this.unmounting = true
 		clearTimeout(this.securityRetry)
+		clearTimeout(this.aiAccessRetry)
 
 		this.vmPollStopped = true
 		clearTimeout(this.vmPollTimer)
@@ -965,12 +968,16 @@ export default {
 			})
 		},
 
-		// Adds the AI access card at its saved place once the MCP module answers.
+		// Adds the AI access card at its saved place once the MCP module answers. A module that did
+		// not answer is asked again a minute later, its saved place kept meanwhile (as the Security card).
 		addAIAccessCardWhenThere(savedOrder) {
+			clearTimeout(this.aiAccessRetry)
 			return this.probeCard(AI_ACCESS_APP_NAME, hasAIAccess).then((available) => {
 				if (available && !this.appList.some(app => app.name === AI_ACCESS_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, aiAccessApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
+				} else if (available === null && !this.unmounting) {
+					this.aiAccessRetry = setTimeout(() => this.addAIAccessCardWhenThere(savedOrder), AI_ACCESS_RETRY_MS)
 				} else if (!available && savedOrder.includes(AI_ACCESS_APP_NAME)) {
 					this.saveSortIfChanged(savedOrder)
 				}
@@ -987,7 +994,8 @@ export default {
 				const has = this.appList.some(app => app.name === AI_ACCESS_APP_NAME)
 				if (available && !has) {
 					this.appList = this.sortApps(concat(this.appList, aiAccessApplication()), [])
-				} else if (!available && has) {
+				} else if (available === false && has) {
+					// a module that did not answer for now keeps its card
 					this.appList = this.appList.filter(app => app.name !== AI_ACCESS_APP_NAME)
 				}
 			})
