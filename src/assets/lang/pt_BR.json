@@ -265,6 +265,7 @@
   "waiting": "Aguardando",
   "Download": "Baixar",
   "Copy Path": "Copiar caminho",
+  "External": "Externo",
   "Search in this folder": "Pesquisar nesta pasta",
   "The first {n} results for \"{q}\" in {path}": "Os primeiros {n} resultados para \"{q}\" em {path}",
   "{n} results for \"{q}\" in {path}": "{n} resultados para \"{q}\" em {path}",
