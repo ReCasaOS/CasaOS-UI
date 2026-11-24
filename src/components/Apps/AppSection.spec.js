@@ -5,7 +5,7 @@ import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '
 import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { hasLogs } from '@/components/Logs/entry'
 import { forgetSecurity, hasSecurity } from '@/components/Security/entry'
-import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
+import { followRescan, refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -37,7 +37,7 @@ vi.mock('@/components/Security/entry', () => ({
 }))
 vi.mock('@/service/vulnScan', async () => {
 	const { reactive } = await import('vue')
-	return { vulnScan: reactive({ apps: {}, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+	return { vulnScan: reactive({ apps: {}, ok: false }), refresh: vi.fn(() => Promise.resolve()), followRescan: vi.fn(() => Promise.resolve()) }
 })
 vi.mock('@/components/Logs/entry', async importOriginal => ({
 	...await importOriginal(),
@@ -1145,6 +1145,28 @@ describe('app section security card', () => {
 		const other = section(['App Store', 'Files'])
 		await AppSection.methods.addSecurityCardWhenThere.call(other, [])
 		expect(names(other)).toEqual(['App Store', 'Files'])
+	})
+
+	it('waits for the scan that follows an app installed, updated, changed or removed', () => {
+		const vm = {
+			getList: () => Promise.resolve(),
+			scrollToNewApp() {},
+			addIdToSessionStorage() {},
+			messageBusToast() {},
+			$t: text => text,
+			$buefy: { toast: { open() {} } },
+		}
+		const properties = { 'app:name': 'jellyfin', 'app:title': '{"en_us":"Jellyfin"}' }
+		followRescan.mockClear()
+		AppSection.sockets['app:install-end'].call(vm)
+		AppSection.sockets['app:uninstall-end'].call(vm)
+		AppSection.sockets['app:apply-changes-end'].call(vm, { Properties: properties })
+		AppSection.sockets['app:update-end'].call(vm, { Properties: { ...properties, 'app:updated': 'true' } })
+		expect(followRescan).toHaveBeenCalledTimes(4)
+
+		// an update that changed nothing leaves the images as they were
+		AppSection.sockets['app:update-end'].call(vm, { Properties: properties })
+		expect(followRescan).toHaveBeenCalledTimes(4)
 	})
 
 	it('comes when the module is installed and goes when it is removed, and the scans are read again', async () => {
