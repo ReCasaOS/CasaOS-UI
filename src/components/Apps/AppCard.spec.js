@@ -1034,3 +1034,48 @@ describe('app card vulnerability badge', () => {
 		container.unmount()
 	})
 })
+
+describe('the version an app runs (CasaOS#179)', () => {
+	it('says it under the name on the classic card', async () => {
+		const wrapper = await card({ version: '1.27.2' })
+		expect(wrapper.find('[data-app-version]').text()).toBe('1.27.2')
+		wrapper.unmount()
+	})
+
+	it('says it next to Running on the compact card', async () => {
+		const wrapper = mount(AppCard, {
+			props: { item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' }, version: '1.27.2' }, compact: true },
+			global: {
+				plugins: [Buefy, i18n],
+				provide: { homeShowFiles: () => {}, openAppStore: () => {} },
+				mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } },
+			},
+			attachTo: document.body,
+		})
+		// a browser draws the template's runs of spaces as one
+		expect(wrapper.find('.app-state').text().replace(/\s+/g, ' ')).toContain('Running · 1.27.2')
+		expect(wrapper.findAll('[data-app-version]')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('says nothing when the backend sent none', async () => {
+		const wrapper = await card({})
+		expect(wrapper.find('[data-app-version]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('links its release notes in the menu, in a new tab', async () => {
+		const wrapper = await card({ release_notes: 'https://github.com/syncthing/syncthing/releases' })
+		const link = document.querySelector('[data-release-notes]')
+		expect(link.getAttribute('href')).toBe('https://github.com/syncthing/syncthing/releases')
+		expect(link.getAttribute('target')).toBe('_blank')
+		expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+		wrapper.unmount()
+	})
+
+	it('has no release notes entry without a link', async () => {
+		const wrapper = await card({})
+		expect(document.querySelector('[data-release-notes]')).toBeNull()
+		wrapper.unmount()
+	})
+})

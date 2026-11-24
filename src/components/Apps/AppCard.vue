@@ -65,6 +65,11 @@
 						</b-loading>
 					</b-button>
 
+					<!-- the releases page its image names, opened in a new tab: the backend sends only https://github.com/... -->
+					<b-button v-if="item.release_notes" :href="item.release_notes" expanded rel="noopener noreferrer" tag="a" target="_blank" type="is-text" data-release-notes>
+						{{ $t('Release notes') }}
+					</b-button>
+
 					<b-button v-if="logsAvailable && (isV2App || (isV1App && canWrite))" expanded type="is-text" @click="showLogs()">
 						{{ $t('Logs') }}
 					</b-button>
@@ -207,6 +212,11 @@
 							<span :class="healthWarning ? healthWarning.dot : item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
 							{{ healthWarning ? $t(healthWarning.label) : item.status === 'running' ? $t('Running') : $t('Stopped') }}
 							<template v-if="memory > 0 && item.status === 'running'"> · {{ renderSize(memory) }}</template>
+							<template v-if="item.version"> · <span :title="$t('Version')" data-app-version>{{ item.version }}</span></template>
+						</p>
+						<!-- the version it runs, from its image: the beta card says it in its state line above -->
+						<p v-if="!compact && item.version" :title="$t('Version')" class="one-line has-text-full-03 _facts" data-app-version>
+							{{ item.version }}
 						</p>
 
 						<!-- Docker hands out names like `adoring_antonelli`, and a container

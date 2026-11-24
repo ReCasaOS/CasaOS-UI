@@ -87,12 +87,12 @@ function anApp(name, title, port, image) {
 
 const APPS = [
 	// an update is offered, and the scan module found critical vulnerabilities it fixes
-	{ ...anApp('jellyfin', 'Jellyfin', '8096', 'linuxserver/jellyfin:latest'), update_available: true },
+	{ ...anApp('jellyfin', 'Jellyfin', '8096', 'linuxserver/jellyfin:latest'), update_available: true, version: '10.9.11-ls240', release_notes: 'https://github.com/linuxserver/docker-jellyfin/releases' },
 	// a health check that has not passed yet, and one that fails: what the card says of each
 	{ ...anApp('nextcloud', 'Nextcloud', '10081', 'nextcloud:latest'), health: 'starting' },
 	{ ...anApp('immich', 'Immich', '2283', 'ghcr.io/immich-app/immich-server:release'), health: 'unhealthy' },
 	// pinned to a version, and the registry holds newer ones
-	{ ...anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:1.40.2'), newer_tags: [{ service: 'plex', image: 'plexinc/pms-docker:1.40.2', current: '1.40.2', patch: '1.40.5', minor: '1.41.3' }] },
+	{ ...anApp('plex', 'Plex', '32400', 'plexinc/pms-docker:1.40.2'), newer_tags: [{ service: 'plex', image: 'plexinc/pms-docker:1.40.2', current: '1.40.2', patch: '1.40.5', minor: '1.41.3' }], version: '1.40.2' },
 ]
 
 // The scan module (ReCasaOS-VulnScan): one app with something to do, one with high
