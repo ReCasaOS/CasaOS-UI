@@ -193,6 +193,8 @@ import { refresh as refreshBackupStatus } from '@/service/backupStatus'
 import { memoryByApp } from '@/components/Apps/appMemory'
 import { FLEET_APP_NAME, fleetApplication, forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, logsApplication } from '@/components/Logs/entry'
+import { SECURITY_APP_NAME, forgetSecurity, hasSecurity, securityApplication } from '@/components/Security/entry'
+import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMachines, vmApplication, withTimeout } from '@/components/VirtualMachines/entry'
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
@@ -461,6 +463,7 @@ export default {
 		this.$EventBus.$on(events.RELOAD_APP_LIST, this.reloadList)
 
 		this.$EventBus.$on(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$on(events.MODULES_CHANGED, this.syncSecurityCard)
 		this.$EventBus.$on(events.FLEET_CHANGED, this.syncFleetCard)
 
 		this.startListTimer()
@@ -489,6 +492,7 @@ export default {
 		this.$EventBus.$off(events.OPEN_APP_STORE_AND_GOTO_SYNCTHING)
 		this.$EventBus.$off(events.RELOAD_APP_LIST, this.reloadList)
 		this.$EventBus.$off(events.MODULES_CHANGED, this.syncVmCard)
+		this.$EventBus.$off(events.MODULES_CHANGED, this.syncSecurityCard)
 		this.$EventBus.$off(events.FLEET_CHANGED, this.syncFleetCard)
 		window.removeEventListener('resize', this.getSkCount)
 
@@ -569,6 +573,10 @@ export default {
 					return this.$t('Your files')
 				case STATS_APP_NAME:
 					return this.$t('CPU, memory, disks')
+				case SECURITY_APP_NAME: {
+					const flagged = Object.values(vulnScan.apps).filter(item => item.actionable).length
+					return flagged > 0 ? this.$t('Apps to update: {count}', { count: flagged }) : this.$t('Vulnerability scan')
+				}
 				case VM_APP_NAME:
 					return this.vms.length > 0 ? this.$t('VMs: {count}', { count: this.vms.length }) : this.$t('Virtual Machines')
 				default:
@@ -722,8 +730,11 @@ export default {
 				// the Logs card the same way, where AppManagement keeps logs
 				const hasLogsCard = this.appList.some(app => app.name === LOGS_APP_NAME)
 				const logsApps = hasLogsCard ? [logsApplication()] : []
+				// the Security card the same way, where the vulnerability scan module answers; its routes are the administrator's
+				const hasSecurityCard = this.canWrite && this.appList.some(app => app.name === SECURITY_APP_NAME)
+				const securityApps = hasSecurityCard ? [securityApplication()] : []
 				// all app list
-				const casaAppList = concat(this.builtInsOf(builtInApplications), vmApps, fleetApps, logsApps, orgNewAppList, listLinkApp)
+				const casaAppList = concat(this.builtInsOf(builtInApplications), vmApps, fleetApps, logsApps, securityApps, orgNewAppList, listLinkApp)
 				// get app sort info.
 				const lateSortList = await this.$api.users
 					.getCustomStorage(orderConfig)
@@ -735,7 +746,7 @@ export default {
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME)) && (hasSecurityCard || !lateSortList.includes(SECURITY_APP_NAME))) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				// the cards of the modules the account may read: the others are neither probed nor shown
@@ -747,6 +758,9 @@ export default {
 				}
 				if (!hasLogsCard) {
 					this.addLogsCardWhenThere(lateSortList)
+				}
+				if (!hasSecurityCard && this.canWrite) {
+					this.addSecurityCardWhenThere(lateSortList)
 				}
 
 				this.isLoading = false
@@ -866,6 +880,36 @@ export default {
 				} else if (!available && savedOrder.includes(LOGS_APP_NAME)) {
 					this.saveSortIfChanged(savedOrder)
 				}
+			})
+		},
+
+		// Adds the Security card at its saved place once the vulnerability scan module answers.
+		addSecurityCardWhenThere(savedOrder) {
+			return this.probeCard(SECURITY_APP_NAME, hasSecurity).then((available) => {
+				if (available && !this.appList.some(app => app.name === SECURITY_APP_NAME)) {
+					this.appList = this.sortApps(concat(this.appList, securityApplication()), savedOrder)
+					this.saveSortIfChanged(savedOrder)
+				} else if (!available && savedOrder.includes(SECURITY_APP_NAME)) {
+					this.saveSortIfChanged(savedOrder)
+				}
+			})
+		},
+
+		// A module was installed or removed: the Security card comes or goes without a reload, and
+		// the apps' cards read the scans again (the module scans right after its install).
+		syncSecurityCard() {
+			if (!this.canWrite) {
+				return Promise.resolve()
+			}
+			forgetSecurity()
+			return hasSecurity().then((available) => {
+				const has = this.appList.some(app => app.name === SECURITY_APP_NAME)
+				if (available && !has) {
+					this.appList = this.sortApps(concat(this.appList, securityApplication()), [])
+				} else if (!available && has) {
+					this.appList = this.appList.filter(app => app.name !== SECURITY_APP_NAME)
+				}
+				return refreshVulnScan({ force: true })
 			})
 		},
 

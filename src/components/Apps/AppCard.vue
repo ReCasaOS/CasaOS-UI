@@ -261,6 +261,7 @@ import { STATS_APP_NAME, openStatistics } from '@/components/Stats/entry'
 import { VM_APP_NAME, openVirtualMachines } from '@/components/VirtualMachines/entry'
 import { FLEET_APP_NAME, openFleet } from '@/components/Fleet/entry'
 import { LOGS_APP_NAME, hasLogs, openLogs } from '@/components/Logs/entry'
+import { SECURITY_APP_NAME, openSecurity } from '@/components/Security/entry'
 import events from '@/events/events'
 import cTooltip from '@/components/basicComponents/tooltip/tooltip.vue'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
@@ -694,6 +695,9 @@ export default {
 					break
 				case LOGS_APP_NAME:
 					openLogs(this.$buefy, this.$store.state)
+					break
+				case SECURITY_APP_NAME:
+					openSecurity(this.$buefy)
 					break
 				default:
 					break

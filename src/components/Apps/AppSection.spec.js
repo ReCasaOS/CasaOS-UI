@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '@/components/VirtualMachines/entry'
 import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { hasLogs } from '@/components/Logs/entry'
+import { forgetSecurity, hasSecurity } from '@/components/Security/entry'
+import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -27,6 +29,16 @@ vi.mock('@/components/Fleet/entry', async importOriginal => ({
 	forgetFleet: vi.fn(),
 	fleetApplication: () => ({ name: 'Fleet' }),
 }))
+vi.mock('@/components/Security/entry', () => ({
+	SECURITY_APP_NAME: 'Security',
+	hasSecurity: vi.fn(() => Promise.resolve(false)),
+	forgetSecurity: vi.fn(),
+	securityApplication: () => ({ name: 'Security' }),
+}))
+vi.mock('@/service/vulnScan', async () => {
+	const { reactive } = await import('vue')
+	return { vulnScan: reactive({ apps: {}, ok: false }), refresh: vi.fn(() => Promise.resolve()) }
+})
 vi.mock('@/components/Logs/entry', async importOriginal => ({
 	...await importOriginal(),
 	hasLogs: vi.fn(() => Promise.resolve(false)),
@@ -247,6 +259,7 @@ describe('app section built-in cards', () => {
 			addVmCardWhenThere: vi.fn(),
 			addFleetCardWhenThere: vi.fn(),
 			addLogsCardWhenThere: vi.fn(),
+			addSecurityCardWhenThere: vi.fn(),
 		}
 		await AppSection.methods.getList.call(vm)
 		const names = vm.appList.map(app => app.name)
@@ -281,7 +294,7 @@ describe('app section built-in cards', () => {
 			$store: { getters: { canReadModule: () => true } },
 			getList: vi.fn(),
 		}
-		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'onSortEnd']) {
+		for (const method of ['retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'onSortEnd']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, toast, setCustomStorage }
@@ -392,7 +405,7 @@ describe('app section cards whose probes answer one after the other', () => {
 			$store: { getters: { canReadModule: () => true } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: [], savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere']) {
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere']) {
 			vm[method] = AppSection.methods[method].bind(vm)
 		}
 		return { vm, stored, setCustomStorage }
@@ -442,7 +455,7 @@ describe('app section when the role changes from owner to plain account', () => 
 			$store: { getters: { canReadModule: () => may } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'pollVms'])
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'pollVms'])
 			vm[method] = AppSection.methods[method].bind(vm)
 		vm.vms = [{ name: 'a vm' }]
 
@@ -481,7 +494,7 @@ describe('app section of an account of role user', () => {
 			$store: { getters: { canReadModule: name => rights.includes(name) } },
 		}
 		Object.assign(vm, AppSection.data.call(vm), { appList: vm.appList, savedOrder: [] })
-		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'pollVms'])
+		for (const method of ['getList', 'retryList', 'saveSortIfChanged', 'saveSortData', 'probeCard', 'addVmCardWhenThere', 'addFleetCardWhenThere', 'addLogsCardWhenThere', 'addSecurityCardWhenThere', 'pollVms'])
 			vm[method] = AppSection.methods[method].bind(vm)
 		return vm
 	}
@@ -1107,5 +1120,60 @@ describe('app section and the apps hidden from the dashboard', () => {
 		const source = readFileSync('src/components/Apps/AppSection.vue', 'utf8')
 		expect(source).toContain('v-if="$store.getters.isAdmin && hiddenApps.length > 0" class="hidden-apps')
 		expect(source).toContain(`'is-dashboard-hidden': isHiddenApp(item)`)
+	})
+})
+
+// The Security card is there only where the vulnerability scan module answers, and comes
+// without a reload when the module is installed.
+describe('app section security card', () => {
+	function section(names, canWrite = true) {
+		const vm = { appList: names.map(name => ({ name })), cardsProbing: [], saveSortData: vi.fn(), canWrite }
+		vm.sortApps = AppSection.methods.sortApps.bind(vm)
+		vm.saveSortIfChanged = AppSection.methods.saveSortIfChanged.bind(vm)
+		vm.probeCard = AppSection.methods.probeCard.bind(vm)
+		return vm
+	}
+	const names = vm => vm.appList.map(app => app.name)
+
+	it('is there only where the module answers, at its saved place', async () => {
+		hasSecurity.mockResolvedValue(true)
+		const vm = section(['App Store', 'Files', 'jellyfin'])
+		await AppSection.methods.addSecurityCardWhenThere.call(vm, ['App Store', 'Files', 'Security', 'jellyfin'])
+		expect(names(vm)).toEqual(['App Store', 'Files', 'Security', 'jellyfin'])
+
+		hasSecurity.mockResolvedValue(false)
+		const other = section(['App Store', 'Files'])
+		await AppSection.methods.addSecurityCardWhenThere.call(other, [])
+		expect(names(other)).toEqual(['App Store', 'Files'])
+	})
+
+	it('comes when the module is installed and goes when it is removed, and the scans are read again', async () => {
+		hasSecurity.mockResolvedValue(true)
+		const vm = section(['App Store', 'jellyfin'])
+		await AppSection.methods.syncSecurityCard.call(vm)
+		expect(forgetSecurity).toHaveBeenCalled()
+		expect(names(vm)).toContain('Security')
+		expect(refreshVulnScan).toHaveBeenCalledWith({ force: true })
+
+		hasSecurity.mockResolvedValue(false)
+		await AppSection.methods.syncSecurityCard.call(vm)
+		expect(names(vm)).toEqual(['App Store', 'jellyfin'])
+	})
+
+	it('is not asked for an account that is not the administrator', async () => {
+		hasSecurity.mockClear()
+		const vm = section(['App Store'], false)
+		await AppSection.methods.syncSecurityCard.call(vm)
+		expect(hasSecurity).not.toHaveBeenCalled()
+		expect(names(vm)).toEqual(['App Store'])
+	})
+
+	it('says on its second line how many apps an update would fix', () => {
+		const vm = { appList: [], vms: [], $t: (key, params) => key.replace('{count}', params?.count) }
+		vulnScan.apps = {}
+		expect(AppSection.methods.systemSubtitle.call(vm, { name: 'Security' })).toBe('Vulnerability scan')
+		vulnScan.apps = { a: { actionable: true }, b: { actionable: false }, c: { actionable: true } }
+		expect(AppSection.methods.systemSubtitle.call(vm, { name: 'Security' })).toBe('Apps to update: 2')
+		vulnScan.apps = {}
 	})
 })

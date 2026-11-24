@@ -3699,5 +3699,15 @@
   "Severity": "Severity",
   "Critical": "Critical",
   "Scan now": "Scan now",
+  "The images of your apps are checked for known vulnerabilities every night. An app is flagged when an update of it fixes a critical one.": "The images of your apps are checked for known vulnerabilities every night. An app is flagged when an update of it fixes a critical one.",
+  "{count} high": "{count} high",
+  "Nothing found": "Nothing found",
+  "A scan is running.": "A scan is running.",
+  "The first scan is running. It can take several minutes.": "The first scan is running. It can take several minutes.",
+  "No scan has run yet.": "No scan has run yet.",
+  "Some apps have a critical vulnerability that an update fixes.": "Some apps have a critical vulnerability that an update fixes.",
+  "No app needs an update for a critical vulnerability.": "No app needs an update for a critical vulnerability.",
+  "Apps to update: {count}": "Apps to update: {count}",
+  "Vulnerability scan": "Vulnerability scan",
   "A critical vulnerability in an app that an update of the app fixes": "A critical vulnerability in an app that an update of the app fixes"
 }
