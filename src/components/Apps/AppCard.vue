@@ -212,10 +212,10 @@
 							<span :class="healthWarning ? healthWarning.dot : item.status === 'running' ? 'is-running' : 'is-stopped'" class="state-dot"></span>
 							{{ healthWarning ? $t(healthWarning.label) : item.status === 'running' ? $t('Running') : $t('Stopped') }}
 							<template v-if="memory > 0 && item.status === 'running'"> · {{ renderSize(memory) }}</template>
-							<template v-if="item.version"> · <span :title="$t('Version')" data-app-version>{{ item.version }}</span></template>
 						</p>
-						<!-- the version it runs, from its image: the beta card says it in its state line above -->
-						<p v-if="!compact && item.version" :title="$t('Version')" class="one-line has-text-full-03 _facts" data-app-version>
+						<!-- the version it runs, from its image, on its own line: after the state and the memory it was
+							cut off on a desktop's narrow tiles (CasaOS#179); a long one is cut here, whole on hover -->
+						<p v-if="item.version" :class="compact ? 'app-version' : 'has-text-full-03 _facts'" :title="`${$t('Version')}: ${item.version}`" class="one-line" data-app-version>
 							{{ item.version }}
 						</p>
 
@@ -1709,6 +1709,12 @@ export default {
   .app-state {
     font-size: 0.75rem;
     opacity: 0.85;
+  }
+
+  .app-version {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    opacity: 0.6;
   }
 
   .state-dot {
