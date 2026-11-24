@@ -262,6 +262,8 @@ const builtInApplications = [
 ]
 
 const isSystemApp = app => app.app_type === 'system'
+// how long a Security card whose module did not answer waits before it is asked again
+const SECURITY_RETRY_MS = 60000
 
 // how often an account that cannot write reads the lists again, in place of the bus's events
 const USER_REFRESH_MS = 10000
@@ -533,6 +535,8 @@ export default {
 		window.removeEventListener('resize', this.getSkCount)
 
 		clearInterval(this.ListRefreshTimer)
+		this.unmounting = true
+		clearTimeout(this.securityRetry)
 
 		this.vmPollStopped = true
 		clearTimeout(this.vmPollTimer)
@@ -925,12 +929,17 @@ export default {
 			})
 		},
 
-		// Adds the Security card at its saved place once the vulnerability scan module answers.
+		// Adds the Security card at its saved place once the vulnerability scan module answers. A
+		// module that did not answer (a scan holding it up) is asked again a minute later: the
+		// card used to stay away until the page was reloaded, and its saved place is kept meanwhile.
 		addSecurityCardWhenThere(savedOrder) {
+			clearTimeout(this.securityRetry)
 			return this.probeCard(SECURITY_APP_NAME, hasSecurity).then((available) => {
 				if (available && !this.appList.some(app => app.name === SECURITY_APP_NAME)) {
 					this.appList = this.sortApps(concat(this.appList, securityApplication()), savedOrder)
 					this.saveSortIfChanged(savedOrder)
+				} else if (available === null && !this.unmounting) {
+					this.securityRetry = setTimeout(() => this.addSecurityCardWhenThere(savedOrder), SECURITY_RETRY_MS)
 				} else if (!available && savedOrder.includes(SECURITY_APP_NAME)) {
 					this.saveSortIfChanged(savedOrder)
 				}
@@ -948,7 +957,8 @@ export default {
 				const has = this.appList.some(app => app.name === SECURITY_APP_NAME)
 				if (available && !has) {
 					this.appList = this.sortApps(concat(this.appList, securityApplication()), [])
-				} else if (!available && has) {
+				} else if (available === false && has) {
+					// a module that did not answer for now keeps its card
 					this.appList = this.appList.filter(app => app.name !== SECURITY_APP_NAME)
 				}
 				return refreshVulnScan({ force: true })
