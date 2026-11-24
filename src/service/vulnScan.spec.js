@@ -127,6 +127,17 @@ describe('the vulnerability scans of this box', () => {
 			expect(calls('/v2/vuln_scan/apps')).toBe(1)
 		})
 
+		it('waits for a scan that runs, however long a large image takes', async () => {
+			const done = followRescan()
+			running = true
+			await vi.advanceTimersByTimeAsync(10 * 60000)
+			running = false
+			lastRun = '2026-11-24T06:12:00Z'
+			await vi.advanceTimersByTimeAsync(10000)
+			await done
+			expect(calls('/v2/vuln_scan/apps')).toBe(2)
+		})
+
 		it('asks nothing of a box without the module', async () => {
 			resetVulnScan()
 			await followRescan()
