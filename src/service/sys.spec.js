@@ -48,6 +48,17 @@ describe('automatic update client', () => {
 	})
 })
 
+describe('update channel client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('sends the channel the Update button follows', async () => {
+		await sys.setUpdateChannel('prerelease')
+		expect(sent().method).toBe('put')
+		expect(sent().url).toBe('/v1/sys/update-channel')
+		expect(JSON.parse(sent().data)).toEqual({ channel: 'prerelease' })
+	})
+})
+
 describe('push alerts client', () => {
 	beforeEach(() => adapter.mockClear())
 

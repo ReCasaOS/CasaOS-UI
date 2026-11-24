@@ -1043,3 +1043,28 @@ describe('top bar dropdown widths (#106)', () => {
 		expect(styles.match(/72rem/g)).toHaveLength(1)
 	})
 })
+
+describe('the update channel (pre-releases)', () => {
+	it('is a row of the updates section, shown when the core says its channel', () => {
+		expect(source).toMatch(/<!-- Update channel Start[\s\S]*?v-if="!updateInfo.image_managed && updateInfo.channel"[\s\S]*?value="release"[\s\S]*?value="prerelease"[\s\S]*?<!-- Update channel End -->/)
+		expect(source).toMatch(/v-if="updateInfo.version && updateInfo.version.prerelease"/)
+	})
+
+	it('saves the channel, then asks for the version again at once', async () => {
+		const setUpdateChannel = vi.fn(() => Promise.resolve({ data: { success: 200 } }))
+		const vm = { updateInfo: { channel: 'release', need_update: false }, channelSaving: false, $api: { sys: { setUpdateChannel } }, checkVersion: vi.fn(), $buefy: { toast: { open: vi.fn() } }, $t: key => key }
+		await TopBar.methods.setUpdateChannel.call(vm, 'prerelease')
+		expect(setUpdateChannel).toHaveBeenCalledWith('prerelease')
+		expect(vm.updateInfo.channel).toBe('prerelease')
+		expect(vm.checkVersion).toHaveBeenCalledWith(true)
+		expect(vm.channelSaving).toBe(false)
+	})
+
+	it('says when the channel could not be saved, and keeps the one shown', async () => {
+		const vm = { updateInfo: { channel: 'release' }, channelSaving: false, $api: { sys: { setUpdateChannel: vi.fn(() => Promise.reject(new Error('500'))) } }, checkVersion: vi.fn(), $buefy: { toast: { open: vi.fn() } }, $t: key => key }
+		await TopBar.methods.setUpdateChannel.call(vm, 'prerelease')
+		expect(vm.updateInfo.channel).toBe('release')
+		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
+		expect(vm.checkVersion).not.toHaveBeenCalled()
+	})
+})

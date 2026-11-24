@@ -579,9 +579,32 @@
 									</div>
 									<div v-else class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
 										{{ $t(updateText) }}
+										<!-- offered on the pre-release channel: proven by the release checks, not yet a release -->
+										<span v-if="updateInfo.version && updateInfo.version.prerelease" class="tag is-warning is-light ml-1" data-update-prerelease>
+											{{ $t('Pre-release') }} {{ updateInfo.version.version }}
+										</span>
 									</div>
 								</div>
 								<!-- Update End -->
+
+								<!-- Update channel Start: what the Update button offers; the night's automatic update installs releases only -->
+								<div v-if="!updateInfo.image_managed && updateInfo.channel" class="_row" data-update-channel>
+									<div class="is-flex is-align-items-center">
+										<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+											<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="source-branch" size="is-20" />
+											{{ $t("Update channel") }}
+										</div>
+										<b-select :model-value="updateInfo.channel" :disabled="channelSaving" size="is-small" data-update-channel-select
+											@update:model-value="setUpdateChannel">
+											<option value="release">{{ $t("Releases") }}</option>
+											<option value="prerelease">{{ $t("Pre-releases too") }}</option>
+										</b-select>
+									</div>
+									<div v-if="updateInfo.channel === 'prerelease'" class="pl-55 ml-1 mt-1 is-size-7 _has-text-gray _is-wrap">
+										{{ $t("The Update button also offers a pre-release newer than the last release. The night's automatic update still installs releases only.") }}
+									</div>
+								</div>
+								<!-- Update channel End -->
 
 								<!-- Automatic update Start -->
 								<div v-if="autoUpdate" class="_row">
@@ -822,6 +845,7 @@ export default {
 				version: Object,
 			},
 			isUpdating: false,
+			channelSaving: false,
 			latestText: 'Currently at the latest version',
 			updateText: 'A new version is available!',
 
@@ -1535,6 +1559,19 @@ export default {
 				}
 			}).catch(() => {}).finally(() => {
 				this.checkingVersion = false
+			})
+		},
+
+		// The channel the Update button follows; the version is asked again at once, past the box's cache.
+		setUpdateChannel(channel) {
+			this.channelSaving = true
+			return this.$api.sys.setUpdateChannel(channel).then(() => {
+				this.updateInfo = { ...this.updateInfo, channel }
+				this.checkVersion(true)
+			}).catch(() => {
+				this.$buefy.toast.open({ message: this.$t('The update channel could not be saved.'), type: 'is-danger' })
+			}).finally(() => {
+				this.channelSaving = false
 			})
 		},
 
