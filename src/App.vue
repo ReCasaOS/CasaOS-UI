@@ -11,6 +11,8 @@
 				<brand-bar v-if="!$store.state.isMobile && $route.path === '/'"
 					v-animate-css="brandAni"></brand-bar>
 				<!-- BrandBar End -->
+				<!-- the owner's footer headlines (CasaOS#180): no call at all in another account's session -->
+				<feed-ticker v-if="!$store.state.isMobile && $route.path === '/' && $store.getters.isAdmin" />
 				<!-- ContactBar Start -->
 				<contact-bar v-if="!$store.state.isMobile && $route.path === '/'"
 					v-animate-css="contactAni"></contact-bar>
@@ -36,6 +38,7 @@
 <script>
 import BrandBar from './components/BrandBar.vue'
 import ContactBar from './components/ContactBar.vue'
+import FeedTicker from './components/FeedTicker.vue'
 import CasaWallpaper from './components/wallpaper/CasaWallpaper.vue'
 import AppIframe from './components/Apps/AppIframe.vue'
 import AppLauncherCheck from './views/AppLauncherCheck.vue'
@@ -77,6 +80,7 @@ export default {
 	components: {
 		BrandBar,
 		ContactBar,
+		FeedTicker,
 		CasaWallpaper,
 		AppIframe,
 		AppLauncherCheck,

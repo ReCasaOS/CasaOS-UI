@@ -346,6 +346,17 @@ const sys = {
 		return api.post(`${PREFIX}/alerts/test`, data)
 	},
 
+	// The footer's feeds (CasaOS#180), owner only: { enabled, feeds: [url], items: [{ title, link, source }] }.
+	// The core answers what it has cached and refreshes in the background. A core older than the feature answers 404.
+	getFeeds() {
+		return api.get(`${PREFIX}/feeds`)
+	},
+
+	// data: { enabled, feeds }, at most ten http(s) URLs; answers as getFeeds.
+	setFeeds(data) {
+		return api.put(`${PREFIX}/feeds`, data)
+	},
+
 	// power -- data:shutdown
 	// power -- data:restart
 	power(data) {

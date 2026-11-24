@@ -72,6 +72,23 @@ describe('push alerts client', () => {
 	})
 })
 
+describe('footer feeds client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads the feeds and their headlines from the core\'s v1 sys group', async () => {
+		await sys.getFeeds()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/feeds')
+	})
+
+	it('sends the switch and the feeds', async () => {
+		await sys.setFeeds({ enabled: true, feeds: ['https://example.org/feed'] })
+		expect(sent().method).toBe('put')
+		expect(sent().url).toBe('/v1/sys/feeds')
+		expect(JSON.parse(sent().data)).toEqual({ enabled: true, feeds: ['https://example.org/feed'] })
+	})
+})
+
 describe('docker update client', () => {
 	beforeEach(() => adapter.mockClear())
 

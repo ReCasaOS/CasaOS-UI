@@ -41,8 +41,10 @@ function mountBar(vm) {
 }
 
 describe('top bar settings', () => {
-	it('has no news feed row', () => {
-		expect(source).not.toMatch(/news feed|rss/i)
+	// the upstream blog's feed, read with no choice of the owner, went in September; the footer's
+	// feeds (CasaOS#180) are the owner's own, off until turned on
+	it('has no upstream news feed row', () => {
+		expect(source).not.toMatch(/zimaspace|rss_switch|rssSwitch/i)
 	})
 })
 
@@ -112,6 +114,7 @@ describe('the anonymous statistics switch', () => {
 			getHardwareInfo: vi.fn(),
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
+			getFeeds: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -229,6 +232,7 @@ describe('the automatic update row', () => {
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
+			getFeeds: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -438,6 +442,7 @@ describe('the alerts row', () => {
 		const vm = {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
+			getFeeds: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -535,6 +540,7 @@ describe('the modules row', () => {
 		const vm = {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
+			getFeeds: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -875,6 +881,7 @@ describe('the fleet row', () => {
 		const vm = {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
+			getFeeds: vi.fn(),
 			getModules: vi.fn(),
 			getOs: vi.fn(),
 			getFleet: vi.fn(),
@@ -957,7 +964,7 @@ describe('the logs row', () => {
 
 	it('asks when the bar mounts', () => {
 		const vm = { $EventBus: createEventBus() }
-		for (const name of ['getAlerts', 'getLogs', 'getModules', 'getFleet', 'getSync', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
+		for (const name of ['getAlerts', 'getFeeds', 'getLogs', 'getModules', 'getFleet', 'getSync', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
 			vm[name] = vi.fn()
 
 		mountBar(vm)
