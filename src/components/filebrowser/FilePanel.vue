@@ -133,6 +133,10 @@
 											}}
 										</b-checkbox>
 									</b-field>
+									<!-- the room left where this folder is (CasaOS#184), the owner's: an account is not shown the disks -->
+									<span v-if="space" :title="space.title" class="is-size-7 ml-3 has-text-grey-light space-left" data-files-space>
+										{{ space.text }}
+									</span>
 								</div>
 								<div class="view-btns is-flex-shrink-0">
 									<b-tooltip :label="showHiddenFilesLabel" position="is-left" type="is-dark">
@@ -158,7 +162,8 @@
 										</b-dropdown-item>
 									</b-dropdown>
 									<b-tooltip :label="$t('Change View')" position="is-left" type="is-dark">
-										<p class="is-clickable none-line-height" role="button" @click="changeView">
+										<p :aria-label="$t('Change View')" class="is-clickable none-line-height" role="button" tabindex="0"
+											@click="changeView" @keydown.enter.prevent="changeView" @keydown.space.prevent="changeView">
 											<b-icon :icon="viewIcon"></b-icon>
 										</p>
 									</b-tooltip>
@@ -341,6 +346,9 @@ export default {
 	},
 	data() {
 		return {
+			// the room left where the folder shown is: { text, title }, null while unknown
+			space: null,
+			spaceRead: 0,
 			isCreated: false,
 			isUnmounted: false,
 			isLoading: true,
@@ -461,6 +469,12 @@ export default {
 		},
 	},
 	watch: {
+		'$store.state.currentPath': {
+			handler(path) {
+				this.readSpace(path)
+			},
+			immediate: true,
+		},
 		'$store.state.access_token': {
 			handler(val) {
 				this.options.headers.Authorization = val
@@ -682,6 +696,30 @@ export default {
 				})
 
 			this.hideMobileSidebar()
+		},
+
+		// The free and total space of the file system the folder is on. The owner's only (an account is
+		// not shown the disks, and the Gateway refuses it the call); a failed read shows nothing.
+		readSpace(path) {
+			const read = ++this.spaceRead
+			if (!path || this.isAccount || !this.$api?.disks?.size) {
+				this.space = null
+				return
+			}
+			this.$api.disks.size(path).then((res) => {
+				const { free, used } = res.data.data || {}
+				if (read !== this.spaceRead || !(free >= 0) || !(used >= 0)) {
+					return
+				}
+				this.space = {
+					text: this.$t('{free} free of {total}', { free: this.renderSize(free), total: this.renderSize(free + used) }),
+					title: this.$t('{used} used', { used: this.renderSize(used) }),
+				}
+			}).catch(() => {
+				if (read === this.spaceRead) {
+					this.space = null
+				}
+			})
 		},
 
 		/**

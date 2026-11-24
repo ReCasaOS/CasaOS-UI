@@ -17,8 +17,11 @@
  * @FilePath: \CasaOS-UI\src\components\filebrowser\components\FileBreadcrumb.vue
 -->
 <template>
-	<div>
-		<b-breadcrumb size="is-medium">
+	<div class="is-flex is-align-items-center path-bar">
+		<!-- a path typed or pasted (CasaOS#184): Enter opens it, Escape or leaving the field gives the breadcrumb back -->
+		<b-input v-if="editing" ref="pathInput" v-model="typed" :aria-label="$t('Path')" class="path-input is-flex-grow-1"
+			data-path-input size="is-small" @blur="editing = false" @keydown.enter.prevent="go" @keydown.esc.prevent="editing = false" />
+		<b-breadcrumb v-else size="is-medium">
 			<b-breadcrumb-item v-for="(item, index) in pathCollection" v-show="item.show || item == activeHide"
 				:key="item + index"
 				:active="checkActive(index)" @click="open(item)">
@@ -43,6 +46,16 @@
 				</template>
 			</b-breadcrumb-item>
 		</b-breadcrumb>
+		<b-tooltip v-if="!editing" :label="$t('Type a path')" position="is-bottom" type="is-dark">
+			<button :aria-label="$t('Type a path')" class="path-button" data-path-edit type="button" @click="edit">
+				<b-icon custom-size="mdi-16px" icon="pencil-outline" />
+			</button>
+		</b-tooltip>
+		<b-tooltip :label="copied ? $t('Copied') : $t('Copy Path')" position="is-bottom" type="is-dark">
+			<button :aria-label="$t('Copy Path')" class="path-button" data-path-copy type="button" @mousedown.prevent @click="copyCurrent">
+				<b-icon :icon="copied ? 'check' : 'content-copy'" custom-size="mdi-16px" />
+			</button>
+		</b-tooltip>
 		<b-breadcrumb id="shadowBread" class="shadow" size="is-medium">
 			<b-breadcrumb-item v-for="(item, index) in pathCollection" :key="`fake${item}${index}`">
 				{{ item.name }}
@@ -57,6 +70,8 @@ import map from 'lodash/map'
 import sum from 'lodash/sum'
 import remove from 'lodash/remove'
 import findLast from 'lodash/findLast'
+import copy from 'clipboard-copy'
+import { typedPath } from '../filesLot'
 
 export default {
 	inject: ['filePanel'],
@@ -65,6 +80,9 @@ export default {
 			pathCollection: [],
 			hideItems: [],
 			activeHide: {},
+			editing: false,
+			typed: '',
+			copied: false,
 		}
 	},
 	watch: {
@@ -98,6 +116,29 @@ export default {
 		subOpen(item) {
 			this.filePanel.getFileList(item.path)
 			// this.onResize(this.pathArray)
+		},
+		edit() {
+			this.typed = this.$store.state.currentPath
+			this.editing = true
+			this.$nextTick(() => {
+				this.$refs.pathInput?.focus()
+				this.$refs.pathInput?.$el.querySelector('input')?.select()
+			})
+		},
+		go() {
+			const path = typedPath(this.typed, this.$store.state.currentPath)
+			this.editing = false
+			if (path) {
+				this.filePanel.getFileList(path)
+			}
+		},
+		copyCurrent() {
+			copy(this.$store.state.currentPath)
+			this.copied = true
+			clearTimeout(this.copiedTimer)
+			this.copiedTimer = setTimeout(() => {
+				this.copied = false
+			}, 1500)
 		},
 		checkActive(index) {
 			return index == this.pathCollection.length - 1
@@ -147,5 +188,30 @@ export default {
 }
 </script>
 
-<style>
+<style lang="scss" scoped>
+.path-bar {
+	min-width: 0;
+}
+
+.path-input {
+	max-width: 40rem;
+}
+
+.path-button {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 0.25rem;
+	padding: 0.125rem;
+	border: none;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	opacity: 0.6;
+
+	&:hover,
+	&:focus-visible {
+		opacity: 1;
+	}
+}
 </style>
