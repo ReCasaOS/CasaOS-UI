@@ -898,6 +898,37 @@ describe('app section with the system row (beta dashboard)', () => {
 		expect(AppSection.computed.dragOptions.call(vm).disabled).toBe(true)
 	})
 
+	it('sorts the grid with the filters, and never saves an order from a sorted grid (CasaOS#183)', () => {
+		const zulu = { name: 'zulu', app_type: 'v2app', status: 'running', title: { en_us: 'Zulu' } }
+		const alpha = { name: 'alpha', app_type: 'v2app', status: 'exited', title: { en_us: 'Alpha' } }
+		const mike = { name: 'mike', app_type: 'v2app', status: 'running', title: { en_us: 'Mike' } }
+		const vm = { compact: true, systemFirst: true, filter: 'all', sort: 'name', vms: [], memory: { mike: 500, zulu: 10 }, appList: [store, zulu, alpha, mike] }
+		vm.sortedView = AppSection.computed.sortedView.call(vm)
+		const names = () => get.call(vm).map(app => app.name)
+
+		expect(names()).toEqual(['alpha', 'mike', 'zulu'])
+		vm.sort = 'memory'
+		expect(names()).toEqual(['mike', 'zulu', 'alpha'])
+		vm.filter = 'running'
+		expect(names()).toEqual(['mike', 'zulu'])
+
+		// a drag of a sorted grid is no order to keep, and none starts
+		vm.filter = 'all'
+		set.call(vm, [alpha, mike, zulu])
+		expect(vm.appList).toEqual([store, zulu, alpha, mike])
+		expect(AppSection.computed.dragOptions.call(vm).disabled).toBe(true)
+
+		// back to the custom order: the order dragged, and dragging again
+		vm.sort = 'custom'
+		vm.sortedView = AppSection.computed.sortedView.call(vm)
+		expect(names()).toEqual(['zulu', 'alpha', 'mike'])
+		expect(AppSection.computed.dragOptions.call(vm).disabled).toBe(false)
+	})
+
+	it('does not sort the classic grid, which has no menu', () => {
+		expect(AppSection.computed.sortedView.call({ compact: false, sort: 'name' })).toBe(false)
+	})
+
 	it('changes nothing on the classic dashboard', () => {
 		const vm = { systemFirst: false, filter: 'all', vms: [], appList: [store, jellyfin, files, nextcloud] }
 		vm.systemApps = systemApps.call(vm)
