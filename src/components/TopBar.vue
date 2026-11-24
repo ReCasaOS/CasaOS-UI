@@ -426,6 +426,21 @@
 								</div>
 								<!-- Logs End -->
 
+								<!-- Footer news Start -->
+								<div v-if="feedsAvailable"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="rss" size="is-20" />
+										{{ $t("Footer news") }}
+									</div>
+									<div class="ml-2">
+										<b-button data-feeds-configure rounded size="is-small" type="is-dark" @click="showFeeds">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Footer news End -->
+
 								<!-- Accounts Start -->
 								<div v-if="$store.getters.isAdmin"
 									class="is-flex is-align-items-center _row _box">
@@ -755,6 +770,7 @@ import SystemPackageUpdateModal from './settings/SystemPackageUpdateModal.vue'
 import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
+import FeedsModal from './settings/FeedsModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
@@ -824,6 +840,7 @@ export default {
 			// true once the core answers GET /v1/sys/alerts: a core older than the
 			// feature shows no row.
 			alertsAvailable: false,
+			feedsAvailable: false,
 			// false until the box answers; an older one has no sync call and 404s
 			showFolderSync: false,
 			logsAvailable: false,
@@ -997,6 +1014,7 @@ export default {
 			this.getTelemetry()
 			this.getAutoUpdate()
 			this.getAlerts()
+			this.getFeeds()
 			this.getSync()
 			this.getFleet()
 			this.getModules()
@@ -1205,6 +1223,27 @@ export default {
 			this.$api.sys.getAlerts().then(() => {
 				this.alertsAvailable = true
 			}).catch(() => {})
+		},
+
+		// a core older than the footer's feeds (CasaOS#180) answers 404: no row
+		getFeeds() {
+			this.$api.sys.getFeeds().then(() => {
+				this.feedsAvailable = true
+			}).catch(() => {})
+		},
+
+		showFeeds() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: FeedsModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				// the footer reads the feeds again at once, not ten minutes later
+				events: { close: () => this.$EventBus.$emit('casaUI:feedsChanged') },
+			})
 		},
 
 		showAlerts() {

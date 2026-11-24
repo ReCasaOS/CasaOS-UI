@@ -597,6 +597,21 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	if (cleaned) {
 		return cleaned
 	}
+	// the footer's feeds (CasaOS#180): on, with two headlines; a PUT keeps what it is given
+	if (path === '/v1/sys/feeds' && (verb === 'GET' || verb === 'PUT')) {
+		state.feeds ??= {
+			enabled: true,
+			feeds: ['https://github.com/ReCasaOS/CasaOS-Install/releases.atom'],
+			items: [
+				{ title: 'v0.5.180: each app card says the version it runs', link: 'https://github.com/ReCasaOS/CasaOS-Install/releases/tag/v0.5.180', source: 'Release notes from CasaOS-Install' },
+				{ title: 'v0.5.179', link: 'https://github.com/ReCasaOS/CasaOS-Install/releases/tag/v0.5.179', source: 'Release notes from CasaOS-Install' },
+			],
+		}
+		if (verb === 'PUT') {
+			state.feeds = { ...state.feeds, enabled: !!body?.enabled, feeds: body?.feeds || [] }
+		}
+		return core(state.feeds)
+	}
 	if (verb === 'POST' && path === '/v2/vuln_scan/scan') {
 		return { status: 202, body: { message: 'scan started' } }
 	}
