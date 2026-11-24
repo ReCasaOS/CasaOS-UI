@@ -1208,6 +1208,23 @@ describe('app section security card', () => {
 		expect(names(other)).toEqual(['App Store', 'Files'])
 	})
 
+	it('asks a module that did not answer again a minute later, its saved place kept', async () => {
+		vi.useFakeTimers()
+		try {
+			hasSecurity.mockResolvedValueOnce(null).mockResolvedValueOnce(true)
+			const vm = section(['App Store', 'Files', 'jellyfin'])
+			vm.addSecurityCardWhenThere = AppSection.methods.addSecurityCardWhenThere.bind(vm)
+			await vm.addSecurityCardWhenThere(['App Store', 'Files', 'Security', 'jellyfin'])
+			expect(names(vm)).toEqual(['App Store', 'Files', 'jellyfin'])
+			expect(vm.saveSortData).not.toHaveBeenCalled()
+
+			await vi.advanceTimersByTimeAsync(60000)
+			expect(names(vm)).toEqual(['App Store', 'Files', 'Security', 'jellyfin'])
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
 	it('waits for the scan that follows an app installed, updated, changed or removed', () => {
 		const vm = {
 			getList: () => Promise.resolve(),
