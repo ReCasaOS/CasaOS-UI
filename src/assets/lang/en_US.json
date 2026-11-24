@@ -3762,5 +3762,6 @@
   "On this address the token travels unencrypted on your network.": "On this address the token travels unencrypted on your network.",
   "Done (token)": "Done",
   "Copied (token)": "Copied",
-  "Revoke {name}": "Revoke {name}"
+  "Revoke {name}": "Revoke {name}",
+  "This address may not work for an assistant: it must reach this box on your local network.": "This address may not work for an assistant: it must reach this box on your local network."
 }

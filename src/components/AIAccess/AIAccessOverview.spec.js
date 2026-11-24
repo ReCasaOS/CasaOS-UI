@@ -177,6 +177,51 @@ describe('the AI access window of the box', () => {
 		expect(wrapper.find('[data-url]').element.value).toBe('http://box.local/v2/mcp/server')
 	})
 
+	describe('when the box says its address on the local network', () => {
+		const LAN = 'http://192.168.1.20/v2/mcp/server'
+		const created = async (lan_url, page = 'https://box.example.com/') => {
+			window.happyDOM.setURL(page)
+			mcpApi.create.mockImplementation(() => answer({ ...laptop, token: SECRET }))
+			const wrapper = await open({ box: lan_url === undefined ? status : { ...status, lan_url } })
+			await create(wrapper)
+			return wrapper
+		}
+
+		it('uses it for the URL and the command, whatever address the page is open at', async () => {
+			const wrapper = await created(LAN)
+			expect(wrapper.find('[data-url]').element.value).toBe(LAN)
+			expect(wrapper.find('[data-command]').element.value).toBe(`claude mcp add --transport http recasaos ${LAN} --header "Authorization: Bearer ${SECRET}"`)
+			expect(wrapper.find('[data-address-note]').exists()).toBe(false)
+		})
+
+		it.each([
+			['javascript:alert(1)'],
+			['http://x/other'],
+			['http://a b/v2/mcp/server'],
+			['http://x/v2/mcp/server" ; rm -rf ~ "'],
+			[42],
+		])('falls back to the address of the page for %j', async (value) => {
+			const wrapper = await created(value)
+			expect(wrapper.find('[data-url]').element.value).toBe('https://box.example.com/v2/mcp/server')
+			expect(wrapper.find('[data-command]').element.value).not.toContain('rm -rf')
+		})
+
+		it('warns that the address may not work when it falls back on a name that is not local', async () => {
+			const wrapper = await created(undefined)
+			expect(wrapper.find('[data-address-note]').text()).toBe('This address may not work for an assistant: it must reach this box on your local network.')
+		})
+
+		it.each([['http://192.168.1.20/'], ['http://localhost:8080/'], ['http://casaos.local/'], ['http://nas/']])('does not warn on %s', async (page) => {
+			const wrapper = await created(undefined, page)
+			expect(wrapper.find('[data-address-note]').exists()).toBe(false)
+		})
+
+		it('says the token travels unencrypted by the scheme of the URL shown, not of the page', async () => {
+			expect((await created(LAN)).find('[data-http]').exists()).toBe(true)
+			expect((await created('https://nas.local/v2/mcp/server', 'http://box.local/')).find('[data-http]').exists()).toBe(false)
+		})
+	})
+
 	it('says a token could not be created, and keeps the form', async () => {
 		mcpApi.create.mockImplementation(() => refusal(400))
 		const wrapper = await open()

@@ -99,6 +99,9 @@
 							{{ copied === 'header' ? $t('Copied (token)') : $t('Copy') }}
 						</b-button>
 					</div>
+					<p v-if="!lanUrl && !localPage" class="is-size-7 has-text-danger mb-3" data-address-note>
+						{{ $t('This address may not work for an assistant: it must reach this box on your local network.') }}
+					</p>
 					<p v-if="plainHttp" class="is-size-7 has-text-danger mb-3" data-http>
 						{{ $t('On this address the token travels unencrypted on your network.') }}
 					</p>
@@ -161,6 +164,7 @@
 <script>
 import copy from 'clipboard-copy'
 import escape from 'lodash/escape'
+import { endpointUrl, isLocalHost, lanEndpoint } from './address'
 import { mcpApi } from '@/service/mcp'
 
 // the module refuses a twenty-first token
@@ -204,18 +208,25 @@ export default {
 			}
 			return this.$t('{read} read-only actions, {all} in all.', { read: actions.read || 0, all })
 		},
+		// the box's own answer when it is valid, else the address the page is open at
 		url() {
-			return `${window.location.origin}/v2/mcp/server`
+			return endpointUrl(this.status?.lan_url, window.location.origin)
+		},
+		lanUrl() {
+			return lanEndpoint(this.status?.lan_url) !== null
+		},
+		localPage() {
+			return isLocalHost(window.location.hostname)
 		},
 		header() {
 			return `Authorization: Bearer ${this.created?.token}`
 		},
-		// no escaping: the token is rcm_ + base64url and the origin is the browser's own
+		// no escaping: the token is rcm_ + base64url, and the URL is the box's own answer, validated, or the browser's origin
 		command() {
 			return `claude mcp add --transport http recasaos ${this.url} --header "${this.header}"`
 		},
 		plainHttp() {
-			return window.location.protocol === 'http:'
+			return this.url.startsWith('http:')
 		},
 	},
 

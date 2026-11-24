@@ -240,7 +240,7 @@ describe('the stub of the vulnerability scan module', () => {
 describe('the stub of the MCP module', () => {
 	it('lists two tokens, one never used, and counts them in its status', () => {
 		const state = newGridState()
-		expect(ask('GET', '/v2/mcp/status', null, state).body).toMatchObject({ endpoint: '/v2/mcp/server', tokens: 2 })
+		expect(ask('GET', '/v2/mcp/status', null, state).body).toMatchObject({ endpoint: '/v2/mcp/server', lan_url: 'http://192.168.1.20/v2/mcp/server', tokens: 2 })
 		const tokens = ask('GET', '/v2/mcp/tokens', null, state).body
 		expect(tokens.map(t => t.name)).toEqual(['Laptop', 'Phone'])
 		expect(tokens[0].last_used).toBe('0001-01-01T00:00:00Z')

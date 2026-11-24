@@ -168,7 +168,7 @@ function newMcp() {
 function mcp(verb, path, body, state) {
 	const mine = state.mcp
 	if (verb === 'GET' && path === '/v2/mcp/status') {
-		return { status: 200, body: { version: '0.1.0', endpoint: '/v2/mcp/server', actions: { read: 58, secret: 22, change: 61, danger: 29 }, unclassified: 0, tokens: mine.tokens.length } }
+		return { status: 200, body: { version: '0.1.0', endpoint: '/v2/mcp/server', lan_url: 'http://192.168.1.20/v2/mcp/server', actions: { read: 58, secret: 22, change: 61, danger: 29 }, unclassified: 0, tokens: mine.tokens.length } }
 	}
 	if (path === '/v2/mcp/tokens' && verb === 'GET') {
 		return { status: 200, body: mine.tokens }

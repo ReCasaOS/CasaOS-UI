@@ -3762,5 +3762,6 @@
   "On this address the token travels unencrypted on your network.": "Neste endereço, o token trafega sem criptografia na sua rede.",
   "Done (token)": "Concluído",
   "Copied (token)": "Copiado",
-  "Revoke {name}": "Revogar {name}"
+  "Revoke {name}": "Revogar {name}",
+  "This address may not work for an assistant: it must reach this box on your local network.": "Este endereço pode não funcionar para um assistente: ele precisa alcançar este servidor na sua rede local."
 }
