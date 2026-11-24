@@ -206,6 +206,12 @@ describe('the AI access window of the box', () => {
 			expect(wrapper.find('[data-command]').element.value).not.toContain('rm -rf')
 		})
 
+		it('puts nothing the shell would read in the command, whatever the box says', async () => {
+			const wrapper = await created('http://x;id;b/v2/mcp/server')
+			expect(wrapper.find('[data-command]').element.value).not.toContain(';')
+			expect(wrapper.find('[data-url]').element.value).toBe('https://box.example.com/v2/mcp/server')
+		})
+
 		it('warns that the address may not work when it falls back on a name that is not local', async () => {
 			const wrapper = await created(undefined)
 			expect(wrapper.find('[data-address-note]').text()).toBe('This address may not work for an assistant: it must reach this box on your local network.')
@@ -218,7 +224,7 @@ describe('the AI access window of the box', () => {
 
 		it('says the token travels unencrypted by the scheme of the URL shown, not of the page', async () => {
 			expect((await created(LAN)).find('[data-http]').exists()).toBe(true)
-			expect((await created('https://nas.local/v2/mcp/server', 'http://box.local/')).find('[data-http]').exists()).toBe(false)
+			expect((await created('https://10.0.0.5/v2/mcp/server', 'http://box.local/')).find('[data-http]').exists()).toBe(false)
 		})
 	})
 

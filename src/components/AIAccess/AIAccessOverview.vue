@@ -209,11 +209,12 @@ export default {
 			return this.$t('{read} read-only actions, {all} in all.', { read: actions.read || 0, all })
 		},
 		// the box's own answer when it is valid, else the address the page is open at
-		url() {
-			return endpointUrl(this.status?.lan_url, window.location.origin)
-		},
+		// the box's own answer when it passes the allowlist, else null
 		lanUrl() {
-			return lanEndpoint(this.status?.lan_url) !== null
+			return lanEndpoint(this.status?.lan_url)
+		},
+		url() {
+			return this.lanUrl ?? endpointUrl(undefined, window.location.origin)
 		},
 		localPage() {
 			return isLocalHost(window.location.hostname)
@@ -221,12 +222,12 @@ export default {
 		header() {
 			return `Authorization: Bearer ${this.created?.token}`
 		},
-		// no escaping: the token is rcm_ + base64url, and the URL is the box's own answer, validated, or the browser's origin
+		// no escaping: the token is rcm_ + base64url, and the URL is the box's own answer, matched against a strict allowlist, or the browser's origin
 		command() {
 			return `claude mcp add --transport http recasaos ${this.url} --header "${this.header}"`
 		},
 		plainHttp() {
-			return this.url.startsWith('http:')
+			return this.url.toLowerCase().startsWith('http:')
 		},
 	},
 
