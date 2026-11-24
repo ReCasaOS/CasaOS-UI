@@ -72,6 +72,13 @@
 				</button>
 			</div>
 
+			<!-- beta dashboard: the order shown (CasaOS#183); only the custom one is dragged -->
+			<b-select v-if="compact" v-model="sort" :aria-label="$t('Sort by')" class="app-sort mr-3" data-app-sort size="is-small">
+				<option v-for="id in sorts" :key="id" :value="id">
+					{{ $t(sortLabels[id]) }}
+				</option>
+			</b-select>
+
 			<b-dropdown v-if="$store.getters.canWrite" animation="fade1" aria-role="menu" class="file-dropdown" position="is-bottom-left">
 				<template #trigger>
 					<b-icon class="polymorphic is-clickable has-text-grey-100"
@@ -177,6 +184,7 @@ import concat from 'lodash/concat'
 import last from 'lodash/last'
 import isEqual from 'lodash/isEqual'
 import escape from 'lodash/escape'
+import { SORTS, SORT_LABELS, saveSort, savedSort, sortApps } from './appSort'
 import { groupLegacyApps } from './legacyApps'
 import { isHiddenApp, shownApps, withHiddenApps } from './dashboardHidden'
 import AppCard from './AppCard.vue'
@@ -351,6 +359,10 @@ export default {
 			vms: [],
 			// compact grid: 'all' | 'running' | 'stopped' | 'updates'
 			filter: 'all',
+			// compact grid: one of SORTS, the browser's choice
+			sort: savedSort(),
+			sorts: SORTS,
+			sortLabels: SORT_LABELS,
 			favorites: [],
 			// compact grid: the bytes each app's containers use, by app name
 			memory: {},
@@ -364,8 +376,9 @@ export default {
 			return {
 				animation: 300,
 				group: 'description',
-				// a filtered grid lacks apps: dragging in it would save an order without them
-				disabled: this.filter !== 'all',
+				// a filtered grid lacks apps: dragging in it would save an order without them;
+				// a sorted one is not the order dragged
+				disabled: this.filter !== 'all' || this.sortedView,
 				ghostClass: 'ghost',
 				// on a touch screen a swipe scrolls the grid: only a long press starts a drag; a mouse drags at once
 				delay: 300,
@@ -386,19 +399,26 @@ export default {
 		gridList: {
 			get() {
 				const all = this.systemFirst ? this.appList.filter(app => !isSystemApp(app)) : this.appList
-				const apps = shownApps(all, this.showHidden)
+				let apps = shownApps(all, this.showHidden)
+				if (this.sortedView) {
+					apps = sortApps(apps, this.sort, { title: app => ice_i18n(app.title) || app.name, memory: this.memory })
+				}
 				if (this.filter !== 'all') {
 					return apps.filter(FILTERS[this.filter])
 				}
 				return withVmTiles(apps, this.vms)
 			},
 			set(list) {
-				if (this.filter !== 'all') {
+				if (this.filter !== 'all' || this.sortedView) {
 					return
 				}
 				const system = this.systemFirst ? this.appList.filter(isSystemApp) : []
 				this.appList = withHiddenApps(concat(system, list.filter(item => !item.vmTile)), this.appList, this.showHidden)
 			},
+		},
+		// a sort other than the custom order, on the compact grid only (the classic grid has no menu)
+		sortedView() {
+			return this.compact && this.sort !== 'custom'
 		},
 		// the System row as drawn: the Virtual Machines card is there, so its tiles are too
 		systemApps() {
@@ -445,6 +465,9 @@ export default {
 		},
 	},
 	watch: {
+		sort(value) {
+			saveSort(value)
+		},
 		// the tiles come with the card, not at the next read
 		hasVmCard() {
 			this.pollVms()
