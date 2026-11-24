@@ -17,7 +17,13 @@
 						custom-size="casa-10px" icon="share"></b-icon>
 				</div>
 			</div>
-			<div class=" is-flex-grow-1 one-line">{{ item.name }}</div>
+			<div class="is-flex-grow-1 name-column">
+				<div class="one-line">{{ item.name }}</div>
+				<!-- a drive's room (CasaOS#184): the bar fills with what is used, the words on hover -->
+				<div v-if="usage" :aria-label="usage.text" :title="usage.text" class="usage-bar" data-usage-bar role="img">
+					<span :class="{ 'is-full': usage.percent >= 90 }" :style="{ width: `${usage.percent}%` }"></span>
+				</div>
+			</div>
 			<div v-if="iconName != ''" :aria-label="iconLabel || null" :role="iconLabel ? 'button' : null"
 				:tabindex="iconLabel ? 0 : null" :title="iconLabel || null" class=" is-flex-shrink-0 is-flex"
 				@click.stop="rightIconClick" @keydown.enter.stop="rightIconClick">
@@ -29,6 +35,7 @@
 
 <script>
 import { parentOf } from './starred.js'
+import { renderSize } from '@/mixins/file_utils'
 
 export default {
 	inject: ['filePanel'],
@@ -72,6 +79,17 @@ export default {
 		return {}
 	},
 	computed: {
+		// item.usage is { free, size } in bytes, for a drive; nothing for a folder or a remote
+		usage() {
+			const { free, size } = this.item?.usage || {}
+			if (!(size > 0) || !(free >= 0) || free > size) {
+				return null
+			}
+			return {
+				percent: Math.round(((size - free) / size) * 100),
+				text: this.$t('{free} free of {total}', { free: renderSize(free), total: renderSize(size) }),
+			}
+		},
 		isActived() {
 			if (!this.isActive) {
 				return false
@@ -115,6 +133,28 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.name-column {
+	min-width: 0;
+}
+
+.usage-bar {
+	height: 3px;
+	margin-top: 2px;
+	border-radius: 2px;
+	background: rgba(127, 127, 127, 0.25);
+	overflow: hidden;
+
+	span {
+		display: block;
+		height: 100%;
+		background: hsl(207, 61%, 53%);
+
+		&.is-full {
+			background: hsl(348, 86%, 61%);
+		}
+	}
+}
+
 .is-unavailable {
 	opacity: 0.5;
 	cursor: default;

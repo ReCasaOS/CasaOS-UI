@@ -36,6 +36,11 @@
 				:item="item"></tree-list-item>
 			<!-- Local Storage List End -->
 
+			<!-- what is plugged in or reached over the network, apart from the box's own drives (CasaOS#184) -->
+			<p v-if="externalCount > 0" class="external-title is-size-7 has-text-grey-light mt-2 mb-1" data-external-title>
+				{{ $t('External') }}
+			</p>
+
 			<!-- Network Storage List Start -->
 			<tree-list-item v-for="item in networkStorageList" :key="item.path" :is-active="isActive" :item="item"
 				icon-name="eject" @rightIconClick="umountNetwork"></tree-list-item>
@@ -62,6 +67,13 @@ import { apiErrorMessage, emptyCloudOnError } from './apiError.js'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
 import { mixin } from '@/mixins/mixin'
 import events from '@/events/events'
+
+// a partition's room as the storage list gives it (byte counts in strings): { free, size }, or null
+export function usageOf(part) {
+	const free = Number(part?.avail)
+	const size = Number(part?.size)
+	return Number.isFinite(free) && Number.isFinite(size) && size > 0 ? { free, size } : null
+}
 
 export default {
 	components: { TreeListItem },
@@ -102,6 +114,9 @@ export default {
 	computed: {
 		isActived() {
 			return this.$store.state.currentPath === this.filePanel.rootPath
+		},
+		externalCount() {
+			return this.usbStorageList.length + this.networkStorageList.length + this.cloudStorageList.length
 		},
 	},
 	created() {
@@ -161,6 +176,7 @@ export default {
 						visible: true,
 						selected: true,
 						extensions: null,
+						usage: usageOf(storage),
 					}
 				})
 				this.usbStorageList = usbStorageArray.map((storage) => {
@@ -172,6 +188,7 @@ export default {
 						visible: true,
 						selected: true,
 						extensions: null,
+						usage: usageOf(storage),
 					}
 				})
 			} catch (error) {
@@ -462,6 +479,13 @@ export default {
 
 .warn {
 	color: hsla(348, 86%, 61%, 1);
+}
+
+.external-title {
+	padding-left: 1rem;
+	text-align: left;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
 }
 
 .hint {
