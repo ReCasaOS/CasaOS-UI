@@ -1,11 +1,14 @@
 <template>
-	<div class="modal-card update-blocked">
+	<div aria-labelledby="update-blocked-title" aria-modal="true" class="modal-card update-blocked" role="dialog">
 		<header class="modal-card-head">
-			<h3 class="title is-header">{{ $t('Update of {name} blocked', { name: title }) }}</h3>
+			<h3 id="update-blocked-title" class="title is-header">{{ $t('Update of {name} blocked', { name: title }) }}</h3>
 		</header>
 
 		<section class="modal-card-body">
-			<b-message v-if="error" class="mb-2" size="is-small" type="is-danger">{{ error }}</b-message>
+			<b-message v-if="error" class="mb-2" size="is-small" type="is-danger">
+				<p>{{ $t('Unable to update at the moment!') }}</p>
+				<p class="is-size-7">{{ error }}</p>
+			</b-message>
 
 			<p class="is-size-7 mb-3">{{ sentence }}</p>
 
@@ -25,7 +28,7 @@
 		</section>
 
 		<footer class="modal-card-foot is-flex is-justify-content-flex-end">
-			<b-button :disabled="busy" rounded @click="$emit('close')">{{ $t('Keep the installed version') }}</b-button>
+			<b-button ref="keep" :disabled="busy" rounded @click="$emit('close')">{{ $t('Keep the installed version') }}</b-button>
 			<b-button v-if="canOverride" :disabled="busy" :loading="busy" rounded type="is-danger" @click="updateAnyway">
 				{{ $t('Update anyway') }}
 			</b-button>
@@ -75,6 +78,10 @@ export default {
 			return Math.max(this.added.length - SHOWN, 0)
 		},
 	},
+	mounted() {
+		// the safe choice has the focus, not the destructive one
+		this.$refs.keep?.$el?.focus?.()
+	},
 	methods: {
 		safeUrl,
 
@@ -82,10 +89,10 @@ export default {
 			this.busy = true
 			this.error = ''
 			try {
-				await this.$openAPI.appManagement.compose.updateComposeApp(this.name, undefined, { params: { skip_scan: true } })
+				await this.$openAPI.appManagement.compose.updateComposeApp(this.name, true, { params: { skip_scan: true } })
 				this.$emit('close')
 			} catch (error) {
-				this.error = error?.response?.data?.message || error?.message || this.$t('Unable to update at the moment!')
+				this.error = error?.response?.data?.message || error?.message || ''
 			} finally {
 				this.busy = false
 			}

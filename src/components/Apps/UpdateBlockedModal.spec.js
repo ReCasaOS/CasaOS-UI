@@ -10,6 +10,7 @@ const vuln = (n, extra = {}) => ({ id: `CVE-2026-${n}`, package: 'openssl', fixe
 
 function open(props = {}, updateComposeApp = vi.fn(() => Promise.resolve({ status: 200 }))) {
 	const wrapper = mount(UpdateBlockedModal, {
+		attachTo: document.body,
 		props: { name: 'jellyfin', title: 'Jellyfin', images: [], canOverride: true, ...props },
 		global: {
 			mocks: { $t, $openAPI: { appManagement: { compose: { updateComposeApp } } } },
@@ -98,6 +99,19 @@ describe('the blocked update window lists what the new version adds', () => {
 	})
 })
 
+describe('the blocked update window is a labelled dialog', () => {
+	it('labels the card by its title and focuses the safe button', () => {
+		const { wrapper } = open()
+		const card = wrapper.find('.modal-card')
+		const id = wrapper.find('h3').attributes('id')
+
+		expect(id).toBeTruthy()
+		expect(card.attributes()).toMatchObject({ 'role': 'dialog', 'aria-modal': 'true', 'aria-labelledby': id })
+		expect(document.activeElement).toBe(button(wrapper, 'Keep the installed version').element)
+		wrapper.unmount()
+	})
+})
+
 describe('updating anyway', () => {
 	it('is not offered to an account that may not do it', () => {
 		const { wrapper } = open({ canOverride: false })
@@ -119,7 +133,7 @@ describe('updating anyway', () => {
 		answer({ status: 200 })
 		await flushPromises()
 
-		expect(updateComposeApp).toHaveBeenCalledWith('jellyfin', undefined, { params: { skip_scan: true } })
+		expect(updateComposeApp).toHaveBeenCalledWith('jellyfin', true, { params: { skip_scan: true } })
 		expect(wrapper.emitted('close')).toHaveLength(1)
 		wrapper.unmount()
 	})
@@ -131,6 +145,7 @@ describe('updating anyway', () => {
 		await button(wrapper, 'Update anyway').trigger('click')
 		await flushPromises()
 
+		expect(wrapper.find('.message').text()).toContain('Unable to update at the moment!')
 		expect(wrapper.find('.message').text()).toContain('only the owner can skip the scan')
 		expect(wrapper.emitted('close')).toBeUndefined()
 		expect(buttons(wrapper).every(b => b.attributes('disabled') === undefined)).toBe(true)

@@ -203,7 +203,7 @@ describe('the automatic app updates window', () => {
 		] }
 		const { wrapper } = await open({ view })
 
-		const entry = wrapper.find('[data-run] .has-text-warning')
+		const entry = wrapper.find('[data-run] .has-text-warning-on-scheme')
 		expect(entry.text()).toContain('Jellyfin · Blocked — the new version has 2 more critical vulnerabilities')
 		wrapper.unmount()
 	})

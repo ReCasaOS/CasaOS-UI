@@ -79,7 +79,7 @@
 						<div class="_has-text-gray">
 							{{ whenOf(run.at) }}
 						</div>
-						<div v-for="entry in run.apps" :key="entry.id" :class="{ 'has-text-danger': entry.state === 'failed', 'has-text-warning': entry.state === 'blocked' }">
+						<div v-for="entry in run.apps" :key="entry.id" :class="{ 'has-text-danger': entry.state === 'failed', 'has-text-warning-on-scheme': entry.state === 'blocked' }">
 							{{ titleOf(entry.id) }} · {{ $t(stateOf(entry)) }}<template v-if="entry.message"> — {{ entry.message }}</template>
 						</div>
 						<div v-if="!run.apps.length" class="_has-text-gray">
