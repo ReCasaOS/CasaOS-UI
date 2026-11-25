@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeService, runSummary } from './updateAll'
+import { STATE_LABELS, describeService, runSummary } from './updateAll'
 
 describe('what an update would do, said per service', () => {
 	it('names the image the catalogue moves to', () => {
@@ -32,7 +32,24 @@ describe('where a run stands', () => {
 		expect(runSummary(finished).params).toEqual({ updated: 2, current: 1, failed: 1 })
 	})
 
+	it('counts a blocked app as done while it runs', () => {
+		expect(runSummary({ apps: [...apps, { id: 'e', state: 'blocked' }] }).params).toEqual({ done: 3, total: 5 })
+	})
+
+	it('adds the blocked count once it is over, only when something is blocked', () => {
+		const finished = { finished_at: 'x', apps: [{ id: 'a', state: 'updated' }, { id: 'b', state: 'blocked' }] }
+		expect(runSummary(finished)).toEqual({
+			message: 'Done: {updated} updated, {current} already current, {failed} failed, {blocked} blocked.',
+			params: { updated: 1, current: 0, failed: 0, blocked: 1 },
+		})
+		expect(runSummary({ finished_at: 'x', apps: [{ id: 'a', state: 'updated' }] }).message).toBe('Done: {updated} updated, {current} already current, {failed} failed.')
+	})
+
 	it('survives nothing at all', () => {
 		expect(runSummary(null).params).toEqual({ done: 0, total: 0 })
 	})
+})
+
+it('labels the blocked state', () => {
+	expect(STATE_LABELS.blocked).toBe('blocked')
 })

@@ -15,15 +15,20 @@ export function describeService(app, service) {
 export function runSummary(run) {
 	const apps = (run && run.apps) || []
 	const count = state => apps.filter(app => app.state === state).length
-	const done = count('updated') + count('current') + count('failed')
+	const done = count('updated') + count('current') + count('failed') + count('blocked')
 
 	if (!run || !run.finished_at) {
 		return { message: '{done} of {total} done', params: { done, total: apps.length } }
 	}
 
+	const params = { updated: count('updated'), current: count('current'), failed: count('failed') }
+	if (!count('blocked')) {
+		return { message: 'Done: {updated} updated, {current} already current, {failed} failed.', params }
+	}
+
 	return {
-		message: 'Done: {updated} updated, {current} already current, {failed} failed.',
-		params: { updated: count('updated'), current: count('current'), failed: count('failed') },
+		message: 'Done: {updated} updated, {current} already current, {failed} failed, {blocked} blocked.',
+		params: { ...params, blocked: count('blocked') },
 	}
 }
 
@@ -33,4 +38,5 @@ export const STATE_LABELS = {
 	updated: 'updated',
 	current: 'already current',
 	failed: 'failed',
+	blocked: 'blocked',
 }

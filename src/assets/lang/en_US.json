@@ -785,6 +785,8 @@
   "Update {n} apps": "Update {n} apps",
   "{done} of {total} done": "{done} of {total} done",
   "Done: {updated} updated, {current} already current, {failed} failed.": "Done: {updated} updated, {current} already current, {failed} failed.",
+  "Done: {updated} updated, {current} already current, {failed} failed, {blocked} blocked.": "Done: {updated} updated, {current} already current, {failed} failed, {blocked} blocked.",
+  "blocked": "blocked",
   "updating…": "updating…",
   "updated": "updated",
   "already current": "already current",
