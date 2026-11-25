@@ -762,7 +762,6 @@
 			<!-- System support badge End -->
 		</div>
 
-
 		<div class="navbar-menu">
 			<div class="navbar-end mr-3">
 				<!-- <b-icon pack="far" icon="comment-alt"></b-icon> -->
