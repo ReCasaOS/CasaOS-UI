@@ -179,11 +179,11 @@ export default {
 		},
 
 		stateIcon(state) {
-			return { queued: 'clock-outline', updating: 'loading', updated: 'check', current: 'check', failed: 'alert-circle-outline' }[state] || 'help-circle-outline'
+			return { queued: 'clock-outline', updating: 'loading', updated: 'check', current: 'check', failed: 'alert-circle-outline', blocked: 'shield-alert-outline' }[state] || 'help-circle-outline'
 		},
 
 		stateClass(state) {
-			return { updated: 'has-text-success-on-scheme', current: '_has-text-gray', failed: 'has-text-danger-on-scheme' }[state] || '_has-text-gray'
+			return { updated: 'has-text-success-on-scheme', current: '_has-text-gray', failed: 'has-text-danger-on-scheme', blocked: 'has-text-warning-on-scheme' }[state] || '_has-text-gray'
 		},
 
 		// A translated sentence says what failed; what the box answered goes under it.

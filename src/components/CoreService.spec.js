@@ -180,6 +180,40 @@ describe('installing an app', () => {
 		expect(vm.noticesData.anythingllm.content.text).toBe('Creating the containers')
 	})
 
+	// the new image is scanned between its download and the containers: seconds to ten
+	// minutes, which read "Installation completed" at 100%
+	it('shows the check step as a sentence, with no percentage', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'check' })
+
+		expect(vm.noticesData.anythingllm.content).toMatchObject({
+			text: 'Checking the new version for vulnerabilities',
+			value: undefined,
+			detail: '',
+		})
+		expect(vm.noticesData.anythingllm.content.text).not.toBe('Installation completed')
+	})
+
+	it('ignores an image frame that arrives after the check step', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-begin', llm)
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'check' })
+		fire('app:install-progress', pulling)
+
+		expect(vm.noticesData.anythingllm.content.text).toBe('Checking the new version for vulnerabilities')
+	})
+
+	it('does not open a card for the check step alone', () => {
+		const { vm, fire } = service()
+
+		fire('app:install-progress', { ...llm, 'app:progress': '100', 'app:install:step': 'check' })
+
+		expect(vm.noticesData).toEqual({})
+	})
+
 	// A restore that installs the app goes through the same steps with no install around
 	// them, so nothing would ever take the card away; and a step that lands after the end
 	// of its install would open it again for good.

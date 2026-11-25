@@ -26,6 +26,7 @@ const DECLARED = new Set([
 	'app:progress',
 	'app:install:step',
 	'app:updated',
+	'app:update-blocked-images',
 	'docker:container:id',
 	'docker:container:name',
 	'docker:image:name',

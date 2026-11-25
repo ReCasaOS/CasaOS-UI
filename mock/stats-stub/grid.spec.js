@@ -237,6 +237,18 @@ describe('the stub of the vulnerability scan module', () => {
 	})
 })
 
+describe('the stub of the automatic app updates', () => {
+	it('has the scan check on, a blocked night, and keeps what the check is set to', () => {
+		const state = newGridState()
+		const view = ask('GET', '/v2/app_management/auto-update', null, state).body.data
+		expect(view).toMatchObject({ scan_available: true, scan_before_update: true })
+		expect(view.runs.flatMap(run => run.apps).find(app => app.state === 'blocked').id).toBe('jellyfin')
+
+		expect(ask('PUT', '/v2/app_management/auto-update', { scan_before_update: false }, state).body.data).toMatchObject({ scan_before_update: false, min_days: 3 })
+		expect(ask('GET', '/v2/app_management/auto-update', null, state).body.data.scan_before_update).toBe(false)
+	})
+})
+
 describe('the stub of the MCP module', () => {
 	it('lists two tokens, one never used, and counts them in its status', () => {
 		const state = newGridState()

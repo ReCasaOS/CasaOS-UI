@@ -42,6 +42,26 @@ describe('the update every app dialog, with nothing to confirm', () => {
 	})
 })
 
+describe('a blocked app in a run', () => {
+	it('shows its label, its message, a shield icon and the warning class', async () => {
+		const run = () => Promise.resolve({ data: { data: { finished_at: null, apps: [{ id: 'seerr', state: 'blocked', message: 'more critical vulnerabilities' }] } } })
+		const wrapper = mount(UpdateAllModal, {
+			global: {
+				mocks: { $t: k => k, $api: { updates: { run, plan: noRun } }, $EventBus: { $emit() {} } },
+				stubs: { 'b-message': true, 'b-button': true, 'b-icon': true, 'b-checkbox': true },
+			},
+		})
+		await flushPromises()
+
+		expect(wrapper.text()).toContain('blocked')
+		expect(wrapper.text()).toContain('more critical vulnerabilities')
+		const icon = wrapper.find('b-icon-stub')
+		expect(icon.attributes('icon')).toBe('shield-alert-outline')
+		expect(icon.classes()).toContain('has-text-warning-on-scheme')
+		wrapper.unmount()
+	})
+})
+
 describe('the icon of each app in the list', () => {
 	const plan = () => Promise.resolve({
 		data: {

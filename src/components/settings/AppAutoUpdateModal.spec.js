@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AppAutoUpdateModal from './AppAutoUpdateModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
+import pt from '@/assets/lang/pt_BR.json'
 
 const GRID = [
 	{ name: 'jellyfin', title: { en_us: 'Jellyfin' }, app_type: 'v2app', icon: '' },
@@ -17,9 +18,10 @@ const GRID = [
 
 const answer = data => vi.fn(() => Promise.resolve({ data: { data } }))
 
-async function open({ view = { apps: [], min_days: 3, runs: [] }, setAutoUpdate, setAutoUpdateWait } = {}) {
+async function open({ view = { apps: [], min_days: 3, runs: [] }, setAutoUpdate, setAutoUpdateWait, setAutoUpdateScan } = {}) {
 	const updates = {
 		autoUpdate: answer(view),
+		setAutoUpdateScan,
 		setAutoUpdateWait: setAutoUpdateWait || vi.fn(days => Promise.resolve({ data: { data: { ...view, min_days: days } } })),
 		setAutoUpdate: setAutoUpdate || vi.fn((name, on) => Promise.resolve({ data: { data: { apps: on ? [name] : [], next: on ? '2026-11-21T03:00:00Z' : undefined, runs: [] } } })),
 	}
@@ -161,11 +163,66 @@ describe('the automatic app updates window', () => {
 		wrapper.unmount()
 	})
 
+	it('has no check switch when the scan module is not there', async () => {
+		const { wrapper } = await open()
+
+		expect(wrapper.find('[data-row="scan"]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows the check as the box holds it, and turns it off', async () => {
+		const view = { apps: [], min_days: 3, runs: [], scan_available: true, scan_before_update: true }
+		const setAutoUpdateScan = vi.fn(on => Promise.resolve({ data: { data: { ...view, scan_before_update: on } } }))
+		const { wrapper, updates } = await open({ view, setAutoUpdateScan })
+
+		expect(wrapper.find('[data-row="scan"] button').attributes('data-on')).toBe('true')
+		await wrapper.find('[data-row="scan"] button').trigger('click')
+		await flushPromises()
+
+		expect(updates.setAutoUpdateScan).toHaveBeenCalledWith(false)
+		expect(wrapper.find('[data-row="scan"] button').attributes('data-on')).toBe('false')
+		wrapper.unmount()
+	})
+
+	it('puts the check switch back when the box refuses', async () => {
+		const view = { apps: [], min_days: 3, runs: [], scan_available: true, scan_before_update: true }
+		const setAutoUpdateScan = vi.fn(() => Promise.reject(Object.assign(new Error('500'), { response: { data: { message: 'cannot save' } } })))
+		const { wrapper } = await open({ view, setAutoUpdateScan })
+
+		await wrapper.find('[data-row="scan"] button').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.find('[data-row="scan"] button').attributes('data-on')).toBe('true')
+		expect(wrapper.text()).toContain('cannot save')
+		wrapper.unmount()
+	})
+
+	it('says a night blocked an update, in warning colour, with the reason', async () => {
+		const view = { apps: ['jellyfin'], min_days: 3, runs: [
+			{ at: '2026-11-21T02:00:07Z', apps: [{ id: 'jellyfin', state: 'blocked', message: 'the new version has 2 more critical vulnerabilities than the one installed' }] },
+		] }
+		const { wrapper } = await open({ view })
+
+		const entry = wrapper.find('[data-run] .has-text-warning-on-scheme')
+		expect(entry.text()).toContain('Jellyfin · Blocked — the new version has 2 more critical vulnerabilities')
+		wrapper.unmount()
+	})
+
 	it('has its sentences in English and in French', () => {
 		for (const key of ['Automatic app updates', 'Last nights', 'Next night: {date}', 'No night has run yet.']) {
 			expect(en[key], key).toBe(key)
 			expect(fr[key], key).toBeTruthy()
 			expect(fr[key], key).not.toBe(key)
+		}
+	})
+
+	it('has the check sentences in English, French and Portuguese', () => {
+		for (const key of ['Check the new version before an update', 'An update whose new version has more critical vulnerabilities than the installed one is blocked.', 'Blocked']) {
+			expect(en[key], key).toBe(key)
+			for (const lang of [fr, pt]) {
+				expect(lang[key], key).toBeTruthy()
+				expect(lang[key], key).not.toBe(key)
+			}
 		}
 	})
 })

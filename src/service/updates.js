@@ -30,6 +30,11 @@ const updates = {
 		return api.put(`${PREFIX}/auto-update`, { min_days: minDays })
 	},
 
+	// whether a night checks the new image's vulnerabilities before it updates
+	setAutoUpdateScan(on) {
+		return api.put(`${PREFIX}/auto-update`, { scan_before_update: on })
+	},
+
 	setAutoUpdate(id, enabled) {
 		return api.put(`${PREFIX}/compose/${encodeURIComponent(id)}/auto-update`, { enabled })
 	},
