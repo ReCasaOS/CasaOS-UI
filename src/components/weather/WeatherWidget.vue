@@ -14,7 +14,8 @@
 				<b-icon :icon="now.icon" custom-size="mdi-36px" />
 				<div>
 					<div class="weather-big">{{ degrees(forecast.current.temperature) }}</div>
-					<div class="weather-dim">{{ $t(now.label) }} · {{ placeName }}</div>
+					<div>{{ $t(now.label) }}</div>
+					<div class="weather-dim weather-where">{{ placeName }}</div>
 				</div>
 			</div>
 			<div class="weather-facts weather-dim">
@@ -135,7 +136,8 @@ export default {
 	white-space: nowrap;
 }
 
-.weather-card {
+// Buefy's dropdown items do not wrap: a long place name would run out of the card
+.weather-widget .weather-card {
 	width: 17rem;
 	padding: 1rem;
 	white-space: normal;
@@ -155,6 +157,10 @@ export default {
 
 .weather-dim {
 	opacity: 0.7;
+}
+
+.weather-where {
+	font-size: 0.8125rem;
 }
 
 .weather-facts {

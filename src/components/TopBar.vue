@@ -762,14 +762,15 @@
 			<!-- System support badge End -->
 		</div>
 
-		<!-- the owner's weather (CasaOS#188), outside navbar-menu, which a phone hides -->
-		<weather-widget v-if="weatherAvailable" class="ml-auto mr-3" />
 
 		<div class="navbar-menu">
 			<div class="navbar-end mr-3">
 				<!-- <b-icon pack="far" icon="comment-alt"></b-icon> -->
 			</div>
 		</div>
+
+		<!-- the owner's weather (CasaOS#188): after navbar-menu, which takes the room on a desktop and is hidden on a phone -->
+		<weather-widget v-if="weatherAvailable" class="ml-auto mr-3" />
 
 		<b-modal v-model="showPower" :can-cancel="false" class="_modal" scroll="clip" width="20rem">
 			<b-message @close="resetPower">
