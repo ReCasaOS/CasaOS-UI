@@ -2293,8 +2293,16 @@ describe('the sentence that says where the versions come from', () => {
 			expect(MODULE_KEYS).toContain(key)
 	})
 
+	it('says that ReCasaOS offers a module, not this release, now that the catalogue comes from the network', () => {
+		expect(TEXT.gone).toBe(REASONS.catalogue)
+		expect(CHECKS.catalogue).toBe('Offered by ReCasaOS')
+		expect(fr[CHECKS.catalogue]).toBe('Proposé par ReCasaOS')
+		for (const old of ['This release of ReCasaOS no longer offers this module.', 'Offered by this release'])
+			expect([en, fr, pt].map(table => Object.hasOwn(table, old)), old).toEqual([false, false, false])
+	})
+
 	it('has them in Brazilian Portuguese too', () => {
-		for (const key of [...Object.values(TEXT.online), TEXT.lookAgain, TEXT.none, TEXT.catalogueBad, REASONS.catalogue]) {
+		for (const key of [...Object.values(TEXT.online), TEXT.lookAgain, TEXT.none, TEXT.catalogueBad, REASONS.catalogue, CHECKS.catalogue, TEXT.gone]) {
 			expect(pt[key], key).toBeTruthy()
 			expect(pt[key], key).not.toBe(key)
 			expect(pt[key].match(/\{\w+\}/g) || [], key).toEqual(key.match(/\{\w+\}/g) || [])

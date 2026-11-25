@@ -138,7 +138,7 @@ export const TEXT = {
 	offered: 'Version offered',
 	unsupported: 'This machine cannot have this module.',
 	broken: 'The record of this module cannot be read. Remove the module, then install it again.',
-	gone: 'This release of ReCasaOS no longer offers this module.',
+	gone: 'ReCasaOS no longer offers this module.',
 	jobRunning: 'A job is running. The buttons come back when it ends. Closing this window does not stop it: open the window again to see how it goes.',
 	checking: 'Looking for a job that is already running…',
 	reported: 'Reported by ReCasaOS',
@@ -361,7 +361,7 @@ export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 
 // pkg/osmodule/plan.go Check*, in the order the plan lists them: the topic of each, said before the mark that tells whether it passed
 export const CHECKS = {
-	catalogue: 'Offered by this release',
+	catalogue: 'Offered by ReCasaOS',
 	os: 'Operating system',
 	arch: 'Processor',
 	recasaos: 'Release of ReCasaOS',
