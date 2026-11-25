@@ -645,6 +645,8 @@ export default {
 					].join(' · ')
 				case 'extract':
 					return [this.$t('Unpacking the image'), ...several].join(' · ')
+				case 'check':
+					return this.$t('Checking the new version for vulnerabilities')
 				case 'create':
 					return this.$t('Creating the containers')
 				case 'start':
@@ -666,7 +668,7 @@ export default {
 				return
 			}
 
-			const afterTheImages = step => step === 'create' || step === 'start'
+			const afterTheImages = step => step === 'check' || step === 'create' || step === 'start'
 
 			if (!this.noticesData[res.name]) {
 				// A step alone opens nothing. A restore that installs the app goes through

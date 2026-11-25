@@ -481,6 +481,7 @@
   "Unpacking the image": "Décompression de l'image",
   "Creating the containers": "Création des conteneurs",
   "Starting, waiting for the app to answer": "Démarrage, en attente que l'app réponde",
+  "Checking the new version for vulnerabilities": "Vérification des failles de la nouvelle version",
   "Starting update": "Démarrage de la mise à jour",
   "New": "Nouveau",
   "NEW": "NOUVEAU",
