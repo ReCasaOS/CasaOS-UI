@@ -607,6 +607,79 @@ describe('an update the box blocked for its vulnerabilities', () => {
 		wrapper.unmount()
 	})
 
+	describe('the ask belongs to one update', () => {
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+
+		it('opens it when its own begin was seen, however long the update took', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			const { wrapper, modal, fire, ask } = await setup()
+			await ask()
+
+			fire('app:update-begin', { 'app:name': 'syncthing' })
+			vi.setSystemTime(Date.now() + 30 * 60 * 1000)
+			fire('app:update-blocked', blocked())
+
+			expect(modal).toHaveBeenCalledTimes(1)
+			wrapper.unmount()
+		})
+
+		it('does not open the window for a night block after this card\'s update ended plainly', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			const { wrapper, modal, fire, ask } = await setup()
+			await ask()
+			fire('app:update-begin', { 'app:name': 'syncthing' })
+			fire('app:update-end', { 'app:name': 'syncthing' })
+
+			// hours later, the box's night run
+			vi.setSystemTime(Date.now() + 6 * 60 * 60 * 1000)
+			fire('app:update-begin', { 'app:name': 'syncthing' })
+			fire('app:update-blocked', blocked())
+
+			expect(modal).not.toHaveBeenCalled()
+			wrapper.unmount()
+		})
+
+		it('does not open it when the ask is older than five minutes and another update begins', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			const { wrapper, modal, fire, ask } = await setup()
+			await ask()
+
+			vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+			fire('app:update-begin', { 'app:name': 'syncthing' })
+			fire('app:update-blocked', blocked())
+
+			expect(modal).not.toHaveBeenCalled()
+			wrapper.unmount()
+		})
+
+		it('does not open it on a lost begin once the ask is older than five minutes', async () => {
+			vi.useFakeTimers({ toFake: ['Date'] })
+			const { wrapper, modal, fire, ask } = await setup()
+			await ask()
+
+			vi.setSystemTime(Date.now() + 6 * 60 * 1000)
+			fire('app:update-blocked', blocked())
+
+			expect(modal).not.toHaveBeenCalled()
+			expect(wrapper.vm.isUpdating).toBe(false)
+			wrapper.unmount()
+		})
+
+		it('lets another app\'s begin leave the ask alone', async () => {
+			const { wrapper, modal, fire, ask } = await setup()
+			await ask()
+
+			fire('app:update-begin', { 'app:name': 'jellyfin' })
+			fire('app:update-begin', { 'app:name': 'syncthing' })
+			fire('app:update-blocked', blocked())
+
+			expect(modal).toHaveBeenCalledTimes(1)
+			wrapper.unmount()
+		})
+	})
+
 	it('shows no "latest version" toast before a block', async () => {
 		const { wrapper, toast, fire, ask } = await setup()
 		await ask()

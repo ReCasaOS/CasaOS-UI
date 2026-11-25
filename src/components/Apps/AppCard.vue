@@ -299,6 +299,9 @@ const RECREATE_TAG = 'recreate:container:id'
 // object the client happened to flatten to `dry_run.name`, which worked by
 // accident of the serializer.
 const REBUILD_TAG = 'rebuild:container:id'
+// How long an update this card asked for may take to begin. A begin after that,
+// or a second one, is an update started elsewhere (Update every app, the night run).
+const ASK_BEGIN_WINDOW_MS = 5 * 60 * 1000
 
 export default {
 	name: 'AppCard',
@@ -341,9 +344,10 @@ export default {
 			isCloning: false,
 			isCheckThenUpdate: false,
 			isUpdating: false,
-			// this card started the update it is waiting on: only then may a block open
-			// a window here, not for Update every app or the box's night run
-			askedUpdate: false,
+			// when this card asked for an update (0: it did not), and whether that
+			// update's begin was seen: only its block may open a window here
+			askedAt: 0,
+			askBegun: false,
 			isRestarting: false,
 			isStarting: false,
 			isRebuilding: false,
@@ -1175,10 +1179,21 @@ export default {
 			this.closeMenu()
 		},
 
+		forgetAsk() {
+			this.askedAt = 0
+			this.askBegun = false
+		},
+
+		// asked recently enough for its begin to still be on its way
+		askIsFresh() {
+			return this.askedAt > 0 && Date.now() - this.askedAt < ASK_BEGIN_WINDOW_MS
+		},
+
 		checkAppVersion(name) {
 			this.isCheckThenUpdate = true
 			// set before the request: its events may come back before its answer
-			this.askedUpdate = true
+			this.askedAt = Date.now()
+			this.askBegun = false
 			this.$openAPI.appManagement.compose.updateComposeApp(name).then((resp) => {
 				// 200:
 				if (resp.status === 200) {
@@ -1197,7 +1212,7 @@ export default {
 				}
 			}).catch(() => {
 				// no update was started, so no event will end it
-				this.askedUpdate = false
+				this.forgetAsk()
 				this.$buefy.toast.open({
 					message: this.$t(`Unable to update at the moment!`),
 					type: 'is-danger',
@@ -1292,13 +1307,15 @@ export default {
 				this.isSaving = false
 			}
 		},
-		/**
-		 * @description: Update App Status
-		 * @param {object} data
-		 * @return {void}
-		 */
-		'app:update-begin': function () {
-
+		// The first begin of this app after this card asked, within the window, is the
+		// update it asked for; any other begin is an update started elsewhere.
+		'app:update-begin': function (data) {
+			if (data.Properties['app:name'] !== this.item.name)
+				return
+			if (this.askIsFresh() && !this.askBegun)
+				this.askBegun = true
+			else
+				this.forgetAsk()
 		},
 
 		'docker:image:pull-end': function (data) {
@@ -1335,12 +1352,12 @@ export default {
 			if (data.Properties['app:name'] !== this.item.name)
 				return
 			if (data.Properties['app:updated'] === 'true') {
-				this.askedUpdate = false
+				this.forgetAsk()
 				// the section reloads the grid on this one, and this card with it
 				return
 			}
 			this.isUpdating = false
-			// askedUpdate stays: a blocked update ends here too, and its own event may
+			// the ask stays: a blocked update ends here too, and its own event may
 			// still be on its way (it is published from a goroutine)
 			// An App Store update publishes update-end whether it worked or failed:
 			// app:updated is the only thing that tells the two apart, and a failure
@@ -1385,7 +1402,7 @@ export default {
 				return
 			this.isRecreating = false
 			this.isUpdating = false
-			this.askedUpdate = false
+			this.forgetAsk()
 			this.$buefy.toast.open({
 				message: escape(this.$t('Updating {name} failed: {reason}', {
 					name: this.containerName,
@@ -1402,9 +1419,11 @@ export default {
 			if (data.Properties['app:name'] !== this.item.name)
 				return
 			this.isUpdating = false
-			if (!this.askedUpdate)
+			// its begin seen, or lost or still to come while the ask is fresh
+			const ours = this.askBegun || this.askIsFresh()
+			this.forgetAsk()
+			if (!ours)
 				return
-			this.askedUpdate = false
 			this.$buefy.modal.open({
 				component: UpdateBlockedModal,
 				hasModalCard: true,
