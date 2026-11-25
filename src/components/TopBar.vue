@@ -441,6 +441,21 @@
 								</div>
 								<!-- Footer news End -->
 
+								<!-- Weather Start -->
+								<div v-if="weatherAvailable"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="weather-partly-cloudy" size="is-20" />
+										{{ $t("Weather") }}
+									</div>
+									<div class="ml-2">
+										<b-button data-weather-configure rounded size="is-small" type="is-dark" @click="showWeather">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- Weather End -->
+
 								<!-- Accounts Start -->
 								<div v-if="$store.getters.isAdmin"
 									class="is-flex is-align-items-center _row _box">
@@ -794,6 +809,7 @@ import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FeedsModal from './settings/FeedsModal.vue'
+import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
@@ -865,6 +881,7 @@ export default {
 			// feature shows no row.
 			alertsAvailable: false,
 			feedsAvailable: false,
+			weatherAvailable: false,
 			// false until the box answers; an older one has no sync call and 404s
 			showFolderSync: false,
 			logsAvailable: false,
@@ -1039,6 +1056,7 @@ export default {
 			this.getAutoUpdate()
 			this.getAlerts()
 			this.getFeeds()
+			this.getWeather()
 			this.getSync()
 			this.getFleet()
 			this.getModules()
@@ -1254,6 +1272,27 @@ export default {
 			this.$api.sys.getFeeds().then(() => {
 				this.feedsAvailable = true
 			}).catch(() => {})
+		},
+
+		// a core older than the weather (CasaOS#188) answers 404: no row
+		getWeather() {
+			this.$api.sys.getWeather().then(() => {
+				this.weatherAvailable = true
+			}).catch(() => {})
+		},
+
+		showWeather() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: WeatherModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				// the top bar reads the weather again at once, not ten minutes later
+				events: { close: () => this.$EventBus.$emit('casaUI:weatherChanged') },
+			})
 		},
 
 		showFeeds() {

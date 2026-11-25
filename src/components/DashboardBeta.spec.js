@@ -14,17 +14,25 @@ const HealthStrip = {
 	methods: { showAttention },
 }
 
-function dashboard() {
+function dashboard(isAdmin = false) {
 	return mount(DashboardBeta, {
 		global: {
-			stubs: { 'HealthStrip': HealthStrip, 'SearchBar': true, 'CoreService': true, 'AppSection': true, 'b-tag': true, 'b-button': true, 'b-icon': true },
+			stubs: { 'HealthStrip': HealthStrip, 'SearchBar': true, 'CoreService': true, 'AppSection': true, 'WeatherWidget': true, 'b-tag': true, 'b-button': true, 'b-icon': true },
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, name) => params[name]) : key),
-				$store: { state: { searchEngineSwitch: false }, getters: { canWrite: true, canReadModule: () => true } },
+				$store: { state: { searchEngineSwitch: false }, getters: { canWrite: true, canReadModule: () => true, isAdmin } },
 			},
 		},
 	})
 }
+
+describe('beta dashboard weather', () => {
+	// CasaOS#188: the owner's, and on the new dashboard only
+	it('is there for the owner and not for another account', () => {
+		expect(dashboard(true).findComponent({ name: 'WeatherWidget' }).exists()).toBe(true)
+		expect(dashboard(false).findComponent({ name: 'WeatherWidget' }).exists()).toBe(false)
+	})
+})
 
 describe('beta dashboard bell', () => {
 	it('shows the number of things that need a person, and none when nothing does', async () => {
