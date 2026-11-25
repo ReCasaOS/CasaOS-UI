@@ -79,7 +79,7 @@ const refused = (error_code, data, code = 409) => ({ response: { status: code, d
 
 // `lookModules` is getModules(true), the look for newer versions: kept apart, so that `getModules` counts the readings of the list as it always did
 const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus'].map(name => [name, vi.fn()]))
-const sys = { ...calls, getModules: refresh => refresh ? calls.lookModules(refresh) : calls.getModules() }
+const sys = { ...calls, getModules: (refresh, signal) => refresh ? calls.lookModules(refresh, signal) : calls.getModules() }
 let wrapper
 
 const answer = data => Promise.resolve({ data: { success: 200, message: 'ok', data } })
@@ -252,7 +252,7 @@ describe('the list of modules', () => {
 	it('says a module that the catalogue no longer has, and offers to remove it', async () => {
 		await open(listRaw([moduleRaw({ catalogue: false, tier: '', tag: '', installed: { version: 'v0.1.0' }, system: { supported: false, reasons: ['catalogue'] } })]))
 
-		expect(text('.modules-gone')).toBe('This release of ReCasaOS no longer offers this module.')
+		expect(text('.modules-gone')).toBe('ReCasaOS no longer offers this module.')
 		expect(wrapper.find('.modules-unsupported').exists()).toBe(false)
 		expect(wrapper.find('.modules-remove').exists()).toBe(true)
 		expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -3064,7 +3064,7 @@ describe('the look for newer versions', () => {
 		expect(calls.getModules).toHaveBeenCalledTimes(1)
 		expect(calls.getModules).toHaveBeenCalledWith()
 		expect(calls.lookModules).toHaveBeenCalledTimes(1)
-		expect(calls.lookModules).toHaveBeenCalledWith(true)
+		expect(calls.lookModules).toHaveBeenCalledWith(true, expect.any(AbortSignal))
 		expect(calls.getModules.mock.invocationCallOrder[0]).toBeLessThan(calls.lookModules.mock.invocationCallOrder[0])
 		// the list is there before the look answers, and its buttons work
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
@@ -3103,12 +3103,41 @@ describe('the look for newer versions', () => {
 
 		expect(wrapper.find('.modules-online').exists()).toBe(false)
 		expect(look().exists()).toBe(false)
-		expect(calls.lookModules).toHaveBeenCalledWith(true)
+		expect(calls.lookModules).toHaveBeenCalledWith(true, expect.any(AbortSignal))
 
 		out.resolve({ data: { data: listRaw([installed()]) } })
 		await settle()
 		expect(wrapper.find('.modal-card-body').html()).toBe(before)
 		expect(calls.lookModules).toHaveBeenCalledTimes(1)
+	})
+
+	it('gives the look up when the window closes, and writes nothing after', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online([installed()]))
+		const signal = calls.lookModules.mock.calls[0][1]
+		expect(signal.aborted).toBe(false)
+		const vm = wrapper.vm
+		const view = vm.view
+		close()
+
+		expect(signal.aborted).toBe(true)
+		out.reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+		await settle()
+		expect(vm.view).toBe(view)
+		expect(vm.looking).toBe(true)
+	})
+
+	it.each([
+		['read', { ok: true, serial: 2, generated: GENERATED }],
+		['not read', { ok: false, error: 'none' }],
+	])('says no source for its versions when the list cannot be read (catalogue %s), and keeps the button', async (_, state) => {
+		await open(listRaw([installed()], { ok: false, error: 'unreadable', online: state }))
+
+		expect(wrapper.find('.modules-online-note').exists()).toBe(false)
+		expect(look().exists()).toBe(true)
+		expect(text('.modules-none')).toBe(TEXT.none)
+		expect(text('.modules-catalogue-bad')).toBe(`${TEXT.catalogueBad} unreadable`)
 	})
 
 	it('writes nothing when the window was closed before the look answered', async () => {
@@ -3234,7 +3263,7 @@ describe('the look for newer versions', () => {
 		button.trigger('click')
 		await settle()
 		expect(calls.lookModules).toHaveBeenCalledTimes(2)
-		expect(calls.lookModules).toHaveBeenLastCalledWith(true)
+		expect(calls.lookModules).toHaveBeenLastCalledWith(true, expect.any(AbortSignal))
 		expect(look().attributes('aria-disabled')).toBe('true')
 		expect(look().attributes('disabled')).toBeUndefined()
 		expect(text('.modules-live')).toBe(TEXT.loading)

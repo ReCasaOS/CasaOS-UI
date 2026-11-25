@@ -16,7 +16,8 @@
 
 			<!-- where the versions come from, on a core that says it, and a way to look again (as the Check for updates of the top bar) -->
 			<div v-if="view && view.online" class="modules-online is-flex is-align-items-center is-size-7 _has-text-gray">
-				<span v-if="onlineLine" class="modules-online-note">{{ say(onlineLine) }}</span>
+				<!-- a list that cannot be read offers nothing: no sentence says where its versions come from, but the box can be asked again -->
+				<span v-if="onlineLine && view.ok" class="modules-online-note">{{ say(onlineLine) }}</span>
 				<b-tooltip :label="$t(TEXT.lookAgain)" position="is-left" type="is-dark">
 					<!-- aria-disabled, not disabled: a control that is disabled under the focus drops it outside the window; lookAgain refuses a second look itself -->
 					<button :aria-disabled="looking ? 'true' : undefined" :aria-label="$t(TEXT.lookAgain)" class="modules-look ml-1" type="button" @click="lookAgain(true)">
@@ -639,6 +640,7 @@ export default {
 			listSerial: 0,
 			// a look for newer versions is out (getModules with refresh): one at a time
 			looking: false,
+			lookAbort: null,
 			// the jobs the window knows of, by the name of the module: { view, followed, kind, dismissedAt }. A job that this window started is told until it
 			// starts another; one it only found is told when it is running or did not end well; a report that was read is put away until another job begins.
 			jobs: Object.create(null),
@@ -744,6 +746,7 @@ export default {
 		clearTimeout(this.retryTimer)
 		clearTimeout(this.discoveryTimer)
 		this.discovery?.abort()
+		this.lookAbort?.abort()
 		this.planTicket++
 		this.planAbort?.abort()
 		document.removeEventListener('visibilitychange', this.onVisibility)
@@ -832,15 +835,18 @@ export default {
 			if (asked)
 				this.announced = this.$t(TEXT.loading)
 			const serial = this.listSerial
+			const controller = typeof AbortController === 'function' ? new AbortController() : null
+			this.lookAbort = controller
 			let view = null
 			try {
-				view = listView((await this.$api.sys.getModules(true))?.data?.data)
+				view = listView((await this.$api.sys.getModules(true, controller?.signal))?.data?.data)
 			} catch {
-				// the list on the screen is still the box's list
+				// the list on the screen is still the box's list (a look given up when the window closed is one of these)
 			}
 			if (this.gone)
 				return
 			this.looking = false
+			this.lookAbort = null
 			// the region is emptied, so that the next look is announced again (the same words would change nothing in it)
 			if (asked && this.announced === this.$t(TEXT.loading))
 				this.announced = ''

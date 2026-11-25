@@ -301,6 +301,7 @@ describe('modules client', () => {
 		expect(sent().data).toBeUndefined()
 		expect(sent().params).toBeUndefined()
 		expect(sent().timeout).toBe(35000)
+		expect(sent().signal).toBeUndefined()
 	})
 
 	it('asks the box to look for a newer catalogue when it is told to, and waits as long', async () => {
@@ -308,6 +309,14 @@ describe('modules client', () => {
 		expect(sent().url).toBe('/v1/sys/modules')
 		expect(sent().params).toEqual({ refresh: 1 })
 		expect(sent().timeout).toBe(35000)
+		expect(sent().signal).toBeUndefined()
+	})
+
+	it('passes the cancel signal of the look on', async () => {
+		const controller = new AbortController()
+		await sys.getModules(true, controller.signal)
+		expect(sent().params).toEqual({ refresh: 1 })
+		expect(sent().signal).toBe(controller.signal)
 	})
 
 	it('asks for the plan with an empty object, waits longer than the minute the core takes, and passes the cancel signal on', async () => {
