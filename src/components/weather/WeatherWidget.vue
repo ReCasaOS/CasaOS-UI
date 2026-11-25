@@ -136,6 +136,11 @@ export default {
 	white-space: nowrap;
 }
 
+// above the app cards' badges (z-index 20 and 30), which come later in the dashboard
+.weather-widget :deep(.dropdown-menu) {
+	z-index: 40;
+}
+
 // the dashboard's glass (as its tab bar), not Buefy's plain dark menu (CasaOS#188 asked for it)
 .weather-widget :deep(.dropdown-content) {
 	border: 1px solid rgba(255, 255, 255, 0.08);
