@@ -3667,6 +3667,8 @@
   "No app can update by itself: apps built from a repository deploy by themselves already.": "Aucune app ne peut se mettre à jour seule : les apps construites depuis un dépôt se déploient déjà d'elles-mêmes.",
   "Update {app} automatically": "Mettre à jour {app} automatiquement",
   "Last nights": "Dernières nuits",
+  "Check the new version before an update": "Vérifier la nouvelle version avant une mise à jour",
+  "An update whose new version has more critical vulnerabilities than the installed one is blocked.": "Une mise à jour dont la nouvelle version porte plus de failles critiques que celle installée est bloquée.",
   "No night has run yet.": "Aucune nuit n'a encore tourné.",
   "Nothing to do.": "Rien à faire.",
   "Updated": "Mise à jour effectuée",

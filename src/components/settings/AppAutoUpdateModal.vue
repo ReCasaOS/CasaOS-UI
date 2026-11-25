@@ -40,6 +40,20 @@
 					</b-select>
 				</div>
 
+				<div v-if="view.scan_available" class="settings-card is-flex is-flex-wrap-wrap is-align-items-center is-gap-1" data-row="scan">
+					<div class="is-flex-grow-1">
+						<div class="has-text-weight-semibold">
+							{{ $t('Check the new version before an update') }}
+						</div>
+						<div class="is-size-7 _has-text-gray">
+							{{ $t('An update whose new version has more critical vulnerabilities than the installed one is blocked.') }}
+						</div>
+					</div>
+					<b-switch :key="`scan-${redraw}`" :disabled="!!saving" :model-value="view.scan_before_update" size="is-small" @update:model-value="setScan">
+						<span class="is-sr-only">{{ $t('Check the new version before an update') }}</span>
+					</b-switch>
+				</div>
+
 				<div class="settings-card" data-row="apps">
 					<p v-if="!apps.length" class="is-size-7 _has-text-gray">
 						{{ $t('No app can update by itself: apps built from a repository deploy by themselves already.') }}
@@ -65,7 +79,7 @@
 						<div class="_has-text-gray">
 							{{ whenOf(run.at) }}
 						</div>
-						<div v-for="entry in run.apps" :key="entry.id" :class="entry.state === 'failed' ? 'has-text-danger' : ''">
+						<div v-for="entry in run.apps" :key="entry.id" :class="{ 'has-text-danger': entry.state === 'failed', 'has-text-warning': entry.state === 'blocked' }">
 							{{ titleOf(entry.id) }} · {{ $t(stateOf(entry)) }}<template v-if="entry.message"> — {{ entry.message }}</template>
 						</div>
 						<div v-if="!run.apps.length" class="_has-text-gray">
@@ -94,6 +108,7 @@ const STATES = {
 	current: 'Up to date',
 	failed: 'Failed',
 	queued: 'Waiting',
+	blocked: 'Blocked',
 }
 
 export default {
@@ -182,6 +197,19 @@ export default {
 			this.error = ''
 			try {
 				this.view = (await this.$api.updates.setAutoUpdateWait(days)).data.data
+			} catch (error) {
+				this.error = this.messageOf(error)
+				this.redraw++
+			} finally {
+				this.saving = ''
+			}
+		},
+
+		async setScan(on) {
+			this.saving = 'scan'
+			this.error = ''
+			try {
+				this.view = (await this.$api.updates.setAutoUpdateScan(on)).data.data
 			} catch (error) {
 				this.error = this.messageOf(error)
 				this.redraw++

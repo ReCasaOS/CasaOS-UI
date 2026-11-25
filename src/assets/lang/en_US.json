@@ -3665,6 +3665,8 @@
   "No app can update by itself: apps built from a repository deploy by themselves already.": "No app can update by itself: apps built from a repository deploy by themselves already.",
   "Update {app} automatically": "Update {app} automatically",
   "Last nights": "Last nights",
+  "Check the new version before an update": "Check the new version before an update",
+  "An update whose new version has more critical vulnerabilities than the installed one is blocked.": "An update whose new version has more critical vulnerabilities than the installed one is blocked.",
   "No night has run yet.": "No night has run yet.",
   "Nothing to do.": "Nothing to do.",
   "Updated": "Updated",

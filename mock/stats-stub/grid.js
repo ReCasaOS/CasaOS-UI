@@ -539,6 +539,7 @@ function cleanup(verb, path, body, state) {
 	if (path === '/v2/app_management/auto-update' && (verb === 'GET' || verb === 'PUT')) {
 		if (verb === 'PUT') {
 			left.autoUpdate.min_days = body?.min_days ?? left.autoUpdate.min_days
+			left.autoUpdate.scan_before_update = body?.scan_before_update ?? left.autoUpdate.scan_before_update
 		}
 		return { status: 200, body: { data: left.autoUpdate } }
 	}
@@ -573,8 +574,13 @@ function newCleanup() {
 		autoUpdate: {
 			apps: ['jellyfin'],
 			min_days: 3,
+			scan_before_update: true,
+			scan_available: true,
 			next: '2026-11-21T02:00:00Z',
-			runs: [{ at: '2026-11-20T03:00:04Z', apps: [{ id: 'jellyfin', state: 'updated' }] }],
+			runs: [
+				{ at: '2026-11-21T02:00:07Z', apps: [{ id: 'jellyfin', state: 'blocked', message: 'the new version has 2 more critical vulnerabilities than the one installed' }] },
+				{ at: '2026-11-20T03:00:04Z', apps: [{ id: 'jellyfin', state: 'updated' }] },
+			],
 		},
 		schedule: {
 			weekly: false,
