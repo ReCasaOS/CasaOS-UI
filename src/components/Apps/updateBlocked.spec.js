@@ -12,6 +12,8 @@ describe('parseBlockedImages', () => {
 	it('keeps only objects, and always gives them a list of added vulnerabilities', () => {
 		expect(parseBlockedImages('[1,{}]')).toEqual([{ added: [] }])
 		expect(parseBlockedImages('[{"added":"CVE-1"}]')).toEqual([{ added: [] }])
+		expect(parseBlockedImages('[{"added":[null,1,"x"]}]')).toEqual([{ added: [] }])
+		expect(parseBlockedImages('[{"added":[[],{"id":"CVE-1"}]}]')).toEqual([{ added: [{ id: 'CVE-1' }] }])
 	})
 
 	it('reads what the box published', () => {
@@ -28,6 +30,13 @@ describe('moreCritical', () => {
 		expect(moreCritical([{ current: 4, candidate: 1 }, { current: 0, candidate: 1 }])).toBe(1)
 		expect(moreCritical([{ added: [] }])).toBe(0)
 		expect(moreCritical([])).toBe(0)
+	})
+
+	it('counts only whole numbers, and ignores what is not one', () => {
+		expect(moreCritical([{ current: 0, candidate: Infinity }, { current: '0', candidate: '1e999' }])).toBe(0)
+		expect(moreCritical([{ current: 0, candidate: 1.5 }])).toBe(0)
+		expect(moreCritical([{ current: '1', candidate: '3' }])).toBe(2)
+		expect(moreCritical([{ current: 5, candidate: 2 }, { current: 0, candidate: 1 }])).toBe(1)
 	})
 })
 

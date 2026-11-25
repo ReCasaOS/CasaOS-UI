@@ -64,7 +64,9 @@ export default {
 			return this.$t('The new version has more critical vulnerabilities than the installed one.')
 		},
 		added() {
-			return this.images.flatMap(image => image.added)
+			// parseBlockedImages already cleans the list; this holds for any other caller
+			return this.images.flatMap(image => (Array.isArray(image.added) ? image.added : []))
+				.filter(vuln => vuln !== null && typeof vuln === 'object')
 		},
 		shown() {
 			return this.added.slice(0, SHOWN)

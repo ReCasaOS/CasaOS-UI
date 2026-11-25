@@ -11,15 +11,25 @@ export function parseBlockedImages(raw) {
 	if (!Array.isArray(list))
 		return []
 	return list
-		.filter(image => image && typeof image === 'object' && !Array.isArray(image))
-		.map(image => ({ ...image, added: Array.isArray(image.added) ? image.added : [] }))
+		.filter(isObject)
+		.map(image => ({ ...image, added: Array.isArray(image.added) ? image.added.filter(isObject) : [] }))
+}
+
+function isObject(value) {
+	return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 // How many more critical vulnerabilities the new version carries, image by image:
-// an image that lost some does not make up for one that gained some.
+// an image that lost some does not make up for one that gained some. Counts are
+// read with Number(), so "3" counts; anything that is then not a whole number
+// (Infinity, "1e999", 1.5, garbage) is ignored.
 export function moreCritical(images) {
 	return images.reduce((sum, image) => {
-		const more = Number(image.candidate) - Number(image.current)
+		const candidate = Number(image.candidate)
+		const current = Number(image.current)
+		if (!Number.isInteger(candidate) || !Number.isInteger(current))
+			return sum
+		const more = candidate - current
 		return more > 0 ? sum + more : sum
 	}, 0)
 }

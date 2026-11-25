@@ -691,6 +691,20 @@ describe('an update the box blocked for its vulnerabilities', () => {
 		expect(toast).not.toHaveBeenCalled()
 		wrapper.unmount()
 	})
+
+	it('still shows the "latest version" toast when the update found nothing newer', async () => {
+		const { wrapper, toast, modal, fire, ask } = await setup()
+		await ask()
+		toast.mockClear()
+
+		fire('app:update-end', { 'app:name': 'syncthing', 'docker:image:updated': 'false' })
+
+		expect(toast).toHaveBeenCalledTimes(1)
+		expect(toast.mock.calls[0][0].type).toBe('is-success')
+		expect(toast.mock.calls[0][0].message).toContain('is the latest version!')
+		expect(modal).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
 })
 
 describe('what a finished recreate may claim', () => {

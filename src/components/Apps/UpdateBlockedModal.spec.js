@@ -80,6 +80,14 @@ describe('the blocked update window lists what the new version adds', () => {
 		wrapper.unmount()
 	})
 
+	it('still renders when an image has no list of added vulnerabilities', () => {
+		const { wrapper } = open({ images: [{ current: 0, candidate: 2 }, { current: 0, candidate: 0, added: [vuln(1)] }] })
+
+		expect(wrapper.text()).toContain('The new version has 2 more critical vulnerabilities than the installed one.')
+		expect(wrapper.findAll('.vuln-line')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
 	it('lists 20 and counts the rest', () => {
 		const added = Array.from({ length: 23 }, (_, i) => vuln(i))
 		const { wrapper } = open({ images: [{ current: 0, candidate: 23, added }] })
