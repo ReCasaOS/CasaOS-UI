@@ -258,9 +258,9 @@ const sys = {
 	// could not be started a 500 start_failed. A core older than the feature answers 404.
 
 	// What the catalogue of this release offers, joined with what is installed: { catalogue: { ok, error? }, modules: [{ name, title, description,
-	// tier, tag, installed: { version } | null, system: { supported, reasons }, broken?, catalogue }] }. It runs no apt.
-	getModules() {
-		return instance.get(`/v1${PREFIX}/modules`, { timeout: 35000 })
+	// tier, tag, installed: { version } | null, system: { supported, reasons }, broken?, catalogue }] }. It runs no apt. With `refresh` the box first looks for a newer catalogue.
+	getModules(refresh) {
+		return instance.get(`/v1${PREFIX}/modules`, refresh ? { params: { refresh: 1 }, timeout: 35000 } : { timeout: 35000 })
 	},
 
 	// The plan of an install (or, with `mode` 'update', of the update of a module that is installed), with the machine unchanged: always 200, with

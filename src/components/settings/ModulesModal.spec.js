@@ -258,7 +258,7 @@ describe('the list of modules', () => {
 		it('says that nothing is offered, and nothing else', async () => {
 			await open(listRaw([], { ok: false, error: 'none' }))
 
-			expect(text('.modules-none')).toBe('No module is offered by this release.')
+			expect(text('.modules-none')).toBe('No module is offered.')
 			expect(wrapper.find('.modules-card').exists()).toBe(false)
 			expect(wrapper.find('.modules-catalogue-bad').exists()).toBe(false)
 			expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -268,8 +268,8 @@ describe('the list of modules', () => {
 		it.each(['unreadable', 'invalid'])('says it, with the code small beside it, when the catalogue is %s', async (error) => {
 			await open(listRaw([], { ok: false, error }))
 
-			expect(text('.modules-none')).toBe('No module is offered by this release.')
-			expect(text('.modules-catalogue-bad')).toBe(`The list of modules of this release could not be read. ${error}`)
+			expect(text('.modules-none')).toBe('No module is offered.')
+			expect(text('.modules-catalogue-bad')).toBe(`The list of modules could not be read. ${error}`)
 		})
 
 		it('offers nothing to install even when the core lists modules, and keeps the ones that are installed', async () => {

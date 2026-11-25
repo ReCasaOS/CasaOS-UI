@@ -303,6 +303,13 @@ describe('modules client', () => {
 		expect(sent().timeout).toBe(35000)
 	})
 
+	it('asks the box to look for a newer catalogue when it is told to, and waits as long', async () => {
+		await sys.getModules(true)
+		expect(sent().url).toBe('/v1/sys/modules')
+		expect(sent().params).toEqual({ refresh: 1 })
+		expect(sent().timeout).toBe(35000)
+	})
+
 	it('asks for the plan with an empty object, waits longer than the minute the core takes, and passes the cancel signal on', async () => {
 		const controller = new AbortController()
 		await sys.planModule('virt', controller.signal)
