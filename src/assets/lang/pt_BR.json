@@ -2250,6 +2250,8 @@
   "Bring it up to date": "Atualizar",
   "Failed to perform power operation.": "Falha ao executar a operação de energia.",
   "Modules": "Módulos",
+  "1 update": "1 atualização",
+  "{n} updates": "{n} atualizações",
   "Reading the list of modules…": "Lendo a lista de módulos…",
   "No module is offered.": "Nenhum módulo é oferecido.",
   "The list of modules could not be read.": "Não foi possível ler a lista de módulos.",

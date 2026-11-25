@@ -51,7 +51,7 @@
 						type="is-dark"
 						@click="$messageBus('dashboardsetting')">
 						<p role="button">
-							<b-icon :class="{ 'update-icon-dot': updateInfo.need_update }"
+							<b-icon :class="{ 'update-icon-dot': updateInfo.need_update || moduleUpdates > 0 }"
 								class="picon"
 								icon="control-outline"
 								pack="casa"
@@ -702,7 +702,12 @@
 									class="is-flex is-align-items-center _row _box">
 									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
 										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="puzzle-outline" size="is-20" />
-										{{ $t("Modules") }}
+										<div :class="{ 'update-text-dot': moduleUpdates > 0 }">
+											{{ $t("Modules") }}
+										</div>
+									</div>
+									<div v-if="moduleUpdates > 0" class="_has-text-gray _modules-updates">
+										{{ moduleUpdates === 1 ? $t("1 update") : $t("{n} updates", { n: moduleUpdates }) }}
 									</div>
 									<div class="ml-2">
 										<b-button rounded size="is-small" type="is-dark" @click="showModules">
@@ -812,6 +817,7 @@ import FeedsModal from './settings/FeedsModal.vue'
 import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
+import { listView } from './settings/osModules'
 import { osBadge } from './settings/osSupport'
 import { powerRefusal } from './settings/osUpgrade'
 import { opensFullScreen, setOpensFullScreen } from './logsAndTerminal/terminalLogin'
@@ -891,6 +897,8 @@ export default {
 			// true once the core answers GET /v1/sys/modules: a core older than the
 			// feature shows no row.
 			modulesAvailable: false,
+			// how many installed modules have a later version waiting
+			moduleUpdates: 0,
 			// The view of GET /v1/sys/os. null until the core answers: a core older than
 			// the feature, or a call that failed, shows no badge.
 			os: null,
@@ -1394,13 +1402,15 @@ export default {
 			})
 		},
 
-		// Asked once, from mounted(): the window reads the list itself. The row shows only
-		// when something is offered, or when something is installed (to be managed).
+		// Asked from mounted(), and again when the Modules window closes: the window reads the
+		// list itself. The row shows only when something is offered, or when something is
+		// installed (to be managed); it counts the updates the window would offer.
 		getModules() {
 			this.$api.sys.getModules().then((res) => {
 				const d = res?.data?.data
 				const list = Array.isArray(d?.modules) ? d.modules : []
 				this.modulesAvailable = (d?.catalogue?.ok === true && list.length > 0) || list.some(m => m.installed)
+				this.moduleUpdates = (listView(d)?.modules ?? []).filter(m => m.canUpdate).length
 			}).catch(() => {})
 		},
 
@@ -1419,6 +1429,9 @@ export default {
 				canCancel: ['escape', 'outside'],
 				scroll: 'keep',
 				animation: 'zoom-in',
+				// an update made in the window takes the dot away
+				onCancel: () => this.getModules(),
+				events: { close: () => this.getModules() },
 			})
 		},
 
