@@ -136,6 +136,16 @@ export default {
 	white-space: nowrap;
 }
 
+// the dashboard's glass (as its tab bar), not Buefy's plain dark menu (CasaOS#188 asked for it)
+.weather-widget :deep(.dropdown-content) {
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 1rem;
+	// darker than the tab bar: a card's text under the menu must not read through
+	background: rgba(11, 18, 32, 0.85);
+	backdrop-filter: blur(18px);
+	color: #f1f5f9;
+}
+
 // Buefy's dropdown items do not wrap: a long place name would run out of the card
 .weather-widget .weather-card {
 	width: 17rem;
