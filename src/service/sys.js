@@ -362,6 +362,23 @@ const sys = {
 		return api.put(`${PREFIX}/feeds`, data)
 	},
 
+	// The dashboard's weather (CasaOS#188), owner only: { enabled, place: { name, region, country, latitude, longitude } | null,
+	// units: 'metric' | 'imperial', forecast: { current: { temperature, humidity, wind, code, day }, days: [{ date, code, min, max, rain }], updated } | null, error? }.
+	// The box reads Open-Meteo, never the browser. A core older than the feature answers 404.
+	getWeather() {
+		return api.get(`${PREFIX}/weather`)
+	},
+
+	// data: { enabled, place, units }; on needs a place. Answers as getWeather.
+	setWeather(data) {
+		return api.put(`${PREFIX}/weather`, data)
+	},
+
+	// up to five places named like name, in language (two letters): [{ name, region, country, latitude, longitude }]
+	findWeatherPlaces(name, language) {
+		return api.get(`${PREFIX}/weather/places`, { name, language })
+	},
+
 	// power -- data:shutdown
 	// power -- data:restart
 	power(data) {

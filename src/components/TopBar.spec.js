@@ -115,6 +115,7 @@ describe('the anonymous statistics switch', () => {
 			getAutoUpdate: vi.fn(),
 			getAlerts: vi.fn(),
 			getFeeds: vi.fn(),
+			getWeather: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -233,6 +234,7 @@ describe('the automatic update row', () => {
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),
 			getFeeds: vi.fn(),
+			getWeather: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -443,6 +445,7 @@ describe('the alerts row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getFeeds: vi.fn(),
+			getWeather: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -541,6 +544,7 @@ describe('the modules row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getFeeds: vi.fn(),
+			getWeather: vi.fn(),
 			getModules: vi.fn(),
 			getFleet: vi.fn(),
 			getSync: vi.fn(),
@@ -882,6 +886,7 @@ describe('the fleet row', () => {
 			$EventBus: createEventBus(),
 			getAlerts: vi.fn(),
 			getFeeds: vi.fn(),
+			getWeather: vi.fn(),
 			getModules: vi.fn(),
 			getOs: vi.fn(),
 			getFleet: vi.fn(),
@@ -964,7 +969,7 @@ describe('the logs row', () => {
 
 	it('asks when the bar mounts', () => {
 		const vm = { $EventBus: createEventBus() }
-		for (const name of ['getAlerts', 'getFeeds', 'getLogs', 'getModules', 'getFleet', 'getSync', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
+		for (const name of ['getAlerts', 'getFeeds', 'getWeather', 'getLogs', 'getModules', 'getFleet', 'getSync', 'getOs', 'checkVersion', 'getUserInfo', 'getUsbStatus', 'getTelemetry', 'getAutoUpdate', 'getHardwareInfo', 'onTelemetryChanged'])
 			vm[name] = vi.fn()
 
 		mountBar(vm)

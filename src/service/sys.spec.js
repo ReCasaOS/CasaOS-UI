@@ -83,6 +83,24 @@ describe('push alerts client', () => {
 	})
 })
 
+describe('weather client', () => {
+	beforeEach(() => adapter.mockClear())
+
+	it('reads, sets and searches the weather in the core\'s v1 sys group', async () => {
+		await sys.getWeather()
+		expect(sent().method).toBe('get')
+		expect(sent().url).toBe('/v1/sys/weather')
+		adapter.mockClear()
+		await sys.setWeather({ enabled: true, place: null, units: 'metric' })
+		expect(sent().method).toBe('put')
+		expect(JSON.parse(sent().data)).toEqual({ enabled: true, place: null, units: 'metric' })
+		adapter.mockClear()
+		await sys.findWeatherPlaces('São Paulo', 'pt')
+		expect(sent().url).toBe('/v1/sys/weather/places')
+		expect(sent().params).toEqual({ name: 'São Paulo', language: 'pt' })
+	})
+})
+
 describe('footer feeds client', () => {
 	beforeEach(() => adapter.mockClear())
 

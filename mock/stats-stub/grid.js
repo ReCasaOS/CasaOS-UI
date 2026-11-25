@@ -666,6 +666,32 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 		}
 		return core(state.feeds)
 	}
+	// the weather (CasaOS#188): on, in Vinhedo; a PUT keeps what it is given, a search finds Vinhedo
+	if (path === '/v1/sys/weather' && (verb === 'GET' || verb === 'PUT')) {
+		state.weather ??= {
+			enabled: true,
+			place: { name: 'Vinhedo', region: 'São Paulo', country: 'Brazil', latitude: -23.03, longitude: -46.97 },
+			units: 'metric',
+			forecast: {
+				current: { temperature: 24.4, humidity: 61, wind: 11.5, code: 2, day: true },
+				days: [
+					{ date: '2026-11-25', code: 2, min: 15.2, max: 27.1, rain: 10 },
+					{ date: '2026-11-26', code: 61, min: 14, max: 22, rain: 80 },
+					{ date: '2026-11-27', code: 95, min: 16, max: 25, rain: 70 },
+					{ date: '2026-11-28', code: 3, min: 15, max: 24, rain: 20 },
+					{ date: '2026-11-29', code: 0, min: 14, max: 28, rain: 0 },
+				],
+				updated: new Date().toISOString(),
+			},
+		}
+		if (verb === 'PUT') {
+			state.weather = { ...state.weather, enabled: !!body?.enabled, place: body?.place ?? null, units: body?.units === 'imperial' ? 'imperial' : 'metric' }
+		}
+		return core(state.weather)
+	}
+	if (verb === 'GET' && path === '/v1/sys/weather/places') {
+		return core([{ name: 'Vinhedo', region: 'São Paulo', country: 'Brazil', latitude: -23.03, longitude: -46.97 }])
+	}
 	if (path.startsWith('/v2/mcp/')) {
 		return mcp(verb, path, body, state)
 	}
