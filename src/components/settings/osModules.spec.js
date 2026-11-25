@@ -2248,6 +2248,8 @@ describe('the list: where its versions come from', () => {
 	it('knows no other state', () => {
 		expect(online({ ok: false, error: 'weird' })).toBeNull()
 		expect(online({ ok: false })).toBeNull()
+		expect(online({ ok: 'true' })).toBeNull()
+		expect(online({ ok: false, error: 5 })).toBeNull()
 		expect(online({ ok: false, error: '__proto__' })).toBeNull()
 	})
 
