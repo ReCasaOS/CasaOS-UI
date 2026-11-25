@@ -3069,7 +3069,7 @@ describe('the look for newer versions', () => {
 		// the list is there before the look answers, and its buttons work
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
 		expect(wrapper.find('.modules-remove').attributes('disabled')).toBeUndefined()
-		expect(look().attributes('disabled')).toBeDefined()
+		expect(look().attributes('aria-disabled')).toBe('true')
 		expect(wrapper.find('.modules-look .mdi-spin').exists()).toBe(true)
 		// the look at the opening is not announced
 		expect(text('.modules-live')).toBe('')
@@ -3089,7 +3089,7 @@ describe('the look for newer versions', () => {
 
 		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
 		expect(wrapper.find('.modules-update-button').exists()).toBe(true)
-		expect(look().attributes('disabled')).toBeUndefined()
+		expect(look().attributes('aria-disabled')).toBeUndefined()
 		expect(wrapper.find('.modules-look .mdi-spin').exists()).toBe(false)
 		expect(document.activeElement).toBe(focused)
 		expect(calls.getModules).toHaveBeenCalledTimes(1)
@@ -3144,7 +3144,44 @@ describe('the look for newer versions', () => {
 		await settle()
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
 		expect(wrapper.find('.modules-offered').exists()).toBe(false)
-		expect(look().attributes('disabled')).toBeUndefined()
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+	})
+
+	it('ignores a look that answers while a later reading of the list is out, and shows that reading', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online())
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		const reading = deferred()
+		calls.getModules.mockReturnValue(reading.promise)
+		await press('.modules-busy-retry')
+
+		out.resolve({ data: { data: online([moduleRaw({ tag: 'v0.2.0' })]) } })
+		await settle()
+		expect(text('.modules-offered')).toBe('Version offered: v0.1.0')
+
+		reading.resolve({ data: { data: online([installed()]) } })
+		await settle()
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+	})
+
+	it('takes away the sentence that the list could not be read when a look brings it', async () => {
+		await open(online([installed()]))
+		await press('.modules-remove')
+		calls.removeModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		calls.getModules.mockImplementation(failure({ response: { status: 502 } }))
+		await press('.modules-busy-retry')
+		expect(wrapper.find('.modules-list-error').exists()).toBe(true)
+
+		calls.lookModules.mockImplementation(() => answer(online([newer()])))
+		await press('.modules-look')
+		expect(wrapper.find('.modules-list-error').exists()).toBe(false)
+		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
 	})
 
 	it('says nothing when the look fails or gets no answer, keeps the list, and lets it be asked again', async () => {
@@ -3153,7 +3190,7 @@ describe('the look for newer versions', () => {
 
 		expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
-		expect(look().attributes('disabled')).toBeUndefined()
+		expect(look().attributes('aria-disabled')).toBeUndefined()
 
 		calls.lookModules.mockImplementation(failure({ code: 'ECONNABORTED', message: 'timeout of 35000ms exceeded' }))
 		await press('.modules-look')
@@ -3161,7 +3198,7 @@ describe('the look for newer versions', () => {
 		expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
 		expect(wrapper.find('.modules-list-error').exists()).toBe(false)
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
-		expect(look().attributes('disabled')).toBeUndefined()
+		expect(look().attributes('aria-disabled')).toBeUndefined()
 	})
 
 	it('leaves an open confirmation as it was, with its module and its plan, when the look answers', async () => {
@@ -3182,7 +3219,7 @@ describe('the look for newer versions', () => {
 		expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID })
 	})
 
-	it('has a button with a name, which asks once at a time and is announced once', async () => {
+	it('has a button with a name, which asks once at a time and announces each look once', async () => {
 		await open(online([installed()]))
 		const button = look()
 		expect(button.element.tagName).toBe('BUTTON')
@@ -3198,14 +3235,41 @@ describe('the look for newer versions', () => {
 		await settle()
 		expect(calls.lookModules).toHaveBeenCalledTimes(2)
 		expect(calls.lookModules).toHaveBeenLastCalledWith(true)
-		expect(look().attributes('disabled')).toBeDefined()
+		expect(look().attributes('aria-disabled')).toBe('true')
+		expect(look().attributes('disabled')).toBeUndefined()
 		expect(text('.modules-live')).toBe(TEXT.loading)
+		// a press while the look is out asks nothing
+		await press('.modules-look')
+		expect(calls.lookModules).toHaveBeenCalledTimes(2)
 
 		out.resolve({ data: { data: online([newer()]) } })
 		await settle()
-		expect(look().attributes('disabled')).toBeUndefined()
-		expect(text('.modules-live')).toBe(TEXT.loading)
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+		expect(text('.modules-live')).toBe('')
 		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
+
+		// the next look is announced again
+		const again = deferred()
+		calls.lookModules.mockReturnValue(again.promise)
+		await press('.modules-look')
+		expect(calls.lookModules).toHaveBeenCalledTimes(3)
+		expect(text('.modules-live')).toBe(TEXT.loading)
+		again.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(text('.modules-live')).toBe('')
+	})
+
+	it('keeps the focus on the button while it looks and after the answer', async () => {
+		await open(online([installed()]))
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		look().element.focus()
+		await press('.modules-look')
+		expect(document.activeElement).toBe(look().element)
+
+		out.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(document.activeElement).toBe(look().element)
 	})
 
 	it('says where the versions come from, in each of the four states', async () => {

@@ -18,7 +18,8 @@
 			<div v-if="view && view.online" class="modules-online is-flex is-align-items-center is-size-7 _has-text-gray">
 				<span v-if="onlineLine" class="modules-online-note">{{ say(onlineLine) }}</span>
 				<b-tooltip :label="$t(TEXT.lookAgain)" position="is-left" type="is-dark">
-					<button :aria-label="$t(TEXT.lookAgain)" class="modules-look ml-1" :disabled="looking" type="button" @click="lookAgain(true)">
+					<!-- aria-disabled, not disabled: a control that is disabled under the focus drops it outside the window; lookAgain refuses a second look itself -->
+					<button :aria-disabled="looking ? 'true' : undefined" :aria-label="$t(TEXT.lookAgain)" class="modules-look ml-1" type="button" @click="lookAgain(true)">
 						<b-icon :custom-class="looking ? 'mdi-spin' : ''" custom-size="mdi-18px" icon="refresh" />
 					</button>
 				</b-tooltip>
@@ -822,7 +823,8 @@ export default {
 			return true
 		},
 		// The box looks for a newer catalogue before it answers (up to 30 s). Nothing is said when it fails: the list on the screen stays. An answer that
-		// comes after a later list (the end of a job, Check again) is older than it and is dropped; nothing touches an open confirmation.
+		// comes after a later list (the end of a job, Check again), or while one is being read, is older than it and is dropped; nothing touches an open
+		// confirmation.
 		async lookAgain(asked) {
 			if (this.looking || this.gone)
 				return
@@ -839,8 +841,13 @@ export default {
 			if (this.gone)
 				return
 			this.looking = false
-			if (view && serial === this.listSerial)
+			// the region is emptied, so that the next look is announced again (the same words would change nothing in it)
+			if (asked && this.announced === this.$t(TEXT.loading))
+				this.announced = ''
+			if (view && serial === this.listSerial && !this.loading) {
 				this.view = view
+				this.listError = null
+			}
 		},
 		// The list at the end of a job says what is installed now, and the buttons depend on it: when it cannot be read it is read once more, later.
 		async refreshList() {
@@ -1384,7 +1391,7 @@ export default {
 	opacity: 0.6;
 	cursor: pointer;
 
-	&:hover:not(:disabled),
+	&:hover:not([aria-disabled="true"]),
 	&:focus-visible {
 		opacity: 1;
 	}
@@ -1392,6 +1399,12 @@ export default {
 	&:focus-visible {
 		outline: 2px solid currentColor;
 		outline-offset: 2px;
+	}
+
+	// while it looks: as a disabled button, the focus kept
+	&[aria-disabled="true"] {
+		opacity: 0.6;
+		cursor: default;
 	}
 }
 
