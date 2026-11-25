@@ -259,6 +259,8 @@ import { newerBadgeOf } from './newerTags'
 import BackupAppModal from './BackupAppModal.vue'
 import ContainerDetailPanel from './ContainerDetailPanel.vue'
 import SecurityModal from './SecurityModal.vue'
+import UpdateBlockedModal from './UpdateBlockedModal.vue'
+import { parseBlockedImages } from './updateBlocked'
 import ShareAppModal from '@/components/PublicShare/ShareAppModal.vue'
 import { appEntry } from '@/components/PublicShare/shareWords'
 import { publicShare, refresh as refreshPublicShare } from '@/service/publicShare'
@@ -339,6 +341,9 @@ export default {
 			isCloning: false,
 			isCheckThenUpdate: false,
 			isUpdating: false,
+			// this card started the update it is waiting on: only then may a block open
+			// a window here, not for Update every app or the box's night run
+			askedUpdate: false,
 			isRestarting: false,
 			isStarting: false,
 			isRebuilding: false,
@@ -1172,6 +1177,8 @@ export default {
 
 		checkAppVersion(name) {
 			this.isCheckThenUpdate = true
+			// set before the request: its events may come back before its answer
+			this.askedUpdate = true
 			this.$openAPI.appManagement.compose.updateComposeApp(name).then((resp) => {
 				// 200:
 				if (resp.status === 200) {
@@ -1189,6 +1196,8 @@ export default {
 					})
 				}
 			}).catch(() => {
+				// no update was started, so no event will end it
+				this.askedUpdate = false
 				this.$buefy.toast.open({
 					message: this.$t(`Unable to update at the moment!`),
 					type: 'is-danger',
@@ -1326,10 +1335,13 @@ export default {
 			if (data.Properties['app:name'] !== this.item.name)
 				return
 			if (data.Properties['app:updated'] === 'true') {
+				this.askedUpdate = false
 				// the section reloads the grid on this one, and this card with it
 				return
 			}
 			this.isUpdating = false
+			// askedUpdate stays: a blocked update ends here too, and its own event may
+			// still be on its way (it is published from a goroutine)
 			// An App Store update publishes update-end whether it worked or failed:
 			// app:updated is the only thing that tells the two apart, and a failure
 			// also arrives on its own event, app:update-error. docker:image:updated
@@ -1373,6 +1385,7 @@ export default {
 				return
 			this.isRecreating = false
 			this.isUpdating = false
+			this.askedUpdate = false
 			this.$buefy.toast.open({
 				message: escape(this.$t('Updating {name} failed: {reason}', {
 					name: this.containerName,
@@ -1380,6 +1393,29 @@ export default {
 				})),
 				type: 'is-danger',
 				duration: 5000,
+			})
+		},
+		// The box put the installed version back: the new one carries more critical
+		// vulnerabilities. Every card of the app stops waiting; the window opens only on
+		// the card whose update it was, and once.
+		'app:update-blocked': function (data) {
+			if (data.Properties['app:name'] !== this.item.name)
+				return
+			this.isUpdating = false
+			if (!this.askedUpdate)
+				return
+			this.askedUpdate = false
+			this.$buefy.modal.open({
+				component: UpdateBlockedModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				props: {
+					name: this.item.name,
+					title: this.containerName,
+					images: parseBlockedImages(data.Properties['app:update-blocked-images']),
+					canOverride: this.$store.getters.isAdmin === true,
+				},
 			})
 		},
 		// `id` is not a property any event carries, so a failed uninstall never

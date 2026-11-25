@@ -14,6 +14,7 @@ import { backupStatus, refresh } from '@/service/backupStatus'
 import { publicShare } from '@/service/publicShare'
 import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import SecurityModal from '@/components/Apps/SecurityModal.vue'
+import UpdateBlockedModal from '@/components/Apps/UpdateBlockedModal.vue'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
@@ -486,6 +487,135 @@ describe('app store update outcome', () => {
 		fire('app:update-end', { 'app:name': 'syncthing', 'app:updated': 'true' })
 
 		expect(open).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+})
+
+describe('an update the box blocked for its vulnerabilities', () => {
+	const added = [{ id: 'CVE-2026-1234', package: 'openssl', fixed: '3.0.15', title: 'overflow', url: '' }]
+	const images = JSON.stringify([{ service: 'syncthing', image: 'syncthing/syncthing:latest', repo_digests: [], id: 'sha256:ab', current: 0, candidate: 1, added }])
+	const blocked = (raw = images) => ({ 'app:name': 'syncthing', 'message': 'the new image carries 1 more critical vulnerability', 'app:update-blocked-images': raw })
+
+	async function setup(getters = {}) {
+		const toast = vi.fn()
+		const modal = vi.fn()
+		const updateComposeApp = vi.fn(() => Promise.resolve({ status: 200, data: { message: 'In the process of asynchronous updating.' } }))
+		const wrapper = await card({}, {
+			$buefy: { toast: { open: toast }, modal: { open: modal } },
+			$openAPI: { appManagement: { compose: { updateComposeApp } } },
+			$messageBus: () => {},
+			$store: { getters: { canWrite: true, canReadModule: () => true, isAdmin: true, ...getters } },
+		})
+		const fire = (event, Properties) =>
+			wrapper.vm.$options.sockets[event].call(wrapper.vm, { Properties })
+		// what the Update entry of the menu does
+		const ask = async () => {
+			wrapper.vm.checkAppVersion('syncthing')
+			await flushPromises()
+			wrapper.vm.isUpdating = true
+		}
+		return { wrapper, toast, modal, fire, ask }
+	}
+
+	it('opens the blocked window when this card asked for the update', async () => {
+		const { wrapper, modal, fire, ask } = await setup()
+		await ask()
+
+		fire('app:update-blocked', blocked())
+		fire('app:update-end', { 'app:name': 'syncthing' })
+
+		expect(wrapper.vm.isUpdating).toBe(false)
+		expect(modal).toHaveBeenCalledTimes(1)
+		expect(modal.mock.calls[0][0]).toMatchObject({
+			component: UpdateBlockedModal,
+			hasModalCard: true,
+			props: { name: 'syncthing', title: 'Syncthing', images: [{ service: 'syncthing', current: 0, candidate: 1, added }], canOverride: true },
+		})
+		wrapper.unmount()
+	})
+
+	it('opens it when blocked arrives after update-end', async () => {
+		const { wrapper, modal, fire, ask } = await setup()
+		await ask()
+
+		fire('app:update-end', { 'app:name': 'syncthing' })
+		fire('app:update-blocked', blocked())
+
+		expect(modal).toHaveBeenCalledTimes(1)
+		expect(wrapper.vm.isUpdating).toBe(false)
+		// once only: a second event of the same kind finds nobody waiting
+		fire('app:update-blocked', blocked())
+		expect(modal).toHaveBeenCalledTimes(1)
+		wrapper.unmount()
+	})
+
+	it('does not open it for an update this card did not ask for', async () => {
+		// Update every app, or the box at night: the card stops spinning and says nothing
+		const { wrapper, modal, fire } = await setup()
+		wrapper.vm.isUpdating = true
+
+		fire('app:update-blocked', blocked())
+
+		expect(wrapper.vm.isUpdating).toBe(false)
+		expect(modal).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('leaves another app\'s block to that app\'s card', async () => {
+		const { wrapper, modal, fire, ask } = await setup()
+		await ask()
+
+		fire('app:update-blocked', { ...blocked(), 'app:name': 'jellyfin' })
+
+		expect(wrapper.vm.isUpdating).toBe(true)
+		expect(modal).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('forgets the update it asked for once it failed or went through', async () => {
+		const { wrapper, modal, fire, ask } = await setup()
+		await ask()
+		fire('app:update-error', { 'app:name': 'syncthing', 'message': 'no space left on device' })
+		fire('app:update-blocked', blocked())
+
+		await ask()
+		fire('app:update-end', { 'app:name': 'syncthing', 'app:updated': 'true' })
+		fire('app:update-blocked', blocked())
+
+		expect(modal).not.toHaveBeenCalled()
+		wrapper.unmount()
+	})
+
+	it('opens it with the sentence alone when the images cannot be read', async () => {
+		const { wrapper, modal, fire, ask } = await setup()
+		await ask()
+
+		fire('app:update-blocked', blocked('{not json'))
+
+		expect(modal).toHaveBeenCalledTimes(1)
+		expect(modal.mock.calls[0][0].props.images).toEqual([])
+		wrapper.unmount()
+	})
+
+	it('gives canOverride only to the owner', async () => {
+		const { wrapper, modal, fire, ask } = await setup({ isAdmin: false })
+		await ask()
+
+		fire('app:update-blocked', blocked())
+
+		expect(modal.mock.calls[0][0].props.canOverride).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('shows no "latest version" toast before a block', async () => {
+		const { wrapper, toast, fire, ask } = await setup()
+		await ask()
+		toast.mockClear()
+
+		fire('app:update-end', { 'app:name': 'syncthing', 'docker:image:updated': 'true' })
+		fire('app:update-end', { 'app:name': 'syncthing' })
+
+		expect(toast).not.toHaveBeenCalled()
 		wrapper.unmount()
 	})
 })
