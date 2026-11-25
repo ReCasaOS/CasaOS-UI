@@ -9,7 +9,7 @@
 				<span class="weather-place">{{ place.name }}</span>
 			</button>
 		</template>
-		<b-dropdown-item :focusable="false" class="weather-card" custom paddingless>
+		<b-dropdown-item :focusable="false" class="weather-card" custom>
 			<div class="weather-head">
 				<b-icon :icon="now.icon" custom-size="mdi-36px" />
 				<div>
@@ -153,8 +153,8 @@ export default {
 
 // Buefy's dropdown items do not wrap: a long place name would run out of the card
 .weather-widget .weather-card {
-	width: 17rem;
-	padding: 1rem;
+	width: 18rem;
+	padding: 1rem 1.25rem;
 	white-space: normal;
 }
 
