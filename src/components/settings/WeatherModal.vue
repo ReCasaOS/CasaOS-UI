@@ -8,7 +8,7 @@
 
 		<section class="modal-card-body">
 			<p class="settings-intro mb-3">
-				{{ $t('The weather of a place you choose, at the top right of the dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.') }}
+				{{ $t('The weather of a place you choose, at the top right of the new dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.') }}
 			</p>
 
 			<b-message v-if="error" class="mb-3" size="is-small" type="is-danger">

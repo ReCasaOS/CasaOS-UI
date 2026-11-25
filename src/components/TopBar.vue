@@ -769,9 +769,6 @@
 			</div>
 		</div>
 
-		<!-- the owner's weather (CasaOS#188): after navbar-menu, which takes the room on a desktop and is hidden on a phone -->
-		<weather-widget v-if="weatherAvailable" class="ml-auto mr-3" />
-
 		<b-modal v-model="showPower" :can-cancel="false" class="_modal" scroll="clip" width="20rem">
 			<b-message @close="resetPower">
 				<template #header>
@@ -814,7 +811,6 @@ import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FeedsModal from './settings/FeedsModal.vue'
 import WeatherModal from './settings/WeatherModal.vue'
-import WeatherWidget from './weather/WeatherWidget.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import { osBadge } from './settings/osSupport'
@@ -833,7 +829,6 @@ export default {
 	name: 'TopBar',
 	components: {
 		AccountPanel,
-		WeatherWidget,
 	},
 	mixins: [mixin],
 	props: {
@@ -1280,7 +1275,7 @@ export default {
 			}).catch(() => {})
 		},
 
-		// a core older than the weather (CasaOS#188) answers 404: no row, no widget
+		// a core older than the weather (CasaOS#188) answers 404: no row
 		getWeather() {
 			this.$api.sys.getWeather().then(() => {
 				this.weatherAvailable = true

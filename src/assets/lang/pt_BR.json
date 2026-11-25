@@ -3780,7 +3780,7 @@
   "Wind": "Vento",
   "Last updated {time}": "Atualizado às {time}",
   "Weather data by Open-Meteo": "Dados do clima: Open-Meteo",
-  "The weather of a place you choose, at the top right of the dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.": "O clima de um lugar à sua escolha, no canto superior direito do painel. O servidor consulta o Open-Meteo a cada 30 minutos, apenas com as coordenadas desse lugar; o lugar que você pesquisa também é enviado ao Open-Meteo.",
+  "The weather of a place you choose, at the top right of the dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.": "O clima de um lugar à sua escolha, no canto superior direito do novo painel. O servidor consulta o Open-Meteo a cada 30 minutos, apenas com as coordenadas desse lugar; o lugar que você pesquisa também é enviado ao Open-Meteo.",
   "Show the weather on the dashboard": "Mostrar o clima no painel",
   "Place": "Lugar",
   "Search a town or a city": "Pesquisar uma cidade",

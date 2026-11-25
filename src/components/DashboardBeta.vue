@@ -4,6 +4,8 @@
 		<div class="beta-bar is-flex is-align-items-center mb-4 ml-2">
 			<b-tag rounded type="is-dark">{{ $t('Beta') }}</b-tag>
 			<span class="beta-title has-text-grey-100">{{ $t('New dashboard (beta)') }}</span>
+			<!-- the owner's weather (CasaOS#188), on the new dashboard only: the classic one is to go -->
+			<WeatherWidget v-if="$store.getters.isAdmin" class="beta-weather" />
 			<button :aria-label="bellLabel" class="beta-bell" type="button" @click="$refs.strip.showAttention()">
 				<b-icon icon="bell-outline" size="is-20" />
 				<span v-if="attentionCount > 0" class="beta-bell-count">{{ attentionCount }}</span>
@@ -38,6 +40,7 @@ import CoreService from '@/components/CoreService.vue'
 import AppSection from '@/components/Apps/AppSection.vue'
 import HealthStrip from '@/components/dashboard/HealthStrip.vue'
 import BetaTabBar from '@/components/dashboard/BetaTabBar.vue'
+import WeatherWidget from '@/components/weather/WeatherWidget.vue'
 
 export default {
 	name: 'DashboardBeta',
@@ -47,6 +50,7 @@ export default {
 		AppSection,
 		HealthStrip,
 		BetaTabBar,
+		WeatherWidget,
 	},
 	emits: ['leave'],
 	data() {
@@ -89,6 +93,11 @@ export default {
 
 .beta-leave {
 	flex-shrink: 0;
+}
+
+.beta-weather {
+	flex-shrink: 0;
+	color: #f1f5f9;
 }
 
 // the bell of the proposal: the number of things that need a person, on the accent

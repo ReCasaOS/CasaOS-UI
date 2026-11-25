@@ -3780,7 +3780,7 @@
   "Wind": "Wind",
   "Last updated {time}": "Last updated {time}",
   "Weather data by Open-Meteo": "Weather data by Open-Meteo",
-  "The weather of a place you choose, at the top right of the dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.": "The weather of a place you choose, at the top right of the dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.",
+  "The weather of a place you choose, at the top right of the new dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.": "The weather of a place you choose, at the top right of the new dashboard. The box asks Open-Meteo every 30 minutes, with the coordinates of that place only; the place you search for is sent to Open-Meteo too.",
   "Show the weather on the dashboard": "Show the weather on the dashboard",
   "Place": "Place",
   "Search a town or a city": "Search a town or a city",
