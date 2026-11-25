@@ -14,6 +14,18 @@
 				{{ announced }}
 			</p>
 
+			<!-- where the versions come from, on a core that says it, and a way to look again (as the Check for updates of the top bar) -->
+			<div v-if="view && view.online" class="modules-online is-flex is-align-items-center is-size-7 _has-text-gray">
+				<!-- a list that cannot be read offers nothing: no sentence says where its versions come from, but the box can be asked again -->
+				<span v-if="onlineLine && view.ok" class="modules-online-note">{{ say(onlineLine) }}</span>
+				<b-tooltip :label="$t(TEXT.lookAgain)" position="is-left" type="is-dark">
+					<!-- aria-disabled, not disabled: a control that is disabled under the focus drops it outside the window; lookAgain refuses a second look itself -->
+					<button :aria-disabled="looking ? 'true' : undefined" :aria-label="$t(TEXT.lookAgain)" class="modules-look ml-1" type="button" @click="lookAgain(true)">
+						<b-icon :custom-class="looking ? 'mdi-spin' : ''" custom-size="mdi-18px" icon="refresh" />
+					</button>
+				</b-tooltip>
+			</div>
+
 			<p v-if="loading && !view" class="modules-loading">
 				{{ $t(TEXT.loading) }}
 			</p>
@@ -590,6 +602,7 @@ import {
 	modulePlanView,
 	moduleStatusFailure,
 	nextJobPoll,
+	onlineNote,
 	reasonMessage,
 } from './osModules'
 import events from '@/events/events'
@@ -623,6 +636,11 @@ export default {
 			view: null,
 			loading: false,
 			listError: null,
+			// how many lists loadList brought: a look for newer versions that answers after a later one is out of date
+			listSerial: 0,
+			// a look for newer versions is out (getModules with refresh): one at a time
+			looking: false,
+			lookAbort: null,
 			// the jobs the window knows of, by the name of the module: { view, followed, kind, dismissedAt }. A job that this window started is told until it
 			// starts another; one it only found is told when it is running or did not end well; a report that was read is put away until another job begins.
 			jobs: Object.create(null),
@@ -681,6 +699,10 @@ export default {
 		outage() {
 			return this.failure ? moduleOutage({ kind: this.failure, code: this.failureCode, elapsedMs: this.elapsedMs }) : null
 		},
+		// the sentence that says where the versions come from, or null
+		onlineLine() {
+			return onlineNote(this.view?.online, this.locale)
+		},
 		busyMessage() {
 			return reasonMessage('busy')
 		},
@@ -724,6 +746,7 @@ export default {
 		clearTimeout(this.retryTimer)
 		clearTimeout(this.discoveryTimer)
 		this.discovery?.abort()
+		this.lookAbort?.abort()
 		this.planTicket++
 		this.planAbort?.abort()
 		document.removeEventListener('visibilitychange', this.onVisibility)
@@ -771,6 +794,8 @@ export default {
 			await this.loadList()
 			if (this.view && !this.probed) {
 				this.probed = true
+				// once, in the background: the list is on the screen and its buttons work while the box looks
+				this.lookAgain(false)
 				await this.probeJobs()
 			}
 		},
@@ -797,7 +822,38 @@ export default {
 			}
 			this.listError = null
 			this.view = view
+			this.listSerial++
 			return true
+		},
+		// The box looks for a newer catalogue before it answers (up to 30 s). Nothing is said when it fails: the list on the screen stays. An answer that
+		// comes after a later list (the end of a job, Check again), or while one is being read, is older than it and is dropped; nothing touches an open
+		// confirmation.
+		async lookAgain(asked) {
+			if (this.looking || this.gone)
+				return
+			this.looking = true
+			if (asked)
+				this.announced = this.$t(TEXT.loading)
+			const serial = this.listSerial
+			const controller = typeof AbortController === 'function' ? new AbortController() : null
+			this.lookAbort = controller
+			let view = null
+			try {
+				view = listView((await this.$api.sys.getModules(true, controller?.signal))?.data?.data)
+			} catch {
+				// the list on the screen is still the box's list (a look given up when the window closed is one of these)
+			}
+			if (this.gone)
+				return
+			this.looking = false
+			this.lookAbort = null
+			// the region is emptied, so that the next look is announced again (the same words would change nothing in it)
+			if (asked && this.announced === this.$t(TEXT.loading))
+				this.announced = ''
+			if (view && serial === this.listSerial && !this.loading) {
+				this.view = view
+				this.listError = null
+			}
 		},
 		// The list at the end of a job says what is installed now, and the buttons depend on it: when it cannot be read it is read once more, later.
 		async refreshList() {
@@ -1328,6 +1384,33 @@ export default {
 .modules-dialog {
 	.modal-card-body {
 		overflow-wrap: anywhere;
+	}
+}
+
+// the Check for updates button of the top bar (TopBar.vue), with a ring for the keyboard
+.modules-look {
+	display: flex;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	opacity: 0.6;
+	cursor: pointer;
+
+	&:hover:not([aria-disabled="true"]),
+	&:focus-visible {
+		opacity: 1;
+	}
+
+	&:focus-visible {
+		outline: 2px solid currentColor;
+		outline-offset: 2px;
+	}
+
+	// while it looks: as a disabled button, the focus kept
+	&[aria-disabled="true"] {
+		opacity: 0.6;
+		cursor: default;
 	}
 }
 

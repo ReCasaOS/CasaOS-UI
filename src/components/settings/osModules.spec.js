@@ -28,11 +28,13 @@ import {
 	modulePlanView,
 	moduleStatusFailure,
 	nextJobPoll,
+	onlineNote,
 	reasonMessage,
 } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
+import pt from '@/assets/lang/pt_BR.json'
 
 // ---- the core's words, pinned here ----------------------------------------------------------------------------------------
 // These lists MIRROR the core (CasaOS pkg/modulecmd, pkg/osmodule, service/system_module.go): a code added to the core without a sentence in
@@ -2221,5 +2223,89 @@ describe('the language files', () => {
 	it('says the headline of an install and of a removal in French', () => {
 		expect(fr[JOB_TITLES.succeeded.install]).toBe('L\'installation de {module} est terminée.')
 		expect(fr[JOB_TITLES.succeeded.remove]).toBe('La suppression de {module} est terminée.')
+	})
+})
+
+describe('the list: where its versions come from', () => {
+	const online = value => listView(listRaw([moduleRaw()], { ok: true, online: value })).online
+
+	it('says nothing when the core says nothing, or says it as something that is not an object', () => {
+		expect(listView(listRaw()).online).toBeNull()
+		expect(online('x')).toBeNull()
+		expect(online([])).toBeNull()
+		expect(online(null)).toBeNull()
+	})
+
+	it('reads the catalogue it found, with its date', () => {
+		expect(online({ ok: true, serial: 2, generated: '2026-11-25T13:36:14Z' })).toEqual({ state: 'ok', at: '2026-11-25T13:36:14Z' })
+		expect(online({ ok: true })).toEqual({ state: 'ok', at: '' })
+	})
+
+	it.each([['none', 'none'], ['unreadable', 'unreadable'], ['invalid', 'unreadable'], ['off', 'off']])('reads the error %s as %s, with no date', (error, state) => {
+		expect(online({ ok: false, error, generated: '2026-11-25T13:36:14Z' })).toEqual({ state, at: '' })
+	})
+
+	it('knows no other state', () => {
+		expect(online({ ok: false, error: 'weird' })).toBeNull()
+		expect(online({ ok: false })).toBeNull()
+		expect(online({ ok: 'true' })).toBeNull()
+		expect(online({ ok: false, error: 5 })).toBeNull()
+		expect(online({ ok: false, error: '__proto__' })).toBeNull()
+	})
+
+	it('says it whether the catalogue is ok or not, and leaves the rest of the list as it was', () => {
+		const bad = listView(listRaw([moduleRaw()], { ok: false, error: 'unreadable', online: { ok: false, error: 'off' } }))
+		expect(bad).toMatchObject({ ok: false, error: 'unreadable', online: { state: 'off', at: '' } })
+		const good = listView(listRaw([moduleRaw()], { ok: true, online: { ok: false, error: 'none' } }))
+		expect(good.ok).toBe(true)
+		expect(good.modules).toHaveLength(1)
+	})
+
+	it('cleans the date it keeps', () => {
+		expect(online({ ok: true, generated: `2026‮${'x'.repeat(100)}` }).at.length).toBeLessThanOrEqual(40)
+	})
+})
+
+describe('the sentence that says where the versions come from', () => {
+	it('says the date of the catalogue it read', () => {
+		const note = onlineNote({ state: 'ok', at: '2026-11-25T13:36:14Z' }, 'en_us')
+		expect(note.key).toBe(TEXT.online.read)
+		expect(note.params.date).toBeTruthy()
+	})
+
+	it('says nothing rather than a sentence with a hole', () => {
+		expect(onlineNote({ state: 'ok', at: '' }, 'en_us')).toBeNull()
+		expect(onlineNote({ state: 'ok', at: 'yesterday' }, 'en_us')).toBeNull()
+	})
+
+	it.each(['none', 'unreadable', 'off'])('says %s with no parameter', (state) => {
+		expect(onlineNote({ state, at: '' }, 'en_us')).toEqual({ key: TEXT.online[state], params: {} })
+	})
+
+	it('says nothing for nothing', () => {
+		expect(onlineNote(null, 'en_us')).toBeNull()
+		expect(onlineNote(undefined, 'en_us')).toBeNull()
+		expect(onlineNote({ state: 'weird', at: '' }, 'en_us')).toBeNull()
+	})
+
+	it('has its sentences in the tables of the language files', () => {
+		for (const key of [...Object.values(TEXT.online), TEXT.lookAgain, TEXT.none, TEXT.catalogueBad, REASONS.catalogue])
+			expect(MODULE_KEYS).toContain(key)
+	})
+
+	it('says that ReCasaOS offers a module, not this release, now that the catalogue comes from the network', () => {
+		expect(TEXT.gone).toBe(REASONS.catalogue)
+		expect(CHECKS.catalogue).toBe('Offered by ReCasaOS')
+		expect(fr[CHECKS.catalogue]).toBe('Proposé par ReCasaOS')
+		for (const old of ['This release of ReCasaOS no longer offers this module.', 'Offered by this release'])
+			expect([en, fr, pt].map(table => Object.hasOwn(table, old)), old).toEqual([false, false, false])
+	})
+
+	it('has them in Brazilian Portuguese too', () => {
+		for (const key of [...Object.values(TEXT.online), TEXT.lookAgain, TEXT.none, TEXT.catalogueBad, REASONS.catalogue, CHECKS.catalogue, TEXT.gone]) {
+			expect(pt[key], key).toBeTruthy()
+			expect(pt[key], key).not.toBe(key)
+			expect(pt[key].match(/\{\w+\}/g) || [], key).toEqual(key.match(/\{\w+\}/g) || [])
+		}
 	})
 })

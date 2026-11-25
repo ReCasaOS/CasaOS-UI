@@ -689,6 +689,20 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 		}
 		return core(state.weather)
 	}
+	// the modules: virt installed and up to date, mcp offered. `refresh=1` finds a newer catalogue where virt has an update,
+	// which later reads keep. shortcut: answered at once, as handleGrid cannot wait; the core takes up to 30 s, so the spinning button is not seen here
+	if (verb === 'GET' && path === '/v1/sys/modules') {
+		state.modulesLooked ||= query.refresh === '1'
+		const looked = state.modulesLooked
+		const system = { supported: true, reasons: [] }
+		return core({
+			catalogue: { ok: true, online: { ok: true, serial: looked ? 3 : 2, generated: looked ? '2026-11-25T06:00:00Z' : '2026-11-20T06:00:00Z' } },
+			modules: [
+				{ name: 'virt', title: 'Virtual machines', description: 'Create and run virtual machines with libvirt and QEMU.', tier: 'core', tag: looked ? 'v0.2.6' : 'v0.2.5', catalogue: true, installed: { version: 'v0.2.5' }, system, ...(looked && { update: { available: true, installed: 'v0.2.5', latest: 'v0.2.6' } }) },
+				{ name: 'mcp', title: 'MCP', description: 'Lets an AI assistant read and act on this box, with tokens you give it.', tier: 'core', tag: 'v0.1.0', catalogue: true, installed: null, system },
+			],
+		})
+	}
 	if (verb === 'GET' && path === '/v1/sys/weather/places') {
 		return core([{ name: 'Vinhedo', region: 'São Paulo', country: 'Brazil', latitude: -23.03, longitude: -46.97 }])
 	}

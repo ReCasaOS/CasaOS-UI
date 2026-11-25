@@ -22,8 +22,9 @@
  * EXPORTS
  *
  *   The list
- *     listView(raw) -> { ok, error, modules } | null          null for what is not a list. `ok` is the catalogue's; when it is not, no module can be
+ *     listView(raw) -> { ok, error, online, modules } | null         null for what is not a list. `ok` is the catalogue's; when it is not, no module can be
  *                                                              installed (the ones that are installed can still be removed)
+ *       `online` is where the versions come from: { state: 'ok' | 'none' | 'unreadable' | 'off', at } or null. onlineNote(online, locale) says it.
  *       module: { name, title, description, tier: { id, label, sentence, raw } | null, tag, installed: { version } | null, supported,
  *                 reasons: [{ code, message }], broken, inCatalogue, update: { installed, latest } | null, canInstall, canUpdate, canRemove }
  *       `update` is there only when the core says an update is available AND the two tags say it too (the latest is strictly later than the
@@ -122,14 +123,22 @@ export function formatBytes(bytes, locale = 'en') {
 export const TEXT = {
 	heading: 'Modules',
 	loading: 'Reading the list of modules…',
-	none: 'No module is offered by this release.',
-	catalogueBad: 'The list of modules of this release could not be read.',
+	none: 'No module is offered.',
+	catalogueBad: 'The list of modules could not be read.',
+	lookAgain: 'Look for newer versions',
+	// where the versions come from (the catalogue the box fetched by itself, when its core says so)
+	online: {
+		read: 'Versions from the ReCasaOS catalogue of {date}.',
+		none: 'This box has not reached the catalogue of the modules yet. It offers the versions that came with ReCasaOS.',
+		unreadable: 'The catalogue of the modules kept on this box cannot be read. It offers the versions that came with ReCasaOS.',
+		off: 'The catalogue of the modules is turned off on this box. It offers the versions that came with ReCasaOS.',
+	},
 	installed: 'Installed version',
 	installedUnknown: 'Installed, version not known',
 	offered: 'Version offered',
 	unsupported: 'This machine cannot have this module.',
 	broken: 'The record of this module cannot be read. Remove the module, then install it again.',
-	gone: 'This release of ReCasaOS no longer offers this module.',
+	gone: 'ReCasaOS no longer offers this module.',
 	jobRunning: 'A job is running. The buttons come back when it ends. Closing this window does not stop it: open the window again to see how it goes.',
 	checking: 'Looking for a job that is already running…',
 	reported: 'Reported by ReCasaOS',
@@ -277,7 +286,7 @@ export const REASONS = {
 	start_failed: { text: 'ReCasaOS could not start the job. Nothing was changed.', steps: { start: 'The service of the module would not start.' } },
 	internal: 'The request could not be carried out.',
 	// the checks of the plan, and the refusals of its disk and apt checks (pkg/osmodule/plan.go)
-	catalogue: 'This release of ReCasaOS does not offer this module.',
+	catalogue: 'ReCasaOS no longer offers this module.',
 	os: 'This operating system is not one that the module supports.',
 	arch: 'The module has no version for this kind of processor.',
 	recasaos: 'This release of ReCasaOS is too old for the module. Update ReCasaOS first.',
@@ -352,7 +361,7 @@ export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 
 // pkg/osmodule/plan.go Check*, in the order the plan lists them: the topic of each, said before the mark that tells whether it passed
 export const CHECKS = {
-	catalogue: 'Offered by this release',
+	catalogue: 'Offered by ReCasaOS',
 	os: 'Operating system',
 	arch: 'Processor',
 	recasaos: 'Release of ReCasaOS',
@@ -511,6 +520,30 @@ function moduleView(raw, catalogueOk) {
 	}
 }
 
+// The catalogue the box fetched by itself (`catalogue.online`), as { state, at }: null for what a core that does not say it, or this code, does not know.
+// 'invalid' is a catalogue that is there and cannot be used: said as unreadable.
+const ONLINE_ERRORS = { none: 'none', unreadable: 'unreadable', invalid: 'unreadable', off: 'off' }
+function onlineOf(raw) {
+	if (!isPlain(raw))
+		return null
+	if (raw.ok === true)
+		return { state: 'ok', at: clean(raw.generated, 40) }
+	const state = own(ONLINE_ERRORS, raw.error)
+	return state ? { state, at: '' } : null
+}
+
+/** The sentence that says where the versions come from, { key, params } or null: a date it cannot write is no sentence. */
+export function onlineNote(online, locale) {
+	if (!isPlain(online))
+		return null
+	if (online.state === 'ok') {
+		const date = formatMoment(online.at, locale)
+		return date ? { key: TEXT.online.read, params: { date } } : null
+	}
+	const key = own(TEXT.online, online.state)
+	return key ? { key, params: {} } : null
+}
+
 /**
  * The list the core answers: the catalogue of this release joined with what is installed. A catalogue that is not ok offers nothing to install
  * (the core says an empty list, and the dashboard says so whatever it is sent), but what is installed can still be removed. null for something that
@@ -528,7 +561,7 @@ export function listView(raw) {
 		seen.add(item.name)
 		return true
 	})
-	return { ok, error: ok ? '' : clean(catalogue.error, 20), modules: ok ? modules : modules.filter(item => item.canRemove) }
+	return { ok, error: ok ? '' : clean(catalogue.error, 20), online: onlineOf(catalogue.online), modules: ok ? modules : modules.filter(item => item.canRemove) }
 }
 
 // ---- the plan -----------------------------------------------------------------------------------------------------------

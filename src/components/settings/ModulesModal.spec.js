@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, reasonMessage } from './osModules'
+import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, onlineNote, reasonMessage } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -77,7 +77,9 @@ const refused = (error_code, data, code = 409) => ({ response: { status: code, d
 
 // ---- the mocked client --------------------------------------------------------------------------------------------------
 
-const calls = Object.fromEntries(['getModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus'].map(name => [name, vi.fn()]))
+// `lookModules` is getModules(true), the look for newer versions: kept apart, so that `getModules` counts the readings of the list as it always did
+const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus'].map(name => [name, vi.fn()]))
+const sys = { ...calls, getModules: (refresh, signal) => refresh ? calls.lookModules(refresh, signal) : calls.getModules() }
 let wrapper
 
 const answer = data => Promise.resolve({ data: { success: 200, message: 'ok', data } })
@@ -120,7 +122,7 @@ async function open(list = listRaw(), options = {}) {
 		calls.getModules.mockImplementation(() => answer(list))
 	wrapper = mount(ModulesModal, {
 		attachTo: document.body,
-		global: { plugins: [Buefy, i18n], mocks: { $api: { sys: calls }, $EventBus: eventBus } },
+		global: { plugins: [Buefy, i18n], mocks: { $api: { sys }, $EventBus: eventBus } },
 		...options,
 	})
 	await settle()
@@ -157,6 +159,8 @@ beforeEach(() => {
 	for (const fn of [...Object.values(calls), copy])
 		fn.mockReset()
 	calls.planModule.mockImplementation(() => answer(planRaw()))
+	// the look for newer versions answers what the list answers, unless a test says otherwise
+	calls.lookModules.mockImplementation(() => calls.getModules.getMockImplementation()?.())
 	calls.installModule.mockImplementation(() => answer(jobAnswer({ state: 'running', step: '' })))
 	calls.removeModule.mockImplementation(() => answer(jobAnswer({ state: 'running', step: '' })))
 	serveJob(IDLE)
@@ -248,7 +252,7 @@ describe('the list of modules', () => {
 	it('says a module that the catalogue no longer has, and offers to remove it', async () => {
 		await open(listRaw([moduleRaw({ catalogue: false, tier: '', tag: '', installed: { version: 'v0.1.0' }, system: { supported: false, reasons: ['catalogue'] } })]))
 
-		expect(text('.modules-gone')).toBe('This release of ReCasaOS no longer offers this module.')
+		expect(text('.modules-gone')).toBe('ReCasaOS no longer offers this module.')
 		expect(wrapper.find('.modules-unsupported').exists()).toBe(false)
 		expect(wrapper.find('.modules-remove').exists()).toBe(true)
 		expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -258,7 +262,7 @@ describe('the list of modules', () => {
 		it('says that nothing is offered, and nothing else', async () => {
 			await open(listRaw([], { ok: false, error: 'none' }))
 
-			expect(text('.modules-none')).toBe('No module is offered by this release.')
+			expect(text('.modules-none')).toBe('No module is offered.')
 			expect(wrapper.find('.modules-card').exists()).toBe(false)
 			expect(wrapper.find('.modules-catalogue-bad').exists()).toBe(false)
 			expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -268,8 +272,8 @@ describe('the list of modules', () => {
 		it.each(['unreadable', 'invalid'])('says it, with the code small beside it, when the catalogue is %s', async (error) => {
 			await open(listRaw([], { ok: false, error }))
 
-			expect(text('.modules-none')).toBe('No module is offered by this release.')
-			expect(text('.modules-catalogue-bad')).toBe(`The list of modules of this release could not be read. ${error}`)
+			expect(text('.modules-none')).toBe('No module is offered.')
+			expect(text('.modules-catalogue-bad')).toBe(`The list of modules could not be read. ${error}`)
 		})
 
 		it('offers nothing to install even when the core lists modules, and keeps the ones that are installed', async () => {
@@ -3034,5 +3038,288 @@ describe('the update of an installed module', () => {
 			expect(wrapper.find('.modules-log img').exists()).toBe(false)
 			expect(text('.modules-log-text')).toContain('<img src=x onerror=alert(1)>')
 		})
+	})
+})
+
+// ---- where the versions come from ---------------------------------------------------------------------------------------------
+
+describe('the look for newer versions', () => {
+	const GENERATED = '2026-11-20T08:00:00Z'
+	// a core that fetched the catalogue by itself, and says so
+	const online = (modules = [moduleRaw()], state = { ok: true, serial: 2, generated: GENERATED }) => listRaw(modules, { ok: true, online: state })
+	const installed = (changes = {}) => moduleRaw({ installed: { version: 'v0.1.0' }, ...changes })
+	// the same module, with a later version in the catalogue the look brought
+	const newer = () => installed({ tag: 'v0.2.0', update: { available: true, installed: 'v0.1.0', latest: 'v0.2.0' } })
+	const look = () => wrapper.find('.modules-look')
+	const sentence = (state, at = '') => {
+		const note = onlineNote({ state, at }, 'en_us')
+		return i18n.global.t(note.key, note.params)
+	}
+
+	it('shows the list it read, and then asks once, in the background, for newer versions', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online([installed()]))
+
+		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(calls.getModules).toHaveBeenCalledWith()
+		expect(calls.lookModules).toHaveBeenCalledTimes(1)
+		expect(calls.lookModules).toHaveBeenCalledWith(true, expect.any(AbortSignal))
+		expect(calls.getModules.mock.invocationCallOrder[0]).toBeLessThan(calls.lookModules.mock.invocationCallOrder[0])
+		// the list is there before the look answers, and its buttons work
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		expect(wrapper.find('.modules-remove').attributes('disabled')).toBeUndefined()
+		expect(look().attributes('aria-disabled')).toBe('true')
+		expect(wrapper.find('.modules-look .mdi-spin').exists()).toBe(true)
+		// the look at the opening is not announced
+		expect(text('.modules-live')).toBe('')
+		await tick(120000)
+		expect(calls.lookModules).toHaveBeenCalledTimes(1)
+	})
+
+	it('shows the list the look brought, with the update it offers, and leaves the focus where it was', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online([installed()]))
+		expect(wrapper.find('.modules-update-badge').exists()).toBe(false)
+		const focused = document.activeElement
+
+		out.resolve({ data: { data: online([newer()]) } })
+		await settle()
+
+		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
+		expect(wrapper.find('.modules-update-button').exists()).toBe(true)
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+		expect(wrapper.find('.modules-look .mdi-spin').exists()).toBe(false)
+		expect(document.activeElement).toBe(focused)
+		expect(calls.getModules).toHaveBeenCalledTimes(1)
+	})
+
+	it('says nothing and offers no button on an older core, which is still asked once and changes nothing', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(listRaw([installed()]))
+		const before = wrapper.find('.modal-card-body').html()
+
+		expect(wrapper.find('.modules-online').exists()).toBe(false)
+		expect(look().exists()).toBe(false)
+		expect(calls.lookModules).toHaveBeenCalledWith(true, expect.any(AbortSignal))
+
+		out.resolve({ data: { data: listRaw([installed()]) } })
+		await settle()
+		expect(wrapper.find('.modal-card-body').html()).toBe(before)
+		expect(calls.lookModules).toHaveBeenCalledTimes(1)
+	})
+
+	it('gives the look up when the window closes, and writes nothing after', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online([installed()]))
+		const signal = calls.lookModules.mock.calls[0][1]
+		expect(signal.aborted).toBe(false)
+		const vm = wrapper.vm
+		const view = vm.view
+		close()
+
+		expect(signal.aborted).toBe(true)
+		out.reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }))
+		await settle()
+		expect(vm.view).toBe(view)
+		expect(vm.looking).toBe(true)
+	})
+
+	it.each([
+		['read', { ok: true, serial: 2, generated: GENERATED }],
+		['not read', { ok: false, error: 'none' }],
+	])('says no source for its versions when the list cannot be read (catalogue %s), and keeps the button', async (_, state) => {
+		await open(listRaw([installed()], { ok: false, error: 'unreadable', online: state }))
+
+		expect(wrapper.find('.modules-online-note').exists()).toBe(false)
+		expect(look().exists()).toBe(true)
+		expect(text('.modules-none')).toBe(TEXT.none)
+		expect(text('.modules-catalogue-bad')).toBe(`${TEXT.catalogueBad} unreadable`)
+	})
+
+	it('writes nothing when the window was closed before the look answered', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online([installed()]))
+		const vm = wrapper.vm
+		const view = vm.view
+		close()
+
+		out.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(vm.view).toBe(view)
+		expect(vm.looking).toBe(true)
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('ignores a look that answers after a later reading of the list, made when Check again was pressed', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online())
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		// the machine installed the module meanwhile: the reading of Check again says so
+		calls.getModules.mockImplementation(() => answer(online([installed()])))
+		await press('.modules-busy-retry')
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+
+		// the look was asked before, and brings the list as it was then
+		out.resolve({ data: { data: online([moduleRaw({ tag: 'v0.2.0' })]) } })
+		await settle()
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		expect(wrapper.find('.modules-offered').exists()).toBe(false)
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+	})
+
+	it('ignores a look that answers while a later reading of the list is out, and shows that reading', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online())
+		await installDialog()
+		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		const reading = deferred()
+		calls.getModules.mockReturnValue(reading.promise)
+		await press('.modules-busy-retry')
+
+		out.resolve({ data: { data: online([moduleRaw({ tag: 'v0.2.0' })]) } })
+		await settle()
+		expect(text('.modules-offered')).toBe('Version offered: v0.1.0')
+
+		reading.resolve({ data: { data: online([installed()]) } })
+		await settle()
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+	})
+
+	it('takes away the sentence that the list could not be read when a look brings it', async () => {
+		await open(online([installed()]))
+		await press('.modules-remove')
+		calls.removeModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
+		await press('.modules-dialog-ok')
+		await press('.modules-dialog-cancel')
+		calls.getModules.mockImplementation(failure({ response: { status: 502 } }))
+		await press('.modules-busy-retry')
+		expect(wrapper.find('.modules-list-error').exists()).toBe(true)
+
+		calls.lookModules.mockImplementation(() => answer(online([newer()])))
+		await press('.modules-look')
+		expect(wrapper.find('.modules-list-error').exists()).toBe(false)
+		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
+	})
+
+	it('says nothing when the look fails or gets no answer, keeps the list, and lets it be asked again', async () => {
+		calls.lookModules.mockImplementation(failure({ response: { status: 502 } }))
+		await open(online([installed()]))
+
+		expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+
+		calls.lookModules.mockImplementation(failure({ code: 'ECONNABORTED', message: 'timeout of 35000ms exceeded' }))
+		await press('.modules-look')
+		expect(calls.lookModules).toHaveBeenCalledTimes(2)
+		expect(wrapper.findAll('[role="alert"]')).toHaveLength(0)
+		expect(wrapper.find('.modules-list-error').exists()).toBe(false)
+		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+	})
+
+	it('leaves an open confirmation as it was, with its module and its plan, when the look answers', async () => {
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		await open(online())
+		await installDialog()
+		const title = text('.modules-dialog-title')
+		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+
+		out.resolve({ data: { data: online([moduleRaw({ tag: 'v0.2.0', title: 'Other title' })]) } })
+		await settle()
+		expect(dialog().exists()).toBe(true)
+		expect(text('.modules-dialog-title')).toBe(title)
+		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+
+		await press('.modules-dialog-ok')
+		expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID })
+	})
+
+	it('has a button with a name, which asks once at a time and announces each look once', async () => {
+		await open(online([installed()]))
+		const button = look()
+		expect(button.element.tagName).toBe('BUTTON')
+		expect(button.attributes('type')).toBe('button')
+		expect(button.attributes('aria-label')).toBe(TEXT.lookAgain)
+		expect(calls.lookModules).toHaveBeenCalledTimes(1)
+
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		// two clicks before the page is drawn again: the second finds a look already out
+		button.trigger('click')
+		button.trigger('click')
+		await settle()
+		expect(calls.lookModules).toHaveBeenCalledTimes(2)
+		expect(calls.lookModules).toHaveBeenLastCalledWith(true, expect.any(AbortSignal))
+		expect(look().attributes('aria-disabled')).toBe('true')
+		expect(look().attributes('disabled')).toBeUndefined()
+		expect(text('.modules-live')).toBe(TEXT.loading)
+		// a press while the look is out asks nothing
+		await press('.modules-look')
+		expect(calls.lookModules).toHaveBeenCalledTimes(2)
+
+		out.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(look().attributes('aria-disabled')).toBeUndefined()
+		expect(text('.modules-live')).toBe('')
+		expect(text('.modules-update-badge')).toBe('Version v0.2.0 available')
+
+		// the next look is announced again
+		const again = deferred()
+		calls.lookModules.mockReturnValue(again.promise)
+		await press('.modules-look')
+		expect(calls.lookModules).toHaveBeenCalledTimes(3)
+		expect(text('.modules-live')).toBe(TEXT.loading)
+		again.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(text('.modules-live')).toBe('')
+	})
+
+	it('keeps the focus on the button while it looks and after the answer', async () => {
+		await open(online([installed()]))
+		const out = deferred()
+		calls.lookModules.mockReturnValue(out.promise)
+		look().element.focus()
+		await press('.modules-look')
+		expect(document.activeElement).toBe(look().element)
+
+		out.resolve({ data: { data: online([newer()]) } })
+		await settle()
+		expect(document.activeElement).toBe(look().element)
+	})
+
+	it('says where the versions come from, in each of the four states', async () => {
+		for (const [state, raw] of [
+			['ok', { ok: true, serial: 2, generated: GENERATED }],
+			['none', { ok: false, error: 'none' }],
+			['unreadable', { ok: false, error: 'unreadable' }],
+			['off', { ok: false, error: 'off' }],
+		]) {
+			await open(online([installed()], raw))
+			expect(text('.modules-online-note')).toBe(sentence(state, GENERATED))
+			expect(wrapper.find('.modules-online').classes()).toEqual(expect.arrayContaining(['is-size-7', '_has-text-gray']))
+			expect(look().exists()).toBe(true)
+			close()
+		}
+	})
+
+	it('shows the button with no sentence when the date of the catalogue cannot be written', async () => {
+		await open(online([installed()], { ok: true, serial: 2, generated: 'not a date' }))
+
+		expect(wrapper.find('.modules-online-note').exists()).toBe(false)
+		expect(look().exists()).toBe(true)
 	})
 })
