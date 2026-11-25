@@ -14,6 +14,7 @@ import UpdateModal from './settings/UpdateModal.vue'
 import LogsSettingsModal from './settings/LogsSettingsModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
+import pt from '@/assets/lang/pt_BR.json'
 import createEventBus from '@/events/eventBus'
 import events from '@/events/events'
 import { fleetApi } from '@/service/fleet'
@@ -537,6 +538,73 @@ describe('the modules row', () => {
 
 		expect(vm.modulesAvailable).toBe(false)
 		expect(source).toMatch(/<div v-if="modulesAvailable"/)
+	})
+
+	// How many updates the row and the settings icon announce.
+	const full = (name, installed, tag, update) => ({
+		name,
+		title: name,
+		tier: 'core',
+		tag,
+		catalogue: true,
+		installed: installed ? { version: installed } : null,
+		system: { supported: true, reasons: [] },
+		...(update ? { update: { available: true, installed, latest: tag } } : {}),
+	})
+	async function counts(modules, catalogue = { ok: true }) {
+		const vm = bar({ getModules: vi.fn(() => Promise.resolve({ data: { success: 200, data: { catalogue, modules } } })) })
+		vm.moduleUpdates = 0
+
+		vm.getModules()
+		await flushPromises()
+
+		return vm.moduleUpdates
+	}
+
+	it('counts the installed modules that have a later version waiting', async () => {
+		expect(await counts([full('mcp', 'v0.2.0', 'v0.2.1', true), full('virt', 'v0.2.6', 'v0.2.6', false)])).toBe(1)
+		expect(await counts([full('mcp', 'v0.2.0', 'v0.2.1', true), full('virt', 'v0.2.5', 'v0.2.6', true)])).toBe(2)
+	})
+
+	it('counts nothing for a module that is not installed, or that is up to date', async () => {
+		expect(await counts([full('mcp', null, 'v0.2.1', false), full('virt', 'v0.2.6', 'v0.2.6', false)])).toBe(0)
+	})
+
+	it('counts nothing when the list cannot be read, or the call fails', async () => {
+		expect(await counts([full('mcp', 'v0.2.0', 'v0.2.1', true)], { ok: false, error: 'unreadable' })).toBe(0)
+
+		const vm = bar({ getModules: vi.fn(() => Promise.reject(new Error('404'))) })
+		vm.moduleUpdates = 0
+		vm.getModules()
+		await flushPromises()
+		expect(vm.moduleUpdates).toBe(0)
+	})
+
+	it('puts a dot on the settings icon and on the row, and says how many updates wait', () => {
+		expect(source).toMatch(/'update-icon-dot': updateInfo\.need_update \|\| moduleUpdates > 0/)
+		expect(source).toMatch(/'update-text-dot': moduleUpdates > 0/)
+		expect(source).toMatch(/moduleUpdates === 1 \? \$t\("1 update"\) : \$t\("\{n\} updates", \{ n: moduleUpdates \}\)/)
+	})
+
+	it('asks again when the Modules window closes, by its button or from outside', () => {
+		const vm = bar({ getModules: vi.fn(() => Promise.resolve({ data: { success: 200, data: { catalogue: { ok: true }, modules: [] } } })) })
+
+		vm.showModules()
+		const opened = vm.$buefy.modal.open.mock.calls[0][0]
+		opened.onCancel()
+		opened.events.close()
+
+		expect(vm.$api.sys.getModules).toHaveBeenCalledTimes(2)
+	})
+
+	it('has the two sentences in French and in Brazilian Portuguese', () => {
+		for (const lang of [fr, pt]) {
+			expect(lang['1 update']).toBeTruthy()
+			expect(lang['1 update']).not.toBe('1 update')
+			expect(lang['{n} updates']).toContain('{n}')
+		}
+		expect(en['1 update']).toBe('1 update')
+		expect(en['{n} updates']).toBe('{n} updates')
 	})
 
 	it('asks the core when the bar mounts', () => {

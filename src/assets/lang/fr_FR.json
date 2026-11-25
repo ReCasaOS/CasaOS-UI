@@ -2250,6 +2250,8 @@
   "Bring it up to date": "Mettre à jour",
   "Failed to perform power operation.": "Le redémarrage ou l'arrêt de la machine a échoué.",
   "Modules": "Modules",
+  "1 update": "1 mise à jour",
+  "{n} updates": "{n} mises à jour",
   "Reading the list of modules…": "Lecture de la liste des modules…",
   "No module is offered.": "Aucun module n'est proposé.",
   "The list of modules could not be read.": "La liste des modules n'a pas pu être lue.",

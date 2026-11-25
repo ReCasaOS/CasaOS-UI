@@ -2250,6 +2250,8 @@
   "Bring it up to date": "Bring it up to date",
   "Failed to perform power operation.": "Failed to perform power operation.",
   "Modules": "Modules",
+  "1 update": "1 update",
+  "{n} updates": "{n} updates",
   "Reading the list of modules…": "Reading the list of modules…",
   "No module is offered.": "No module is offered.",
   "The list of modules could not be read.": "The list of modules could not be read.",
