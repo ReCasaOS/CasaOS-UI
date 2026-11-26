@@ -2364,6 +2364,7 @@
   "This module is ReCasaOS's own: its updates follow the general setting.": "Este módulo é do próprio ReCasaOS: as atualizações dele seguem o ajuste geral.",
   "The catalogue cannot be read now: try again later.": "O catálogo não pode ser lido agora: tente novamente mais tarde.",
   "ReCasaOS withdrew this version from the catalogue: {reason}": "O ReCasaOS retirou esta versão do catálogo: {reason}",
+  "ReCasaOS withdrew this version from the catalogue.": "O ReCasaOS retirou esta versão do catálogo.",
   "Not withdrawn from the catalogue": "Versão não retirada do catálogo",
   "Unknown kind": "Tipo desconhecido",
   "This page does not know this kind of module. ReCasaOS has not proved it.": "Esta página não conhece este tipo de módulo. O ReCasaOS não o comprovou.",

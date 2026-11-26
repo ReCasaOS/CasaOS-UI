@@ -364,6 +364,8 @@ export const REASONS = {
 }
 // The refusals of the switch of the night that say another thing than the same code does elsewhere (the catalogue of the install is not offering the module; here it cannot be read)
 export const AUTO_UPDATE_REASONS = { catalogue: 'The catalogue cannot be read now: try again later.' }
+// a withdrawn version whose reason nobody gave: no colon, nothing after it
+export const REASON_WITHDRAWN_BARE = 'ReCasaOS withdrew this version from the catalogue.'
 export const REASON_UNKNOWN = 'ReCasaOS gave a reason that this page does not know: {code}.'
 
 /** The sentence of a code. `step` is the step of a job (start_failed depends on it), `kind` the kind of the job or of the plan (files_unreadable depends on it), `data` the core's data of a refusal. */
@@ -378,7 +380,11 @@ export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 	if (isPlain(entry))
 		return msg(own(entry.steps ?? {}, step) ?? own(entry.kinds ?? {}, kind) ?? entry.text)
 	// the reason of a withdrawal is the catalogue's text, whole up to the 200 characters the core allows
-	return code === 'withdrawn' ? msg(entry, { reason: clean(isPlain(data) ? data.reason : '', 200) }) : msg(entry)
+	if (code === 'withdrawn') {
+		const reason = clean(isPlain(data) ? data.reason : '', 200)
+		return reason ? msg(entry, { reason }) : msg(REASON_WITHDRAWN_BARE)
+	}
+	return msg(entry)
 }
 
 // ---- the checks of the plan ---------------------------------------------------------------------------------------------
@@ -468,8 +474,11 @@ function checkView(raw, refused, locale, kind = '') {
 const MARK_ORDER = { failed: 0, notChecked: 1, passed: 2 }
 
 // The sentence of a plan that was refused, or of a call that was refused with the code of a check: the check says more for a release that is not known.
-function refusalMessage(refused, checks, kind = '') {
-	if (refused === 'recasaos' || refused === 'withdrawn') {
+function refusalMessage(refused, checks, kind = '', data = {}) {
+	// the reason of a withdrawal: the failed check's, else the refusal's own
+	if (refused === 'withdrawn')
+		return reasonMessage(refused, { data: { reason: checks.find(check => check.code === refused && check.mark === 'failed')?.detail || data.reason } })
+	if (refused === 'recasaos') {
 		const failed = checks.find(check => check.code === refused && check.mark === 'failed')
 		if (failed?.message)
 			return failed.message
@@ -522,7 +531,7 @@ function updateOf(raw, installed) {
 const OWNER = /^[A-Z0-9](?:[A-Z0-9-]{0,37}[A-Z0-9])?$/i
 const REPO = /^[A-Z][\w.-]{0,63}$/i
 function originOf(raw) {
-	if (raw.repository === undefined && raw.foreign === undefined)
+	if ((raw.repository ?? null) === null && (raw.foreign ?? null) === null)
 		return null
 	const [owner, repo, ...rest] = typeof raw.repository === 'string' ? raw.repository.split('/') : []
 	const good = rest.length === 0 && OWNER.test(owner ?? '') && REPO.test(repo ?? '')
@@ -1130,7 +1139,7 @@ export function moduleFailure(error, locale = 'en_us', { read = false, mutating 
 	const data = isPlain(body) && isPlain(body.data) ? body.data : {}
 	const all = list(data.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, base.code, locale, mode))
 	const items = all.filter(check => check.mark === 'failed').map(check => ({ code: check.code, message: check.message }))
-	const message = base.code === 'recasaos' || base.code === 'withdrawn' ? refusalMessage(base.code, all, mode) : reasonMessage(base.code, { data, kind: mode })
+	const message = base.code === 'recasaos' || base.code === 'withdrawn' ? refusalMessage(base.code, all, mode, data) : reasonMessage(base.code, { data, kind: mode })
 	const busy = base.code === 'busy' ? (all.find(check => check.code === 'busy' && check.mark === 'failed')?.detailMessage ?? null) : null
 	return { kind: 'refusal', status: base.status, code: base.code, message, items, detail: base.code === 'busy' ? line(data.reason, 200) : '', busy, unhold: holdOf(all, base.code) }
 }
@@ -1158,6 +1167,7 @@ export const MODULE_KEYS = [...new Set([
 	...strings(TIER_UNKNOWN),
 	...strings(REASONS),
 	...strings(AUTO_UPDATE_REASONS),
+	REASON_WITHDRAWN_BARE,
 	REASON_UNKNOWN,
 	...strings(CHECKS),
 	CHECK_UNKNOWN,

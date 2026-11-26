@@ -13,6 +13,7 @@ import {
 	PLAN_ID,
 	REASONS,
 	REASON_UNKNOWN,
+	REASON_WITHDRAWN_BARE,
 	ROLLBACK,
 	STEPS,
 	STEP_MARKS,
@@ -414,7 +415,7 @@ describe('the view of the plan', () => {
 		const view = plan({ refused: code, plan_id: '' })
 		expect(view.installable).toBe(false)
 		expect(view.refused).toBe(code)
-		expect(view.refusedMessage.key).toBe(REASONS[code])
+		expect(view.refusedMessage.key).toBe(code === 'withdrawn' ? REASON_WITHDRAWN_BARE : REASONS[code])
 	})
 
 	it('cannot install a plan that is refused, whatever else is in it', () => {
@@ -1464,7 +1465,7 @@ describe('the failure of a call', () => {
 	it.each(PLAN_REFUSALS)('says the refusal %s of the install in its sentence and lists the checks that failed', (code) => {
 		const checks = [{ code: 'os', ok: false, detail: 'x' }, { code: 'arch', ok: true, detail: '' }, { code: 'busy', ok: false, detail: 'not_checked' }]
 		const failure = moduleFailure(refusal(code, { checks }))
-		expect(failure.message.key).toBe(REASONS[code])
+		expect(failure.message.key).toBe(code === 'withdrawn' ? REASON_WITHDRAWN_BARE : REASONS[code])
 		expect(failure.items.map(item => item.code)).toEqual(['os'])
 		expect(failure.items[0].message.key).toBe(REASONS.os)
 	})
@@ -2444,5 +2445,48 @@ describe('the sentences for the switch of the night and the tier community', () 
 				expect(lang[key], key).toBeTruthy()
 			expect(en[key]).toBe(key)
 		}
+	})
+})
+
+describe('fix round 1: a withdrawn version is said with its reason, whatever the refusal carries', () => {
+	const reason = 'It loses the data of its disks.'
+	const said = { key: REASONS.withdrawn, params: { reason } }
+	const bare = { key: REASON_WITHDRAWN_BARE, params: {} }
+	const withdrawnCheck = detail => ({ code: 'withdrawn', ok: false, detail })
+
+	it('takes the reason of data.reason when the refusal lists no checks', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason }), 'en_us').message).toEqual(said)
+	})
+
+	it('takes it from data.reason when the checks lack the withdrawn item, or it passed', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason, checks: [{ code: 'catalogue', ok: true }] }), 'en_us').message).toEqual(said)
+		expect(moduleFailure(refusal('withdrawn', { reason, checks: [{ code: 'withdrawn', ok: true }] }), 'en_us').message).toEqual(said)
+	})
+
+	it('prefers the detail of the failed withdrawn check', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason: 'other', checks: [withdrawnCheck(reason)] }), 'en_us').message).toEqual(said)
+	})
+
+	it('says a sentence with no colon when nothing gives a reason', () => {
+		expect(moduleFailure(refusal('withdrawn', { checks: [withdrawnCheck('')] }), 'en_us').message).toEqual(bare)
+		expect(moduleFailure(refusal('withdrawn', { reason: '  ' }), 'en_us').message).toEqual(bare)
+		expect(moduleFailure(refusal('withdrawn', {}), 'en_us').message).toEqual(bare)
+		expect(REASON_WITHDRAWN_BARE).not.toContain(':')
+	})
+
+	it('says the same on the plan path, with an empty detail', () => {
+		const checks = [{ code: 'catalogue', ok: true }, withdrawnCheck('')]
+		const view = plan({ checks, refused: 'withdrawn' })
+		expect(view.refusedMessage).toEqual(bare)
+		expect(view.checks.find(item => item.code === 'withdrawn').message).toEqual(bare)
+	})
+
+	it.each([[{}], [{ repository: null }], [{ foreign: null }], [{ repository: null, foreign: null }]])('gives no origin for %j', (changes) => {
+		expect(listView(listRaw([moduleRaw(changes)])).modules[0].origin).toBeNull()
+	})
+
+	it('says the catalogue of the switch of the night with mode autoUpdate, and the offer of the module without', () => {
+		expect(moduleFailure(refusal('catalogue', {}), 'en_us', { mode: 'autoUpdate' }).message.key).toBe(AUTO_UPDATE_REASONS.catalogue)
+		expect(moduleFailure(refusal('catalogue', {}), 'en_us').message.key).toBe(REASONS.catalogue)
 	})
 })

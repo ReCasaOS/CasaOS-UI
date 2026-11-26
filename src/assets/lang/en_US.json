@@ -2364,6 +2364,7 @@
   "This module is ReCasaOS's own: its updates follow the general setting.": "This module is ReCasaOS's own: its updates follow the general setting.",
   "The catalogue cannot be read now: try again later.": "The catalogue cannot be read now: try again later.",
   "ReCasaOS withdrew this version from the catalogue: {reason}": "ReCasaOS withdrew this version from the catalogue: {reason}",
+  "ReCasaOS withdrew this version from the catalogue.": "ReCasaOS withdrew this version from the catalogue.",
   "Not withdrawn from the catalogue": "Not withdrawn from the catalogue",
   "Unknown kind": "Unknown kind",
   "This page does not know this kind of module. ReCasaOS has not proved it.": "This page does not know this kind of module. ReCasaOS has not proved it.",
