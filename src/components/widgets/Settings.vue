@@ -24,7 +24,7 @@
 						item-key="name" tag="div" @end="handleInput">
 						<template #item="{ element: item, index }">
 							<div class="is-flex is-align-items-center item">
-								<span :aria-label="$t('Move {name} up or down with the arrow keys', { name: $t(getTitle(item.name)) })"
+								<span :aria-label="$t('Move {name} up or down with the arrow keys', { name: label(item.name) })"
 									:title="$t('Drag to reorder')" class="drag-handle mr-2" role="button" tabindex="0"
 									@keydown.down.prevent="move(index, 1)" @keydown.up.prevent="move(index, -1)">
 									<span class="dot"></span><span class="dot"></span>
@@ -33,7 +33,7 @@
 								</span>
 								<div class="is-flex is-align-items-center is-flex-grow-1">
 									<b-icon :icon="getIcon(item.name)" class="mr-2" pack="casa"></b-icon>
-									<b>{{ $t(getTitle(item.name)) }}</b>
+									<b>{{ label(item.name) }}</b>
 								</div>
 								<b-field>
 									<b-switch v-model="item.show" class="is-flex-direction-row-reverse mr-0" size="is-small"
@@ -65,6 +65,7 @@
 
 <script>
 import find from 'lodash/find'
+import isEqual from 'lodash/isEqual'
 import draggable from 'vuedraggable'
 import shippedWidgets from './shippedWidgets'
 import { moveWidget, resetWidgetOrder } from './widgetOrder'
@@ -76,6 +77,8 @@ export default {
 	},
 	props: {
 		modelValue: Array,
+		// the cards of the modules that exist now: { 'module:<name>': { title, icon } }
+		moduleInfo: { type: Object, default: () => ({}) },
 	},
 	data() {
 		return {
@@ -96,6 +99,11 @@ export default {
 	},
 
 	watch: {
+		// the cards of the modules come after the widgets
+		modelValue(value) {
+			if (!isEqual(value, this.settingsData))
+				this.settingsData = JSON.parse(JSON.stringify(value))
+		},
 		settingsData: {
 			handler() {
 				let offsetTop = 0
@@ -121,10 +129,11 @@ export default {
 	},
 	methods: {
 		getIcon(value) {
-			return find(shippedWidgets, o => o.name === value).icon
+			return this.moduleInfo[value]?.icon ?? find(shippedWidgets, o => o.name === value).icon
 		},
-		getTitle(value) {
-			return find(shippedWidgets, o => o.name === value).title
+		// the title of a module is the module's own text: shown as it is, and never looked up as a key
+		label(value) {
+			return this.moduleInfo[value]?.title ?? this.$t(find(shippedWidgets, o => o.name === value).title)
 		},
 		// The arrow keys on a handle do what dragging it does, for whoever does not
 		// use a mouse. Focus follows the widget that moved.

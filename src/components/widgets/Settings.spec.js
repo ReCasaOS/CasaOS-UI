@@ -9,9 +9,9 @@ vi.mock('./shippedWidgets', () => ({
 	default: ['clock', 'cpu', 'disks'].map(name => ({ name, title: name, icon: name })),
 }))
 
-function settings(order) {
+function settings(order, moduleInfo = {}) {
 	return mount(Settings, {
-		props: { modelValue: order.map(name => ({ name, show: name !== 'cpu' })) },
+		props: { modelValue: order.map(name => ({ name, show: name !== 'cpu' })), moduleInfo },
 		attachTo: document.body,
 		global: {
 			plugins: [Buefy],
@@ -68,5 +68,29 @@ describe('widgets settings: order', () => {
 		expect(names(chosen)).toEqual(['clock', 'cpu', 'disks'])
 		expect(chosen.find('.reset-order').attributes('disabled')).toBeDefined()
 		chosen.unmount()
+	})
+})
+
+describe('widgets settings: the cards of the modules', () => {
+	const info = { 'module:wake': { title: 'Wake {x} | @machines', icon: 'network-outline' } }
+
+	it('lists a card with the title and the icon of the module, as text and not as a sentence to translate', () => {
+		const wrapper = settings(['clock', 'module:wake'], info)
+		const items = wrapper.findAll('.item.is-flex')
+		expect(items.at(1).find('b').text()).toBe('Wake {x} | @machines')
+		expect(items.at(1).find('.casa-network-outline, [class*="network-outline"]').exists()).toBe(true)
+		expect(wrapper.find('.drag-handle[aria-label*="Wake {x}"]').exists()).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('moves a card, and shows one that comes after the others', async () => {
+		const wrapper = settings(['clock', 'module:wake'], info)
+		await wrapper.findAll('.drag-handle')[1].trigger('keydown', { key: 'ArrowUp' })
+		expect(names(wrapper)).toEqual(['module:wake', 'clock'])
+
+		await wrapper.setProps({ modelValue: [{ name: 'clock', show: true }, { name: 'module:wake', show: true }, { name: 'module:two', show: false }], moduleInfo: { ...info, 'module:two': { title: 'Two', icon: 'time-outline' } } })
+		expect(wrapper.findAll('.drag-handle')).toHaveLength(3)
+		expect(wrapper.text()).toContain('Two')
+		wrapper.unmount()
 	})
 })

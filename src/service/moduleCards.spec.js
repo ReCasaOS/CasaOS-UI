@@ -42,7 +42,7 @@ describe('the client of the cards', () => {
 	it('asks the list of the cards from the core, with the token as the dashboard sends it, read when the call is made', async () => {
 		localStorage.setItem('access_token', 'tok-1')
 		await getCards()
-		expect(adapter.mock.calls[0][0].url).toBe('/v1/modules/cards')
+		expect(adapter.mock.calls[0][0].url).toBe('/v1/sys/modules/cards')
 		expect(adapter.mock.calls[0][0].method).toBe('get')
 		expect(adapter.mock.calls[0][0].headers.Authorization).toBe('tok-1')
 

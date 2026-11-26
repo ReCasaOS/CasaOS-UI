@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { combineWidgetSettings, moveWidget, resetWidgetOrder } from './widgetOrder'
+import { combineWidgetSettings, moveWidget, resetWidgetOrder, withAbsent } from './widgetOrder'
 
 const shipped = [
 	{ name: 'clock', show: true },
@@ -77,5 +77,32 @@ describe('putting the widgets back in the order they ship', () => {
 	it('puts a name the dashboard does not ship at the end rather than losing it', () => {
 		const list = [{ name: 'weather', show: true }, { name: 'disks', show: true }, { name: 'clock', show: true }]
 		expect(resetWidgetOrder(list, ['clock', 'disks']).map(w => w.name)).toEqual(['clock', 'disks', 'weather'])
+	})
+})
+
+describe('the cards of the modules among the widgets', () => {
+	const withCard = [...shipped, { name: 'module:wake-on-lan', show: true }]
+
+	it('adds a card that the saved list does not know at the end', () => {
+		const saved = shipped.map(widget => ({ ...widget }))
+		expect(combineWidgetSettings(withCard, saved).at(-1)).toEqual({ name: 'module:wake-on-lan', show: true })
+	})
+
+	it('keeps the place and the hidden state of a saved card while the list of cards does not have it yet', () => {
+		const saved = [{ name: 'clock', show: true }, { name: 'module:wake-on-lan', show: false }, { name: 'cpu', show: true }]
+		expect(combineWidgetSettings(shipped, saved).map(w => [w.name, w.show])).toEqual([['clock', true], ['module:wake-on-lan', false], ['cpu', true], ['disks', true], ['network', true]])
+		// and the card keeps them when the list comes
+		expect(combineWidgetSettings(withCard, combineWidgetSettings(shipped, saved)).map(w => w.name)).toEqual(['clock', 'module:wake-on-lan', 'cpu', 'disks', 'network'])
+	})
+
+	it('still drops what is not a widget nor a card, and a card saved twice', () => {
+		const saved = [{ name: 'module:Bad Name', show: true }, { name: 'module:', show: true }, { name: 'modul:x', show: true }, { name: 5, show: true }, { name: 'module:a', show: true }, { name: 'module:a', show: false }]
+		expect(combineWidgetSettings(shipped, saved).map(w => w.name)).toEqual(['module:a', 'clock', 'cpu', 'disks', 'network'])
+	})
+
+	it('puts back the saved cards that Settings did not list, where they were', () => {
+		const full = [{ name: 'clock', show: true }, { name: 'module:gone', show: false }, { name: 'cpu', show: true }]
+		expect(withAbsent([{ name: 'cpu', show: true }, { name: 'clock', show: true }], full, ['clock', 'cpu']).map(w => w.name)).toEqual(['cpu', 'module:gone', 'clock'])
+		expect(withAbsent(full, full, ['clock', 'cpu'])).toEqual(full)
 	})
 })

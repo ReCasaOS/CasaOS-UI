@@ -120,7 +120,9 @@ async function boot({ minute = true } = {}) {
 		mine.push(`${config.method.toUpperCase()} ${url.pathname}`)
 		if (config.method !== 'get' && !store.state.user.role)
 			unknownRoleWrites.push(`${config.method.toUpperCase()} ${url.pathname}`)
-		const answer = { data: answerFor(config.method, url.pathname), status: 200, statusText: 'OK', headers: {}, config }
+		// the core answers a saved choice with what it saved (the sidebar shows what comes back)
+		const saved = config.method === 'post' && url.pathname === '/v1/users/current/custom/widgets_config'
+		const answer = { data: saved ? reply(JSON.parse(config.data)) : answerFor(config.method, url.pathname), status: 200, statusText: 'OK', headers: {}, config }
 		// the server says who the account is late, for the case where nothing is stored
 		return url.pathname === '/v1/users/current' && slowRole ? new Promise(done => setTimeout(() => done(answer), 3000)) : Promise.resolve(answer)
 	}

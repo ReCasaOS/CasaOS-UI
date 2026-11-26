@@ -47,7 +47,7 @@ card.interceptors.request.use((config) => {
 	return config
 })
 
-export const getCards = () => card.get('/v1/modules/cards')
+export const getCards = () => card.get('/v1/sys/modules/cards')
 export const getCard = route => card.get(cardUrl(route, '/card'))
 
 /** POSTs an action of a card: `route + path`, the JSON of `body` (up to 16 KiB) or `{}`. */
