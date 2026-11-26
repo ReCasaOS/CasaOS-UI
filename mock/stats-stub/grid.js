@@ -714,6 +714,32 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 				plan_id: `m1-${'ab'.repeat(16)}`,
 			})
 		}
+		// no system package: a program and its service
+		if (moduleCall[1] === 'wake-on-lan' && body?.mode !== 'update') {
+			return core({
+				name: 'wake-on-lan',
+				tag: 'v0.1.0',
+				tier: 'community',
+				checks,
+				refused: null,
+				packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true },
+				archive: { url: 'https://github.com/inkly/recasaos-wake-on-lan/releases/download/v0.1.0/linux-amd64-casaos-wake-on-lan-v0.1.0.tar.gz', bytes: 3145728 },
+				plan_id: `m1-${'cd'.repeat(16)}`,
+			})
+		}
+		// a check that could not be made: the plan is not refused, and says so before the details
+		if (moduleCall[1] === 'tv-remote' && body?.mode !== 'update') {
+			return core({
+				name: 'tv-remote',
+				tag: 'v0.2.0',
+				tier: 'community',
+				checks: checks.map(check => check.code === 'busy' ? { ...check, ok: false, detail: 'not_checked' } : check),
+				refused: null,
+				packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true },
+				archive: { url: 'https://github.com/example-author/casaos-tv-remote/releases/download/v0.2.0/linux-amd64-casaos-tv-remote-v0.2.0.tar.gz', bytes: 1048576 },
+				plan_id: `m1-${'ef'.repeat(16)}`,
+			})
+		}
 		if (moduleCall[1] === 'dns-filter' && body?.mode === 'update') {
 			const reason = 'It can stop the network of the box when its list is empty.'
 			return core({
@@ -731,7 +757,7 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 		return null
 	}
 	// the install never starts a job here: the first call says the plan changed (so that the new plan can be seen), the next ones say the machine is busy
-	if (moduleCall && verb === 'POST' && moduleCall[2] === 'install' && moduleCall[1] === 'backup-b2') {
+	if (moduleCall && verb === 'POST' && moduleCall[2] === 'install' && ['backup-b2', 'wake-on-lan', 'tv-remote'].includes(moduleCall[1])) {
 		if (!state.modulesPlanChanged) {
 			state.modulesPlanChanged = true
 			return refusal('plan_changed')
@@ -757,6 +783,8 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 				{ name: 'virt', title: 'Virtual machines', description: 'Create and run virtual machines with libvirt and QEMU.', tier: 'core', tag: looked ? 'v0.2.6' : 'v0.2.5', catalogue: true, installed: { version: 'v0.2.5' }, system, ...(looked && { update: { available: true, installed: 'v0.2.5', latest: 'v0.2.6' } }) },
 				{ name: 'mcp', title: 'MCP', description: 'Lets an AI assistant read and act on this box, with tokens you give it.', tier: 'core', tag: 'v0.1.0', catalogue: true, installed: null, system },
 				{ name: 'backup-b2', title: 'Backups to B2', description: 'Copies the backups of this box to a Backblaze B2 bucket.', tier: 'community', tag: 'v1.0.0', catalogue: true, installed: null, system, repository: 'example-author/casaos-backup-b2', foreign: true },
+				{ name: 'wake-on-lan', title: 'Wake-on-LAN', description: 'Wakes up the machines of the house from this box.', tier: 'community', tag: 'v0.1.0', catalogue: true, installed: null, system, repository: 'inkly/recasaos-wake-on-lan', foreign: true },
+				{ name: 'tv-remote', title: 'TV remote', description: 'Controls the television from the dashboard.', tier: 'community', tag: 'v0.2.0', catalogue: true, installed: null, system, repository: 'example-author/casaos-tv-remote', foreign: true },
 				{ name: 'dns-filter', title: 'DNS filter', description: 'Blocks the names of known trackers for every device on the network.', tier: 'community', tag: 'v0.3.1', catalogue: true, installed: { version: 'v0.3.0' }, system, repository: 'example-author/casaos-dns-filter', foreign: true, auto_update: night['dns-filter'], withdrawn: { tag: 'v0.3.0', reason: 'It can stop the network of the box when its list is empty.' }, update: { available: false, installed: 'v0.3.0', latest: 'v0.3.1' } },
 				{ name: 'photo-sync', title: 'Photo sync', description: 'Keeps the photos of the phones of the house in a folder of this box.', tier: 'community', tag: 'v1.2.0', catalogue: true, installed: { version: 'v1.2.0' }, system, repository: 'example-author/casaos-photo-sync', foreign: true, auto_update: night['photo-sync'] },
 			],
