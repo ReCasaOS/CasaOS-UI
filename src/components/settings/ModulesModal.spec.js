@@ -206,6 +206,80 @@ describe('the list of modules', () => {
 		expect(wrapper.find('.modules-job').exists()).toBe(false)
 	})
 
+	describe('who wrote the module', () => {
+		const foreign = { repository: 'someone/CasaOS-Virt', foreign: true }
+
+		it('says a module written outside ReCasaOS, with a link to its repository', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+
+			expect(text('.modules-origin')).toContain('Written by someone, not by ReCasaOS.')
+			const link = wrapper.find('.modules-origin-link')
+			expect(link.text()).toBe('See its repository')
+			expect(link.attributes('href')).toBe('https://github.com/someone/CasaOS-Virt')
+			expect(link.attributes('target')).toBe('_blank')
+			expect(link.attributes('rel')).toBe('noopener noreferrer')
+		})
+
+		it('says "written outside ReCasaOS" with no name and no link when the repository is refused', async () => {
+			await open(listRaw([moduleRaw({ repository: 'javascript:alert(1)', foreign: true })]))
+
+			expect(text('.modules-origin')).toBe('Written outside ReCasaOS.')
+			expect(wrapper.find('.modules-origin-link').exists()).toBe(false)
+			expect(wrapper.find('.modules-origin a').exists()).toBe(false)
+		})
+
+		it('says nothing for a module of the organisation, whatever its tier, nor for an older core', async () => {
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+			expect(wrapper.find('.modules-origin').exists()).toBe(false)
+			await open(listRaw([moduleRaw()]))
+			expect(wrapper.find('.modules-origin').exists()).toBe(false)
+		})
+
+		it('says it in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([moduleRaw(foreign)]))
+
+			expect(text('.modules-origin')).toContain('Écrit par someone, pas par ReCasaOS.')
+			expect(text('.modules-origin-link')).toBe('Voir son dépôt')
+		})
+	})
+
+	describe('a version that the catalogue withdrew', () => {
+		const withdrawn = reason => moduleRaw({ installed: { version: 'v0.1.0' }, withdrawn: { tag: 'v0.1.0', reason } })
+
+		it('warns, with the version, the reason and what happens next', async () => {
+			await open(listRaw([withdrawn('It loses the data of its disks.')]))
+
+			const warning = wrapper.find('.modules-withdrawn')
+			expect(warning.html()).toContain('is-warning')
+			expect(warning.text()).toContain('Version v0.1.0 was withdrawn from the catalogue.')
+			expect(warning.text()).toContain('Reason given: It loses the data of its disks.')
+			expect(warning.text()).toContain('It stays installed. Remove it, or wait for a later version.')
+			expect(wrapper.find('.modules-update-button').exists()).toBe(false)
+		})
+
+		it('shows markup as the text it is, and creates no element', async () => {
+			await open(listRaw([withdrawn('<img src=x onerror=alert(1)>')]))
+
+			expect(text('.modules-withdrawn')).toContain('<img src=x onerror=alert(1)>')
+			expect(wrapper.find('.modules-withdrawn img').exists()).toBe(false)
+		})
+
+		it('says nothing for a core that does not say it', async () => {
+			await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-withdrawn').exists()).toBe(false)
+		})
+
+		it('says it in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([withdrawn('Perte de données.')]))
+
+			expect(text('.modules-withdrawn')).toContain('La version v0.1.0 a été retirée du catalogue.')
+			expect(text('.modules-withdrawn')).toContain('Raison donnée : Perte de données.')
+			expect(text('.modules-withdrawn')).toContain('Il reste installé.')
+		})
+	})
+
 	it('says a module of the core in its words', async () => {
 		await open(listRaw([moduleRaw({ tier: 'core' })]))
 

@@ -117,6 +117,11 @@
 							{{ $t(card.module.tier.sentence) }}
 							<code v-if="card.module.tier.raw">{{ card.module.tier.raw }}</code>
 						</p>
+						<!-- written outside ReCasaOS: the name and the link are there only when the catalogue's repository is well formed -->
+						<p v-if="card.module.origin && card.module.origin.foreign" class="modules-origin is-size-7 mt-1">
+							{{ card.module.origin.owner ? $t(TEXT.origin.by, { owner: card.module.origin.owner }) : $t(TEXT.origin.outside) }}
+							<a v-if="card.module.origin.url" class="modules-origin-link" :href="card.module.origin.url" target="_blank" rel="noopener noreferrer">{{ $t(TEXT.origin.repository) }}</a>
+						</p>
 
 						<ul class="modules-facts mt-2">
 							<li v-if="card.module.installed" class="modules-installed">
@@ -146,6 +151,18 @@
 								</ul>
 							</li>
 						</ul>
+
+						<b-message v-if="card.module.withdrawn" class="modules-withdrawn mt-3" size="is-small" type="is-warning">
+							<p class="has-text-weight-semibold">
+								{{ $t(TEXT.withdrawn.title, { tag: card.module.withdrawn.tag }) }}
+							</p>
+							<p class="mt-1">
+								{{ $t(TEXT.withdrawn.reason, { reason: card.module.withdrawn.reason }) }}
+							</p>
+							<p class="mt-1">
+								{{ $t(TEXT.withdrawn.stays) }}
+							</p>
+						</b-message>
 
 						<b-message v-if="card.job" class="modules-job mt-3" :class="card.job.stateClass" size="is-small" :type="card.job.tone">
 							<h5 class="modules-job-title has-text-weight-semibold">
