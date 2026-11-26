@@ -25,7 +25,8 @@
  *     listView(raw) -> { ok, error, online, modules } | null         null for what is not a list. `ok` is the catalogue's; when it is not, no module can be
  *                                                              installed (the ones that are installed can still be removed)
  *       `online` is where the versions come from: { state: 'ok' | 'none' | 'unreadable' | 'off', at } or null. onlineNote(online, locale) says it.
- *       module: { name, title, description, tier: { id, label, sentence, raw } | null, tag, installed: { version } | null, supported,
+ *       module: { name, title, description, tier: { id, label, sentence, raw } | null, tag, origin: { foreign, owner, repository, url } | null,
+ *                 autoUpdate: boolean | null, withdrawn: { tag, reason } | null, installed: { version } | null, supported,
  *                 reasons: [{ code, message }], broken, inCatalogue, update: { installed, latest } | null, canInstall, canUpdate, canRemove }
  *       `update` is there only when the core says an update is available AND the two tags say it too (the latest is strictly later than the
  *       installed one, which is the version the list shows).
@@ -122,6 +123,23 @@ export function formatBytes(bytes, locale = 'en') {
 // Every sentence the page says that is not the sentence of a code of the core. The component looks them up and writes nothing of its own.
 export const TEXT = {
 	heading: 'Modules',
+	// where a module comes from, and what the person agrees to for one that ReCasaOS did not write
+	origin: {
+		by: 'Written by {owner}, not by ReCasaOS.',
+		outside: 'Written outside ReCasaOS.',
+		repository: 'See its repository',
+		rights: 'It runs with every right on this machine.',
+		confirm: 'I understand that ReCasaOS did not write this module',
+	},
+	withdrawn: {
+		title: 'Version {tag} was withdrawn from the catalogue.',
+		reason: 'Reason given: {reason}',
+		stays: 'It stays installed. Remove it, or wait for a later version.',
+	},
+	autoUpdate: {
+		label: 'Update it at night',
+		hint: 'Only when automatic updates are on, and 24 hours after a new version appears.',
+	},
 	loading: 'Reading the list of modules…',
 	none: 'No module is offered.',
 	catalogueBad: 'The list of modules could not be read.',
@@ -257,7 +275,7 @@ export const TEXT = {
 
 export const TIERS = {
 	core: { label: 'Maintained by ReCasaOS', sentence: 'Proved on a real machine by ReCasaOS.' },
-	community: { label: 'Community', sentence: 'Tested only against a simulated machine, not a real one.' },
+	community: { label: 'Community', sentence: 'Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.' },
 }
 export const TIER_UNKNOWN = { label: 'Unknown kind', sentence: 'This page does not know this kind of module. ReCasaOS has not proved it.' }
 
@@ -283,10 +301,13 @@ export const REASONS = {
 	plan_changed: 'The plan changed after you read it. Read the new plan, then confirm again.',
 	plan_timeout: 'The plan took too long to make. Try again in a moment.',
 	not_installed: 'Nothing of this module is installed, so there is nothing to remove or to update.',
+	// the switch of the night (PUT .../auto-update)
+	not_foreign: 'This module is ReCasaOS\'s own: its updates follow the general setting.',
 	start_failed: { text: 'ReCasaOS could not start the job. Nothing was changed.', steps: { start: 'The service of the module would not start.' } },
 	internal: 'The request could not be carried out.',
 	// the checks of the plan, and the refusals of its disk and apt checks (pkg/osmodule/plan.go)
 	catalogue: 'ReCasaOS no longer offers this module.',
+	withdrawn: 'ReCasaOS withdrew this version from the catalogue: {reason}',
 	os: 'This operating system is not one that the module supports.',
 	arch: 'The module has no version for this kind of processor.',
 	recasaos: 'This release of ReCasaOS is too old for the module. Update ReCasaOS first.',
@@ -341,11 +362,13 @@ export const REASONS = {
 	backup_not_dropped: 'The backup of the old version could not be deleted.',
 	internal_error: 'ReCasaOS hit an internal error. The log below may say more.',
 }
+// The refusals of the switch of the night that say another thing than the same code does elsewhere (the catalogue of the install is not offering the module; here it cannot be read)
+export const AUTO_UPDATE_REASONS = { catalogue: 'The catalogue cannot be read now: try again later.' }
 export const REASON_UNKNOWN = 'ReCasaOS gave a reason that this page does not know: {code}.'
 
 /** The sentence of a code. `step` is the step of a job (start_failed depends on it), `kind` the kind of the job or of the plan (files_unreadable depends on it), `data` the core's data of a refusal. */
 export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
-	const entry = own(REASONS, code)
+	const entry = (kind === 'autoUpdate' ? own(AUTO_UPDATE_REASONS, code) : undefined) ?? own(REASONS, code)
 	if (entry === undefined)
 		return msg(REASON_UNKNOWN, { code: clean(code, 60) || '?' })
 	if (Array.isArray(entry)) {
@@ -354,7 +377,8 @@ export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 	}
 	if (isPlain(entry))
 		return msg(own(entry.steps ?? {}, step) ?? own(entry.kinds ?? {}, kind) ?? entry.text)
-	return msg(entry)
+	// the reason of a withdrawal is the catalogue's text, whole up to the 200 characters the core allows
+	return code === 'withdrawn' ? msg(entry, { reason: clean(isPlain(data) ? data.reason : '', 200) }) : msg(entry)
 }
 
 // ---- the checks of the plan ---------------------------------------------------------------------------------------------
@@ -362,6 +386,7 @@ export function reasonMessage(code, { step = '', data = {}, kind = '' } = {}) {
 // pkg/osmodule/plan.go Check*, in the order the plan lists them: the topic of each, said before the mark that tells whether it passed
 export const CHECKS = {
 	catalogue: 'Offered by ReCasaOS',
+	withdrawn: 'Not withdrawn from the catalogue',
 	os: 'Operating system',
 	arch: 'Processor',
 	recasaos: 'Release of ReCasaOS',
@@ -412,6 +437,9 @@ function detailMessage(code, detail, locale) {
 function failureMessage(code, refused, detail, kind) {
 	if (code === 'recasaos' && detail.trim() === 'unknown')
 		return msg(TEXT.checks.recasaosUnknown)
+	// the reason of a withdrawal is the catalogue's own text: whole, with no address scrubbed out of it
+	if (code === 'withdrawn')
+		return reasonMessage('withdrawn', { data: { reason: detail } })
 	return reasonMessage(checkFailure(code, refused), { kind })
 }
 
@@ -432,7 +460,7 @@ function checkView(raw, refused, locale, kind = '') {
 		markText: TEXT.marks[mark],
 		message: failed ? failureMessage(code, refused, detail, kind) : null,
 		// the core allows 400 characters to what apt says; of a check that passed only the os check of a derivative says something, the release the box was read as and what it is
-		detail: failed || (ok && code === 'os') ? line(detail, 400) : '',
+		detail: code === 'withdrawn' ? (failed ? clean(detail, 200) : '') : failed || (ok && code === 'os') ? line(detail, 400) : '',
 		detailMessage: failed ? detailMessage(code, detail, locale) : null,
 	}
 }
@@ -441,8 +469,8 @@ const MARK_ORDER = { failed: 0, notChecked: 1, passed: 2 }
 
 // The sentence of a plan that was refused, or of a call that was refused with the code of a check: the check says more for a release that is not known.
 function refusalMessage(refused, checks, kind = '') {
-	if (refused === 'recasaos') {
-		const failed = checks.find(check => check.code === 'recasaos' && check.mark === 'failed')
+	if (refused === 'recasaos' || refused === 'withdrawn') {
+		const failed = checks.find(check => check.code === refused && check.mark === 'failed')
 		if (failed?.message)
 			return failed.message
 	}
@@ -489,6 +517,24 @@ function updateOf(raw, installed) {
 	return { installed: raw.installed, latest: raw.latest }
 }
 
+// What a module says of where it comes from: "<owner>/<repository>", the owner as GitHub allows it and the repository as the catalogue's `component`
+// (COMPONENT_RE of scripts/build-modules-catalogue.py of the installer). Anything else gives no name and no link.
+const OWNER = /^[A-Z0-9](?:[A-Z0-9-]{0,37}[A-Z0-9])?$/i
+const REPO = /^[A-Z][\w.-]{0,63}$/i
+function originOf(raw) {
+	if (raw.repository === undefined && raw.foreign === undefined)
+		return null
+	const [owner, repo, ...rest] = typeof raw.repository === 'string' ? raw.repository.split('/') : []
+	const good = rest.length === 0 && OWNER.test(owner ?? '') && REPO.test(repo ?? '')
+	return { foreign: raw.foreign === true, owner: good ? owner : '', repository: good ? raw.repository : '', url: good ? `https://github.com/${raw.repository}` : '' }
+}
+
+// The installed version that the catalogue withdrew, and the reason it gave (text, whole up to the 200 characters the core allows).
+function withdrawnOf(raw) {
+	const reason = isPlain(raw) ? clean(raw.reason, 200) : ''
+	return reason && TAG.test(raw.tag) ? { tag: raw.tag, reason } : null
+}
+
 function moduleView(raw, catalogueOk) {
 	if (!isPlain(raw) || typeof raw.name !== 'string' || !MODULE_NAME.test(raw.name))
 		return null
@@ -508,6 +554,9 @@ function moduleView(raw, catalogueOk) {
 		description: clean(raw.description, 400),
 		tier: tierOf(raw.tier),
 		tag: typeof raw.tag === 'string' && TAG.test(raw.tag) ? raw.tag : '',
+		origin: originOf(raw),
+		autoUpdate: typeof raw.auto_update === 'boolean' ? raw.auto_update : null,
+		withdrawn: withdrawnOf(raw.withdrawn),
 		installed,
 		supported,
 		reasons,
@@ -1081,7 +1130,7 @@ export function moduleFailure(error, locale = 'en_us', { read = false, mutating 
 	const data = isPlain(body) && isPlain(body.data) ? body.data : {}
 	const all = list(data.checks).filter(isPlain).slice(0, 20).map(check => checkView(check, base.code, locale, mode))
 	const items = all.filter(check => check.mark === 'failed').map(check => ({ code: check.code, message: check.message }))
-	const message = base.code === 'recasaos' ? refusalMessage(base.code, all, mode) : reasonMessage(base.code, { data, kind: mode })
+	const message = base.code === 'recasaos' || base.code === 'withdrawn' ? refusalMessage(base.code, all, mode) : reasonMessage(base.code, { data, kind: mode })
 	const busy = base.code === 'busy' ? (all.find(check => check.code === 'busy' && check.mark === 'failed')?.detailMessage ?? null) : null
 	return { kind: 'refusal', status: base.status, code: base.code, message, items, detail: base.code === 'busy' ? line(data.reason, 200) : '', busy, unhold: holdOf(all, base.code) }
 }
@@ -1108,6 +1157,7 @@ export const MODULE_KEYS = [...new Set([
 	...strings(TIERS),
 	...strings(TIER_UNKNOWN),
 	...strings(REASONS),
+	...strings(AUTO_UPDATE_REASONS),
 	REASON_UNKNOWN,
 	...strings(CHECKS),
 	CHECK_UNKNOWN,

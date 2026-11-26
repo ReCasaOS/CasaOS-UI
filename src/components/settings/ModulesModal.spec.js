@@ -198,7 +198,7 @@ describe('the list of modules', () => {
 		expect(text('.modules-description')).toContain('Create and run virtual machines')
 		expect(text('.modules-description')).toContain('A virtual machine can be given a USB device')
 		expect(text('.modules-tier')).toBe('Community')
-		expect(text('.modules-tier-sentence')).toBe('Tested only against a simulated machine, not a real one.')
+		expect(text('.modules-tier-sentence')).toBe('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 		expect(text('.modules-offered')).toBe('Version offered: v0.1.0')
 		expect(wrapper.find('.modules-install').exists()).toBe(true)
 		expect(wrapper.find('.modules-install').text()).toBe('Install')
@@ -434,7 +434,7 @@ describe('the plan of an install', () => {
 		expect(text('.modules-size-extra')).toBe('Room used on the disk by the packages: 200 MiB')
 		expect(text('.modules-archive-url')).toBe(`The module comes from: ${URL_OK}`)
 		expect(text('.modules-dialog-tier')).toContain('Community')
-		expect(text('.modules-dialog-tier')).toContain('Tested only against a simulated machine, not a real one.')
+		expect(text('.modules-dialog-tier')).toContain('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 		expect(text('.modules-stay')).toBe('The packages stay on the machine if you remove the module later.')
 		expect(wrapper.findAll('.modules-check')).toHaveLength(9)
 		expect(wrapper.findAll('.modules-check').every(check => check.classes().includes('is-passed'))).toBe(true)
@@ -2510,7 +2510,7 @@ describe('the page', () => {
 		i18n.global.locale = 'fr_fr'
 		await open()
 
-		expect(text('.modules-tier-sentence')).toBe('Testé uniquement sur une machine simulée, pas sur une vraie.')
+		expect(text('.modules-tier-sentence')).toBe('Écrit hors de ReCasaOS, relu à son entrée au catalogue, non testé par ReCasaOS.')
 		expect(text('.modules-offered')).toBe('Version proposée : v0.1.0')
 		expect(wrapper.find('.modules-install').text()).toBe('Installer')
 	})
