@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, onlineNote, reasonMessage } from './osModules'
+import { AUTO_UPDATE_REASONS, JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, onlineNote, reasonMessage } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -324,7 +324,8 @@ describe('the list of modules', () => {
 			await input().setValue(false)
 			await settle()
 
-			expect(text('.modules-auto-update-error')).toContain(REASONS.not_installed)
+			expect(text('.modules-auto-update-error')).toContain(AUTO_UPDATE_REASONS.not_installed)
+			expect(text('.modules-auto-update-error')).not.toContain('remove')
 			expect(input().element.checked).toBe(true)
 			expect(calls.getModules).toHaveBeenCalledTimes(1)
 		})
@@ -373,7 +374,7 @@ describe('the list of modules', () => {
 			await mine.setValue(true)
 			await settle()
 
-			expect(text('.modules-live')).toBe(REASONS.not_installed)
+			expect(text('.modules-live')).toBe(AUTO_UPDATE_REASONS.not_installed)
 			const again = wrapper.find('.modules-auto-update[data-module="virt"] input').element
 			expect(document.activeElement).toBe(again)
 		})

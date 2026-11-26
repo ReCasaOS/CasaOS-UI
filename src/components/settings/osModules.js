@@ -362,8 +362,8 @@ export const REASONS = {
 	backup_not_dropped: 'The backup of the old version could not be deleted.',
 	internal_error: 'ReCasaOS hit an internal error. The log below may say more.',
 }
-// The refusals of the switch of the night that say another thing than the same code does elsewhere (the catalogue of the install is not offering the module; here it cannot be read)
-export const AUTO_UPDATE_REASONS = { catalogue: 'The catalogue cannot be read now: try again later.' }
+// The refusals of the switch of the night that say another thing than the same code does elsewhere (not_installed talks of removing; the catalogue of the install is not offering the module, here it cannot be read)
+export const AUTO_UPDATE_REASONS = { not_installed: 'This module is no longer installed, so it has nothing to update at night.', catalogue: 'The catalogue cannot be read now: try again later.' }
 // a withdrawn version whose reason nobody gave: no colon, nothing after it
 export const REASON_WITHDRAWN_BARE = 'ReCasaOS withdrew this version from the catalogue.'
 export const REASON_UNKNOWN = 'ReCasaOS gave a reason that this page does not know: {code}.'

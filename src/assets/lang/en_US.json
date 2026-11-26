@@ -2362,6 +2362,7 @@
   "Update it at night": "Update it at night",
   "Only when automatic updates are on, and 24 hours after a new version appears.": "Only when automatic updates are on, and 24 hours after a new version appears.",
   "This module is ReCasaOS's own: its updates follow the general setting.": "This module is ReCasaOS's own: its updates follow the general setting.",
+  "This module is no longer installed, so it has nothing to update at night.": "This module is no longer installed, so it has nothing to update at night.",
   "The catalogue cannot be read now: try again later.": "The catalogue cannot be read now: try again later.",
   "ReCasaOS withdrew this version from the catalogue: {reason}": "ReCasaOS withdrew this version from the catalogue: {reason}",
   "ReCasaOS withdrew this version from the catalogue.": "ReCasaOS withdrew this version from the catalogue.",

@@ -2362,6 +2362,7 @@
   "Update it at night": "Le mettre à jour la nuit",
   "Only when automatic updates are on, and 24 hours after a new version appears.": "Seulement quand les mises à jour automatiques sont activées, et 24 heures après l'apparition d'une nouvelle version.",
   "This module is ReCasaOS's own: its updates follow the general setting.": "Ce module est celui de ReCasaOS : ses mises à jour suivent le réglage général.",
+  "This module is no longer installed, so it has nothing to update at night.": "Ce module n'est plus installé : il n'a rien à mettre à jour la nuit.",
   "The catalogue cannot be read now: try again later.": "Le catalogue ne peut pas être lu pour l'instant : réessayez plus tard.",
   "ReCasaOS withdrew this version from the catalogue: {reason}": "ReCasaOS a retiré cette version du catalogue : {reason}",
   "ReCasaOS withdrew this version from the catalogue.": "ReCasaOS a retiré cette version du catalogue.",
