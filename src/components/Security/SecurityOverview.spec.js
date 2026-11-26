@@ -74,7 +74,7 @@ describe('the Security window of the box', () => {
 		expect(wrapper.find('[data-state]').text()).toBe('No scan has run yet.')
 	})
 
-	it('lists the most critical apps first when none is exploited', async () => {
+	it('lists the apps an update would fix first, then the most critical ones', async () => {
 		vulnScan.apps = {
 			calibre: { app: 'calibre', critical: 0, high: 3, actionable: false },
 			vaultwarden: { app: 'vaultwarden', critical: 4, high: 117, actionable: false },
@@ -82,10 +82,10 @@ describe('the Security window of the box', () => {
 		}
 		const wrapper = await open()
 		const rows = wrapper.findAll('[data-app]')
-		expect(rows.map(row => row.find('.security-overview__name').text())).toEqual(['vaultwarden', 'anythingllm', 'calibre'])
-		expect(rows[0].text()).toContain('4 critical')
-		expect(rows[0].text()).toContain('117 high')
-		expect(rows[1].text()).toContain('2 critical · update')
+		expect(rows.map(row => row.find('.security-overview__name').text())).toEqual(['anythingllm', 'vaultwarden', 'calibre'])
+		expect(rows[0].text()).toContain('2 critical · update')
+		expect(rows[1].text()).toContain('4 critical')
+		expect(rows[1].text()).toContain('117 high')
 		expect(wrapper.find('[data-state]').text()).toBe('Some apps have a critical vulnerability that an update fixes.')
 	})
 
@@ -97,10 +97,11 @@ describe('the Security window of the box', () => {
 			d: { app: 'd', critical: 3, high: 0, actionable: false, epss_max: 0.5 },
 			e: { app: 'e', critical: 5, high: 0, actionable: false },
 			f: { app: 'f', critical: 5, high: 0, actionable: false },
-			g: { app: 'g', critical: 0, high: 0, actionable: true, exploited: 2, epss_max: 0.9 },
+			g: { app: 'g', critical: 0, high: 0, actionable: false, exploited: 2, epss_max: 0.9 },
+			h: { app: 'h', critical: 1, high: 0, actionable: true },
 		}
 		const wrapper = await open()
-		expect(wrapper.findAll('[data-app]').map(row => row.find('.security-overview__name').text())).toEqual(['g', 'c', 'b', 'd', 'a', 'e', 'f'])
+		expect(wrapper.findAll('[data-app]').map(row => row.find('.security-overview__name').text())).toEqual(['h', 'g', 'c', 'b', 'd', 'a', 'e', 'f'])
 	})
 
 	it('shows the exploited tag first', async () => {

@@ -87,10 +87,10 @@ export default {
 	emits: ['close'],
 
 	computed: {
-		// real risk first: exploited, then likelihood of exploitation (EPSS), then critical ones, then by name
+		// the apps an update would fix first, then real risk: exploited, then likelihood of exploitation (EPSS), then critical ones, then by name
 		apps() {
 			return Object.values(vulnScan.apps).sort((a, b) =>
-				(b.exploited || 0) - (a.exploited || 0) || (b.epss_max ?? -1) - (a.epss_max ?? -1) || (b.critical || 0) - (a.critical || 0) || a.app.localeCompare(b.app))
+				Number(b.actionable === true) - Number(a.actionable === true) || (b.exploited || 0) - (a.exploited || 0) || (b.epss_max ?? -1) - (a.epss_max ?? -1) || (b.critical || 0) - (a.critical || 0) || a.app.localeCompare(b.app))
 		},
 		// the one sentence that says where things stand
 		state() {
