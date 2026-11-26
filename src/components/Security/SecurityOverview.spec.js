@@ -24,6 +24,9 @@ vi.mock('@/assets/lang', () => ({
 			'{count} critical · update': '{count} critical · update',
 			'{count} critical': '{count} critical',
 			'{count} high': '{count} high',
+			'{count} exploited': '{count} exploited',
+			'List of exploited vulnerabilities of {date}': 'List of exploited vulnerabilities of {date}',
+			'The list of exploited vulnerabilities could not be updated: {reason}': 'The list of exploited vulnerabilities could not be updated: {reason}',
 		},
 	},
 }))
@@ -71,7 +74,7 @@ describe('the Security window of the box', () => {
 		expect(wrapper.find('[data-state]').text()).toBe('No scan has run yet.')
 	})
 
-	it('lists the apps an update would fix first, then the most critical ones', async () => {
+	it('lists the most critical apps first when none is exploited', async () => {
 		vulnScan.apps = {
 			calibre: { app: 'calibre', critical: 0, high: 3, actionable: false },
 			vaultwarden: { app: 'vaultwarden', critical: 4, high: 117, actionable: false },
@@ -79,11 +82,53 @@ describe('the Security window of the box', () => {
 		}
 		const wrapper = await open()
 		const rows = wrapper.findAll('[data-app]')
-		expect(rows.map(row => row.find('.security-overview__name').text())).toEqual(['anythingllm', 'vaultwarden', 'calibre'])
-		expect(rows[0].text()).toContain('2 critical · update')
-		expect(rows[1].text()).toContain('4 critical')
-		expect(rows[1].text()).toContain('117 high')
+		expect(rows.map(row => row.find('.security-overview__name').text())).toEqual(['vaultwarden', 'anythingllm', 'calibre'])
+		expect(rows[0].text()).toContain('4 critical')
+		expect(rows[0].text()).toContain('117 high')
+		expect(rows[1].text()).toContain('2 critical · update')
 		expect(wrapper.find('[data-state]').text()).toBe('Some apps have a critical vulnerability that an update fixes.')
+	})
+
+	it('sorts the apps by real risk', async () => {
+		vulnScan.apps = {
+			a: { app: 'a', critical: 9, high: 0, actionable: false },
+			b: { app: 'b', critical: 1, high: 0, actionable: false, exploited: 1, epss_max: 0.2 },
+			c: { app: 'c', critical: 0, high: 0, actionable: false, exploited: 1, epss_max: 0.9 },
+			d: { app: 'd', critical: 3, high: 0, actionable: false, epss_max: 0.5 },
+			e: { app: 'e', critical: 5, high: 0, actionable: false },
+			f: { app: 'f', critical: 5, high: 0, actionable: false },
+			g: { app: 'g', critical: 0, high: 0, actionable: true, exploited: 2, epss_max: 0.9 },
+		}
+		const wrapper = await open()
+		expect(wrapper.findAll('[data-app]').map(row => row.find('.security-overview__name').text())).toEqual(['g', 'c', 'b', 'd', 'a', 'e', 'f'])
+	})
+
+	it('shows the exploited tag first', async () => {
+		vulnScan.apps = { vaultwarden: { app: 'vaultwarden', critical: 4, high: 1, actionable: false, exploited: 2, epss_max: 0.4 } }
+		const wrapper = await open()
+		const tags = wrapper.findAll('[data-app] .tag')
+		expect(tags[0].text()).toBe('2 exploited')
+		expect(tags[0].classes()).toContain('is-danger')
+		expect(tags[0].classes()).not.toContain('is-light')
+		expect(tags[1].text()).toBe('4 critical')
+	})
+
+	it('says the date of the list', async () => {
+		const wrapper = await open({ ...scanned, threat_updated_at: '2026-11-25T03:00:00Z' })
+		expect(wrapper.find('[data-threat]').text()).toBe(`List of exploited vulnerabilities of ${new Date('2026-11-25T03:00:00Z').toLocaleDateString()}`)
+	})
+
+	it('says when the list could not be updated', async () => {
+		const wrapper = await open({ ...scanned, threat_error: 'HTTP 503' })
+		expect(wrapper.find('[data-threat-error]').text()).toBe('The list of exploited vulnerabilities could not be updated: HTTP 503')
+	})
+
+	it('works with a module that sends none of the new fields', async () => {
+		vulnScan.apps = { jellyfin: { app: 'jellyfin', critical: 1, high: 0, actionable: false } }
+		const wrapper = await open()
+		expect(wrapper.find('[data-threat]').exists()).toBe(false)
+		expect(wrapper.find('[data-threat-error]').exists()).toBe(false)
+		expect(wrapper.find('[data-app]').text()).not.toContain('exploited')
 	})
 
 	it('opens the vulnerabilities of an app from its line', async () => {

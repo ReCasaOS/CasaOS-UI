@@ -23,6 +23,7 @@ vi.mock('@/assets/lang', () => ({
 			'Last scan: {date}': 'Last scan: {date}',
 			'Vulnerability database of {date}': 'Vulnerability database of {date}',
 			'The last scan stopped early: {reason}': 'The last scan stopped early: {reason}',
+			'EPSS {percent} %': 'EPSS {percent} %',
 		},
 	},
 }))
@@ -62,6 +63,33 @@ describe('the Security window of an app', () => {
 		expect(rows[0].text()).toContain('3.0.9')
 		expect(rows[0].text()).toContain('Critical')
 		expect(rows[1].text()).toContain('High')
+		wrapper.unmount()
+	})
+
+	it('marks an exploited vulnerability and shows its EPSS', async () => {
+		const wrapper = await open({ app: detail([image([
+			finding('CVE-2026-1', 'CRITICAL', { exploited: true, epss: 0.8765 }),
+			finding('CVE-2026-2', 'HIGH'),
+		])]) })
+		const rows = wrapper.findAll('[data-finding]')
+		expect(rows[0].text()).toContain('Exploited')
+		expect(rows[0].text()).toContain('EPSS 88 %')
+		expect(rows[1].text()).not.toContain('Exploited')
+		expect(rows[1].text()).not.toContain('EPSS')
+		expect(rows[1].text()).not.toContain('NaN')
+		wrapper.unmount()
+	})
+
+	it('sorts the vulnerabilities by real risk', async () => {
+		const wrapper = await open({ app: detail([image([
+			finding('A', 'CRITICAL'),
+			finding('B', 'HIGH', { epss: 0.1 }),
+			finding('C', 'HIGH', { exploited: true, epss: 0.1 }),
+			finding('D', 'HIGH', { epss: 0.7 }),
+			finding('E', 'HIGH', { exploited: true, epss: 0.6 }),
+			finding('F', 'HIGH'),
+		])]) })
+		expect(wrapper.findAll('[data-finding]').map(r => r.find('td').text())).toEqual(['E', 'C', 'D', 'B', 'A', 'F'])
 		wrapper.unmount()
 	})
 
