@@ -49,10 +49,8 @@
 <script>
 import escape from 'lodash/escape'
 import { CARD_ICON_FALLBACK, CARD_TEXT, actionNote, cardView } from './moduleCards'
-import { actUrl, getCard } from '@/service/moduleCards'
+import { GONE, actUrl, getCard } from '@/service/moduleCards'
 
-// the answers that mean "this module has no card for you": the card goes, with no word of it
-const GONE = [401, 403, 404]
 const UNAVAILABLE_REFRESH = 60
 
 // The variant `panel` is drawn by the home that holds it, in its own markup and styles (the default slot gets the state, the card and `run`).

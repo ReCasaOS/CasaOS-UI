@@ -723,6 +723,10 @@ export default {
 					openAIAccess(this.$buefy)
 					break
 				default:
+					// a module's tile: its page in a tab of its own, never in the app window, which is not kept apart from the dashboard
+					if (item.moduleLink) {
+						window.open(item.moduleLink, '_blank', 'noopener,noreferrer')
+					}
 					break
 			}
 		},

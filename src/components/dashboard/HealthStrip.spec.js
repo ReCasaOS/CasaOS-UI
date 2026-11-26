@@ -888,6 +888,13 @@ describe('the cards of the modules', () => {
 		wrapper.unmount()
 	})
 
+	it('draws no panel for a card that is only a link (its tile is in the app grid), and one for a card with a link and content', async () => {
+		const wrapper = cards([entry('router-admin'), entry('a')], { descriptions: { '/v1/router_admin': { schema: 1, title: 'Router', link: { label: 'Open', path: '/' } }, '/v1/a': description({ title: 'A' }) } })
+		await ready()
+		expect(titles(wrapper)).toEqual(['A'])
+		wrapper.unmount()
+	})
+
 	it('asks nothing and shows nothing for an account that is not the administrator', async () => {
 		const wrapper = cards([entry('a')], { getters: { canWrite: false, isAdmin: false, canReadModule: () => true } })
 		await ready()

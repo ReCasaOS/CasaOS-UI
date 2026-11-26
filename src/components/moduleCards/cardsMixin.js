@@ -1,6 +1,6 @@
 import { cardList, cardView } from './moduleCards'
 import events from '@/events/events'
-import { getCard, getCards } from '@/service/moduleCards'
+import { GONE, getCard, getCards } from '@/service/moduleCards'
 
 // the list is read again this often, and when the Modules window installs or removes a module
 const CARDS_EVERY_MS = 5 * 60 * 1000
@@ -15,10 +15,14 @@ const CARDS_EVERY_MS = 5 * 60 * 1000
  *
  * A component can define `cardsBefore()` (awaited before the list is read), `cardsToProbe(list)` (the modules worth a first read, all of them
  * by default) and `cardsRead()` (called when a list has been read).
+ *
+ * `cardViews` keeps the last valid description of each card in `moduleCards`, by name. A component that draws no ModuleCard (the app grid)
+ * has nothing that reads its cards again: it sets `cardsReread: true` in its data, and each reading of the list reads every card again. A
+ * 401, 403 or 404 then takes the card away (cardGone); any other failure, or a description that is refused, keeps the last valid one.
  */
 export const cardsMixin = {
 	data() {
-		return { moduleCards: [], proven: [], cardsTimer: 0, cardsSerial: 0, cardsStale: false, cardsGone: [] }
+		return { moduleCards: [], proven: [], cardViews: {}, cardsTimer: 0, cardsSerial: 0, cardsStale: false, cardsGone: [] }
 	},
 	computed: {
 		cardsAllowed() {
@@ -67,6 +71,7 @@ export const cardsMixin = {
 			if (!this.cardsAllowed) {
 				this.moduleCards = []
 				this.proven = []
+				this.cardViews = {}
 				return
 			}
 			let list
@@ -78,19 +83,23 @@ export const cardsMixin = {
 			}
 			if (serial !== this.cardsSerial)
 				return
-			const toProbe = (this.cardsToProbe ? this.cardsToProbe(list) : list).filter(card => !this.proven.includes(card.name))
+			const toProbe = (this.cardsToProbe ? this.cardsToProbe(list) : list).filter(card => this.cardsReread || !this.proven.includes(card.name))
 			const found = await Promise.all(toProbe.map(async (card) => {
 				try {
-					return cardView((await getCard(card.route)).data, card.route) ? card.name : ''
-				} catch {
-					return ''
+					return { name: card.name, view: cardView((await getCard(card.route)).data, card.route) }
+				} catch (error) {
+					return { name: card.name, view: null, gone: GONE.includes(error?.status) }
 				}
 			}))
 			if (serial !== this.cardsSerial)
 				return
+			// only a card read again can go here: a first read that fails was never in
+			found.filter(item => item.gone && this.proven.includes(item.name)).forEach(item => this.cardGone(item.name))
+			const views = Object.fromEntries(found.filter(item => item.view).map(item => [item.name, item.view]))
 			// the cards that went while the others were read stay out: what holds is what is now, not what was when this reading began
 			const left = name => !this.cardsGone.includes(name)
-			this.proven = [...new Set([...this.proven, ...found.filter(Boolean)])].filter(name => list.some(card => card.name === name) && left(name))
+			this.proven = [...new Set([...this.proven, ...Object.keys(views)])].filter(name => list.some(card => card.name === name) && left(name))
+			this.cardViews = Object.fromEntries(this.proven.map(name => [name, views[name] ?? this.cardViews[name]]))
 			this.moduleCards = list.filter(card => this.proven.includes(card.name))
 			this.cardsRead?.()
 		},

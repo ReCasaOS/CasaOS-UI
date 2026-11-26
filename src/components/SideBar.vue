@@ -24,7 +24,7 @@ import isEqual from 'lodash/isEqual'
 import Settings from '@/components/widgets/Settings.vue'
 import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
 import { cardsMixin } from '@/components/moduleCards/cardsMixin'
-import { CARD_ICON_FALLBACK } from '@/components/moduleCards/moduleCards'
+import { CARD_ICON_FALLBACK, isTileOnly } from '@/components/moduleCards/moduleCards'
 import { combineWidgetSettings, withAbsent } from '@/components/widgets/widgetOrder'
 
 const widgetsComponents = require.context(
@@ -65,11 +65,12 @@ export default {
 			// a saved card whose module is not in the list now is kept in the settings, and not shown
 			return newArray.filter(Boolean)
 		},
+		// a card that is only a button is the module's tile in the app grid: no widget, no row in the settings
 		moduleApps() {
-			return this.moduleCards.map(card => ({ name: `module:${card.name}`, card }))
+			return this.moduleCards.filter(card => !isTileOnly(this.cardViews[card.name])).map(card => ({ name: `module:${card.name}`, card }))
 		},
 		moduleInfo() {
-			return Object.fromEntries(this.moduleCards.map(card => [`module:${card.name}`, { title: card.title, icon: this.cardIcons[card.name] || CARD_ICON_FALLBACK }]))
+			return Object.fromEntries(this.moduleApps.map(({ name, card }) => [name, { title: card.title, icon: this.cardIcons[card.name] || CARD_ICON_FALLBACK }]))
 		},
 		// what Settings lists: the widgets and the cards that exist now
 		listedSettings() {

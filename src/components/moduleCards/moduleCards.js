@@ -167,6 +167,14 @@ export function cardView(raw, route) {
 	}
 }
 
+/**
+ * Whether a card is only a button: a link and nothing else to show (no status, no rows, no actions). It is the module's tile in the app grid,
+ * and neither a widget of the classic home nor a panel of the beta dashboard. A card without a link is never one: it would be shown nowhere.
+ */
+export function isTileOnly(view) {
+	return Boolean(view?.link) && !view.status && !view.rows?.length && !view.actions?.length
+}
+
 /** What an action answers: its `message` as a short text, or nothing. */
 export function actionNote(raw) {
 	return isPlain(raw) ? cut(clean(raw.message, 1000), 120) : ''

@@ -8,6 +8,8 @@ export const MAX_BYTES = 16384
 export const TIMEOUT = 5000
 // the list of the cards is the core's own call, as slow as the dashboard's other module calls can be
 export const LIST_TIMEOUT = 35000
+// the answers that mean "this module has no card for you": the card goes, with no word of it
+export const GONE = [401, 403, 404]
 
 export const ROUTE = /^\/v\d+\/[a-z0-9_]{1,40}$/
 const PATH_MAX = 200

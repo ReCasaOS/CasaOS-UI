@@ -202,7 +202,8 @@ function mcp(verb, path, body, state) {
 }
 
 // What each module of the stub says of its card (the description, version 1). bad-card is hostile on purpose: an action leaves the module's route,
-// so the whole card is refused and the home says "unavailable"; tv-remote answers 401, so its card is not shown at all.
+// so the whole card is refused and the home says "unavailable"; tv-remote answers 401, so its card is not shown at all. router-admin is only a
+// link: a tile in the app grid, and no widget nor panel.
 function moduleCard(route) {
 	if (route === 'wake_on_lan') {
 		return {
@@ -230,6 +231,9 @@ function moduleCard(route) {
 			actions: [{ label: 'Sync now', method: 'POST', path: '/sync-now', confirm: 'Copy the photos of the phones now? It can take a while.' }],
 			refresh: 60,
 		}
+	}
+	if (route === 'router_admin') {
+		return { schema: 1, title: 'Router', icon: 'internet-outline', link: { label: 'Open', path: '/' } }
 	}
 	if (route === 'bad_card') {
 		return { schema: 1, title: 'Bad card', actions: [{ label: 'Go', method: 'POST', path: '//evil.example/x' }] }
@@ -816,10 +820,11 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 				{ name: 'photo-sync', title: 'Photo sync', route: '/v1/photo_sync', foreign: true, repository: 'example-author/casaos-photo-sync' },
 				{ name: 'bad-card', title: 'Bad card', route: '/v1/bad_card', foreign: true, repository: 'example-author/casaos-bad-card' },
 				{ name: 'tv-remote', title: 'TV remote', route: '/v1/tv_remote', foreign: true, repository: 'example-author/casaos-tv-remote' },
+				{ name: 'router-admin', title: 'Router', route: '/v1/router_admin' },
 			],
 		})
 	}
-	const cardCall = path.match(/^\/v1\/(wake_on_lan|photo_sync|bad_card|tv_remote)\/([a-z-]+)$/)
+	const cardCall = path.match(/^\/v1\/(wake_on_lan|photo_sync|bad_card|tv_remote|router_admin)\/([a-z-]+)$/)
 	if (cardCall && verb === 'GET' && cardCall[2] === 'card') {
 		return cardCall[1] === 'tv_remote' ? { status: 401, body: moduleCard('tv_remote') } : { status: 200, body: moduleCard(cardCall[1]) }
 	}
