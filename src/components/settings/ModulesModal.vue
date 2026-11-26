@@ -1103,6 +1103,11 @@ export default {
 			dialog.phase = 'planning'
 			dialog.plan = null
 			dialog.notice = null
+			// a new plan is for the module as the list holds it now (the core binds the repository into the plan), and asks to be understood again
+			const card = this.view?.modules.find(module => module.name === dialog.name)
+			if (card)
+				dialog.origin = card.origin?.foreign ? card.origin : null
+			dialog.understood = false
 			let raw
 			let failure = null
 			try {
@@ -1205,6 +1210,10 @@ export default {
 			if (STALE.has(failure.code))
 				this.loadList()
 			if (failure.code === 'plan_changed' && dialog.kind !== 'remove' && this.dialog === dialog) {
+				// the list is read again first: the module may now come from another repository
+				await this.loadList()
+				if (this.gone || this.dialog !== dialog)
+					return
 				await this.requestPlan(true)
 				return
 			}

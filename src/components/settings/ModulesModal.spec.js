@@ -2723,6 +2723,41 @@ describe('the update of an installed module', () => {
 			expect(text('.modules-dialog .modules-call-sentence')).toBe(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
 		})
 
+		describe('a new plan', () => {
+			async function replanned(listAfter) {
+				await open(listRaw([moduleRaw(foreign)]))
+				await installDialog()
+				await tick('.modules-dialog-understood input')
+				expect(ok().attributes('disabled')).toBeUndefined()
+				calls.getModules.mockImplementation(() => answer(listAfter))
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+			}
+
+			it('asks for the confirmation again after plan_changed', async () => {
+				await replanned(listRaw([moduleRaw(foreign)]))
+
+				expect(wrapper.find('.modules-dialog-understood input').element.checked).toBe(false)
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('says the new owner when the module now comes from another repository', async () => {
+				await replanned(listRaw([moduleRaw({ repository: 'other/CasaOS-Virt', foreign: true })]))
+
+				expect(text('.modules-dialog-origin')).toContain('Written by other, not by ReCasaOS.')
+				expect(wrapper.find('.modules-dialog-origin a').attributes('href')).toBe('https://github.com/other/CasaOS-Virt')
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('has no warning and no box when the module is now one of the organisation', async () => {
+				await replanned(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+
+				expect(wrapper.find('.modules-dialog-origin').exists()).toBe(false)
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+				expect(ok().attributes('disabled')).toBeUndefined()
+			})
+		})
+
 		it('says the box in French', async () => {
 			i18n.global.locale = 'fr_fr'
 			await open(listRaw([moduleRaw(foreign)]))
