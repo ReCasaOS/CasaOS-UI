@@ -281,3 +281,25 @@ describe('the stub of the MCP module', () => {
 		expect(ask('GET', '/v2/mcp/tokens', null, state).body.map(t => t.name)).toEqual(['Phone', 'stuck'])
 	})
 })
+
+describe('the stub of the cards of the modules', () => {
+	it('lists the four modules that have a card, under the core route', () => {
+		const { status, body } = ask('GET', '/v1/sys/modules/cards')
+		expect(status).toBe(200)
+		expect(body.data.modules.map(item => item.name)).toEqual(['wake-on-lan', 'photo-sync', 'bad-card', 'tv-remote'])
+	})
+
+	it('answers a valid card, a card with a confirmation, a hostile one and a 401', () => {
+		expect(ask('GET', '/v1/wake_on_lan/card').body).toMatchObject({ schema: 1, title: 'Wake-on-LAN' })
+		expect(ask('GET', '/v1/photo_sync/card').body.actions[0].confirm).toBeTruthy()
+		expect(ask('GET', '/v1/bad_card/card').body.actions[0].path).toBe('//evil.example/x')
+		expect(ask('GET', '/v1/tv_remote/card').status).toBe(401)
+	})
+
+	it('answers an action with its message once, then with a 500 once', () => {
+		const state = newGridState()
+		expect(ask('POST', '/v1/wake_on_lan/wake', {}, state)).toMatchObject({ status: 200, body: { message: expect.any(String) } })
+		expect(ask('POST', '/v1/photo_sync/sync-now', {}, state)).toMatchObject({ status: 500, body: { message: expect.any(String) } })
+		expect(ask('POST', '/v1/wake_on_lan/wake-all', {}, state).status).toBe(200)
+	})
+})

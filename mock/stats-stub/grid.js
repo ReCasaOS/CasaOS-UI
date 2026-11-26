@@ -201,6 +201,42 @@ function mcp(verb, path, body, state) {
 	return null
 }
 
+// What each module of the stub says of its card (the description, version 1). bad-card is hostile on purpose: an action leaves the module's route,
+// so the whole card is refused and the home says "unavailable"; tv-remote answers 401, so its card is not shown at all.
+function moduleCard(route) {
+	if (route === 'wake_on_lan') {
+		return {
+			schema: 1,
+			title: 'Wake-on-LAN',
+			icon: 'network-outline',
+			status: { level: 'ok', text: '3 machines' },
+			rows: [
+				{ label: 'NAS', value: 'asleep', level: 'warning', action: { label: 'Wake', method: 'POST', path: '/wake', body: { mac: 'aa:bb:cc:00:00:01' } } },
+				{ label: 'Desktop', value: 'awake', level: 'ok' },
+				{ label: 'Media PC', value: 'asleep', level: 'warning', action: { label: 'Wake', method: 'POST', path: '/wake', body: { mac: 'aa:bb:cc:00:00:03' } } },
+			],
+			actions: [{ label: 'Wake all', method: 'POST', path: '/wake-all' }],
+			link: { label: 'Open', path: '/ui' },
+			refresh: 30,
+		}
+	}
+	if (route === 'photo_sync') {
+		return {
+			schema: 1,
+			title: 'Photo sync',
+			icon: 'cloud-outline',
+			status: { level: 'warning', text: 'Late' },
+			rows: [{ label: 'Last sync', value: '3 days ago', level: 'warning' }, { label: 'Phones', value: '4' }],
+			actions: [{ label: 'Sync now', method: 'POST', path: '/sync-now', confirm: 'Copy the photos of the phones now? It can take a while.' }],
+			refresh: 60,
+		}
+	}
+	if (route === 'bad_card') {
+		return { schema: 1, title: 'Bad card', actions: [{ label: 'Go', method: 'POST', path: '//evil.example/x' }] }
+	}
+	return { message: 'unauthorized' }
+}
+
 export function newGridState(demo = false) {
 	return {
 		custom: new Map(),
@@ -771,6 +807,28 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 			return core({ name: 'dns-filter', auto_update: state.modulesNight['dns-filter'] })
 		}
 		return refusal(moduleCall[1] === 'photo-sync' ? 'not_installed' : 'not_foreign')
+	}
+	// the cards that modules show on the home screens: the core lists them (installed modules that are running), each module answers its own route
+	if (verb === 'GET' && path === '/v1/sys/modules/cards') {
+		return core({
+			modules: [
+				{ name: 'wake-on-lan', title: 'Wake-on-LAN', route: '/v1/wake_on_lan', foreign: true, repository: 'inkly/recasaos-wake-on-lan' },
+				{ name: 'photo-sync', title: 'Photo sync', route: '/v1/photo_sync', foreign: true, repository: 'example-author/casaos-photo-sync' },
+				{ name: 'bad-card', title: 'Bad card', route: '/v1/bad_card', foreign: true, repository: 'example-author/casaos-bad-card' },
+				{ name: 'tv-remote', title: 'TV remote', route: '/v1/tv_remote', foreign: true, repository: 'example-author/casaos-tv-remote' },
+			],
+		})
+	}
+	const cardCall = path.match(/^\/v1\/(wake_on_lan|photo_sync|bad_card|tv_remote)\/([a-z-]+)$/)
+	if (cardCall && verb === 'GET' && cardCall[2] === 'card') {
+		return cardCall[1] === 'tv_remote' ? { status: 401, body: moduleCard('tv_remote') } : { status: 200, body: moduleCard(cardCall[1]) }
+	}
+	if (cardCall && verb === 'POST') {
+		// an action answers its message once, then a 500 once, and so on: both can be seen
+		state.cardActions = (state.cardActions || 0) + 1
+		return state.cardActions % 2 === 1
+			? { status: 200, body: { message: 'Done: the request was sent.' } }
+			: { status: 500, body: { message: 'The module could not do it. Try again.' } }
 	}
 	if (verb === 'GET' && path === '/v1/sys/modules') {
 		state.modulesLooked ||= query.refresh === '1'
