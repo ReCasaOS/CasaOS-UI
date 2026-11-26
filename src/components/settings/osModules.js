@@ -537,7 +537,7 @@ function updateOf(raw, installed) {
 // (COMPONENT_RE of scripts/build-modules-catalogue.py of the installer). Anything else gives no name and no link.
 const OWNER = /^[A-Z0-9](?:[A-Z0-9-]{0,37}[A-Z0-9])?$/i
 const REPO = /^[A-Z][\w.-]{0,63}$/i
-function originOf(raw) {
+export function originOf(raw) {
 	if ((raw.repository ?? null) === null && (raw.foreign ?? null) === null)
 		return null
 	const [owner, repo, ...rest] = typeof raw.repository === 'string' ? raw.repository.split('/') : []

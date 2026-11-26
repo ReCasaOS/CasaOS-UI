@@ -3831,5 +3831,9 @@
   "Units": "Units",
   "The weather settings could not be loaded: {error}": "The weather settings could not be loaded: {error}",
   "The weather settings could not be saved: {error}": "The weather settings could not be saved: {error}",
-  "Open-Meteo could not be asked: {error}": "Open-Meteo could not be asked: {error}"
+  "Open-Meteo could not be asked: {error}": "Open-Meteo could not be asked: {error}",
+  "This card is unavailable for now": "This card is unavailable for now",
+  "by {owner}": "by {owner}",
+  "Confirm": "Confirm",
+  "The module did not answer. Try again.": "The module did not answer. Try again."
 }
