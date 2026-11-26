@@ -351,7 +351,7 @@
 								{{ say(dialog.notice) }}
 							</p>
 
-							<!-- written outside ReCasaOS: said by the origin the card had when the window was opened -->
+							<!-- written outside ReCasaOS: said by the origin of a list read after this plan answered -->
 							<b-message v-if="dialog.origin && !dialog.plan.refused" class="modules-dialog-origin mt-2" size="is-small" type="is-warning">
 								<p class="has-text-weight-semibold">
 									{{ dialog.origin.owner ? $t(TEXT.origin.by, { owner: dialog.origin.owner }) : $t(TEXT.origin.outside) }}
@@ -1126,10 +1126,7 @@ export default {
 			dialog.phase = 'planning'
 			dialog.plan = null
 			dialog.notice = null
-			// a new plan is for the module as the list holds it now (the core binds the repository into the plan), and asks to be understood again
-			const card = this.view?.modules.find(module => module.name === dialog.name)
-			if (card)
-				dialog.origin = card.origin?.foreign ? card.origin : null
+			// a new plan asks to be understood again
 			dialog.understood = false
 			let raw
 			let failure = null
@@ -1144,14 +1141,37 @@ export default {
 			// the window was closed, or another plan was asked for: this one is for nobody
 			if (this.gone || ticket !== this.planTicket)
 				return
-			this.acting = ''
 			this.planAbort = null
 			const plan = failure ? null : modulePlanView(raw, { name: dialog.name, locale: this.locale, mode: dialog.kind === 'update' ? 'update' : 'install' })
 			if (!plan) {
+				this.acting = ''
 				dialog.phase = 'failed'
 				this.callError = failure ?? moduleFailure(null, this.locale, { read: true })
 				return
 			}
+			// The origin comes from a list read that starts after the plan answered (never one already in flight, never the cached one). The core binds the repository
+			// into the plan id, so a list newer than the plan that names another repository makes the install of this plan refuse with plan_changed: what is left is a box that is not needed.
+			// The dialog stays in its planning state, with no button, while it is read.
+			// (A plan that is refused shows no warning and no box, so it has no use for an origin.)
+			let list = null
+			if (!plan.refused) {
+				try {
+					list = listView((await this.$api.sys.getModules())?.data?.data)
+				} catch (error) {
+					failure = moduleFailure(error, this.locale, { read: true })
+				}
+				if (this.gone || ticket !== this.planTicket)
+					return
+			}
+			this.acting = ''
+			if (!plan.refused && !list) {
+				dialog.phase = 'failed'
+				this.callError = failure ?? moduleFailure(null, this.locale, { read: true })
+				return
+			}
+			const card = list?.modules.find(module => module.name === dialog.name)
+			if (card)
+				dialog.origin = card.origin?.foreign ? card.origin : null
 			dialog.plan = plan
 			dialog.phase = 'plan'
 			dialog.notice = changed ? reasonMessage('plan_changed') : null
@@ -1233,7 +1253,10 @@ export default {
 			if (STALE.has(failure.code))
 				this.loadList()
 			if (failure.code === 'plan_changed' && dialog.kind !== 'remove' && this.dialog === dialog) {
-				// the list is read again first: the module may now come from another repository
+				// the plan on the screen is out of date: nothing can be sent while the list is read again (the module may now come from another repository)
+				dialog.phase = 'planning'
+				dialog.plan = null
+				dialog.understood = false
 				await this.loadList()
 				if (this.gone || this.dialog !== dialog)
 					return

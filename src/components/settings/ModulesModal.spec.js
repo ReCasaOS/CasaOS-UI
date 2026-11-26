@@ -924,12 +924,12 @@ describe('the install', () => {
 		expect(text('.modules-busy-sentence')).toBe(REASONS.busy)
 		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: an upgrade of the operating system is open')
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
-		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
 
 		await press('.modules-busy-retry')
 
 		expect(wrapper.find('.modules-busy').exists()).toBe(false)
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeUndefined()
 	})
 
@@ -1119,12 +1119,12 @@ describe('the job', () => {
 
 		it('stops when the job is over, and reads the list again', async () => {
 			await running('route')
-			expect(calls.getModules).toHaveBeenCalledTimes(1)
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
 			serveJob(jobAnswer({ state: 'succeeded', step: 'done', ended_at: '2026-10-18T12:01:00Z' }, { installed: true }))
 			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
 			await tick(MODULE_POLL_MS.running)
 
-			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(calls.getModules).toHaveBeenCalledTimes(3)
 			const asked = calls.getModuleStatus.mock.calls.length
 			await tick(60000)
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(asked)
@@ -1288,7 +1288,7 @@ describe('the job', () => {
 			out.resolve({ data: { data: jobAnswer({ state: 'succeeded', step: 'done' }) } })
 			await tick(120000)
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(1)
-			expect(calls.getModules).toHaveBeenCalledTimes(1)
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
 			expect(vi.getTimerCount()).toBe(0)
 		})
 
@@ -2066,12 +2066,12 @@ describe('the busy flag', () => {
 		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
 		await press('.modules-dialog-ok')
 		await press('.modules-dialog-cancel')
-		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
 
 		serveJob(jobAnswer({ state: 'running', step: 'download' }))
 		await press('.modules-busy-retry')
 
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(calls.getModuleStatus).toHaveBeenCalledWith('virt', expect.anything())
 		expect(wrapper.find('.modules-busy').exists()).toBe(false)
 		expect(wrapper.vm.follow).toBe('virt')
@@ -2090,7 +2090,7 @@ describe('a call that lost its answer', () => {
 
 		expect(dialog().exists()).toBe(false)
 		expect(text('.modules-job-title')).toBe('The install of Virtual machines is done.')
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
 		expect(wrapper.find('.modules-job-note').exists()).toBe(false)
 	})
@@ -2180,7 +2180,7 @@ describe('the list when the page learns that it is out of date', () => {
 		calls.installModule.mockImplementation(failure(refused('already_installed', {})))
 		await press('.modules-dialog-ok')
 
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
 		await press('.modules-dialog-cancel')
 		expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -2816,6 +2816,67 @@ describe('the update of an installed module', () => {
 			expect(text('.modules-dialog .modules-call-sentence')).toBe(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
 		})
 
+		describe('the origin is read after the plan', () => {
+			const org = () => listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })])
+
+			it('takes it from a list read after the plan, whatever the list on the screen said', async () => {
+				await open(org())
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				await installDialog()
+
+				expect(text('.modules-dialog-origin')).toContain('Written by someone, not by ReCasaOS.')
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('does not count a read that was already out when the plan answered: it reads again by itself', async () => {
+				await open(org())
+				const planning = deferred()
+				calls.planModule.mockImplementation(() => planning.promise)
+				await press('.modules-install')
+				const old = deferred()
+				calls.getModules.mockImplementationOnce(() => old.promise)
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				wrapper.vm.loadList()
+				const before = calls.getModules.mock.calls.length
+				planning.resolve({ data: { data: planRaw() } })
+				await settle()
+
+				expect(calls.getModules.mock.calls.length).toBe(before + 1)
+				expect(text('.modules-dialog-origin')).toContain('Written by someone')
+				old.resolve({ data: { data: org() } })
+				await settle()
+				expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			})
+
+			it('shows no plan, and no button, when that read fails', async () => {
+				await open(listRaw([moduleRaw(foreign)]))
+				calls.getModules.mockImplementation(failure({ code: 'ERR_NETWORK', message: 'Network Error' }))
+				await installDialog()
+
+				expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+				expect(wrapper.find('.modules-dialog-retry').exists()).toBe(true)
+				expect(calls.installModule).not.toHaveBeenCalled()
+			})
+
+			it('has no button and sends nothing while the list is read again after plan_changed', async () => {
+				await open(listRaw([moduleRaw(foreign)]))
+				await installDialog()
+				await tick('.modules-dialog-understood input')
+				const reading = deferred()
+				calls.getModules.mockImplementation(() => reading.promise)
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+
+				expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+				wrapper.vm.confirmDialog()
+				await settle()
+				expect(calls.installModule).toHaveBeenCalledTimes(1)
+				reading.resolve({ data: { data: listRaw([moduleRaw(foreign)]) } })
+				await settle()
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+		})
+
 		describe('a new plan', () => {
 			async function replanned(listAfter) {
 				await open(listRaw([moduleRaw(foreign)]))
@@ -2839,6 +2900,18 @@ describe('the update of an installed module', () => {
 
 				expect(text('.modules-dialog-origin')).toContain('Written by other, not by ReCasaOS.')
 				expect(wrapper.find('.modules-dialog-origin a').attributes('href')).toBe('https://github.com/other/CasaOS-Virt')
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('shows the box when the module was one of the organisation at the opening and is foreign at the new plan', async () => {
+				await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+				await installDialog()
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(true)
 				expect(ok().attributes('disabled')).toBeDefined()
 			})
 
@@ -3162,7 +3235,7 @@ describe('the update of an installed module', () => {
 			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeUndefined()
 			// a list that is out of date is read again
 			if (code === 'up_to_date' || code === 'not_installed')
-				expect(calls.getModules).toHaveBeenCalledTimes(2)
+				expect(calls.getModules).toHaveBeenCalledTimes(3)
 		})
 	})
 
@@ -3202,7 +3275,7 @@ describe('the update of an installed module', () => {
 			expect(wrapper.find('.modules-advice').exists()).toBe(false)
 			expect(wrapper.find('.modules-kept').exists()).toBe(false)
 			// the list is read again: the new version is the installed one and there is no badge any more
-			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(calls.getModules).toHaveBeenCalledTimes(3)
 			expect(text('.modules-installed')).toBe('Installed version: v0.1.3')
 			expect(wrapper.find('.modules-update-badge').exists()).toBe(false)
 			expect(wrapper.find('.modules-update-button').exists()).toBe(false)
