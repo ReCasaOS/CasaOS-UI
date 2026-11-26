@@ -697,15 +697,68 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	}
 	// the modules: virt installed and up to date, mcp offered. `refresh=1` finds a newer catalogue where virt has an update,
 	// which later reads keep. shortcut: answered at once, as handleGrid cannot wait; the core takes up to 30 s, so the spinning button is not seen here
+	// modules written outside ReCasaOS: a refusal as the core sends it (a 409 with the code in data.error_code), the plans, the install and the night switch
+	const refusal = (code, data = {}) => ({ status: 409, body: { success: 409, message: code, data: { error_code: code, error: `refused: ${code}`, data } } })
+	const moduleCall = path.match(/^\/v1\/sys\/modules\/([a-z][a-z0-9-]{0,31})\/(plan|install|auto-update)$/)
+	if (moduleCall && verb === 'POST' && moduleCall[2] === 'plan') {
+		const checks = ['catalogue', 'withdrawn', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt'].map(code => ({ code, ok: true, detail: '' }))
+		if (moduleCall[1] === 'backup-b2' && body?.mode !== 'update') {
+			return core({
+				name: 'backup-b2',
+				tag: 'v1.0.0',
+				tier: 'community',
+				checks,
+				refused: null,
+				packages: { to_install: ['rclone'], to_upgrade: [], download_bytes: 2097152, extra_bytes: 8388608, known: true },
+				archive: { url: 'https://github.com/ReCasaOS/modules/releases/download/m-backup-b2-v1.0.0/linux-amd64-casaos-backup-b2-v1.0.0.tar.gz', bytes: 4194304 },
+				plan_id: `m1-${'ab'.repeat(16)}`,
+			})
+		}
+		if (moduleCall[1] === 'dns-filter' && body?.mode === 'update') {
+			const reason = 'It can stop the network of the box when its list is empty.'
+			return core({
+				name: 'dns-filter',
+				mode: 'update',
+				tag: 'v0.3.1',
+				tier: 'community',
+				checks: checks.map(check => check.code === 'withdrawn' ? { ...check, ok: false, detail: reason } : check),
+				refused: 'withdrawn',
+				packages: { to_install: [], to_upgrade: [], known: false },
+				archive: { url: '', bytes: 0 },
+				plan_id: '',
+			})
+		}
+		return null
+	}
+	// the install never starts a job here: the first call says the plan changed (so that the new plan can be seen), the next ones say the machine is busy
+	if (moduleCall && verb === 'POST' && moduleCall[2] === 'install' && moduleCall[1] === 'backup-b2') {
+		if (!state.modulesPlanChanged) {
+			state.modulesPlanChanged = true
+			return refusal('plan_changed')
+		}
+		return refusal('busy', { reason: 'another module job is running' })
+	}
+	if (moduleCall && verb === 'PUT' && moduleCall[2] === 'auto-update') {
+		state.modulesNight ||= { 'dns-filter': false, 'photo-sync': true }
+		if (moduleCall[1] === 'dns-filter') {
+			state.modulesNight['dns-filter'] = !!body?.enabled
+			return core({ name: 'dns-filter', auto_update: state.modulesNight['dns-filter'] })
+		}
+		return refusal(moduleCall[1] === 'photo-sync' ? 'not_installed' : 'not_foreign')
+	}
 	if (verb === 'GET' && path === '/v1/sys/modules') {
 		state.modulesLooked ||= query.refresh === '1'
 		const looked = state.modulesLooked
 		const system = { supported: true, reasons: [] }
+		const night = (state.modulesNight ||= { 'dns-filter': false, 'photo-sync': true })
 		return core({
 			catalogue: { ok: true, online: { ok: true, serial: looked ? 3 : 2, generated: looked ? '2026-11-25T06:00:00Z' : '2026-11-20T06:00:00Z' } },
 			modules: [
 				{ name: 'virt', title: 'Virtual machines', description: 'Create and run virtual machines with libvirt and QEMU.', tier: 'core', tag: looked ? 'v0.2.6' : 'v0.2.5', catalogue: true, installed: { version: 'v0.2.5' }, system, ...(looked && { update: { available: true, installed: 'v0.2.5', latest: 'v0.2.6' } }) },
 				{ name: 'mcp', title: 'MCP', description: 'Lets an AI assistant read and act on this box, with tokens you give it.', tier: 'core', tag: 'v0.1.0', catalogue: true, installed: null, system },
+				{ name: 'backup-b2', title: 'Backups to B2', description: 'Copies the backups of this box to a Backblaze B2 bucket.', tier: 'community', tag: 'v1.0.0', catalogue: true, installed: null, system, repository: 'example-author/casaos-backup-b2', foreign: true },
+				{ name: 'dns-filter', title: 'DNS filter', description: 'Blocks the names of known trackers for every device on the network.', tier: 'community', tag: 'v0.3.1', catalogue: true, installed: { version: 'v0.3.0' }, system, repository: 'example-author/casaos-dns-filter', foreign: true, auto_update: night['dns-filter'], withdrawn: { tag: 'v0.3.0', reason: 'It can stop the network of the box when its list is empty.' }, update: { available: false, installed: 'v0.3.0', latest: 'v0.3.1' } },
+				{ name: 'photo-sync', title: 'Photo sync', description: 'Keeps the photos of the phones of the house in a folder of this box.', tier: 'community', tag: 'v1.2.0', catalogue: true, installed: { version: 'v1.2.0' }, system, repository: 'example-author/casaos-photo-sync', foreign: true, auto_update: night['photo-sync'] },
 			],
 		})
 	}
