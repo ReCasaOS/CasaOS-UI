@@ -376,6 +376,17 @@ describe('modules client', () => {
 		expect(sent().timeout).toBe(70000)
 	})
 
+	it('sets the switch of the night with the one field, and the timeout of the other module calls', async () => {
+		await sys.setModuleAutoUpdate('virt', true)
+		expect(sent().method).toBe('put')
+		expect(sent().url).toBe('/v1/sys/modules/virt/auto-update')
+		expect(JSON.parse(sent().data)).toEqual({ enabled: true })
+		expect(sent().timeout).toBe(70000)
+		await sys.setModuleAutoUpdate('virt', 'yes')
+		expect(JSON.parse(adapter.mock.calls[1][0].data)).toEqual({ enabled: false })
+		expect(() => sys.setModuleAutoUpdate('../x', true)).toThrow('not the name of a module')
+	})
+
 	it('asks how the job is going from the status of the module, sends nothing, waits longer than the 30 seconds the core takes to read it, and passes the cancel signal on', async () => {
 		const controller = new AbortController()
 		await sys.getModuleStatus('virt', controller.signal)

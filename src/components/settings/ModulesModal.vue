@@ -164,6 +164,22 @@
 							</p>
 						</b-message>
 
+						<!-- the night may update a module written outside ReCasaOS only when its owner says so: the box's answer is what the switch shows -->
+						<div v-if="card.module.autoUpdate !== null" class="modules-auto-update mt-3" :data-module="card.module.name">
+							<div class="is-flex is-align-items-center">
+								<span class="is-flex-grow-1 has-text-weight-semibold">{{ $t(TEXT.autoUpdate.label) }}</span>
+								<b-switch :key="`${card.module.name}-${autoRedraw}`" :disabled="Boolean(autoSaving)" :model-value="autoValue(card.module)" size="is-small" @update:model-value="setAutoUpdate(card.module, $event)">
+									<span class="is-sr-only">{{ $t(TEXT.autoUpdate.label) }}</span>
+								</b-switch>
+							</div>
+							<p class="is-size-7 _has-text-gray">
+								{{ $t(TEXT.autoUpdate.hint) }}
+							</p>
+							<p v-if="autoErrors[card.module.name]" class="modules-auto-update-error is-size-7 has-text-danger mt-1">
+								{{ autoErrors[card.module.name] }}
+							</p>
+						</div>
+
 						<b-message v-if="card.job" class="modules-job mt-3" :class="card.job.stateClass" size="is-small" :type="card.job.tone">
 							<h5 class="modules-job-title has-text-weight-semibold">
 								{{ say(card.job.title) }}
@@ -669,6 +685,11 @@ export default {
 			listError: null,
 			// how many lists loadList brought: a look for newer versions that answers after a later one is out of date
 			listSerial: 0,
+			// the switch of the night: the module whose call is out, what the box answered (by module), the sentence of a refusal (by module), a counter that redraws the switch
+			autoSaving: '',
+			autoAnswers: {},
+			autoErrors: {},
+			autoRedraw: 0,
 			// a look for newer versions is out (getModules with refresh): one at a time
 			looking: false,
 			lookAbort: null,
@@ -857,6 +878,8 @@ export default {
 			}
 			this.listError = null
 			this.view = view
+			// the list is what the box holds now
+			this.autoAnswers = {}
 			this.listSerial++
 			return true
 		},
@@ -1218,6 +1241,41 @@ export default {
 				return
 			}
 			this.callError = failure
+		},
+
+		// ---- the switch of the night ----
+
+		autoValue(module) {
+			return this.autoAnswers[module.name] ?? module.autoUpdate
+		},
+		// One call at a time. The answer is what the switch shows; a call that failed says why, the switch goes back to what the list holds, and the list is read again.
+		async setAutoUpdate(module, on) {
+			if (this.autoSaving || this.gone)
+				return
+			this.autoSaving = module.name
+			this.autoErrors = { ...this.autoErrors, [module.name]: '' }
+			let held = null
+			let failure = null
+			try {
+				held = (await this.$api.sys.setModuleAutoUpdate(module.name, on))?.data?.data?.auto_update
+				if (typeof held !== 'boolean')
+					failure = moduleFailure(null, this.locale, { read: true })
+			} catch (error) {
+				failure = moduleFailure(error, this.locale, { mode: 'autoUpdate' })
+			}
+			if (this.gone)
+				return
+			this.autoSaving = ''
+			if (!failure) {
+				this.autoAnswers = { ...this.autoAnswers, [module.name]: held }
+				// the switch says what the box holds, not what was clicked
+				if (held !== on)
+					this.autoRedraw++
+				return
+			}
+			this.autoErrors = { ...this.autoErrors, [module.name]: this.say(failure.message) }
+			this.autoRedraw++
+			this.loadList()
 		},
 
 		// ---- the confirmation window ----

@@ -78,7 +78,7 @@ const refused = (error_code, data, code = 409) => ({ response: { status: code, d
 // ---- the mocked client --------------------------------------------------------------------------------------------------
 
 // `lookModules` is getModules(true), the look for newer versions: kept apart, so that `getModules` counts the readings of the list as it always did
-const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus'].map(name => [name, vi.fn()]))
+const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus', 'setModuleAutoUpdate'].map(name => [name, vi.fn()]))
 const sys = { ...calls, getModules: (refresh, signal) => refresh ? calls.lookModules(refresh, signal) : calls.getModules() }
 let wrapper
 
@@ -277,6 +277,99 @@ describe('the list of modules', () => {
 			expect(text('.modules-withdrawn')).toContain('La version v0.1.0 a été retirée du catalogue.')
 			expect(text('.modules-withdrawn')).toContain('Raison donnée : Perte de données.')
 			expect(text('.modules-withdrawn')).toContain('Il reste installé.')
+		})
+	})
+
+	describe('the switch of the night', () => {
+		const owned = (changes = {}) => moduleRaw({ repository: 'someone/CasaOS-Virt', foreign: true, installed: { version: 'v0.1.0' }, auto_update: false, ...changes })
+		const input = () => wrapper.find('.modules-auto-update input')
+
+		it('is there only for a module that says its setting, with its label and its sentence', async () => {
+			await open(listRaw([owned()]))
+			expect(text('.modules-auto-update')).toContain('Update it at night')
+			expect(text('.modules-auto-update')).toContain('Only when automatic updates are on, and 24 hours after a new version appears.')
+			expect(input().element.checked).toBe(false)
+
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt', installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-auto-update').exists()).toBe(false)
+			await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-auto-update').exists()).toBe(false)
+		})
+
+		it('calls the core with the name and the choice, and shows the value of the answer', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(true)
+			await settle()
+
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledTimes(1)
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledWith('virt', true)
+			expect(input().element.checked).toBe(true)
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(false)
+		})
+
+		it('shows what the box holds when the answer says otherwise', async () => {
+			await open(listRaw([owned({ auto_update: true })]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(false)
+			await settle()
+
+			expect(input().element.checked).toBe(true)
+		})
+
+		it('says why a refusal was made, goes back to what the box holds and reads the list again', async () => {
+			await open(listRaw([owned({ auto_update: true })]))
+			calls.getModules.mockClear()
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await input().setValue(false)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toContain(REASONS.not_installed)
+			expect(input().element.checked).toBe(true)
+			expect(calls.getModules).toHaveBeenCalledTimes(1)
+		})
+
+		it('says the catalogue that cannot be read in its own words, and not that ReCasaOS no longer offers the module', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('catalogue', {})))
+			await input().setValue(true)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toContain('The catalogue cannot be read now: try again later.')
+			expect(text('.modules-auto-update-error')).not.toContain(REASONS.catalogue)
+		})
+
+		it('says a network failure, and goes back', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure({ code: 'ERR_NETWORK', message: 'Network Error' }))
+			await input().setValue(true)
+			await settle()
+
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(true)
+			expect(input().element.checked).toBe(false)
+		})
+
+		it('makes one call at a time: the switch is inactive while one is out', async () => {
+			await open(listRaw([owned()]))
+			const out = deferred()
+			calls.setModuleAutoUpdate.mockReturnValue(out.promise)
+			await input().setValue(true)
+			await settle()
+
+			expect(input().attributes('disabled')).toBeDefined()
+			wrapper.vm.setAutoUpdate(wrapper.vm.cards[0].module, false)
+			await settle()
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledTimes(1)
+			out.resolve({ data: { data: { name: 'virt', auto_update: true } } })
+			await settle()
+			expect(input().attributes('disabled')).toBeUndefined()
+		})
+
+		it('says the label in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([owned()]))
+
+			expect(text('.modules-auto-update')).toContain('Le mettre à jour la nuit')
 		})
 	})
 
