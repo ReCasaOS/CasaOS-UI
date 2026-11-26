@@ -25,8 +25,13 @@ describe('logsModel', () => {
 	})
 
 	it('names a restart the box did itself, as a warning with its icon', () => {
-		const r = toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', container: 'c', kind: 'auto-restarted' })
+		// as the journal records it: the service and the container, no detail
+		const r = toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', container: 'c', kind: 'auto-restarted', detail: '' })
 		expect(r).toMatchObject({ level: 'warn', text: 'a/s restarted automatically' })
+		// a container nobody followed: no service, its name
+		const named = toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: '', container: 'a-web-1', kind: 'auto-restarted', detail: '' })
+		expect(named.text).toBe('a/a-web-1 restarted automatically')
+		expect(named.text).not.toMatch(/a\/ /)
 		expect(readFileSync('src/components/Logs/LogStream.vue', 'utf8')).toContain('\'auto-restarted\': \'restart-alert\'')
 	})
 

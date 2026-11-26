@@ -544,6 +544,7 @@
 									<div>
 										<b-field>
 											<b-switch :model-value="autoHeal"
+												:disabled="autoHealSaving"
 												class="is-flex-direction-row-reverse mr-0 _small"
 												type="is-dark"
 												@update:model-value="setAutoHeal" />
@@ -898,6 +899,7 @@ export default {
 			autoUsbMount: false,
 			// null until the box has answered: an older box answers 404 and the row stays hidden
 			autoHeal: null,
+			autoHealSaving: false,
 			// null until the core answers GET /v1/sys/telemetry: a core without the
 			// route shows no switch that could not work
 			telemetryEnabled: null,
@@ -1144,7 +1146,8 @@ export default {
 					this.checkVersion()
 					// the night may have moved it: waiting, updating, up to date
 					this.getAutoUpdate()
-					this.getAutoHeal()
+					if (this.$store.getters.isAdmin)
+						this.getAutoHeal()
 				}
 			} else {
 				// Reset the text when the Settings layer closes
@@ -1675,26 +1678,32 @@ export default {
 		/*************************************************
 		 * PART 1-5b  Dashboard Setting - Automatic update
 		 **************************************************/
-		// Kept as it was when the core cannot be asked: an older core never shows
-		// the row, and a blip once it is shown does not take it away.
 		getAutoHeal() {
 			return this.$api.updates.autoHeal().then((res) => {
 				this.autoHeal = res.data.data.enabled
 			}).catch(() => {})
 		},
 
-		// The switch shows the new value at once and ends where the box says it is.
+		// The switch shows the new value at once and ends where the box says it is; it waits
+		// for its write, so that two answers cannot arrive out of order.
 		async setAutoHeal(enabled) {
+			if (this.autoHealSaving)
+				return
 			const before = this.autoHeal
 			this.autoHeal = enabled
+			this.autoHealSaving = true
 			try {
 				this.autoHeal = (await this.$api.updates.setAutoHeal(enabled)).data.data.enabled
 			} catch {
 				this.autoHeal = before
 				this.$buefy.toast.open({ message: this.$t('Unable to update at the moment!'), type: 'is-danger' })
+			} finally {
+				this.autoHealSaving = false
 			}
 		},
 
+		// Kept as it was when the core cannot be asked: an older core never shows
+		// the row, and a blip once it is shown does not take it away.
 		getAutoUpdate() {
 			this.$api.sys.getAutoUpdate().then((res) => {
 				this.autoUpdate = res.data.data

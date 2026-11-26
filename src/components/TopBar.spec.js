@@ -212,6 +212,7 @@ describe('the restart an unhealthy app switch', () => {
 	function bar(updates, autoHeal = null) {
 		const vm = {
 			autoHeal,
+			autoHealSaving: false,
 			$t: key => key,
 			$api: { updates },
 			$buefy: { toast: { open: vi.fn() } },
@@ -224,13 +225,35 @@ describe('the restart an unhealthy app switch', () => {
 
 	it('is the owner\'s, and hidden until the box has answered', () => {
 		expect(source).toMatch(/<div v-if="\$store\.getters\.isAdmin && autoHeal !== null"/)
-		expect(source).toMatch(/<b-switch :model-value="autoHeal"[^>]*@update:model-value="setAutoHeal"/)
+		expect(source).toMatch(/<b-switch :model-value="autoHeal"\s+:disabled="autoHealSaving"[^>]*@update:model-value="setAutoHeal"/)
 	})
 
-	it('is read when the menu opens', () => {
-		const vm = { canWrite: true, $store: { commit: vi.fn() }, checkVersion: vi.fn(), getAutoUpdate: vi.fn(), getAutoHeal: vi.fn() }
-		TopBar.methods.onOpen.call(vm, true)
-		expect(vm.getAutoHeal).toHaveBeenCalledTimes(1)
+	it('is read when the menu opens, by the owner only', () => {
+		for (const isAdmin of [true, false]) {
+			const vm = { canWrite: true, $store: { commit: vi.fn(), getters: { isAdmin } }, checkVersion: vi.fn(), getAutoUpdate: vi.fn(), getAutoHeal: vi.fn() }
+			TopBar.methods.onOpen.call(vm, true)
+			expect(vm.getAutoHeal).toHaveBeenCalledTimes(isAdmin ? 1 : 0)
+		}
+	})
+
+	it('waits for its write: disabled meanwhile, a second change ignored', async () => {
+		let answer
+		const setAutoHeal = vi.fn(() => new Promise((resolve) => {
+			answer = resolve
+		}))
+		const vm = bar({ setAutoHeal }, true)
+		const first = vm.setAutoHeal(false)
+		expect(vm.autoHealSaving).toBe(true)
+		await vm.setAutoHeal(true)
+		expect(setAutoHeal).toHaveBeenCalledTimes(1)
+		answer({ data: { data: { enabled: false } } })
+		await first
+		expect(vm.autoHealSaving).toBe(false)
+		expect(vm.autoHeal).toBe(false)
+	})
+
+	it('keeps the getAutoUpdate comment above getAutoUpdate', () => {
+		expect(source).toMatch(/\/\/ the row, and a blip once it is shown does not take it away\.\n\t\tgetAutoUpdate\(\)/)
 	})
 
 	it('follows the box\'s answer', async () => {
@@ -285,7 +308,7 @@ describe('the automatic update row', () => {
 			$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
 			$api: { sys },
 			$EventBus: createEventBus(),
-			$store: { commit: vi.fn() },
+			$store: { commit: vi.fn(), getters: { isAdmin: true } },
 			$buefy: { toast: { open: vi.fn() }, modal: { open: vi.fn() } },
 			$refs: { settingsDrop: { toggle: vi.fn() } },
 			// The rest of mounted() and onOpen(), which these tests do not look at.
