@@ -2131,7 +2131,7 @@ describe('the sizes', () => {
 // ---- the language files ---------------------------------------------------------------------------------------------------
 
 // a word that French writes as English does
-const SAME_IN_FRENCH = new Set(['Modules'])
+const SAME_IN_FRENCH = new Set(['Modules', 'Version {tag}', 'Version {installed} → {latest}'])
 
 describe('the language files', () => {
 	it('have each key once, and a good many', () => {
@@ -2488,5 +2488,22 @@ describe('fix round 1: a withdrawn version is said with its reason, whatever the
 	it('says the catalogue of the switch of the night with mode autoUpdate, and the offer of the module without', () => {
 		expect(moduleFailure(refusal('catalogue', {}), 'en_us', { mode: 'autoUpdate' }).message.key).toBe(AUTO_UPDATE_REASONS.catalogue)
 		expect(moduleFailure(refusal('catalogue', {}), 'en_us').message.key).toBe(REASONS.catalogue)
+	})
+})
+
+describe('the words of the simpler plan', () => {
+	const keys = [TEXT.plan.version, TEXT.plan.does, TEXT.plan.doesText, TEXT.plan.doesPackages, TEXT.plan.checksPassed, TEXT.plan.checksFailed, TEXT.plan.details, TEXT.plan.detailsHide, TEXT.plan.consequencesNoPackages, TEXT.update.version, TEXT.update.does]
+
+	it.each(keys)('says "%s" in every language file and in MODULE_KEYS', (key) => {
+		expect(MODULE_KEYS).toContain(key)
+		for (const lang of [en, fr, pt])
+			expect(lang[key]).toBeTruthy()
+	})
+
+	it('has no sentence left for what the plan no longer says', () => {
+		for (const gone of ['This is what the install does. Read it, then confirm.', 'This is what the update does. Read it, then confirm.', 'apt installs no package for this module.', 'Packages that apt installs']) {
+			expect(MODULE_KEYS).not.toContain(gone)
+			expect(en[gone]).toBeUndefined()
+		}
 	})
 })

@@ -19,6 +19,7 @@ describe('the refusal toast with the real Buefy', () => {
 		await flushPromises()
 
 		expect(failure.response).toBeDefined()
-		expect(document.body.textContent).toContain('You do not have the right to do this.')
+		// the toast is drawn a moment after the call fails: a busy machine (the whole suite at once) takes longer than one flush of the promises
+		await vi.waitFor(() => expect(document.body.textContent).toContain('You do not have the right to do this.'))
 	})
 })

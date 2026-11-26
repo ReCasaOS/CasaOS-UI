@@ -397,37 +397,40 @@
 								<p v-else-if="dialog.plan.noId" class="modules-incomplete modules-no-id mt-2">
 									{{ $t(TEXT.plan.noId) }}
 								</p>
-								<p v-else class="modules-dialog-line mt-2">
-									{{ $t(words.intro) }}
-								</p>
-								<template v-if="dialog.plan.update">
-									<p class="modules-dialog-installed mt-2">
-										{{ fact(TEXT.installed, dialog.plan.update.installed) }}
-									</p>
-									<p class="modules-dialog-version mt-1">
-										{{ fact(TEXT.offered, dialog.plan.update.latest) }}
-									</p>
-								</template>
-								<p v-else-if="dialog.plan.tag" class="modules-dialog-version mt-2">
-									{{ fact(TEXT.offered, dialog.plan.tag) }}
-								</p>
-								<p v-if="dialog.plan.tier" class="modules-dialog-tier mt-2">
-									<span class="tag is-light" :class="`is-${dialog.plan.tier.id}`">{{ $t(dialog.plan.tier.label) }}</span>
-									{{ $t(dialog.plan.tier.sentence) }}
+								<!-- the version and the kind, on one line: the sentence of the kind is in the details -->
+								<p class="modules-dialog-summary mt-2">
+									<span v-if="dialog.plan.update || dialog.plan.tag" class="modules-dialog-version">{{ dialog.plan.update ? $t(TEXT.update.version, { installed: dialog.plan.update.installed, latest: dialog.plan.update.latest }) : $t(TEXT.plan.version, { tag: dialog.plan.tag }) }}</span>
+									<template v-if="dialog.plan.tier">
+										<span v-if="dialog.plan.update || dialog.plan.tag" aria-hidden="true"> · </span>
+										<span class="modules-dialog-tier tag is-light" :class="`is-${dialog.plan.tier.id}`">{{ $t(dialog.plan.tier.label) }}</span>
+									</template>
 								</p>
 
-								<template v-if="dialog.description">
-									<h6 class="has-text-weight-semibold mt-3">
-										{{ $t(TEXT.plan.about) }}
-									</h6>
-									<p class="modules-dialog-about mt-1">
-										{{ dialog.description }}
+								<p v-if="dialog.description" class="modules-dialog-about mt-2">
+									{{ dialog.description }}
+								</p>
+
+								<h6 class="modules-does-heading has-text-weight-semibold mt-3">
+									{{ $t(words.does) }}
+								</h6>
+								<!-- what the install does: nothing is said that is empty -->
+								<template v-if="!dialog.plan.update">
+									<p class="modules-does mt-1">
+										{{ $t(dialog.plan.packages.install.length ? TEXT.plan.doesPackages : TEXT.plan.doesText) }}
 									</p>
+									<ul v-if="dialog.plan.packages.install.length" class="modules-names mt-1">
+										<li v-for="name in dialog.plan.packages.install" :key="name">
+											{{ name }}
+										</li>
+										<li v-if="dialog.plan.packages.moreInstall">
+											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreInstall }) }}
+										</li>
+									</ul>
 								</template>
 
 								<!-- what the update adds, and what the new version no longer names (those stay: no package is removed) -->
 								<template v-if="dialog.plan.update">
-									<h6 class="modules-update-added-heading has-text-weight-semibold mt-3">
+									<h6 class="modules-update-added-heading has-text-weight-semibold mt-2">
 										{{ $t(TEXT.update.added) }}
 									</h6>
 									<ul v-if="dialog.plan.update.added.length" class="modules-names modules-added mt-1">
@@ -459,98 +462,129 @@
 									</template>
 								</template>
 
-								<template v-if="dialog.plan.packages.listed">
-									<h6 v-if="!dialog.plan.update" class="has-text-weight-semibold mt-3">
-										{{ $t(TEXT.plan.packages) }}
+								<template v-if="dialog.plan.packages.upgrade.length">
+									<h6 class="has-text-weight-semibold mt-2">
+										{{ $t(TEXT.plan.upgrades) }}
 									</h6>
-									<!-- the packages of an update that apt installs are the list above -->
-									<ul v-if="!dialog.plan.update && dialog.plan.packages.install.length" class="modules-names mt-1">
-										<li v-for="name in dialog.plan.packages.install" :key="name">
+									<ul class="modules-names modules-upgrades mt-1">
+										<li v-for="name in dialog.plan.packages.upgrade" :key="name">
 											{{ name }}
 										</li>
-										<li v-if="dialog.plan.packages.moreInstall">
-											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreInstall }) }}
+										<li v-if="dialog.plan.packages.moreUpgrade">
+											{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreUpgrade }) }}
 										</li>
 									</ul>
-									<p v-else-if="!dialog.plan.update" class="modules-no-packages mt-1">
-										{{ $t(TEXT.plan.noPackages) }}
-									</p>
-									<template v-if="dialog.plan.packages.upgrade.length">
-										<h6 class="has-text-weight-semibold mt-2">
-											{{ $t(TEXT.plan.upgrades) }}
-										</h6>
-										<ul class="modules-names modules-upgrades mt-1">
-											<li v-for="name in dialog.plan.packages.upgrade" :key="name">
-												{{ name }}
-											</li>
-											<li v-if="dialog.plan.packages.moreUpgrade">
-												{{ $t(TEXT.plan.more, { n: dialog.plan.packages.moreUpgrade }) }}
-											</li>
-										</ul>
-									</template>
 								</template>
 
-								<ul class="modules-sizes mt-3">
+								<ul v-if="dialog.plan.packages.downloadText || dialog.plan.packages.extraText || (hasPackages && !dialog.plan.packages.known)" class="modules-sizes mt-2">
 									<li v-if="dialog.plan.packages.downloadText" class="modules-size-download">
 										{{ fact(TEXT.plan.download, dialog.plan.packages.downloadText) }}
-									</li>
-									<li v-if="dialog.plan.archive.bytesText" class="modules-size-archive">
-										{{ fact(TEXT.plan.archive, dialog.plan.archive.bytesText) }}
 									</li>
 									<li v-if="dialog.plan.packages.extraText" class="modules-size-extra">
 										{{ fact(TEXT.plan.extra, dialog.plan.packages.extraText) }}
 									</li>
-									<li v-if="!dialog.plan.packages.known && !(dialog.plan.update && !dialog.plan.packages.install.length)" class="modules-size-unknown">
+									<li v-if="hasPackages && !dialog.plan.packages.known" class="modules-size-unknown">
 										{{ $t(TEXT.plan.unknownSize) }}
-									</li>
-									<li v-if="dialog.plan.archive.url" class="modules-archive-url">
-										{{ fact(TEXT.plan.from, dialog.plan.archive.url) }}
 									</li>
 								</ul>
 
-								<!-- what the install or the update does to the machine: said before it is confirmed -->
-								<template v-if="dialog.plan.update">
-									<h6 class="has-text-weight-semibold mt-3">
-										{{ $t(TEXT.update.consequences) }}
-									</h6>
-									<ul class="modules-consequences modules-update-consequences mt-1">
-										<li>{{ $t(TEXT.update.stops) }}</li>
-										<li>{{ $t(TEXT.update.machines) }}</li>
-										<li>{{ $t(TEXT.update.config) }}</li>
-										<li>{{ $t(TEXT.update.back) }}</li>
-										<li>{{ $t(TEXT.update.keepOn) }}</li>
+								<!-- the checks that did not pass are said here; the ones that passed are in the details -->
+								<ul v-if="checkSummary.bad.length" class="modules-checks modules-checks-bad mt-3">
+									<li v-for="check in checkSummary.bad" :key="check.code" class="modules-check" :class="`is-${check.mark}`">
+										<span class="modules-check-mark is-size-7 has-text-weight-semibold">{{ $t(check.markText) }}</span>
+										{{ ' ' }}
+										<span class="modules-check-label">{{ say(check.label) }}</span>
+										{{ ' ' }}
+										<span v-if="check.message" class="modules-check-sentence">{{ say(check.message) }}</span>
+										{{ ' ' }}
+										<span v-if="check.detailMessage" class="modules-check-detail is-size-7">{{ say(check.detailMessage) }}</span>
+										<span v-else-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
+										{{ ' ' }}
+										<code class="is-size-7">{{ check.code }}</code>
+									</li>
+								</ul>
+								<p class="modules-checks-summary mt-3" :class="{ 'is-bad': checkSummary.bad.length }">
+									<span v-if="!checkSummary.bad.length" aria-hidden="true">✓ </span>
+									{{ checkSummary.bad.length ? $t(TEXT.plan.checksFailed, { failed: checkSummary.bad.length, n: dialog.plan.checks.length }) : $t(TEXT.plan.checksPassed, { n: dialog.plan.checks.length }) }}
+									<button type="button" class="modules-details-toggle button is-small is-text" :aria-expanded="dialog.details ? 'true' : 'false'" aria-controls="modules-details" @click="dialog.details = !dialog.details">
+										{{ $t(dialog.details ? TEXT.plan.detailsHide : TEXT.plan.details) }}
+									</button>
+								</p>
+
+								<div v-if="dialog.details" id="modules-details" class="modules-details mt-2">
+									<p v-if="dialog.plan.tier" class="modules-dialog-tier-sentence">
+										{{ $t(dialog.plan.tier.sentence) }}
+									</p>
+									<!-- what the install or the update does to the machine: said before it is confirmed -->
+									<template v-if="dialog.plan.update">
+										<h6 class="has-text-weight-semibold mt-3">
+											{{ $t(TEXT.update.consequences) }}
+										</h6>
+										<ul class="modules-consequences modules-update-consequences mt-1">
+											<li>{{ $t(TEXT.update.stops) }}</li>
+											<li>{{ $t(TEXT.update.machines) }}</li>
+											<li>{{ $t(TEXT.update.config) }}</li>
+											<li>{{ $t(TEXT.update.back) }}</li>
+											<li>{{ $t(TEXT.update.keepOn) }}</li>
+										</ul>
+									</template>
+									<template v-else>
+										<h6 class="has-text-weight-semibold mt-3">
+											{{ $t(TEXT.plan.consequences) }}
+										</h6>
+										<p class="modules-consequences mt-1">
+											{{ $t(dialog.plan.packages.install.length ? TEXT.plan.consequencesText : TEXT.plan.consequencesNoPackages) }}
+										</p>
+										<p v-if="dialog.plan.installable && dialog.plan.packages.install.length" class="modules-stay is-size-7 mt-2">
+											{{ $t(TEXT.plan.stay) }}
+										</p>
+									</template>
+									<ul v-if="dialog.plan.archive.url || dialog.plan.archive.bytesText" class="modules-sizes mt-3">
+										<li v-if="dialog.plan.archive.bytesText" class="modules-size-archive">
+											{{ fact(TEXT.plan.archive, dialog.plan.archive.bytesText) }}
+										</li>
+										<li v-if="dialog.plan.archive.url" class="modules-archive-url">
+											{{ fact(TEXT.plan.from, dialog.plan.archive.url) }}
+										</li>
 									</ul>
-								</template>
-								<template v-else>
 									<h6 class="has-text-weight-semibold mt-3">
-										{{ $t(TEXT.plan.consequences) }}
+										{{ $t(TEXT.plan.checks) }}
 									</h6>
-									<p class="modules-consequences mt-1">
-										{{ $t(TEXT.plan.consequencesText) }}
-									</p>
-									<p v-if="dialog.plan.installable" class="modules-stay is-size-7 mt-2">
-										{{ $t(TEXT.plan.stay) }}
-									</p>
-								</template>
+									<ul class="modules-checks mt-1">
+										<li v-for="check in checkSummary.good" :key="check.code" class="modules-check" :class="`is-${check.mark}`">
+											<span class="modules-check-mark is-size-7 has-text-weight-semibold">{{ $t(check.markText) }}</span>
+											{{ ' ' }}
+											<span class="modules-check-label">{{ say(check.label) }}</span>
+											{{ ' ' }}
+											<span v-if="check.detailMessage" class="modules-check-detail is-size-7">{{ say(check.detailMessage) }}</span>
+											<span v-else-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
+											{{ ' ' }}
+											<code class="is-size-7">{{ check.code }}</code>
+										</li>
+									</ul>
+								</div>
 							</template>
 
-							<h6 class="has-text-weight-semibold mt-3">
-								{{ $t(TEXT.plan.checks) }}
-							</h6>
-							<ul class="modules-checks mt-1">
-								<li v-for="check in dialog.plan.checks" :key="check.code" class="modules-check" :class="`is-${check.mark}`">
-									<span class="modules-check-mark is-size-7 has-text-weight-semibold">{{ $t(check.markText) }}</span>
-									{{ ' ' }}
-									<span class="modules-check-label">{{ say(check.label) }}</span>
-									{{ ' ' }}
-									<span v-if="check.message" class="modules-check-sentence">{{ say(check.message) }}</span>
-									{{ ' ' }}
-									<span v-if="check.detailMessage" class="modules-check-detail is-size-7">{{ say(check.detailMessage) }}</span>
-									<span v-else-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
-									{{ ' ' }}
-									<code class="is-size-7">{{ check.code }}</code>
-								</li>
-							</ul>
+							<!-- a plan that was refused keeps its checks as they were -->
+							<template v-if="dialog.plan.refused">
+								<h6 class="has-text-weight-semibold mt-3">
+									{{ $t(TEXT.plan.checks) }}
+								</h6>
+								<ul class="modules-checks mt-1">
+									<li v-for="check in dialog.plan.checks" :key="check.code" class="modules-check" :class="`is-${check.mark}`">
+										<span class="modules-check-mark is-size-7 has-text-weight-semibold">{{ $t(check.markText) }}</span>
+										{{ ' ' }}
+										<span class="modules-check-label">{{ say(check.label) }}</span>
+										{{ ' ' }}
+										<span v-if="check.message" class="modules-check-sentence">{{ say(check.message) }}</span>
+										{{ ' ' }}
+										<span v-if="check.detailMessage" class="modules-check-detail is-size-7">{{ say(check.detailMessage) }}</span>
+										<span v-else-if="check.detail" class="modules-check-detail is-size-7">{{ check.detail }}</span>
+										{{ ' ' }}
+										<code class="is-size-7">{{ check.code }}</code>
+									</li>
+								</ul>
+							</template>
 						</template>
 
 						<!-- the remove -->
@@ -775,6 +809,16 @@ export default {
 		// the way out of the window: a step that can be given up is cancelled, a plan that cannot go ahead is closed
 		cancelLabel() {
 			return this.dialog?.phase === 'planning' || this.dialogOk ? 'Cancel' : 'Close'
+		},
+		// does the plan name packages that apt installs (or upgrades)? a plan with none says nothing of packages
+		hasPackages() {
+			const packages = this.dialog?.plan?.packages
+			return Boolean(packages && (packages.install.length || packages.upgrade.length))
+		},
+		// the checks of the plan that did not pass (said in the open), and the ones that did (in the details)
+		checkSummary() {
+			const checks = this.dialog?.plan?.checks ?? []
+			return { bad: checks.filter(check => check.mark !== 'passed'), good: checks.filter(check => check.mark === 'passed') }
 		},
 		// an install of a module that ReCasaOS did not write waits for the box to be ticked
 		needsUnderstood() {
@@ -1132,6 +1176,7 @@ export default {
 			dialog.notice = null
 			// a new plan asks to be understood again
 			dialog.understood = false
+			dialog.details = false
 			let raw
 			let failure = null
 			try {
