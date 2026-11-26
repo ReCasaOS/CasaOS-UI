@@ -5,13 +5,19 @@
 // order could never survive a reload. The saved order wins now. A widget the saved
 // list does not name, one a newer version added, goes at the end as shipped; one
 // this dashboard no longer ships, or a name saved twice, is dropped.
+//
+// The card of a module is a widget named `module:<name>` that comes and goes with the list of cards (`shipped` holds the ones that the
+// list has now). A saved one is kept even while its module is not in `shipped` (the list is slow, or the module is stopped for a while):
+// its place and its hidden state are not lost. Nothing shows it, or offers it, until the list has it again (SideBar and Settings only know the ones of the list).
+export const MODULE_WIDGET = /^module:[a-z][a-z0-9-]{0,31}$/
+
 export function combineWidgetSettings(shipped, saved) {
 	const known = new Map(shipped.map(widget => [widget.name, widget]))
 	const kept = []
 	for (const widget of Array.isArray(saved) ? saved : []) {
-		if (!widget || !known.has(widget.name) || kept.some(k => k.name === widget.name))
+		if (!widget || typeof widget.name !== 'string' || (!known.has(widget.name) && !MODULE_WIDGET.test(widget.name)) || kept.some(k => k.name === widget.name))
 			continue
-		kept.push({ name: widget.name, show: typeof widget.show === 'boolean' ? widget.show : known.get(widget.name).show })
+		kept.push({ name: widget.name, show: typeof widget.show === 'boolean' ? widget.show : (known.get(widget.name)?.show ?? true) })
 	}
 
 	const added = shipped
@@ -41,4 +47,15 @@ export function resetWidgetOrder(list, names) {
 	const rank = widget => (names.includes(widget.name) ? names.indexOf(widget.name) : names.length)
 
 	return [...list].sort((a, b) => rank(a) - rank(b))
+}
+
+// What Settings hands back is the list of the widgets that exist now; the saved ones that do not (a module that is away) go back where they
+// were, so that choosing a place for another widget does not forget theirs.
+export function withAbsent(listed, full, names) {
+	const result = [...listed]
+	full.forEach((widget, index) => {
+		if (!names.includes(widget.name) && !result.some(item => item.name === widget.name))
+			result.splice(Math.min(index, result.length), 0, widget)
+	})
+	return result
 }

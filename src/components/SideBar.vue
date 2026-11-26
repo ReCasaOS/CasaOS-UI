@@ -1,11 +1,15 @@
 <template>
 	<div v-if="!isLoading" ref="sidebar" :class="{ open: sidebarOpen }" class="side-bar contextmenu-canvas">
 		<div class="widgets-content contextmenu-canvas">
-			<div v-for="(item, index) in activeApps" :key="`widgets_${index}`">
-				<component :is="item.app" :class="{ 'last-block': index === activeApps.length - 1 }" />
+			<!-- keyed by name: hiding a widget above a card must not hand its place (and its instance) to another module -->
+			<div v-for="(item, index) in activeApps" :key="`widgets_${item.name || item.app.name}`">
+				<ModuleCard v-if="item.card" :module="item.card" :class="{ 'last-block': index === activeApps.length - 1 }"
+					@loaded="handleCardLoaded" @gone="cardGone" />
+				<component :is="item.app" v-else :class="{ 'last-block': index === activeApps.length - 1 }" />
 			</div>
 		</div>
-		<Settings v-model="widgetsSettings"
+		<Settings :model-value="listedSettings"
+			:module-info="moduleInfo"
 			:class="{ 'mt-4': activeApps.length > 0 }"
 			@change="handleChange"
 			@searchBarChange="handleSearchBarChange" />
@@ -18,7 +22,10 @@ import camelCase from 'lodash/camelCase'
 import find from 'lodash/find'
 import isEqual from 'lodash/isEqual'
 import Settings from '@/components/widgets/Settings.vue'
-import { combineWidgetSettings } from '@/components/widgets/widgetOrder'
+import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
+import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { CARD_ICON_FALLBACK } from '@/components/moduleCards/moduleCards'
+import { combineWidgetSettings, withAbsent } from '@/components/widgets/widgetOrder'
 
 const widgetsComponents = require.context(
 	'@/widgets',
@@ -30,7 +37,9 @@ const widgetsConfig = 'widgets_config'
 
 export default {
 	name: 'SideBar',
+	mixins: [cardsMixin],
 	components: {
+		ModuleCard,
 		Settings,
 	},
 	data() {
@@ -39,6 +48,8 @@ export default {
 			comps: [],
 			apps: [],
 			widgetsSettings: [],
+			// the icon each card named once read
+			cardIcons: {},
 		}
 	},
 	computed: {
@@ -47,12 +58,22 @@ export default {
 				return item.show
 			})
 			const newArray = showWidgets.map((item) => {
-				const obj = find(this.apps, (o) => {
+				return find(this.apps, (o) => {
 					return o.app.name === item.name
-				})
-				return obj
+				}) ?? find(this.moduleApps, o => o.name === item.name)
 			})
-			return newArray
+			// a saved card whose module is not in the list now is kept in the settings, and not shown
+			return newArray.filter(Boolean)
+		},
+		moduleApps() {
+			return this.moduleCards.map(card => ({ name: `module:${card.name}`, card }))
+		},
+		moduleInfo() {
+			return Object.fromEntries(this.moduleCards.map(card => [`module:${card.name}`, { title: card.title, icon: this.cardIcons[card.name] || CARD_ICON_FALLBACK }]))
+		},
+		// what Settings lists: the widgets and the cards that exist now
+		listedSettings() {
+			return this.widgetsSettings.filter(item => this.apps.some(o => o.app.name === item.name) || this.moduleApps.some(o => o.name === item.name))
 		},
 		sidebarOpen() {
 			return this.$store.state.sidebarOpen
@@ -87,6 +108,9 @@ export default {
 
 		window.addEventListener('resize', this.handleResize)
 	},
+	beforeUnmount() {
+		window.removeEventListener('resize', this.handleResize)
+	},
 
 	methods: {
 		/**
@@ -94,8 +118,9 @@ export default {
 		 * @return {*} void
 		 */
 		getConfig() {
-			const initData = this.getInitData()
 			this.$api.users.getCustomStorage(widgetsConfig).then((res) => {
+				// read now: the list of the cards may have come while the settings were on their way
+				const initData = this.getInitData()
 				if (res.status === 200) {
 					if (res.data === '') {
 						this.saveData(initData)
@@ -122,12 +147,31 @@ export default {
 		 * @return {Array} array of widgets
 		 */
 		getInitData() {
-			return this.apps.map((item) => {
-				return {
-					name: item.app.name,
-					show: item.app.initShow,
-				}
-			})
+			return [
+				...this.apps.map((item) => {
+					return {
+						name: item.app.name,
+						show: item.app.initShow,
+					}
+				}),
+				...this.moduleApps.map(item => ({ name: item.name, show: true })),
+			]
+		},
+
+		// a list has been read: the new cards are given a place
+		cardsRead() {
+			if (this.isLoading)
+				return
+			const combined = combineWidgetSettings(this.getInitData(), this.widgetsSettings)
+			if (!isEqual(combined, this.widgetsSettings)) {
+				this.widgetsSettings = combined
+				this.saveData(combined)
+			}
+		},
+
+		handleCardLoaded({ name, icon }) {
+			if (this.cardIcons[name] !== icon)
+				this.cardIcons = { ...this.cardIcons, [name]: icon }
 		},
 
 		/**
@@ -147,7 +191,7 @@ export default {
 		},
 
 		handleChange(data) {
-			this.widgetsSettings = data
+			this.widgetsSettings = withAbsent(data, this.widgetsSettings, data.map(item => item.name))
 			this.saveData(this.widgetsSettings)
 		},
 

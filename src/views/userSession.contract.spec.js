@@ -61,6 +61,9 @@ function answerFor(method, path) {
 		return reply([])
 	if (path === '/v1/sys/utilization')
 		return reply({ cpu: { num: 1, percent: cpuPercent, power: {}, temperature: 0 }, mem: { total: 1, used: 0, usedPercent: 0 }, net: [], sys_disk: {}, sys_usb: [] })
+	// lists, as the core answers them (the disks widget shows once a saved choice comes back)
+	if (path === '/v1/disks/raid' || path === '/v1/disks/snapraid' || path === '/v1/disks/zfs')
+		return reply([])
 	if (path === '/v1/container/usage')
 		return reply([])
 	if (path === '/v1/sys/hardware')
@@ -94,6 +97,8 @@ beforeEach(() => {
 	localStorage.setItem('user', JSON.stringify({ id: 2, username: 'ann', role }))
 	sockets.io.mockClear()
 	sockets.opened.mockClear()
+	// the cards of the modules are read with fetch, not with the shared client: no module has a card here
+	vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(reply({ modules: [] })))))
 	calls = []
 	beta = false
 	serverRights = null
@@ -107,6 +112,7 @@ afterEach(async () => {
 	// a read still on its way when the dashboard went (a module import, a poll) lands in this test's array, not the next one's
 	await flushPromises()
 	vi.useRealTimers()
+	vi.unstubAllGlobals()
 })
 
 async function boot({ minute = true } = {}) {
@@ -120,7 +126,9 @@ async function boot({ minute = true } = {}) {
 		mine.push(`${config.method.toUpperCase()} ${url.pathname}`)
 		if (config.method !== 'get' && !store.state.user.role)
 			unknownRoleWrites.push(`${config.method.toUpperCase()} ${url.pathname}`)
-		const answer = { data: answerFor(config.method, url.pathname), status: 200, statusText: 'OK', headers: {}, config }
+		// the core answers a saved choice with what it saved (the sidebar shows what comes back)
+		const saved = config.method === 'post' && url.pathname === '/v1/users/current/custom/widgets_config'
+		const answer = { data: saved ? reply(JSON.parse(config.data)) : answerFor(config.method, url.pathname), status: 200, statusText: 'OK', headers: {}, config }
 		// the server says who the account is late, for the case where nothing is stored
 		return url.pathname === '/v1/users/current' && slowRole ? new Promise(done => setTimeout(() => done(answer), 3000)) : Promise.resolve(answer)
 	}
