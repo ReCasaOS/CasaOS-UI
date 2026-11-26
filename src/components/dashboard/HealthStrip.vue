@@ -147,7 +147,7 @@
 					</div>
 				</section>
 				<!-- the cards of the modules, in the same anatomy: the module describes its card, and this strip draws it -->
-				<ModuleCard v-for="item in shownCards" :key="item.name" :module="item" variant="panel">
+				<ModuleCard v-for="item in shownCards" :key="item.name" :module="item" variant="panel" @gone="cardGone">
 					<template #default="{ card, state, busy, run, texts }">
 						<section class="widget has-text-grey-100 panel module-panel">
 							<div class="blur-background"></div>
@@ -252,13 +252,16 @@ export default {
 			fleetState: null,
 			timer: 0,
 			// the choice of the widgets (hidden, order) that was saved: the cards of the modules follow it
-			savedWidgets: [],
+			// null until it is read, and false when it could not be: no card is shown, nor asked for, before the strip knows which are hidden
+			savedWidgets: null,
 			cardFallbackIcon: CARD_ICON_FALLBACK,
 		}
 	},
 	computed: {
 		// the cards that are not hidden in the widgets settings, in the order that was saved there (a card not named there goes last)
 		shownCards() {
+			if (!Array.isArray(this.savedWidgets))
+				return []
 			const saved = this.savedWidgets.filter(item => item && typeof item.name === 'string')
 			const rank = (card) => {
 				const index = saved.findIndex(item => item.name === `module:${card.name}`)
@@ -527,14 +530,19 @@ export default {
 	},
 	methods: {
 		// a list of the cards has been read: the saved choice of the widgets says which are hidden, and their order
-		async cardsRead() {
+		async cardsBefore() {
 			try {
 				const res = await this.$api.users.getCustomStorage('widgets_config')
 				const saved = res?.data?.data
 				this.savedWidgets = Array.isArray(saved) ? saved : []
 			} catch {
-				this.savedWidgets = []
+				// not knowing which are hidden, none is shown
+				this.savedWidgets = false
 			}
+		},
+		// a hidden card is not asked for
+		cardsToProbe(list) {
+			return Array.isArray(this.savedWidgets) ? list.filter(card => this.savedWidgets.find(item => item?.name === `module:${card.name}`)?.show !== false) : []
 		},
 		barLevel(value) {
 			if (value >= 90) {

@@ -3,10 +3,10 @@ import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ModuleCard from './ModuleCard.vue'
-import { act, getCard } from '@/service/moduleCards'
+import { actUrl as act, getCard } from '@/service/moduleCards'
 import fr from '@/assets/lang/fr_FR.json'
 
-vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCard: vi.fn(), act: vi.fn() }))
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCard: vi.fn(), actUrl: vi.fn() }))
 
 const ROUTE = '/v1/wake_on_lan'
 const entry = { name: 'wake-on-lan', title: 'Wake-on-LAN', route: ROUTE, foreign: false, owner: '' }
@@ -143,7 +143,7 @@ describe('the actions of a card', () => {
 		await click(wrapper, 'Ping')
 		await click(wrapper, 'Wake all')
 		expect(act).toHaveBeenCalledTimes(1)
-		expect(act).toHaveBeenCalledWith(ROUTE, '/ping', {})
+		expect(act).toHaveBeenCalledWith(ROUTE, `${ROUTE}/ping`, {})
 		expect(confirm).not.toHaveBeenCalled()
 		expect(wrapper.findAll('button').every(b => b.attributes('disabled') !== undefined)).toBe(true)
 		getCard.mockClear()
@@ -169,7 +169,7 @@ describe('the actions of a card', () => {
 		confirm.mock.calls[0][0].onConfirm()
 		await flushPromises()
 		expect(act).toHaveBeenCalledTimes(1)
-		expect(act).toHaveBeenCalledWith(ROUTE, '/wake-all', { all: true })
+		expect(act).toHaveBeenCalledWith(ROUTE, `${ROUTE}/wake-all`, { all: true })
 	})
 
 	it('sends nothing when the confirmation is declined, and the buttons work again', async () => {
@@ -262,5 +262,72 @@ describe('the texts of the card', () => {
 		await flushPromises()
 		expect(wrapper.find('.module-card-unavailable').text()).toBe('Cette carte est indisponible pour le moment')
 		expect(wrapper.find('.module-card-owner').text()).toBe('par inkly')
+	})
+})
+
+describe('a card that leaves the screen, or is given to another module', () => {
+	const click = (wrapper, label) => wrapper.findAll('button').find(b => b.text() === label).trigger('click')
+
+	it('does not read again, nor start a timer, when it is unmounted while an action is on its way', async () => {
+		vi.useFakeTimers()
+		let answer
+		act.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		const wrapper = mountCard()
+		await flushPromises()
+		await click(wrapper, 'Ping')
+		wrapper.unmount()
+		getCard.mockClear()
+		answer({ data: { message: 'late' } })
+		await flushPromises()
+		await vi.advanceTimersByTimeAsync(10 * 60 * 1000)
+		expect(getCard).not.toHaveBeenCalled()
+		expect(vi.getTimerCount()).toBe(0)
+	})
+
+	it('closes its dialog when it is unmounted, and sends nothing if the dialog is answered after that', async () => {
+		const dialog = { close: vi.fn() }
+		confirm.mockReturnValue(dialog)
+		const wrapper = mountCard()
+		await flushPromises()
+		await click(wrapper, 'Wake all')
+		wrapper.unmount()
+		expect(dialog.close).toHaveBeenCalled()
+		confirm.mock.calls[0][0].onConfirm()
+		await flushPromises()
+		expect(act).not.toHaveBeenCalled()
+	})
+
+	it('draws nothing of the old module, and sends nothing to its route, when it is given to another one', async () => {
+		let answer
+		const other = { name: 'second', title: 'Second', route: '/v1/second', foreign: false, owner: '' }
+		const wrapper = mountCard()
+		await flushPromises()
+		expect(wrapper.text()).toContain('Wake machines')
+		getCard.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		await wrapper.setProps({ module: other })
+		expect(wrapper.text()).toBe('')
+		answer({ data: description({ title: 'Other card', actions: [{ label: 'Go', method: 'POST', path: '/go' }] }) })
+		await flushPromises()
+		expect(getCard).toHaveBeenLastCalledWith('/v1/second')
+		expect(wrapper.text()).toContain('Other card')
+		expect(wrapper.text()).not.toContain('Wake machines')
+		await click(wrapper, 'Go')
+		expect(act).toHaveBeenCalledWith('/v1/second', '/v1/second/go', {})
+	})
+
+	it('shows only the word when a read fails, and not the status of the card as it was', async () => {
+		vi.useFakeTimers()
+		const wrapper = mountCard()
+		await flushPromises()
+		expect(wrapper.find('.module-card-status').exists()).toBe(true)
+		getCard.mockRejectedValue(http(500))
+		await vi.advanceTimersByTimeAsync(30000)
+		expect(wrapper.find('.module-card-status').exists()).toBe(false)
+		expect(wrapper.findAll('button')).toHaveLength(0)
+		expect(wrapper.find('.module-card-unavailable').exists()).toBe(true)
 	})
 })

@@ -55,7 +55,7 @@ describe('the list of the cards', () => {
 	})
 
 	it('does not believe a list that names a route of the core or of the distribution', () => {
-		for (const name of ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos'])
+		for (const name of ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos', 'container', 'disks', 'storage', 'usb'])
 			expect(cardList({ modules: [{ ...entry, route: `/v1/${name}` }, { ...entry, route: `/v2/${name}` }] }), name).toEqual([])
 		expect(cardList({ modules: [{ ...entry, route: '/v1/system' }, { ...entry, route: '/v1/sys_x' }] })).toHaveLength(1)
 	})
@@ -272,5 +272,25 @@ describe('the language files', () => {
 
 	it('says the owner of a module with a placeholder', () => {
 		expect(CARD_TEXT.owner).toContain('{owner}')
+	})
+})
+
+describe('the bounds of the card format, in characters', () => {
+	const grin = '\u{1F600}'
+	const view = extra => cardView({ schema: 1, title: 'T', ...extra }, ROUTE)
+
+	it('count code points, as the module does, and not UTF-16 units', () => {
+		expect(view({ title: grin.repeat(40) })).not.toBeNull()
+		expect(view({ title: grin.repeat(41) })).toBeNull()
+		expect(view({ rows: [{ label: grin.repeat(40), value: grin.repeat(40) }] })).not.toBeNull()
+		expect(view({ rows: [{ label: grin.repeat(41) }] })).toBeNull()
+		expect(view({ status: { level: 'ok', text: grin.repeat(40) } }).status.text).toBe(grin.repeat(40))
+		expect(view({ actions: [{ label: grin.repeat(24), method: 'POST', path: '/x', confirm: grin.repeat(120) }] }).actions[0].confirm).toBe(grin.repeat(120))
+		expect(view({ actions: [{ label: grin.repeat(25), method: 'POST', path: '/x' }] })).toBeNull()
+	})
+
+	it('cut the message of an action, and the title of a module, without cutting a character in two', () => {
+		expect(actionNote({ message: grin.repeat(500) })).toBe(grin.repeat(120))
+		expect(cardList({ modules: [{ name: 'a', title: grin.repeat(500), route: '/v1/a' }] })[0].title).toBe(grin.repeat(80))
 	})
 })

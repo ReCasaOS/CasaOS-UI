@@ -44,12 +44,14 @@ export const MODULE_CARD_KEYS = [...new Set(Object.values(CARD_TEXT))]
 const LEVELS = ['ok', 'info', 'warning', 'danger']
 const MAX_CARDS = 32
 // the routes of the core and of the distribution: the core never lists a module under one of them, and a list that does is not believed
-const RESERVED = ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos']
+const RESERVED = ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos', 'container', 'disks', 'storage', 'usb']
 const MAX_ROWS = 8
 const MAX_ACTIONS = 2
 const MAX_BODY = 1024
 const REFRESH_DEFAULT = 60
 
+// the bounds of the card format count characters as the module does, by code points (it cuts by runes): a UTF-16 unit is not a character
+const cut = (value, max) => [...value].slice(0, max).join('')
 const isPlain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const has = (table, key) => Object.prototype.hasOwnProperty.call(table, key)
 
@@ -66,7 +68,7 @@ export function cardList(raw) {
 		seen.add(entry.name)
 		cards.push({
 			name: entry.name,
-			title: clean(entry.title, 80) || entry.name,
+			title: cut(clean(entry.title, 400), 80) || entry.name,
 			route: entry.route,
 			foreign: entry.foreign === true,
 			owner: originOf({ repository: entry.repository, foreign: entry.foreign })?.owner ?? '',
@@ -90,10 +92,10 @@ function known(raw, keys) {
 
 // a text of `min` to `max` characters (the bound is of what the module sent), and clean
 function text(value, min, max) {
-	if (typeof value !== 'string' || value.length > max)
+	if (typeof value !== 'string' || [...value].length > max)
 		refuse()
-	const shown = clean(value, max)
-	if (shown.length < min)
+	const shown = clean(value, value.length)
+	if ([...shown].length < min)
 		refuse()
 	return shown
 }
@@ -167,5 +169,5 @@ export function cardView(raw, route) {
 
 /** What an action answers: its `message` as a short text, or nothing. */
 export function actionNote(raw) {
-	return isPlain(raw) ? clean(raw.message, 120) : ''
+	return isPlain(raw) ? cut(clean(raw.message, 1000), 120) : ''
 }

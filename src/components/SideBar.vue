@@ -1,9 +1,10 @@
 <template>
 	<div v-if="!isLoading" ref="sidebar" :class="{ open: sidebarOpen }" class="side-bar contextmenu-canvas">
 		<div class="widgets-content contextmenu-canvas">
-			<div v-for="(item, index) in activeApps" :key="`widgets_${index}`">
+			<!-- keyed by name: hiding a widget above a card must not hand its place (and its instance) to another module -->
+			<div v-for="(item, index) in activeApps" :key="`widgets_${item.name || item.app.name}`">
 				<ModuleCard v-if="item.card" :module="item.card" :class="{ 'last-block': index === activeApps.length - 1 }"
-					@loaded="handleCardLoaded" />
+					@loaded="handleCardLoaded" @gone="cardGone" />
 				<component :is="item.app" v-else :class="{ 'last-block': index === activeApps.length - 1 }" />
 			</div>
 		</div>

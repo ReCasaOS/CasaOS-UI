@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cardUrl, getCard, getCards } from './moduleCards.js'
+import { act, actUrl, cardUrl, getCard, getCards } from './moduleCards.js'
 import { instance as shared } from './service.js'
 
 const replace = vi.fn()
@@ -186,6 +186,40 @@ describe('a body over 16 KiB', () => {
 	it('is refused before anything is sent, in bytes', () => {
 		expect(() => act(ROUTE, '/wake', { pad: 'x'.repeat(16384) })).toThrow()
 		expect(() => act(ROUTE, '/wake', { pad: 'é'.repeat(9000) })).toThrow()
+		expect(fetchMock).not.toHaveBeenCalled()
+	})
+})
+
+describe('the time that a call may take', () => {
+	const stalled = () => fetchMock.mockImplementation((url, init) => new Promise((resolve, reject) => {
+		init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+	}))
+
+	it('is 35 s for the list of the cards, which is the core\'s, and 5 s for a card and an action', async () => {
+		vi.useFakeTimers()
+		stalled()
+		const list = getCards().catch(e => e)
+		const one = getCard(ROUTE).catch(e => e)
+		const post = act(ROUTE, '/wake').catch(e => e)
+		await vi.advanceTimersByTimeAsync(5000)
+		expect(fetchMock.mock.calls.map(call => call[1].signal.aborted)).toEqual([false, true, true])
+		await vi.advanceTimersByTimeAsync(30000)
+		expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+		expect(await list).toMatchObject({ name: 'AbortError' })
+		expect(await one).toMatchObject({ name: 'AbortError' })
+		expect(await post).toMatchObject({ name: 'AbortError' })
+	})
+})
+
+describe('an action at the address that its description gave', () => {
+	it('is sent to that address, when it is under the route', async () => {
+		await actUrl(ROUTE, `${ROUTE}/wake`, { a: 1 })
+		expect(sent().url).toBe('/v1/wake_on_lan/wake')
+		expect(JSON.parse(sent().init.body)).toEqual({ a: 1 })
+	})
+
+	it.each(['/v1/other/wake', '/v1/wake_on_lan', '/v1/wake_on_lanx/wake', 'https://evil.example/v1/wake_on_lan/x', '/v1/wake_on_lan/../x', '/v1/wake_on_lan//x', '', undefined])('refuses %j, which is not under the route', (url) => {
+		expect(() => actUrl(ROUTE, url)).toThrow()
 		expect(fetchMock).not.toHaveBeenCalled()
 	})
 })

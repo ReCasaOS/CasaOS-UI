@@ -4,23 +4,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, reactive } from 'vue'
 import SideBar from './SideBar.vue'
 import shipped from '@/components/widgets/shippedWidgets'
-import { getCards } from '@/service/moduleCards'
+import { getCard, getCards } from '@/service/moduleCards'
 
 // the widgets are listed by SideBar, and one of them draws with lottie, which needs a real canvas
 vi.mock('lottie-web-vue', () => ({ default: { name: 'lottie-animation', template: '<div/>' } }))
-vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn() }))
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn() }))
 
 const names = shipped.map(widget => widget.name)
 const hidden = names.map(name => ({ name, show: false }))
 const cardsAnswer = (...list) => ({ data: { data: { modules: list.map(name => ({ name, title: `Title ${name}`, route: `/v1/${name.replace(/-/g, '_')}` })) } } })
 
+let stubs = 0
 const ModuleCardStub = {
 	props: ['module'],
-	emits: ['loaded'],
+	emits: ['loaded', 'gone'],
+	data() {
+		return { id: ++stubs }
+	},
 	render() {
-		return h('div', { class: 'card-stub' }, this.module.name)
+		return h('div', { 'class': 'card-stub', 'data-id': this.id }, this.module.name)
 	},
 }
+const valid = { schema: 1, title: 'A card' }
+const http = status => Object.assign(new Error(`status ${status}`), { status, data: null })
 const SettingsStub = {
 	props: ['modelValue', 'moduleInfo'],
 	emits: ['change'],
@@ -52,9 +58,12 @@ beforeEach(() => {
 	document.body.innerHTML = '<div class="slider-content"></div>'
 	getCards.mockReset()
 	getCards.mockResolvedValue(cardsAnswer('wake-on-lan', 'second'))
+	getCard.mockReset()
+	getCard.mockResolvedValue({ data: valid })
 })
 afterEach(() => {
 	vi.useRealTimers()
+	Object.defineProperty(document, 'hidden', { value: false, configurable: true })
 })
 
 const shown = wrapper => wrapper.findAll('.card-stub').map(el => el.text())
@@ -158,5 +167,88 @@ describe('the cards of the modules on the classic home', () => {
 		handlers.modulesChanged()
 		await flushPromises()
 		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+	})
+})
+
+describe('which modules get a card on the home', () => {
+	const settingsNames = wrapper => listed(wrapper)
+
+	it('gives no widget, no settings row and no saved entry to a module whose card is a 404, a 401, a text that is not JSON or a refused description', async () => {
+		getCards.mockResolvedValue(cardsAnswer('no-card', 'locked', 'html', 'evil', 'good'))
+		getCard.mockImplementation((route) => {
+			if (route === '/v1/no_card')
+				return Promise.reject(http(404))
+			if (route === '/v1/locked')
+				return Promise.reject(http(401))
+			if (route === '/v1/html')
+				return Promise.reject(new Error('not JSON'))
+			if (route === '/v1/evil')
+				return Promise.resolve({ data: { ...valid, evil: 1 } })
+			return Promise.resolve({ data: valid })
+		})
+		const wrapper = mountBar()
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['good'])
+		expect(settingsNames(wrapper).filter(name => name.startsWith('module:'))).toEqual(['module:good'])
+		expect(setCustomStorage.mock.calls.flatMap(call => call[1].map(item => item.name)).filter(name => name.startsWith('module:'))).toEqual(['module:good'])
+	})
+
+	it('keeps a saved entry of a module whose card is not read yet, without offering it', async () => {
+		getCard.mockRejectedValue(http(404))
+		const wrapper = mountBar('admin', [...hidden, { name: 'module:second', show: false }])
+		await flushPromises()
+		expect(settingsNames(wrapper)).not.toContain('module:second')
+		expect(shown(wrapper)).toEqual([])
+		for (const call of setCustomStorage.mock.calls)
+			expect(call[1].map(item => item.name)).toContain('module:second')
+	})
+
+	it('offers a card that is hidden in the settings once its card was read', async () => {
+		const wrapper = mountBar('admin', [...hidden, { name: 'module:second', show: false }])
+		await flushPromises()
+		expect(settingsNames(wrapper)).toContain('module:second')
+		expect(shown(wrapper)).toEqual(['wake-on-lan'])
+	})
+
+	it('drops a card that goes, and asks it once more at the next reading of the list', async () => {
+		const wrapper = mountBar()
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+		getCard.mockClear()
+		wrapper.findAllComponents(ModuleCardStub)[1].vm.$emit('gone', 'second')
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan'])
+		expect(getCard).not.toHaveBeenCalled()
+
+		// the next reading of the list asks the one that went, and only it
+		handlers.modulesChanged()
+		await flushPromises()
+		expect(getCard.mock.calls.map(call => call[0])).toEqual(['/v1/second'])
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+	})
+
+	it('does not hand the instance of a card to another module when a widget above it is hidden', async () => {
+		const wrapper = mountBar()
+		await flushPromises()
+		const ids = Object.fromEntries(wrapper.findAll('.card-stub').map(el => [el.text(), el.attributes('data-id')]))
+		const full = wrapper.findComponent(SettingsStub).props('modelValue').map(item => (item.name === 'module:wake-on-lan' ? { ...item, show: false } : item))
+		wrapper.findComponent(SettingsStub).vm.$emit('change', full)
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['second'])
+		expect(wrapper.find('.card-stub').attributes('data-id')).toBe(ids.second)
+	})
+
+	it('asks nothing while the tab is hidden, and reads the list when it is seen again', async () => {
+		vi.useFakeTimers()
+		mountBar()
+		await flushPromises()
+		expect(getCards).toHaveBeenCalledTimes(1)
+		Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+		await vi.advanceTimersByTimeAsync(20 * 60 * 1000)
+		expect(getCards).toHaveBeenCalledTimes(1)
+		Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+		document.dispatchEvent(new Event('visibilitychange'))
+		await flushPromises()
+		expect(getCards).toHaveBeenCalledTimes(2)
 	})
 })

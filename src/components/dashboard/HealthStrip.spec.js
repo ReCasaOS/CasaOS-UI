@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import HealthStrip from './HealthStrip.vue'
 import { openFleet } from '@/components/Fleet/entry'
-import { act, getCard, getCards } from '@/service/moduleCards'
+import { actUrl as act, getCard, getCards } from '@/service/moduleCards'
 import { refreshGuard, shareGuard } from '@/service/shareGuard'
 
-vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn(), act: vi.fn() }))
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn(), actUrl: vi.fn() }))
 vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
 // the store the strip reads, and the read it asks for once a minute
 vi.mock('@/service/shareGuard', async () => {
@@ -897,20 +897,60 @@ describe('the cards of the modules', () => {
 		wrapper.unmount()
 	})
 
-	it('reads the list once and each card once: the strip has no reading of its own besides the cards', async () => {
+	it('reads the list once, and each card twice at most (once to know it has a card, once to show it)', async () => {
 		const wrapper = cards([entry('a'), entry('b')])
 		await ready()
 		expect(getCards).toHaveBeenCalledTimes(1)
-		expect(getCard).toHaveBeenCalledTimes(2)
+		expect(getCard).toHaveBeenCalledTimes(4)
 		wrapper.unmount()
 	})
 
-	it('says a card is unavailable for now, and drops one that the module answers 401 or 404 for', async () => {
-		const wrapper = cards([entry('a'), entry('b'), entry('tv-remote')], { descriptions: { '/v1/a': description({ evil: 1 }), '/v1/b': 404, '/v1/tv_remote': 401 } })
-		await ready()
+	it('shows no panel for a module whose card is a 404, a 401 or a refused description, and says unavailable for one that fails later', async () => {
+		vi.useFakeTimers()
+		const wrapper = cards([entry('a'), entry('b'), entry('tv-remote'), entry('good')], { descriptions: { '/v1/a': description({ evil: 1 }), '/v1/b': 404, '/v1/tv_remote': 401 } })
+		await vi.advanceTimersByTimeAsync(10)
+		await vi.advanceTimersByTimeAsync(10)
 		expect(wrapper.findAll('.module-panel')).toHaveLength(1)
+		getCard.mockRejectedValue(Object.assign(new Error('x'), { status: 502, data: null }))
+		await vi.advanceTimersByTimeAsync(60000)
 		expect(wrapper.find('.module-unavailable').text()).toBe('This card is unavailable for now')
+		expect(wrapper.find('.module-panel .panel-chip').exists()).toBe(false)
 		expect(wrapper.find('.module-panel .panel-foot').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('never asks for a card that is hidden in the widgets settings', async () => {
+		saved = [{ name: 'module:a', show: false }]
+		const wrapper = cards([entry('a'), entry('b')])
+		await ready()
+		expect(getCard.mock.calls.map(call => call[0]).filter(route => route === '/v1/a')).toEqual([])
+		expect(getCard).toHaveBeenCalledWith('/v1/b')
+		wrapper.unmount()
+	})
+
+	it('shows no card, and asks for none, when the saved settings cannot be read', async () => {
+		getCards.mockResolvedValue({ data: { data: { modules: [entry('a')] } } })
+		getCard.mockResolvedValue({ data: description() })
+		const wrapper = strip({ getters: admin, users: { getCustomStorage: () => Promise.reject(new Error('down')) } })
+		await ready()
+		expect(getCard).not.toHaveBeenCalled()
+		expect(wrapper.find('.module-panel').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('asks for no card before the saved settings are known', async () => {
+		let settings
+		getCards.mockResolvedValue({ data: { data: { modules: [entry('a')] } } })
+		getCard.mockResolvedValue({ data: description() })
+		const wrapper = strip({ getters: admin, users: { getCustomStorage: () => new Promise((resolve) => {
+			settings = resolve
+		}) } })
+		await ready()
+		expect(getCard).not.toHaveBeenCalled()
+		expect(getCards).not.toHaveBeenCalled()
+		settings({ status: 200, data: { data: [] } })
+		await ready()
+		expect(getCard).toHaveBeenCalled()
 		wrapper.unmount()
 	})
 
@@ -926,7 +966,7 @@ describe('the cards of the modules', () => {
 		confirm.mock.calls[0][0].onConfirm()
 		await settle()
 		expect(act).toHaveBeenCalledTimes(1)
-		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/wake-all', {})
+		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/v1/wake_on_lan/wake-all', {})
 		expect(toast).toHaveBeenCalledWith({ message: 'Sent', type: 'is-success' })
 		wrapper.unmount()
 	})
@@ -936,7 +976,7 @@ describe('the cards of the modules', () => {
 		await ready()
 		await wrapper.find('.module-row-action').trigger('click')
 		expect(confirm).not.toHaveBeenCalled()
-		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/wake', { mac: 'aa' })
+		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/v1/wake_on_lan/wake', { mac: 'aa' })
 		wrapper.unmount()
 	})
 })

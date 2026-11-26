@@ -6,6 +6,8 @@ import { clean } from '@/components/settings/osPlan'
 // of the core), and the status of an answer is kept whatever its body is.
 export const MAX_BYTES = 16384
 export const TIMEOUT = 5000
+// the list of the cards is the core's own call, as slow as the dashboard's other module calls can be
+export const LIST_TIMEOUT = 35000
 
 export const ROUTE = /^\/v\d+\/[a-z0-9_]{1,40}$/
 const PATH_MAX = 200
@@ -13,7 +15,7 @@ const PATH_MAX = 200
 const PATH_BAD = /\.\.|\/\/|[?#\\]|%2e|%2f|%5c/i
 
 /** Whether `path` is one that a card may ask for: under the module's route, no dot segments, no query, no fragment. */
-export const isCardPath = path => typeof path === 'string' && path.length <= PATH_MAX && path.startsWith('/') && !PATH_BAD.test(path) && clean(path, PATH_MAX) === path
+export const isCardPath = path => typeof path === 'string' && [...path].length <= PATH_MAX && path.startsWith('/') && !PATH_BAD.test(path) && clean(path, PATH_MAX) === path
 
 /** The one place where a route and a path are joined: `route + path`, or an error. */
 export function cardUrl(route, path) {
@@ -55,14 +57,14 @@ const failure = (message, status, data = null) => Object.assign(new Error(messag
 
 // One request. Resolves { data } (the JSON of a 2xx, or null when its body is empty); rejects with an Error that has `status` (the HTTP status,
 // absent when there was none: no answer, a redirect, a time out, a text that is too long) and `data` (the JSON of the body of an error, or null).
-async function call(method, url, body) {
+async function call(method, url, body, timeout = TIMEOUT) {
 	const headers = { 'Content-Type': 'application/json' }
 	// the same header as the shared client's, read when the call is made
 	const token = localStorage.getItem('access_token')
 	if (token)
 		headers.Authorization = token
 	const controller = new AbortController()
-	const timer = setTimeout(() => controller.abort(), TIMEOUT)
+	const timer = setTimeout(() => controller.abort(), timeout)
 	try {
 		const response = await fetch(url, { method, headers, body, redirect: 'error', credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
 		const text = await readText(response)
@@ -83,12 +85,22 @@ async function call(method, url, body) {
 	}
 }
 
-export const getCards = () => call('GET', '/v1/sys/modules/cards')
+export const getCards = () => call('GET', '/v1/sys/modules/cards', undefined, LIST_TIMEOUT)
 export const getCard = route => call('GET', cardUrl(route, '/card'))
 
 /** POSTs an action of a card: `route + path`, the JSON of `body` (up to 16 KiB) or `{}`. */
 export function act(route, path, body = {}) {
-	const url = cardUrl(route, path)
+	return post(cardUrl(route, path), body)
+}
+
+/** The same, for the full address that a description gave (`route + path`): it is checked again against the route that it must be under. */
+export function actUrl(route, url, body = {}) {
+	if (typeof url !== 'string' || typeof route !== 'string' || !url.startsWith(`${route}/`))
+		throw new Error('not under the module route')
+	return act(route, url.slice(route.length), body)
+}
+
+function post(url, body) {
 	const data = JSON.stringify(body ?? {})
 	if (bytes(data) > MAX_BYTES)
 		throw new Error('body too long')

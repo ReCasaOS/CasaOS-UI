@@ -49,7 +49,7 @@
 <script>
 import escape from 'lodash/escape'
 import { CARD_ICON_FALLBACK, CARD_TEXT, actionNote, cardView } from './moduleCards'
-import { act, getCard } from '@/service/moduleCards'
+import { actUrl, getCard } from '@/service/moduleCards'
 
 // the answers that mean "this module has no card for you": the card goes, with no word of it
 const GONE = [401, 403, 404]
@@ -78,15 +78,29 @@ export default {
 			timer: 0,
 			stale: false,
 			serial: 0,
+			// false once the card has left the screen: it asks nothing and sends nothing after that
+			alive: true,
+			dialog: null,
 		}
 	},
 	computed: {
 		busy() {
 			return this.sending || this.confirming
 		},
+		identity() {
+			return `${this.module.name} ${this.module.route}`
+		},
 	},
 	watch: {
-		'module.route': 'load',
+		// the same instance can be handed to another module: what it drew and what it could send are the old one's
+		identity() {
+			clearTimeout(this.timer)
+			this.dialog?.close?.()
+			this.card = null
+			this.state = 'loading'
+			this.stale = false
+			this.load()
+		},
 	},
 	mounted() {
 		document.addEventListener('visibilitychange', this.onVisible)
@@ -95,12 +109,16 @@ export default {
 	beforeUnmount() {
 		document.removeEventListener('visibilitychange', this.onVisible)
 		clearTimeout(this.timer)
+		this.alive = false
+		this.dialog?.close?.()
 		// an answer that comes after this is nobody's
 		this.serial++
 	},
 	methods: {
 		async load() {
 			clearTimeout(this.timer)
+			if (!this.alive)
+				return
 			const serial = ++this.serial
 			let refresh = UNAVAILABLE_REFRESH
 			try {
@@ -123,12 +141,16 @@ export default {
 					this.$emit('gone', this.module.name)
 					return
 				}
+				// only the word: what the card said before is not shown as if it still held
+				this.card = null
 				this.state = 'unavailable'
 			}
 			this.schedule(refresh)
 		},
 		schedule(seconds) {
 			clearTimeout(this.timer)
+			if (!this.alive)
+				return
 			this.timer = setTimeout(() => {
 				// a hidden tab asks nothing: it reads again when it is seen
 				if (document.hidden)
@@ -150,7 +172,7 @@ export default {
 			if (!action.confirm)
 				return this.send(action)
 			this.confirming = true
-			this.$buefy.dialog.confirm({
+			this.dialog = this.$buefy.dialog.confirm({
 				title: this.$t(this.texts.confirm),
 				// the dialog renders its message as HTML
 				message: escape(action.confirm),
@@ -158,7 +180,8 @@ export default {
 				cancelText: this.$t(this.texts.cancel),
 				onConfirm: () => {
 					this.confirming = false
-					this.send(action)
+					if (this.alive)
+						this.send(action)
 				},
 				onCancel: () => {
 					this.confirming = false
@@ -166,13 +189,13 @@ export default {
 			})
 		},
 		async send(action) {
-			if (this.sending)
+			if (this.sending || !this.alive)
 				return
 			this.sending = true
 			let message = ''
 			let type = 'is-success'
 			try {
-				message = actionNote((await act(this.module.route, action.url.slice(this.module.route.length), action.body)).data)
+				message = actionNote((await actUrl(this.module.route, action.url, action.body)).data)
 			} catch (error) {
 				type = 'is-danger'
 				message = actionNote(error?.data) || this.$t(this.texts.failed)
