@@ -335,6 +335,20 @@
 								{{ say(dialog.notice) }}
 							</p>
 
+							<!-- written outside ReCasaOS: said by the origin the card had when the window was opened -->
+							<b-message v-if="dialog.origin && !dialog.plan.refused" class="modules-dialog-origin mt-2" size="is-small" type="is-warning">
+								<p class="has-text-weight-semibold">
+									{{ dialog.origin.owner ? $t(TEXT.origin.by, { owner: dialog.origin.owner }) : $t(TEXT.origin.outside) }}
+									<a v-if="dialog.origin.url" :href="dialog.origin.url" target="_blank" rel="noopener noreferrer">{{ $t(TEXT.origin.repository) }}</a>
+								</p>
+								<p class="mt-1">
+									{{ $t(TEXT.origin.rights) }}
+								</p>
+								<b-checkbox v-if="dialog.kind === 'install' && dialog.plan.installable" v-model="dialog.understood" class="modules-dialog-understood mt-2">
+									{{ $t(TEXT.origin.confirm) }}
+								</b-checkbox>
+							</b-message>
+
 							<template v-if="dialog.plan.refused">
 								<h6 class="modules-refused-heading has-text-weight-semibold mt-2">
 									{{ $t(TEXT.plan.refusedHeading) }}
@@ -588,7 +602,7 @@
 							@click="requestPlan(false)" />
 						<b-button v-if="dialogOk"
 							class="modules-dialog-ok"
-							:disabled="Boolean(acting)"
+							:disabled="Boolean(acting) || needsUnderstood"
 							:label="dialogOk"
 							:loading="acting === dialog.key"
 							rounded
@@ -738,6 +752,10 @@ export default {
 		// the way out of the window: a step that can be given up is cancelled, a plan that cannot go ahead is closed
 		cancelLabel() {
 			return this.dialog?.phase === 'planning' || this.dialogOk ? 'Cancel' : 'Close'
+		},
+		// an install of a module that ReCasaOS did not write waits for the box to be ticked
+		needsUnderstood() {
+			return Boolean(this.dialog?.kind === 'install' && this.dialog.origin && !this.dialog.understood)
 		},
 		// the button that acts: there is none while the plan is made, none for a plan that cannot go ahead, none for a step that the machine says is moot
 		dialogOk() {
@@ -1054,13 +1072,13 @@ export default {
 		pressInstall(module, event) {
 			if (this.disabled || !module.canInstall)
 				return undefined
-			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
+			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null, origin: module.origin?.foreign ? module.origin : null, understood: false }, event)
 			return this.requestPlan(false)
 		},
 		pressUpdate(module, event) {
 			if (this.disabled || !module.canUpdate)
 				return undefined
-			this.openDialog({ kind: 'update', key: 'update', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
+			this.openDialog({ kind: 'update', key: 'update', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null, origin: module.origin?.foreign ? module.origin : null, understood: false }, event)
 			return this.requestPlan(false)
 		},
 		pressRemove(module, event) {
@@ -1126,6 +1144,9 @@ export default {
 				return
 			if (dialog.kind === 'remove')
 				return this.callModule(dialog, 'removeModule', [dialog.name])
+			// a module that ReCasaOS did not write is not installed before the person said they know it (the button is not the only way here)
+			if (this.needsUnderstood)
+				return
 			// the id that is sent is the one of the plan that is shown
 			const body = dialog.phase === 'plan' ? installBody(dialog.plan) : null
 			if (body)

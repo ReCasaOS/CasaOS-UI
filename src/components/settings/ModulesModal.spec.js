@@ -2613,6 +2613,126 @@ describe('the update of an installed module', () => {
 		wrapper.find('.modules-update-button').element.focus()
 		await press('.modules-update-button')
 	}
+	describe('a module written outside ReCasaOS', () => {
+		const foreign = { repository: 'someone/CasaOS-Virt', foreign: true }
+		const ok = () => wrapper.find('.modules-dialog-ok')
+		const tick = async (selector) => {
+			await wrapper.find(selector).setValue(true)
+			await settle()
+		}
+
+		it('warns at the top of the plan and keeps Install inactive until the box is ticked', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+
+			expect(text('.modules-dialog-origin')).toContain('Written by someone, not by ReCasaOS.')
+			expect(text('.modules-dialog-origin')).toContain('It runs with every right on this machine.')
+			const link = wrapper.find('.modules-dialog-origin a')
+			expect(link.attributes('href')).toBe('https://github.com/someone/CasaOS-Virt')
+			expect([link.attributes('target'), link.attributes('rel')]).toEqual(['_blank', 'noopener noreferrer'])
+			expect(text('.modules-dialog-understood')).toBe('I understand that ReCasaOS did not write this module')
+			expect(ok().attributes('disabled')).toBeDefined()
+
+			await tick('.modules-dialog-understood input')
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('never calls the install while the box is unticked, whatever calls it', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			await wrapper.find('.modules-dialog-ok').trigger('click')
+			wrapper.vm.confirmDialog()
+			await settle()
+			expect(calls.installModule).not.toHaveBeenCalled()
+
+			await tick('.modules-dialog-understood input')
+			await press('.modules-dialog-ok')
+			expect(calls.installModule).toHaveBeenCalledTimes(1)
+			expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID })
+		})
+
+		it('asks again with the box unticked each time the window is opened', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			await tick('.modules-dialog-understood input')
+			await press('.modules-dialog-cancel')
+			await installDialog()
+
+			expect(wrapper.find('.modules-dialog-understood input').element.checked).toBe(false)
+			expect(ok().attributes('disabled')).toBeDefined()
+		})
+
+		it('keeps what it said when the list is read again under it', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw()])))
+			await wrapper.vm.loadList()
+			await settle()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			expect(ok().attributes('disabled')).toBeDefined()
+		})
+
+		it('says the warning with no name and no link when the repository is refused', async () => {
+			await open(listRaw([moduleRaw({ repository: '../x', foreign: true })]))
+			await installDialog()
+
+			expect(text('.modules-dialog-origin')).toContain('Written outside ReCasaOS.')
+			expect(wrapper.find('.modules-dialog-origin a').exists()).toBe(false)
+		})
+
+		it('has no warning and no box for a module of the organisation', async () => {
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+			await installDialog()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('has the warning and no box for an update', async () => {
+			await open(updatable(foreign))
+			await updateDialog()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('has no box for a plan that is refused', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog({ refused: 'os', plan_id: '', checks: [{ code: 'os', ok: false, detail: 'x' }] })
+
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+		})
+
+		it('says a withdrawn version with its reason, in the plan and in the refusal of the install', async () => {
+			const reason = 'It loses the data of its disks. <b>x</b>'
+			const checks = [{ code: 'catalogue', ok: true, detail: '' }, { code: 'withdrawn', ok: false, detail: reason }]
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog({ refused: 'withdrawn', plan_id: '', checks })
+			expect(text('.modules-refused')).toContain(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
+			expect(wrapper.find('.modules-refused b').exists()).toBe(false)
+
+			await press('.modules-dialog-cancel')
+			await installDialog()
+			await tick('.modules-dialog-understood input')
+			calls.installModule.mockImplementation(failure(refused('withdrawn', { reason, checks })))
+			await press('.modules-dialog-ok')
+			expect(text('.modules-dialog .modules-call-sentence')).toBe(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
+		})
+
+		it('says the box in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+
+			expect(text('.modules-dialog-understood')).toBe('Je comprends que ReCasaOS n\'a pas écrit ce module')
+			expect(text('.modules-dialog-origin')).toContain('Il s\'exécute avec tous les droits sur cette machine.')
+		})
+	})
+
 	// an update that is running, its window closed
 	async function updating(step = 'backup') {
 		await open(updatable())
