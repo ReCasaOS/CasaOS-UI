@@ -663,11 +663,16 @@ describe('the plan of an install', () => {
 		expect(texts('.modules-dialog .modules-names:not(.modules-upgrades) li')).toEqual(['qemu-utils', 'libvirt-daemon-system'])
 		expect(texts('.modules-upgrades li')).toEqual(['libc6'])
 		expect(text('.modules-size-download')).toBe('Download of the packages: 50 MiB')
-		expect(text('.modules-size-archive')).toBe('Download of the module: 3 MiB')
 		expect(text('.modules-size-extra')).toBe('Room used on the disk by the packages: 200 MiB')
+		// the line of the version and the kind says the label only; the rest is in the details, closed until they are asked for
+		expect(text('.modules-dialog-summary')).toBe('Version v0.1.0 · Community')
+		expect(wrapper.find('.modules-details').exists()).toBe(false)
+		expect(wrapper.find('.modules-stay').exists()).toBe(false)
+		expect(text('.modules-checks-summary')).toContain('The 9 checks passed')
+		await press('.modules-details-toggle')
+		expect(text('.modules-size-archive')).toBe('Download of the module: 3 MiB')
 		expect(text('.modules-archive-url')).toBe(`The module comes from: ${URL_OK}`)
-		expect(text('.modules-dialog-tier')).toContain('Community')
-		expect(text('.modules-dialog-tier')).toContain('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
+		expect(text('.modules-dialog-tier-sentence')).toBe('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 		expect(text('.modules-stay')).toBe('The packages stay on the machine if you remove the module later.')
 		expect(wrapper.findAll('.modules-check')).toHaveLength(9)
 		expect(wrapper.findAll('.modules-check').every(check => check.classes().includes('is-passed'))).toBe(true)
@@ -701,10 +706,10 @@ describe('the plan of an install', () => {
 		expect(text('.modules-size-unknown')).toBe('ReCasaOS could not tell how much apt downloads.')
 	})
 
-	it('says that no package is installed, and lists at most 100', async () => {
+	it('lists at most 100 packages', async () => {
 		await open()
 		await installDialog({ packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true } })
-		expect(text('.modules-no-packages')).toBe('apt installs no package for this module.')
+		expect(wrapper.find('.modules-no-packages').exists()).toBe(false)
 		await press('.modules-dialog-cancel')
 
 		const names = Array.from({ length: 130 }, (_, index) => `pkg-${index}`)
@@ -799,6 +804,7 @@ describe('the plan of an install', () => {
 		await open()
 		await installDialog({ checks: okChecks().map(check => check.code === 'os' ? { ...check, detail } : check) })
 
+		await press('.modules-details-toggle')
 		const row = wrapper.findAll('.modules-check').find(check => check.find('code').text() === 'os')
 		expect(row.classes()).toContain('is-passed')
 		expect(row.find('.modules-check-detail').text()).toBe(detail)
@@ -1956,12 +1962,85 @@ describe('a plan that cannot be confirmed says why', () => {
 		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
 	})
 
-	it('says a plan that installs no package as that, with the button', async () => {
+	it('says a plan that installs no package as a program and its service, says nothing empty, and has the button', async () => {
 		await open()
-		await installDialog({ packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true } })
+		await installDialog({ packages: { to_install: [], to_upgrade: [], download_bytes: 0, extra_bytes: 0, known: true }, archive: { url: URL_OK, bytes: 0 } })
 
-		expect(text('.modules-no-packages')).toBe('apt installs no package for this module.')
+		expect(text('.modules-does-heading')).toBe('What the install does')
+		expect(text('.modules-does')).toBe('A program and its service, which starts with the machine.')
+		const said = dialog().text()
+		for (const gone of ['apt installs no package', '0 B', 'Read it, then confirm', 'This is what the install does', 'stay on the machine if you remove'])
+			expect(said).not.toContain(gone)
+		expect(wrapper.find('.modules-sizes').exists()).toBe(false)
+		expect(wrapper.find('.modules-names').exists()).toBe(false)
+		await press('.modules-details-toggle')
+		expect(text('.modules-consequences')).toBe(TEXT.plan.consequencesNoPackages)
+		expect(wrapper.find('.modules-stay').exists()).toBe(false)
 		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(true)
+	})
+
+	it('says a plan with packages with the list, the sizes, and the sentence about what stays in the details', async () => {
+		await open()
+		await installDialog()
+
+		expect(text('.modules-does')).toBe('A program and its service, which starts with the machine, and these system packages:')
+		expect(texts('.modules-dialog .modules-names:not(.modules-upgrades) li')).toEqual(['qemu-utils', 'libvirt-daemon-system'])
+		expect(text('.modules-size-download')).toBe('Download of the packages: 50 MiB')
+		expect(text('.modules-size-extra')).toBe('Room used on the disk by the packages: 200 MiB')
+		await press('.modules-details-toggle')
+		expect(text('.modules-consequences')).toBe(TEXT.plan.consequencesText)
+		expect(text('.modules-stay')).toBe('The packages stay on the machine if you remove the module later.')
+	})
+
+	describe('the details and the checks', () => {
+		it('is a button that says whether it is open, closed at first, and opens and closes with the keyboard', async () => {
+			await open()
+			await installDialog()
+			const toggle = () => wrapper.find('.modules-details-toggle')
+
+			expect(toggle().element.tagName).toBe('BUTTON')
+			expect(toggle().attributes('aria-expanded')).toBe('false')
+			expect(toggle().text()).toBe('See the details')
+			expect(wrapper.find('.modules-details').exists()).toBe(false)
+			await press('.modules-details-toggle')
+			expect(toggle().attributes('aria-expanded')).toBe('true')
+			expect(toggle().attributes('aria-controls')).toBe(wrapper.find('.modules-details').attributes('id'))
+			expect(toggle().text()).toBe('Hide the details')
+			expect(texts('.modules-details .modules-check')).toHaveLength(9)
+			await press('.modules-details-toggle')
+			expect(wrapper.find('.modules-details').exists()).toBe(false)
+		})
+
+		it('says one line when every check passed, and keeps the checks in the details', async () => {
+			await open()
+			await installDialog()
+
+			expect(text('.modules-checks-summary')).toContain('The 9 checks passed')
+			expect(wrapper.find('.modules-checks-bad').exists()).toBe(false)
+			expect(wrapper.findAll('.modules-check')).toHaveLength(0)
+		})
+
+		it('says the check that failed in the open, above the details, and counts it', async () => {
+			await open()
+			const checks = okChecks().map(check => check.code === 'busy' ? { ...check, ok: false, detail: 'not_checked' } : check)
+			await installDialog({ checks })
+
+			expect(wrapper.find('.modules-checks-bad .modules-check').classes()).toContain('is-notChecked')
+			expect(text('.modules-checks-summary')).toContain('1 of 9 checks did not pass')
+			expect(wrapper.findAll('.modules-checks-bad .modules-check')).toHaveLength(1)
+			await press('.modules-details-toggle')
+			expect(wrapper.findAll('.modules-details .modules-check')).toHaveLength(8)
+		})
+
+		it('says it in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open()
+			await installDialog()
+
+			expect(text('.modules-does-heading')).toBe('Ce que fait l\'installation')
+			expect(text('.modules-checks-summary')).toContain('Les 9 vérifications ont réussi')
+			expect(text('.modules-details-toggle')).toBe('Voir le détail')
+		})
 	})
 
 	it('says what is on hold, and gives the command that takes the hold off as text to copy', async () => {
@@ -2454,7 +2533,8 @@ describe('the confirmation of an install', () => {
 		await installDialog()
 
 		expect(text('.modules-dialog-about')).toContain('A virtual machine can be given a USB device')
-		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+		expect(text('.modules-dialog-version')).toBe('Version v0.1.0')
+		await press('.modules-details-toggle')
 		expect(text('.modules-consequences')).toBe(TEXT.plan.consequencesText)
 		expect(text('.modules-consequences')).toContain('apt as root')
 		expect(text('.modules-consequences')).toContain('/usr/bin')
@@ -2616,6 +2696,7 @@ describe('the Tab key inside the confirmation window, under the real hold of Bue
 	}
 	const inDialog = () => Boolean(document.activeElement?.closest('.modules-dialog'))
 	const cancel = () => wrapper.find('.modules-dialog-cancel').element
+	const first = () => wrapper.find('.modules-details-toggle').element
 	const ok = () => wrapper.find('.modules-dialog-ok').element
 
 	it('goes from the heading to the first control of the window, and not to the button of the card under it', async () => {
@@ -2626,19 +2707,19 @@ describe('the Tab key inside the confirmation window, under the real hold of Bue
 		const event = tab(heading)
 
 		expect(event.defaultPrevented).toBe(true)
-		expect(document.activeElement).toBe(cancel())
+		expect(document.activeElement).toBe(first())
 		expect(document.activeElement).not.toBe(wrapper.find('.modules-install').element)
 	})
 
 	it('goes from the last control to the first, and from the first to the last with the Shift key', async () => {
 		await opened()
 
-		cancel().focus()
-		expect(tab(cancel(), true).defaultPrevented).toBe(true)
+		first().focus()
+		expect(tab(first(), true).defaultPrevented).toBe(true)
 		expect(document.activeElement).toBe(ok())
 
 		expect(tab(ok()).defaultPrevented).toBe(true)
-		expect(document.activeElement).toBe(cancel())
+		expect(document.activeElement).toBe(first())
 	})
 
 	it('goes from the heading to the last control with the Shift key, and does not leave for what is before the window', async () => {
@@ -2677,7 +2758,7 @@ describe('the Tab key inside the confirmation window, under the real hold of Bue
 		expect(document.activeElement).toBe(card)
 
 		expect(tab(card).defaultPrevented).toBe(true)
-		expect(document.activeElement).toBe(cancel())
+		expect(document.activeElement).toBe(first())
 		card.focus()
 		expect(tab(card, true).defaultPrevented).toBe(true)
 		expect(document.activeElement).toBe(ok())
@@ -3108,9 +3189,9 @@ describe('the update of an installed module', () => {
 			await open(updatable())
 			await updateDialog()
 
-			expect(text('.modules-dialog-installed')).toBe('Installed version: v0.1.2')
-			expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.3')
-			expect(text('.modules-dialog .modules-dialog-line')).toBe('This is what the update does. Read it, then confirm.')
+			expect(text('.modules-dialog-summary')).toBe('Version v0.1.2 → v0.1.3 · Community')
+			expect(text('.modules-does-heading')).toBe('What the update does')
+			expect(dialog().text()).not.toContain('Read it, then confirm')
 			expect(text('.modules-update-added-heading')).toBe('These packages will be installed')
 			expect(texts('.modules-added li')).toEqual(['qemu-img'])
 			expect(texts('.modules-dropped li')).toEqual(['old-helper'])
@@ -3118,6 +3199,7 @@ describe('the update of an installed module', () => {
 			// the list of what apt installs is the one above: it is not said twice
 			expect(wrapper.findAll('.modules-dialog .modules-names:not(.modules-added):not(.modules-dropped):not(.modules-upgrades)')).toHaveLength(0)
 			expect(text('.modules-size-download')).toBe('Download of the packages: 1 MiB')
+			await press('.modules-details-toggle')
 			expect(texts('.modules-update-consequences li')).toEqual([
 				'The service of the module stops for a moment, then starts again.',
 				'This page does not touch the machines that the module runs, but the service that manages them is stopped for a moment: check that this is a good time.',
@@ -3697,13 +3779,13 @@ describe('the look for newer versions', () => {
 		await open(online())
 		await installDialog()
 		const title = text('.modules-dialog-title')
-		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+		expect(text('.modules-dialog-version')).toBe('Version v0.1.0')
 
 		out.resolve({ data: { data: online([moduleRaw({ tag: 'v0.2.0', title: 'Other title' })]) } })
 		await settle()
 		expect(dialog().exists()).toBe(true)
 		expect(text('.modules-dialog-title')).toBe(title)
-		expect(text('.modules-dialog-version')).toBe('Version offered: v0.1.0')
+		expect(text('.modules-dialog-version')).toBe('Version v0.1.0')
 
 		await press('.modules-dialog-ok')
 		expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID })
