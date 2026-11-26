@@ -286,7 +286,8 @@ function withVmTiles(apps, vms) {
 // A tile per module whose card has a link, like the Logs and Security cards: it opens the module's page in a tab. The colon keeps its name
 // (and its place in the saved order) apart from a compose app and from the built-ins.
 const MODULE_TILE = 'module:'
-const isModuleTile = app => app.name.startsWith(MODULE_TILE)
+// by its link, which only the dashboard sets: a link app's name is free text and can begin with the prefix too
+const isModuleTile = app => Boolean(app.moduleLink)
 function moduleTiles(cards = [], views = {}) {
 	return cards.filter(card => views[card.name]?.link).map(card => ({
 		id: `${MODULE_TILE}${card.name}`,
@@ -817,8 +818,9 @@ export default {
 				this.appList = this.sortApps(concat(casaAppList, moduleTiles(this.moduleCards, this.cardViews)), lateSortList)
 				this.gridMissing = gridFailed
 				this.gridRead = true
-				// a module tile is known once the cards are read (cardsRead), and an account that may not read them has none
-				const hasModuleTiles = !this.cardsAllowed || this.cardsKnown || !lateSortList.some(name => name.startsWith(MODULE_TILE))
+				// a module tile is known once the cards are read (cardsRead), and an account that is not the admin has none. The admin whose
+				// role is not confirmed yet waits for the cards too: cardsAllowed is false until then, and would let the order be saved without them
+				const hasModuleTiles = this.$store.getters.isAdmin !== true || this.cardsKnown || !lateSortList.some(name => name.startsWith(MODULE_TILE))
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order

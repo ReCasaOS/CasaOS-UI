@@ -1,11 +1,9 @@
 import { cardList, cardView } from './moduleCards'
 import events from '@/events/events'
-import { getCard, getCards } from '@/service/moduleCards'
+import { GONE, getCard, getCards } from '@/service/moduleCards'
 
 // the list is read again this often, and when the Modules window installs or removes a module
 const CARDS_EVERY_MS = 5 * 60 * 1000
-// the answers that mean "this module has no card for you" (as ModuleCard reads them)
-const GONE = [401, 403, 404]
 
 /**
  * The modules that have a card, for the two homes. The administrator's only: another account, or one whose role is not confirmed, asks nothing.

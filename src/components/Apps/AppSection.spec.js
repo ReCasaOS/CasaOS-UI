@@ -1394,7 +1394,7 @@ describe('app section module tiles', () => {
 	}
 
 	// the section with its real methods and the mixin's, the order kept as the server would
-	function section({ savedOrder = [], admin = true } = {}) {
+	function section({ savedOrder = [], admin = true, links = [] } = {}) {
 		const stored = { order: savedOrder }
 		const setCustomStorage = vi.fn((key, { data }) => {
 			stored.order = data
@@ -1405,7 +1405,7 @@ describe('app section module tiles', () => {
 			$t: tp,
 			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'jellyfin' }] } }) } },
 			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: stored.order } } }), setCustomStorage } },
-			getLinkAppList: () => Promise.resolve([]),
+			getLinkAppList: () => Promise.resolve(links.map(link => ({ ...link }))),
 			canWrite: admin,
 			$store: { getters: { canReadModule: () => true, isAdmin: admin }, state: { roleConfirmed: true } },
 			$EventBus: { $on: (event, fn) => { handlers[event] = fn }, $off: vi.fn() },
@@ -1470,6 +1470,34 @@ describe('app section module tiles', () => {
 		await vm.getList()
 		expect(names(vm)[0]).toBe('module:wake-on-lan')
 		expect(stored.order[0]).toBe('module:wake-on-lan')
+	})
+
+	it('does not save a saved order that has a tile while the admin role is not confirmed yet', async () => {
+		const { vm, stored, setCustomStorage } = section({ savedOrder: ['module:wake-on-lan', 'Files', 'App Store', 'Statistics', 'jellyfin'] })
+		vm.$store.state.roleConfirmed = false
+		// the cards are not asked for before the role is known: the list is read twice meanwhile
+		await vm.loadCards()
+		await vm.getList()
+		await vm.getList()
+		expect(getCards).not.toHaveBeenCalled()
+		expect(setCustomStorage).not.toHaveBeenCalled()
+
+		vm.$store.state.roleConfirmed = true
+		await vm.loadCards()
+		await vm.getList()
+		expect(names(vm)[0]).toBe('module:wake-on-lan')
+		expect(stored.order[0]).toBe('module:wake-on-lan')
+	})
+
+	it('leaves alone a link app whose name begins like a tile', async () => {
+		const { vm } = section({ links: [{ name: 'module:nas', app_type: 'LinkApp', hostname: 'http://nas.lan' }] })
+		await vm.getList()
+		await vm.loadCards()
+		await vm.loadCards()
+
+		expect(names(vm).filter(name => name === 'module:nas')).toHaveLength(1)
+		expect(vm.appList.find(app => app.name === 'module:nas')).toMatchObject({ app_type: 'LinkApp' })
+		expect(names(vm)).toContain('module:wake-on-lan')
 	})
 
 	it('puts the tile at its saved place when the cards are read before the list', async () => {
