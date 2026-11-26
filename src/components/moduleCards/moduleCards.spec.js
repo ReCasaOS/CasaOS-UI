@@ -54,6 +54,12 @@ describe('the list of the cards', () => {
 			expect(owner(repository)).toBe('')
 	})
 
+	it('does not believe a list that names a route of the core or of the distribution', () => {
+		for (const name of ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos'])
+			expect(cardList({ modules: [{ ...entry, route: `/v1/${name}` }, { ...entry, route: `/v2/${name}` }] }), name).toEqual([])
+		expect(cardList({ modules: [{ ...entry, route: '/v1/system' }, { ...entry, route: '/v1/sys_x' }] })).toHaveLength(1)
+	})
+
 	it('keeps a module once, and a bounded number of them', () => {
 		expect(cardList({ modules: [entry, entry] })).toHaveLength(1)
 		const many = Array.from({ length: 100 }, (_, i) => ({ name: `m${i}`, title: 'm', route: `/v1/m${i}` }))
@@ -129,12 +135,17 @@ describe('the description of a card', () => {
 		expect(refused(raw => Object.assign(raw, { title: 'x'.repeat(40) }))).not.toBeNull()
 	})
 
-	it('falls back to a neutral icon, for an icon that is unknown, absent or not text, and does not refuse the card', () => {
-		for (const icon of ['evil-outline', '', 5, null, '"><script>', '__proto__'])
-			expect(refused(raw => Object.assign(raw, { icon })).icon, String(icon)).toBe(CARD_ICON_FALLBACK)
+	it('falls back to a neutral icon, for an icon that is an unknown name or is absent, and does not refuse the card', () => {
+		for (const icon of ['evil-outline', '', '"><script>', '__proto__'])
+			expect(refused(set('icon', icon)).icon, String(icon)).toBe(CARD_ICON_FALLBACK)
 		expect(refused((raw) => {
 			delete raw.icon
 		}).icon).toBe(CARD_ICON_FALLBACK)
+	})
+
+	it('refuses an icon that is not text at all', () => {
+		for (const icon of [5, null, {}, [], ['network-outline'], true])
+			expect(refused(set('icon', icon)), JSON.stringify(icon)).toBeNull()
 	})
 
 	it('has a closed list of icons that includes the one of the network', () => {
@@ -203,6 +214,9 @@ describe('the description of a card', () => {
 			expect(refused(set('actions', [action({ body })])), JSON.stringify(body)).toBeNull()
 		expect(refused(set('actions', [action({ body: { pad: 'x'.repeat(1024) } })]))).toBeNull()
 		expect(refused(set('actions', [action({ body: { pad: 'x'.repeat(900) } })]))).not.toBeNull()
+		// the bound is in bytes: 600 characters of 2 bytes are 1200
+		expect(refused(set('actions', [action({ body: { pad: 'é'.repeat(600) } })]))).toBeNull()
+		expect(refused(set('actions', [action({ body: JSON.parse('{"__proto__":{"a":1}}') })])).actions[0].body).toEqual(JSON.parse('{"__proto__":{"a":1}}'))
 	})
 
 	it('refuses a confirmation that is not text, or over 120', () => {

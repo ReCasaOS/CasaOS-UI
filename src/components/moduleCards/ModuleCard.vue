@@ -115,7 +115,7 @@ export default {
 			} catch (error) {
 				if (serial !== this.serial)
 					return
-				if (GONE.includes(error?.response?.status)) {
+				if (GONE.includes(error?.status)) {
 					this.card = null
 					this.state = 'gone'
 					this.$emit('gone', this.module.name)
@@ -173,7 +173,7 @@ export default {
 				message = actionNote((await act(this.module.route, action.url.slice(this.module.route.length), action.body)).data)
 			} catch (error) {
 				type = 'is-danger'
-				message = actionNote(error?.response?.data) || this.$t(this.texts.failed)
+				message = actionNote(error?.data) || this.$t(this.texts.failed)
 			}
 			this.sending = false
 			if (message) {

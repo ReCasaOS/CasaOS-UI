@@ -23,7 +23,7 @@ function description(extra = {}) {
 		...extra,
 	}
 }
-const http = status => Object.assign(new Error(`status ${status}`), { response: { status, data: {} } })
+const http = status => Object.assign(new Error(`status ${status}`), { status, data: null })
 
 let confirm
 let toast
@@ -187,7 +187,7 @@ describe('the actions of a card', () => {
 	it('says the message of a failed action, or the generic sentence, and reads the card again', async () => {
 		const wrapper = mountCard()
 		await flushPromises()
-		act.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { status: 500, data: { message: 'No such machine' } } }))
+		act.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 500, data: { message: 'No such machine' } }))
 		await click(wrapper, 'Ping')
 		await flushPromises()
 		expect(toast).toHaveBeenLastCalledWith({ message: 'No such machine', type: 'is-danger' })

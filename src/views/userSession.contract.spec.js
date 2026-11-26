@@ -94,6 +94,8 @@ beforeEach(() => {
 	localStorage.setItem('user', JSON.stringify({ id: 2, username: 'ann', role }))
 	sockets.io.mockClear()
 	sockets.opened.mockClear()
+	// the cards of the modules are read with fetch, not with the shared client: no module has a card here
+	vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(reply({ modules: [] })))))
 	calls = []
 	beta = false
 	serverRights = null
@@ -107,6 +109,7 @@ afterEach(async () => {
 	// a read still on its way when the dashboard went (a module import, a poll) lands in this test's array, not the next one's
 	await flushPromises()
 	vi.useRealTimers()
+	vi.unstubAllGlobals()
 })
 
 async function boot({ minute = true } = {}) {

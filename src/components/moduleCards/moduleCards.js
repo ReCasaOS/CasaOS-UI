@@ -1,6 +1,6 @@
 import { MODULE_NAME, originOf } from '@/components/settings/osModules'
 import { clean } from '@/components/settings/osPlan'
-import { ROUTE, cardUrl, isCardPath } from '@/service/moduleCards'
+import { ROUTE, byteLength, cardUrl, isCardPath } from '@/service/moduleCards'
 
 /**
  * The cards that modules show on the home screens. A module is not trusted as the core is: its description (version 1) is read strictly,
@@ -8,7 +8,8 @@ import { ROUTE, cardUrl, isCardPath } from '@/service/moduleCards'
  * comes out has no path left to join (every `url` is the route and the path, joined once, by cardUrl) and every text is clean.
  */
 
-// The icons a module may name: the dashboard's own (the casa pack). A name outside the list is not a refusal, the card gets the neutral icon.
+// The icons a module may name: the dashboard's own (the casa pack). A name (a string) outside the list is not a refusal, the card gets the
+// neutral icon; an icon that is not a string at all (a number, an object, a list, null) refuses the card.
 export const CARD_ICONS = [
 	'network-outline',
 	'network2-outline',
@@ -42,6 +43,8 @@ export const MODULE_CARD_KEYS = [...new Set(Object.values(CARD_TEXT))]
 
 const LEVELS = ['ok', 'info', 'warning', 'danger']
 const MAX_CARDS = 32
+// the routes of the core and of the distribution: the core never lists a module under one of them, and a list that does is not believed
+const RESERVED = ['sys', 'users', 'file', 'folder', 'port', 'batch', 'image', 'samba', 'notify', 'driver', 'cloud', 'recover', 'other', 'zt', 'fleet', 'share', 'test', 'app_management', 'message_bus', 'local_storage', 'gateway', 'casaos']
 const MAX_ROWS = 8
 const MAX_ACTIONS = 2
 const MAX_BODY = 1024
@@ -58,7 +61,7 @@ export function cardList(raw) {
 	for (const entry of modules) {
 		if (cards.length >= MAX_CARDS)
 			break
-		if (!isPlain(entry) || typeof entry.name !== 'string' || !MODULE_NAME.test(entry.name) || seen.has(entry.name) || typeof entry.route !== 'string' || !ROUTE.test(entry.route))
+		if (!isPlain(entry) || typeof entry.name !== 'string' || !MODULE_NAME.test(entry.name) || seen.has(entry.name) || typeof entry.route !== 'string' || !ROUTE.test(entry.route) || RESERVED.includes(entry.route.split('/')[2]))
 			continue
 		seen.add(entry.name)
 		cards.push({
@@ -109,7 +112,7 @@ function actionOf(value, route) {
 	if (raw.method !== 'POST')
 		refuse()
 	const body = optional(raw, 'body', (item) => {
-		if (!isPlain(item) || JSON.stringify(item).length > MAX_BODY)
+		if (!isPlain(item) || byteLength(JSON.stringify(item)) > MAX_BODY)
 			refuse()
 		return JSON.parse(JSON.stringify(item))
 	}, {})
@@ -143,7 +146,7 @@ export function cardView(raw, route) {
 		const refresh = optional(raw, 'refresh', item => Number.isInteger(item) && item >= 30 && item <= 3600 ? item : refuse(), REFRESH_DEFAULT)
 		return {
 			title: text(raw.title, 1, 40),
-			icon: typeof raw.icon === 'string' && CARD_ICONS.includes(raw.icon) ? raw.icon : CARD_ICON_FALLBACK,
+			icon: optional(raw, 'icon', item => typeof item === 'string' ? (CARD_ICONS.includes(item) ? item : CARD_ICON_FALLBACK) : refuse(), CARD_ICON_FALLBACK),
 			status: optional(raw, 'status', (item) => {
 				const status = known(item, ['level', 'text'])
 				return { level: level(status.level), text: text(status.text, 0, 40) }
