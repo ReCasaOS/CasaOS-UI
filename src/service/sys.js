@@ -286,6 +286,12 @@ const sys = {
 		return instance.post(`/v1${PREFIX}/modules/${moduleName(name)}/remove`, {}, { timeout: 70000 })
 	},
 
+	// Lets the night update a module written outside ReCasaOS, or no longer: { enabled } and nothing else. 200 with { name, auto_update }; 400 bad_request,
+	// 409 not_installed, not_foreign or catalogue.
+	setModuleAutoUpdate(name, enabled) {
+		return instance.put(`/v1${PREFIX}/modules/${moduleName(name)}/auto-update`, { enabled: enabled === true }, { timeout: 70000 })
+	},
+
 	// How the job of the module is going, or how it went: { job: { name, kind, state, step, code, undo, kept_packages, started_at, ended_at, log_tail },
 	// status: { installed, version, unit, route } }. It runs no apt and is safe to ask every few seconds. The core reads a log for up to 30 seconds,
 	// so the call waits longer than that; `signal` lets the page give up the wait.

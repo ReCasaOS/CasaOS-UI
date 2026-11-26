@@ -5,7 +5,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, nextTick } from 'vue'
 import ModulesModal from './ModulesModal.vue'
-import { JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, onlineNote, reasonMessage } from './osModules'
+import { AUTO_UPDATE_REASONS, JOB_NEXT, MODULE_POLL_MS, REASONS, STEP_TEXTS, TEXT, TIERS, onlineNote, reasonMessage } from './osModules'
 import { POLL_MS, RESTART_LOOK_AFTER_MS } from './osUpgrade'
 import i18n from '@/plugins/i18n'
 
@@ -78,7 +78,7 @@ const refused = (error_code, data, code = 409) => ({ response: { status: code, d
 // ---- the mocked client --------------------------------------------------------------------------------------------------
 
 // `lookModules` is getModules(true), the look for newer versions: kept apart, so that `getModules` counts the readings of the list as it always did
-const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus'].map(name => [name, vi.fn()]))
+const calls = Object.fromEntries(['getModules', 'lookModules', 'planModule', 'installModule', 'removeModule', 'getModuleStatus', 'setModuleAutoUpdate'].map(name => [name, vi.fn()]))
 const sys = { ...calls, getModules: (refresh, signal) => refresh ? calls.lookModules(refresh, signal) : calls.getModules() }
 let wrapper
 
@@ -198,12 +198,245 @@ describe('the list of modules', () => {
 		expect(text('.modules-description')).toContain('Create and run virtual machines')
 		expect(text('.modules-description')).toContain('A virtual machine can be given a USB device')
 		expect(text('.modules-tier')).toBe('Community')
-		expect(text('.modules-tier-sentence')).toBe('Tested only against a simulated machine, not a real one.')
+		expect(text('.modules-tier-sentence')).toBe('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 		expect(text('.modules-offered')).toBe('Version offered: v0.1.0')
 		expect(wrapper.find('.modules-install').exists()).toBe(true)
 		expect(wrapper.find('.modules-install').text()).toBe('Install')
 		expect(wrapper.find('.modules-remove').exists()).toBe(false)
 		expect(wrapper.find('.modules-job').exists()).toBe(false)
+	})
+
+	describe('who wrote the module', () => {
+		const foreign = { repository: 'someone/CasaOS-Virt', foreign: true }
+
+		it('says a module written outside ReCasaOS, with a link to its repository', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+
+			expect(text('.modules-origin')).toContain('Written by someone, not by ReCasaOS.')
+			const link = wrapper.find('.modules-origin-link')
+			expect(link.text()).toBe('See its repository')
+			expect(link.attributes('href')).toBe('https://github.com/someone/CasaOS-Virt')
+			expect(link.attributes('target')).toBe('_blank')
+			expect(link.attributes('rel')).toBe('noopener noreferrer')
+		})
+
+		it('says "written outside ReCasaOS" with no name and no link when the repository is refused', async () => {
+			await open(listRaw([moduleRaw({ repository: 'javascript:alert(1)', foreign: true })]))
+
+			expect(text('.modules-origin')).toBe('Written outside ReCasaOS.')
+			expect(wrapper.find('.modules-origin-link').exists()).toBe(false)
+			expect(wrapper.find('.modules-origin a').exists()).toBe(false)
+		})
+
+		it('says nothing for a module of the organisation, whatever its tier, nor for an older core', async () => {
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+			expect(wrapper.find('.modules-origin').exists()).toBe(false)
+			await open(listRaw([moduleRaw()]))
+			expect(wrapper.find('.modules-origin').exists()).toBe(false)
+		})
+
+		it('says it in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([moduleRaw(foreign)]))
+
+			expect(text('.modules-origin')).toContain('Écrit par someone, pas par ReCasaOS.')
+			expect(text('.modules-origin-link')).toBe('Voir son dépôt')
+		})
+	})
+
+	describe('a version that the catalogue withdrew', () => {
+		const withdrawn = reason => moduleRaw({ installed: { version: 'v0.1.0' }, withdrawn: { tag: 'v0.1.0', reason } })
+
+		it('warns, with the version, the reason and what happens next', async () => {
+			await open(listRaw([withdrawn('It loses the data of its disks.')]))
+
+			const warning = wrapper.find('.modules-withdrawn')
+			expect(warning.html()).toContain('is-warning')
+			expect(warning.text()).toContain('Version v0.1.0 was withdrawn from the catalogue.')
+			expect(warning.text()).toContain('Reason given: It loses the data of its disks.')
+			expect(warning.text()).toContain('It stays installed. Remove it, or wait for a later version.')
+			expect(wrapper.find('.modules-update-button').exists()).toBe(false)
+		})
+
+		it('shows markup as the text it is, and creates no element', async () => {
+			await open(listRaw([withdrawn('<img src=x onerror=alert(1)>')]))
+
+			expect(text('.modules-withdrawn')).toContain('<img src=x onerror=alert(1)>')
+			expect(wrapper.find('.modules-withdrawn img').exists()).toBe(false)
+		})
+
+		it('says nothing for a core that does not say it', async () => {
+			await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-withdrawn').exists()).toBe(false)
+		})
+
+		it('says it in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([withdrawn('Perte de données.')]))
+
+			expect(text('.modules-withdrawn')).toContain('La version v0.1.0 a été retirée du catalogue.')
+			expect(text('.modules-withdrawn')).toContain('Raison donnée : Perte de données.')
+			expect(text('.modules-withdrawn')).toContain('Il reste installé.')
+		})
+	})
+
+	describe('the switch of the night', () => {
+		const owned = (changes = {}) => moduleRaw({ repository: 'someone/CasaOS-Virt', foreign: true, installed: { version: 'v0.1.0' }, auto_update: false, ...changes })
+		const input = () => wrapper.find('.modules-auto-update input')
+
+		it('is there only for a module that says its setting, with its label and its sentence', async () => {
+			await open(listRaw([owned()]))
+			expect(text('.modules-auto-update')).toContain('Update it at night')
+			expect(text('.modules-auto-update')).toContain('Only when automatic updates are on, and 24 hours after a new version appears.')
+			expect(input().element.checked).toBe(false)
+
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt', installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-auto-update').exists()).toBe(false)
+			await open(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })]))
+			expect(wrapper.find('.modules-auto-update').exists()).toBe(false)
+		})
+
+		it('calls the core with the name and the choice, and shows the value of the answer', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(true)
+			await settle()
+
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledTimes(1)
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledWith('virt', true)
+			expect(input().element.checked).toBe(true)
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(false)
+		})
+
+		it('shows what the box holds when the answer says otherwise', async () => {
+			await open(listRaw([owned({ auto_update: true })]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(false)
+			await settle()
+
+			expect(input().element.checked).toBe(true)
+		})
+
+		it('says why a refusal was made, goes back to what the box holds and reads the list again', async () => {
+			await open(listRaw([owned({ auto_update: true })]))
+			calls.getModules.mockClear()
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await input().setValue(false)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toContain(AUTO_UPDATE_REASONS.not_installed)
+			expect(text('.modules-auto-update-error')).not.toContain('remove')
+			expect(input().element.checked).toBe(true)
+			expect(calls.getModules).toHaveBeenCalledTimes(1)
+		})
+
+		it('says the catalogue that cannot be read in its own words, and not that ReCasaOS no longer offers the module', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('catalogue', {})))
+			await input().setValue(true)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toContain('The catalogue cannot be read now: try again later.')
+			expect(text('.modules-auto-update-error')).not.toContain(REASONS.catalogue)
+		})
+
+		it('says a network failure, and goes back', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure({ code: 'ERR_NETWORK', message: 'Network Error' }))
+			await input().setValue(true)
+			await settle()
+
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(true)
+			expect(input().element.checked).toBe(false)
+		})
+
+		it('makes one call at a time: the switch is inactive while one is out', async () => {
+			await open(listRaw([owned()]))
+			const out = deferred()
+			calls.setModuleAutoUpdate.mockReturnValue(out.promise)
+			await input().setValue(true)
+			await settle()
+
+			expect(input().attributes('disabled')).toBeDefined()
+			wrapper.vm.setAutoUpdate(wrapper.vm.cards[0].module, false)
+			await settle()
+			expect(calls.setModuleAutoUpdate).toHaveBeenCalledTimes(1)
+			out.resolve({ data: { data: { name: 'virt', auto_update: true } } })
+			await settle()
+			expect(input().attributes('disabled')).toBeUndefined()
+		})
+
+		it('says a failure aloud, and keeps the focus on the switch that was used', async () => {
+			await open(listRaw([owned(), owned({ name: 'other' })]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			const mine = wrapper.find('.modules-auto-update[data-module="virt"] input')
+			mine.element.focus()
+			await mine.setValue(true)
+			await settle()
+
+			expect(text('.modules-live')).toBe(AUTO_UPDATE_REASONS.not_installed)
+			const again = wrapper.find('.modules-auto-update[data-module="virt"] input').element
+			expect(document.activeElement).toBe(again)
+		})
+
+		it('redraws only the switch of that module', async () => {
+			await open(listRaw([owned(), owned({ name: 'other' })]))
+			const other = wrapper.find('.modules-auto-update[data-module="other"] input').element
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await wrapper.find('.modules-auto-update[data-module="virt"] input').setValue(true)
+			await settle()
+
+			expect(wrapper.find('.modules-auto-update[data-module="other"] input').element).toBe(other)
+		})
+
+		it('keeps the answer of the box against a list that was read before it, and takes a list read after it', async () => {
+			await open(listRaw([owned()]))
+			const older = deferred()
+			calls.getModules.mockImplementationOnce(() => older.promise)
+			wrapper.vm.loadList()
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(true)
+			await settle()
+			older.resolve({ data: { data: listRaw([owned({ auto_update: false })]) } })
+			await settle()
+			expect(input().element.checked).toBe(true)
+
+			calls.getModules.mockImplementation(() => answer(listRaw([owned({ auto_update: false })])))
+			await wrapper.vm.loadList()
+			await settle()
+			expect(input().element.checked).toBe(false)
+		})
+
+		it('forgets the sentence of a failure when the list shows no switch for the module any more', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await input().setValue(true)
+			await settle()
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(true)
+
+			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw()])))
+			await wrapper.vm.loadList()
+			calls.getModules.mockImplementation(() => answer(listRaw([owned()])))
+			await wrapper.vm.loadList()
+			await settle()
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(false)
+		})
+
+		it('says the request may have gone through when the answer has no setting', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt' }))
+			await input().setValue(true)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toBe(TEXT.call.maybe)
+		})
+
+		it('says the label in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([owned()]))
+
+			expect(text('.modules-auto-update')).toContain('Le mettre à jour la nuit')
+		})
 	})
 
 	it('says a module of the core in its words', async () => {
@@ -434,7 +667,7 @@ describe('the plan of an install', () => {
 		expect(text('.modules-size-extra')).toBe('Room used on the disk by the packages: 200 MiB')
 		expect(text('.modules-archive-url')).toBe(`The module comes from: ${URL_OK}`)
 		expect(text('.modules-dialog-tier')).toContain('Community')
-		expect(text('.modules-dialog-tier')).toContain('Tested only against a simulated machine, not a real one.')
+		expect(text('.modules-dialog-tier')).toContain('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 		expect(text('.modules-stay')).toBe('The packages stay on the machine if you remove the module later.')
 		expect(wrapper.findAll('.modules-check')).toHaveLength(9)
 		expect(wrapper.findAll('.modules-check').every(check => check.classes().includes('is-passed'))).toBe(true)
@@ -757,12 +990,12 @@ describe('the install', () => {
 		expect(text('.modules-busy-sentence')).toBe(REASONS.busy)
 		expect(text('.modules-busy-detail')).toBe('Reported by ReCasaOS: an upgrade of the operating system is open')
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeDefined()
-		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
 
 		await press('.modules-busy-retry')
 
 		expect(wrapper.find('.modules-busy').exists()).toBe(false)
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(wrapper.find('.modules-install').attributes('disabled')).toBeUndefined()
 	})
 
@@ -952,12 +1185,12 @@ describe('the job', () => {
 
 		it('stops when the job is over, and reads the list again', async () => {
 			await running('route')
-			expect(calls.getModules).toHaveBeenCalledTimes(1)
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
 			serveJob(jobAnswer({ state: 'succeeded', step: 'done', ended_at: '2026-10-18T12:01:00Z' }, { installed: true }))
 			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw({ installed: { version: 'v0.1.0' } })])))
 			await tick(MODULE_POLL_MS.running)
 
-			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(calls.getModules).toHaveBeenCalledTimes(3)
 			const asked = calls.getModuleStatus.mock.calls.length
 			await tick(60000)
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(asked)
@@ -1121,7 +1354,7 @@ describe('the job', () => {
 			out.resolve({ data: { data: jobAnswer({ state: 'succeeded', step: 'done' }) } })
 			await tick(120000)
 			expect(calls.getModuleStatus).toHaveBeenCalledTimes(1)
-			expect(calls.getModules).toHaveBeenCalledTimes(1)
+			expect(calls.getModules).toHaveBeenCalledTimes(2)
 			expect(vi.getTimerCount()).toBe(0)
 		})
 
@@ -1899,12 +2132,12 @@ describe('the busy flag', () => {
 		calls.installModule.mockImplementation(failure(refused('busy', { reason: 'another job' })))
 		await press('.modules-dialog-ok')
 		await press('.modules-dialog-cancel')
-		expect(calls.getModules).toHaveBeenCalledTimes(1)
+		expect(calls.getModules).toHaveBeenCalledTimes(2)
 
 		serveJob(jobAnswer({ state: 'running', step: 'download' }))
 		await press('.modules-busy-retry')
 
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(calls.getModuleStatus).toHaveBeenCalledWith('virt', expect.anything())
 		expect(wrapper.find('.modules-busy').exists()).toBe(false)
 		expect(wrapper.vm.follow).toBe('virt')
@@ -1923,7 +2156,7 @@ describe('a call that lost its answer', () => {
 
 		expect(dialog().exists()).toBe(false)
 		expect(text('.modules-job-title')).toBe('The install of Virtual machines is done.')
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(text('.modules-installed')).toBe('Installed version: v0.1.0')
 		expect(wrapper.find('.modules-job-note').exists()).toBe(false)
 	})
@@ -2013,7 +2246,7 @@ describe('the list when the page learns that it is out of date', () => {
 		calls.installModule.mockImplementation(failure(refused('already_installed', {})))
 		await press('.modules-dialog-ok')
 
-		expect(calls.getModules).toHaveBeenCalledTimes(2)
+		expect(calls.getModules).toHaveBeenCalledTimes(3)
 		expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
 		await press('.modules-dialog-cancel')
 		expect(wrapper.find('.modules-install').exists()).toBe(false)
@@ -2510,7 +2743,7 @@ describe('the page', () => {
 		i18n.global.locale = 'fr_fr'
 		await open()
 
-		expect(text('.modules-tier-sentence')).toBe('Testé uniquement sur une machine simulée, pas sur une vraie.')
+		expect(text('.modules-tier-sentence')).toBe('Écrit hors de ReCasaOS, relu à son entrée au catalogue, non testé par ReCasaOS.')
 		expect(text('.modules-offered')).toBe('Version proposée : v0.1.0')
 		expect(wrapper.find('.modules-install').text()).toBe('Installer')
 	})
@@ -2539,6 +2772,234 @@ describe('the update of an installed module', () => {
 		wrapper.find('.modules-update-button').element.focus()
 		await press('.modules-update-button')
 	}
+	describe('a module written outside ReCasaOS', () => {
+		const foreign = { repository: 'someone/CasaOS-Virt', foreign: true }
+		const ok = () => wrapper.find('.modules-dialog-ok')
+		const tick = async (selector) => {
+			await wrapper.find(selector).setValue(true)
+			await settle()
+		}
+
+		it('warns at the top of the plan and keeps Install inactive until the box is ticked', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+
+			expect(text('.modules-dialog-origin')).toContain('Written by someone, not by ReCasaOS.')
+			expect(text('.modules-dialog-origin')).toContain('It runs with every right on this machine.')
+			const link = wrapper.find('.modules-dialog-origin a')
+			expect(link.attributes('href')).toBe('https://github.com/someone/CasaOS-Virt')
+			expect([link.attributes('target'), link.attributes('rel')]).toEqual(['_blank', 'noopener noreferrer'])
+			expect(text('.modules-dialog-understood')).toBe('I understand that ReCasaOS did not write this module')
+			expect(ok().attributes('disabled')).toBeDefined()
+
+			await tick('.modules-dialog-understood input')
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('never calls the install while the box is unticked, whatever calls it', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			await wrapper.find('.modules-dialog-ok').trigger('click')
+			wrapper.vm.confirmDialog()
+			await settle()
+			expect(calls.installModule).not.toHaveBeenCalled()
+
+			await tick('.modules-dialog-understood input')
+			await press('.modules-dialog-ok')
+			expect(calls.installModule).toHaveBeenCalledTimes(1)
+			expect(calls.installModule).toHaveBeenCalledWith('virt', { plan_id: PLAN_ID })
+		})
+
+		it('asks again with the box unticked each time the window is opened', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			await tick('.modules-dialog-understood input')
+			await press('.modules-dialog-cancel')
+			await installDialog()
+
+			expect(wrapper.find('.modules-dialog-understood input').element.checked).toBe(false)
+			expect(ok().attributes('disabled')).toBeDefined()
+		})
+
+		it('keeps what it said when the list is read again under it', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw()])))
+			await wrapper.vm.loadList()
+			await settle()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			expect(ok().attributes('disabled')).toBeDefined()
+		})
+
+		it('says the warning with no name and no link when the repository is refused', async () => {
+			await open(listRaw([moduleRaw({ repository: '../x', foreign: true })]))
+			await installDialog()
+
+			expect(text('.modules-dialog-origin')).toContain('Written outside ReCasaOS.')
+			expect(wrapper.find('.modules-dialog-origin a').exists()).toBe(false)
+		})
+
+		it('has no warning and no box for a module of the organisation', async () => {
+			await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+			await installDialog()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('has the warning and no box for an update', async () => {
+			await open(updatable(foreign))
+			await updateDialog()
+
+			expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(ok().attributes('disabled')).toBeUndefined()
+		})
+
+		it('has no box for a plan that is refused', async () => {
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog({ refused: 'os', plan_id: '', checks: [{ code: 'os', ok: false, detail: 'x' }] })
+
+			expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+			expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+		})
+
+		it('says a withdrawn version with its reason, in the plan and in the refusal of the install', async () => {
+			const reason = 'It loses the data of its disks. <b>x</b>'
+			const checks = [{ code: 'catalogue', ok: true, detail: '' }, { code: 'withdrawn', ok: false, detail: reason }]
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog({ refused: 'withdrawn', plan_id: '', checks })
+			expect(text('.modules-refused')).toContain(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
+			expect(wrapper.find('.modules-refused b').exists()).toBe(false)
+
+			await press('.modules-dialog-cancel')
+			await installDialog()
+			await tick('.modules-dialog-understood input')
+			calls.installModule.mockImplementation(failure(refused('withdrawn', { reason, checks })))
+			await press('.modules-dialog-ok')
+			expect(text('.modules-dialog .modules-call-sentence')).toBe(`ReCasaOS withdrew this version from the catalogue: ${reason}`)
+		})
+
+		describe('the origin is read after the plan', () => {
+			const org = () => listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })])
+
+			it('takes it from a list read after the plan, whatever the list on the screen said', async () => {
+				await open(org())
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				await installDialog()
+
+				expect(text('.modules-dialog-origin')).toContain('Written by someone, not by ReCasaOS.')
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('does not count a read that was already out when the plan answered: it reads again by itself', async () => {
+				await open(org())
+				const planning = deferred()
+				calls.planModule.mockImplementation(() => planning.promise)
+				await press('.modules-install')
+				const old = deferred()
+				calls.getModules.mockImplementationOnce(() => old.promise)
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				wrapper.vm.loadList()
+				const before = calls.getModules.mock.calls.length
+				planning.resolve({ data: { data: planRaw() } })
+				await settle()
+
+				expect(calls.getModules.mock.calls.length).toBe(before + 1)
+				expect(text('.modules-dialog-origin')).toContain('Written by someone')
+				old.resolve({ data: { data: org() } })
+				await settle()
+				expect(wrapper.find('.modules-dialog-origin').exists()).toBe(true)
+			})
+
+			it('shows no plan, and no button, when that read fails', async () => {
+				await open(listRaw([moduleRaw(foreign)]))
+				calls.getModules.mockImplementation(failure({ code: 'ERR_NETWORK', message: 'Network Error' }))
+				await installDialog()
+
+				expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+				expect(wrapper.find('.modules-dialog-retry').exists()).toBe(true)
+				expect(calls.installModule).not.toHaveBeenCalled()
+			})
+
+			it('has no button and sends nothing while the list is read again after plan_changed', async () => {
+				await open(listRaw([moduleRaw(foreign)]))
+				await installDialog()
+				await tick('.modules-dialog-understood input')
+				const reading = deferred()
+				calls.getModules.mockImplementation(() => reading.promise)
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+
+				expect(wrapper.find('.modules-dialog-ok').exists()).toBe(false)
+				wrapper.vm.confirmDialog()
+				await settle()
+				expect(calls.installModule).toHaveBeenCalledTimes(1)
+				reading.resolve({ data: { data: listRaw([moduleRaw(foreign)]) } })
+				await settle()
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+		})
+
+		describe('a new plan', () => {
+			async function replanned(listAfter) {
+				await open(listRaw([moduleRaw(foreign)]))
+				await installDialog()
+				await tick('.modules-dialog-understood input')
+				expect(ok().attributes('disabled')).toBeUndefined()
+				calls.getModules.mockImplementation(() => answer(listAfter))
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+			}
+
+			it('asks for the confirmation again after plan_changed', async () => {
+				await replanned(listRaw([moduleRaw(foreign)]))
+
+				expect(wrapper.find('.modules-dialog-understood input').element.checked).toBe(false)
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('says the new owner when the module now comes from another repository', async () => {
+				await replanned(listRaw([moduleRaw({ repository: 'other/CasaOS-Virt', foreign: true })]))
+
+				expect(text('.modules-dialog-origin')).toContain('Written by other, not by ReCasaOS.')
+				expect(wrapper.find('.modules-dialog-origin a').attributes('href')).toBe('https://github.com/other/CasaOS-Virt')
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('shows the box when the module was one of the organisation at the opening and is foreign at the new plan', async () => {
+				await open(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+				await installDialog()
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+				calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw(foreign)])))
+				calls.installModule.mockImplementationOnce(failure(refused('plan_changed', {})))
+				await press('.modules-dialog-ok')
+
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(true)
+				expect(ok().attributes('disabled')).toBeDefined()
+			})
+
+			it('has no warning and no box when the module is now one of the organisation', async () => {
+				await replanned(listRaw([moduleRaw({ repository: 'ReCasaOS/CasaOS-Virt' })]))
+
+				expect(wrapper.find('.modules-dialog-origin').exists()).toBe(false)
+				expect(wrapper.find('.modules-dialog-understood').exists()).toBe(false)
+				expect(ok().attributes('disabled')).toBeUndefined()
+			})
+		})
+
+		it('says the box in French', async () => {
+			i18n.global.locale = 'fr_fr'
+			await open(listRaw([moduleRaw(foreign)]))
+			await installDialog()
+
+			expect(text('.modules-dialog-understood')).toBe('Je comprends que ReCasaOS n\'a pas écrit ce module')
+			expect(text('.modules-dialog-origin')).toContain('Il s\'exécute avec tous les droits sur cette machine.')
+		})
+	})
+
 	// an update that is running, its window closed
 	async function updating(step = 'backup') {
 		await open(updatable())
@@ -2840,7 +3301,7 @@ describe('the update of an installed module', () => {
 			expect(wrapper.find('.modules-update-button').attributes('disabled')).toBeUndefined()
 			// a list that is out of date is read again
 			if (code === 'up_to_date' || code === 'not_installed')
-				expect(calls.getModules).toHaveBeenCalledTimes(2)
+				expect(calls.getModules).toHaveBeenCalledTimes(3)
 		})
 	})
 
@@ -2880,7 +3341,7 @@ describe('the update of an installed module', () => {
 			expect(wrapper.find('.modules-advice').exists()).toBe(false)
 			expect(wrapper.find('.modules-kept').exists()).toBe(false)
 			// the list is read again: the new version is the installed one and there is no badge any more
-			expect(calls.getModules).toHaveBeenCalledTimes(2)
+			expect(calls.getModules).toHaveBeenCalledTimes(3)
 			expect(text('.modules-installed')).toBe('Installed version: v0.1.3')
 			expect(wrapper.find('.modules-update-badge').exists()).toBe(false)
 			expect(wrapper.find('.modules-update-button').exists()).toBe(false)

@@ -117,6 +117,11 @@
 							{{ $t(card.module.tier.sentence) }}
 							<code v-if="card.module.tier.raw">{{ card.module.tier.raw }}</code>
 						</p>
+						<!-- written outside ReCasaOS: the name and the link are there only when the catalogue's repository is well formed -->
+						<p v-if="card.module.origin && card.module.origin.foreign" class="modules-origin is-size-7 mt-1">
+							{{ card.module.origin.owner ? $t(TEXT.origin.by, { owner: card.module.origin.owner }) : $t(TEXT.origin.outside) }}
+							<a v-if="card.module.origin.url" class="modules-origin-link" :href="card.module.origin.url" target="_blank" rel="noopener noreferrer">{{ $t(TEXT.origin.repository) }}</a>
+						</p>
 
 						<ul class="modules-facts mt-2">
 							<li v-if="card.module.installed" class="modules-installed">
@@ -146,6 +151,34 @@
 								</ul>
 							</li>
 						</ul>
+
+						<b-message v-if="card.module.withdrawn" class="modules-withdrawn mt-3" size="is-small" type="is-warning">
+							<p class="has-text-weight-semibold">
+								{{ $t(TEXT.withdrawn.title, { tag: card.module.withdrawn.tag }) }}
+							</p>
+							<p class="mt-1">
+								{{ $t(TEXT.withdrawn.reason, { reason: card.module.withdrawn.reason }) }}
+							</p>
+							<p class="mt-1">
+								{{ $t(TEXT.withdrawn.stays) }}
+							</p>
+						</b-message>
+
+						<!-- the night may update a module written outside ReCasaOS only when its owner says so: the box's answer is what the switch shows -->
+						<div v-if="card.module.autoUpdate !== null" class="modules-auto-update mt-3" :data-module="card.module.name">
+							<div class="is-flex is-align-items-center">
+								<span class="is-flex-grow-1 has-text-weight-semibold">{{ $t(TEXT.autoUpdate.label) }}</span>
+								<b-switch :key="`${card.module.name}-${autoRedraw[card.module.name] ?? 0}`" :disabled="Boolean(autoSaving)" :model-value="autoValue(card.module)" size="is-small" @update:model-value="setAutoUpdate(card.module, $event)">
+									<span class="is-sr-only">{{ $t(TEXT.autoUpdate.label) }}</span>
+								</b-switch>
+							</div>
+							<p class="is-size-7 _has-text-gray">
+								{{ $t(TEXT.autoUpdate.hint) }}
+							</p>
+							<p v-if="autoErrors[card.module.name]" class="modules-auto-update-error is-size-7 has-text-danger mt-1">
+								{{ autoErrors[card.module.name] }}
+							</p>
+						</div>
 
 						<b-message v-if="card.job" class="modules-job mt-3" :class="card.job.stateClass" size="is-small" :type="card.job.tone">
 							<h5 class="modules-job-title has-text-weight-semibold">
@@ -317,6 +350,20 @@
 							<p v-if="dialog.notice" class="modules-dialog-notice has-text-weight-semibold" role="status">
 								{{ say(dialog.notice) }}
 							</p>
+
+							<!-- written outside ReCasaOS: said by the origin of a list read after this plan answered -->
+							<b-message v-if="dialog.origin && !dialog.plan.refused" class="modules-dialog-origin mt-2" size="is-small" type="is-warning">
+								<p class="has-text-weight-semibold">
+									{{ dialog.origin.owner ? $t(TEXT.origin.by, { owner: dialog.origin.owner }) : $t(TEXT.origin.outside) }}
+									<a v-if="dialog.origin.url" :href="dialog.origin.url" target="_blank" rel="noopener noreferrer">{{ $t(TEXT.origin.repository) }}</a>
+								</p>
+								<p class="mt-1">
+									{{ $t(TEXT.origin.rights) }}
+								</p>
+								<b-checkbox v-if="dialog.kind === 'install' && dialog.plan.installable" v-model="dialog.understood" class="modules-dialog-understood mt-2">
+									{{ $t(TEXT.origin.confirm) }}
+								</b-checkbox>
+							</b-message>
 
 							<template v-if="dialog.plan.refused">
 								<h6 class="modules-refused-heading has-text-weight-semibold mt-2">
@@ -571,7 +618,7 @@
 							@click="requestPlan(false)" />
 						<b-button v-if="dialogOk"
 							class="modules-dialog-ok"
-							:disabled="Boolean(acting)"
+							:disabled="Boolean(acting) || needsUnderstood"
 							:label="dialogOk"
 							:loading="acting === dialog.key"
 							rounded
@@ -638,6 +685,13 @@ export default {
 			listError: null,
 			// how many lists loadList brought: a look for newer versions that answers after a later one is out of date
 			listSerial: 0,
+			// the switch of the night: the module whose call is out, what the box answered (by module), the sentence of a refusal (by module), a counter that redraws the switch
+			autoSaving: '',
+			autoAnswers: {},
+			autoErrors: {},
+			autoRedraw: {},
+			// a clock for the reads of the list and the answers of the box: an answer outlives only the lists that were read before it
+			autoClock: 0,
 			// a look for newer versions is out (getModules with refresh): one at a time
 			looking: false,
 			lookAbort: null,
@@ -722,6 +776,10 @@ export default {
 		cancelLabel() {
 			return this.dialog?.phase === 'planning' || this.dialogOk ? 'Cancel' : 'Close'
 		},
+		// an install of a module that ReCasaOS did not write waits for the box to be ticked
+		needsUnderstood() {
+			return Boolean(this.dialog?.kind === 'install' && this.dialog.origin && !this.dialog.understood)
+		},
 		// the button that acts: there is none while the plan is made, none for a plan that cannot go ahead, none for a step that the machine says is moot
 		dialogOk() {
 			const dialog = this.dialog
@@ -804,6 +862,7 @@ export default {
 			if (this.loading || this.gone)
 				return undefined
 			this.loading = true
+			const began = ++this.autoClock
 			let view = null
 			let failure = null
 			try {
@@ -822,6 +881,9 @@ export default {
 			}
 			this.listError = null
 			this.view = view
+			// the list is what the box holds now, unless an answer of the box came after this read began; a sentence about a switch the list no longer shows goes
+			this.autoAnswers = Object.fromEntries(Object.entries(this.autoAnswers).filter(([, answer]) => answer.at > began))
+			this.autoErrors = Object.fromEntries(Object.entries(this.autoErrors).filter(([name]) => view.modules.find(module => module.name === name)?.autoUpdate != null))
 			this.listSerial++
 			return true
 		},
@@ -1037,13 +1099,13 @@ export default {
 		pressInstall(module, event) {
 			if (this.disabled || !module.canInstall)
 				return undefined
-			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
+			this.openDialog({ kind: 'install', key: 'install', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null, origin: module.origin?.foreign ? module.origin : null, understood: false }, event)
 			return this.requestPlan(false)
 		},
 		pressUpdate(module, event) {
 			if (this.disabled || !module.canUpdate)
 				return undefined
-			this.openDialog({ kind: 'update', key: 'update', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null }, event)
+			this.openDialog({ kind: 'update', key: 'update', name: module.name, title: module.title, description: module.description, phase: 'planning', plan: null, notice: null, origin: module.origin?.foreign ? module.origin : null, understood: false }, event)
 			return this.requestPlan(false)
 		},
 		pressRemove(module, event) {
@@ -1068,6 +1130,8 @@ export default {
 			dialog.phase = 'planning'
 			dialog.plan = null
 			dialog.notice = null
+			// a new plan asks to be understood again
+			dialog.understood = false
 			let raw
 			let failure = null
 			try {
@@ -1081,14 +1145,37 @@ export default {
 			// the window was closed, or another plan was asked for: this one is for nobody
 			if (this.gone || ticket !== this.planTicket)
 				return
-			this.acting = ''
 			this.planAbort = null
 			const plan = failure ? null : modulePlanView(raw, { name: dialog.name, locale: this.locale, mode: dialog.kind === 'update' ? 'update' : 'install' })
 			if (!plan) {
+				this.acting = ''
 				dialog.phase = 'failed'
 				this.callError = failure ?? moduleFailure(null, this.locale, { read: true })
 				return
 			}
+			// The origin comes from a list read that starts after the plan answered (never one already in flight, never the cached one). The core binds the repository
+			// into the plan id, so a list newer than the plan that names another repository makes the install of this plan refuse with plan_changed: what is left is a box that is not needed.
+			// The dialog stays in its planning state, with no button, while it is read.
+			// (A plan that is refused shows no warning and no box, so it has no use for an origin.)
+			let list = null
+			if (!plan.refused) {
+				try {
+					list = listView((await this.$api.sys.getModules())?.data?.data)
+				} catch (error) {
+					failure = moduleFailure(error, this.locale, { read: true })
+				}
+				if (this.gone || ticket !== this.planTicket)
+					return
+			}
+			this.acting = ''
+			if (!plan.refused && !list) {
+				dialog.phase = 'failed'
+				this.callError = failure ?? moduleFailure(null, this.locale, { read: true })
+				return
+			}
+			const card = list?.modules.find(module => module.name === dialog.name)
+			if (card)
+				dialog.origin = card.origin?.foreign ? card.origin : null
 			dialog.plan = plan
 			dialog.phase = 'plan'
 			dialog.notice = changed ? reasonMessage('plan_changed') : null
@@ -1109,6 +1196,9 @@ export default {
 				return
 			if (dialog.kind === 'remove')
 				return this.callModule(dialog, 'removeModule', [dialog.name])
+			// a module that ReCasaOS did not write is not installed before the person said they know it (the button is not the only way here)
+			if (this.needsUnderstood)
+				return
 			// the id that is sent is the one of the plan that is shown
 			const body = dialog.phase === 'plan' ? installBody(dialog.plan) : null
 			if (body)
@@ -1167,10 +1257,61 @@ export default {
 			if (STALE.has(failure.code))
 				this.loadList()
 			if (failure.code === 'plan_changed' && dialog.kind !== 'remove' && this.dialog === dialog) {
+				// the plan on the screen is out of date: nothing can be sent while the list is read again (the module may now come from another repository)
+				dialog.phase = 'planning'
+				dialog.plan = null
+				dialog.understood = false
+				await this.loadList()
+				if (this.gone || this.dialog !== dialog)
+					return
 				await this.requestPlan(true)
 				return
 			}
 			this.callError = failure
+		},
+
+		// ---- the switch of the night ----
+
+		autoValue(module) {
+			return this.autoAnswers[module.name]?.value ?? module.autoUpdate
+		},
+		// One call at a time. The answer is what the switch shows; a call that failed says why (aloud too), the switch goes back to what the list holds and keeps the
+		// focus, and the list is read again. Only the switch of that module is drawn again.
+		async setAutoUpdate(module, on) {
+			if (this.autoSaving || this.gone)
+				return
+			const name = module.name
+			const redraw = () => {
+				this.autoRedraw = { ...this.autoRedraw, [name]: (this.autoRedraw[name] ?? 0) + 1 }
+				this.$nextTick(() => this.$el.querySelector?.(`.modules-auto-update[data-module="${name}"] input`)?.focus())
+			}
+			this.autoSaving = name
+			this.autoErrors = { ...this.autoErrors, [name]: '' }
+			let held = null
+			let failure = null
+			try {
+				held = (await this.$api.sys.setModuleAutoUpdate(name, on))?.data?.data?.auto_update
+				// an answer that says nothing of the setting is a call that may have been carried out
+				if (typeof held !== 'boolean')
+					failure = { message: { key: TEXT.call.maybe, params: {} } }
+			} catch (error) {
+				failure = moduleFailure(error, this.locale, { mode: 'autoUpdate' })
+			}
+			if (this.gone)
+				return
+			this.autoSaving = ''
+			if (!failure) {
+				this.autoAnswers = { ...this.autoAnswers, [name]: { value: held, at: ++this.autoClock } }
+				// the switch says what the box holds, not what was clicked
+				if (held !== on)
+					redraw()
+				return
+			}
+			const said = this.say(failure.message)
+			this.autoErrors = { ...this.autoErrors, [name]: said }
+			this.announced = said
+			redraw()
+			this.loadList()
 		},
 
 		// ---- the confirmation window ----

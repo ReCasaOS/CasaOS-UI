@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+	AUTO_UPDATE_REASONS,
 	CHECKS,
 	CHECK_UNKNOWN,
 	JOB_LIVE,
@@ -12,6 +13,7 @@ import {
 	PLAN_ID,
 	REASONS,
 	REASON_UNKNOWN,
+	REASON_WITHDRAWN_BARE,
 	ROLLBACK,
 	STEPS,
 	STEP_MARKS,
@@ -46,22 +48,22 @@ const REMOVE_STEPS = ['stop', 'files', 'manifest', 'reload', 'done']
 // pkg/modulecmd/jobstate.go Job*
 const JOB_STATE_NAMES = ['idle', 'running', 'succeeded', 'refused', 'failed', 'interrupted']
 // pkg/osmodule/plan.go Check*, in the order the plan lists them
-const CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
+const CHECK_CODES = ['catalogue', 'withdrawn', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
 // pkg/osmodule/plan.go: the code a plan is refused with (the code of the check, but for the disk and apt checks, which say more)
-const PLAN_REFUSALS = ['catalogue', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
+const PLAN_REFUSALS = ['catalogue', 'withdrawn', 'os', 'arch', 'recasaos', 'already_installed', 'foreign_unit', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
 // pkg/modulecmd/install.go Code*
 const RUN_CODES = ['not_root', 'busy', 'plan_changed', 'confirmation_needed', 'declined', 'not_installed', 'log_unwritable', 'lock_failed', 'files_unreadable', 'packages_failed', 'dpkg_broken', 'held_package', 'download_failed', 'download_too_large', 'checksum_mismatch', 'unpack_failed', 'units_failed', 'manifest_invalid', 'manifest_mismatch', 'manifest_write_failed', 'start_failed', 'route_timeout', 'interrupted', 'unit_not_stopped', 'remove_incomplete', 'tmp_unusable', 'state_unsafe', 'internal_error']
 // pkg/osmodule/unpack.go: Unpack*, FileExists
 const UNPACK_CODES = ['unpack_path', 'file_exists', 'unpack_limits', 'unpack_corrupt']
 // service/system_module.go Module*, and route/v1/system_module.go (a failure that no refusal covers)
-const API_CODES = ['bad_request', 'not_root', 'unsupported', 'busy', 'plan_changed', 'not_installed', 'plan_timeout', 'start_failed', 'internal']
+const API_CODES = ['bad_request', 'not_root', 'unsupported', 'busy', 'plan_changed', 'not_installed', 'plan_timeout', 'start_failed', 'internal', 'not_foreign']
 // pkg/modulecmd/query.go: the checks that say no to a system in the list (and a module that the catalogue no longer has)
 const SYSTEM_REASONS = ['os', 'arch', 'recasaos', 'catalogue']
 // the update of a module (docs/os-modules.md, "Updating an installed module"): the steps, the checks in their order, the codes of a plan that is refused
 // and the codes of a job that failed
 const UPDATE_STEPS = ['packages', 'download', 'verify', 'unpack', 'backup', 'stop', 'swap', 'units', 'start', 'route', 'done']
-const UPDATE_CHECK_CODES = ['catalogue', 'os', 'arch', 'recasaos', 'installed', 'newer', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
-const UPDATE_REFUSALS = ['catalogue', 'os', 'arch', 'recasaos', 'not_installed', 'manifest_invalid', 'files_unreadable', 'files_unverified', 'version_unknown', 'up_to_date', 'downgrade', 'foreign_unit', 'unit_changed', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
+const UPDATE_CHECK_CODES = ['catalogue', 'withdrawn', 'os', 'arch', 'recasaos', 'installed', 'newer', 'foreign_unit', 'busy', 'dpkg_state', 'disk', 'apt']
+const UPDATE_REFUSALS = ['catalogue', 'withdrawn', 'os', 'arch', 'recasaos', 'not_installed', 'manifest_invalid', 'files_unreadable', 'files_unverified', 'version_unknown', 'up_to_date', 'downgrade', 'foreign_unit', 'unit_changed', 'busy', 'dpkg_state', 'disk_short', 'disk_unknown', 'apt_missing', 'apt_failed', 'apt_removes', 'apt_downgrades', 'held_package', 'package_not_exact']
 const UPDATE_JOB_CODES = ['backup_failed', 'swap_failed', 'recovery_incomplete', 'backup_not_dropped', 'unit_not_stopped', 'unpack_corrupt', 'unpack_path', 'unpack_limits', 'file_exists', 'manifest_invalid', 'manifest_mismatch', 'start_failed', 'route_timeout', 'interrupted']
 const ALL_CODES = [...new Set([...PLAN_REFUSALS, ...RUN_CODES, ...UNPACK_CODES, ...API_CODES, ...SYSTEM_REASONS, ...UPDATE_REFUSALS, ...UPDATE_JOB_CODES])]
 
@@ -273,8 +275,8 @@ describe('the view of the list', () => {
 			expect(listView(listRaw([moduleRaw({ tier })])).modules[0].tier).toEqual({ id: tier, ...TIERS[tier], raw: '' })
 		})
 
-		it('says the community sentence in plain words: tested against a simulated machine only', () => {
-			expect(TIERS.community.sentence).toBe('Tested only against a simulated machine, not a real one.')
+		it('says the community sentence in plain words: written outside, reviewed, not tested', () => {
+			expect(TIERS.community.sentence).toBe('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
 			expect(TIERS.community.sentence).not.toMatch(/maintained|proved/i)
 		})
 
@@ -413,7 +415,7 @@ describe('the view of the plan', () => {
 		const view = plan({ refused: code, plan_id: '' })
 		expect(view.installable).toBe(false)
 		expect(view.refused).toBe(code)
-		expect(view.refusedMessage.key).toBe(REASONS[code])
+		expect(view.refusedMessage.key).toBe(code === 'withdrawn' ? REASON_WITHDRAWN_BARE : REASONS[code])
 	})
 
 	it('cannot install a plan that is refused, whatever else is in it', () => {
@@ -1463,7 +1465,7 @@ describe('the failure of a call', () => {
 	it.each(PLAN_REFUSALS)('says the refusal %s of the install in its sentence and lists the checks that failed', (code) => {
 		const checks = [{ code: 'os', ok: false, detail: 'x' }, { code: 'arch', ok: true, detail: '' }, { code: 'busy', ok: false, detail: 'not_checked' }]
 		const failure = moduleFailure(refusal(code, { checks }))
-		expect(failure.message.key).toBe(REASONS[code])
+		expect(failure.message.key).toBe(code === 'withdrawn' ? REASON_WITHDRAWN_BARE : REASONS[code])
 		expect(failure.items.map(item => item.code)).toEqual(['os'])
 		expect(failure.items[0].message.key).toBe(REASONS.os)
 	})
@@ -2307,5 +2309,184 @@ describe('the sentence that says where the versions come from', () => {
 			expect(pt[key], key).not.toBe(key)
 			expect(pt[key].match(/\{\w+\}/g) || [], key).toEqual(key.match(/\{\w+\}/g) || [])
 		}
+	})
+})
+
+// ---- the modules of other people: where a module comes from, the night, a withdrawn version ------------------------------------
+
+describe('where a module comes from', () => {
+	const first = changes => listView(listRaw([moduleRaw(changes)])).modules[0]
+
+	it('reads a module written outside ReCasaOS, with its exact address', () => {
+		expect(first({ repository: 'someone/CasaOS-Virt', foreign: true }).origin).toEqual({ foreign: true, owner: 'someone', repository: 'someone/CasaOS-Virt', url: 'https://github.com/someone/CasaOS-Virt' })
+	})
+
+	it.each(['../x', 'javascript:alert(1)', 'a/b/c', 'some one/repo', 'someone/re po', 'someone/', '/repo', 'someone', '-a/repo', 'a-/repo', 'someone/-repo', 'someone/.hidden', 'someone/..', `someone/${'r'.repeat(65)}`, `${'o'.repeat(40)}/repo`, `someone/${'r'.repeat(300)}`, 'someone/repo\n', 'someone/repo?x=1', 'someone/repo#x', 'ſomeone/repo', 7, {}, ['a/b']])('keeps no name and no link for %j, and still says it is written outside ReCasaOS', (repository) => {
+		expect(first({ repository, foreign: true }).origin).toEqual({ foreign: true, owner: '', repository: '', url: '' })
+	})
+
+	it('keeps the names that the catalogue allows', () => {
+		for (const repository of ['a/b', 'A1-b2/CasaOS_virt.v2-x', `${'o'.repeat(39)}/${'r'.repeat(64)}`])
+			expect(first({ repository, foreign: true }).origin).toMatchObject({ repository, url: `https://github.com/${repository}` })
+	})
+
+	it('does not call a module of the organisation foreign, whatever its tier', () => {
+		const origin = first({ tier: 'community', repository: 'ReCasaOS/CasaOS-Virt' }).origin
+		expect(origin).toEqual({ foreign: false, owner: 'ReCasaOS', repository: 'ReCasaOS/CasaOS-Virt', url: 'https://github.com/ReCasaOS/CasaOS-Virt' })
+		expect(first({ tier: 'community', repository: 'ReCasaOS/CasaOS-Virt', foreign: 'true' }).origin.foreign).toBe(false)
+	})
+
+	it('says foreign without a repository', () => {
+		expect(first({ foreign: true }).origin).toEqual({ foreign: true, owner: '', repository: '', url: '' })
+	})
+
+	it('says nothing of a module that says neither (an older core): no origin, no setting, no withdrawal', () => {
+		const module = first({})
+		expect([module.origin, module.autoUpdate, module.withdrawn]).toEqual([null, null, null])
+	})
+})
+
+describe('the setting of the night', () => {
+	const night = changes => listView(listRaw([moduleRaw(changes)])).modules[0].autoUpdate
+
+	it.each([[true, true], [false, false], ['yes', null], [1, null], [0, null], ['true', null], [null, null], [undefined, null], [{}, null]])('reads %j as %j', (auto_update, wanted) => {
+		expect(night({ auto_update })).toBe(wanted)
+	})
+})
+
+describe('a version that the catalogue withdrew', () => {
+	const withdrawn = value => listView(listRaw([moduleRaw({ withdrawn: value })])).modules[0].withdrawn
+
+	it('reads the tag and the reason', () => {
+		expect(withdrawn({ tag: 'v1.2.3', reason: 'It loses the data of its disks.' })).toEqual({ tag: 'v1.2.3', reason: 'It loses the data of its disks.' })
+	})
+
+	it.each([[{ tag: 'v1.2.3' }], [{ tag: 'v1.2.3', reason: '' }], [{ tag: 'v1.2.3', reason: '  \u0007 ' }], [{ reason: 'x' }], [{ tag: '1.2.3', reason: 'x' }], [{ tag: 'v1.2', reason: 'x' }], [{ tag: 'v1.2.3', reason: 7 }], ['v1.2.3'], [null], [[]]])('is nothing for %j', (value) => {
+		expect(withdrawn(value)).toBeNull()
+	})
+
+	it('keeps markup as text, and loses only the control characters', () => {
+		const reason = '<b onclick="x()">Broken</b> <script>alert(1)</script>\u0000\u0007 &amp;'
+		expect(withdrawn({ tag: 'v1.2.3', reason }).reason).toBe('<b onclick="x()">Broken</b> <script>alert(1)</script>   &amp;')
+	})
+
+	it('cuts a reason of 250 characters to 200, in Unicode', () => {
+		const reason = 'é世界'.repeat(84).slice(0, 250)
+		expect(withdrawn({ tag: 'v1.2.3', reason }).reason).toBe(reason.slice(0, 200))
+		expect(withdrawn({ tag: 'v1.2.3', reason }).reason).toHaveLength(200)
+	})
+})
+
+describe('the plan of a version that was withdrawn', () => {
+	const reason = 'é世界 <i>x</i> https://example.org/a?b=c '.repeat(5).slice(0, 200).trim()
+	const refusedPlan = () => {
+		const checks = [{ code: 'catalogue', ok: true }, { code: 'withdrawn', ok: false, detail: reason }, ...okChecks().filter(check => check.code !== 'catalogue')]
+		return plan({ checks, refused: 'withdrawn' })
+	}
+
+	it('says the reason whole in the refusal, and on the check', () => {
+		const view = refusedPlan()
+		expect(view.refusedMessage).toEqual({ key: REASONS.withdrawn, params: { reason } })
+		expect(view.installable).toBe(false)
+		const check = view.checks.find(item => item.code === 'withdrawn')
+		expect(check.label.key).toBe(CHECKS.withdrawn)
+		expect(check.message.params.reason).toBe(reason)
+		expect(reason).toContain('?b=c')
+	})
+
+	it('passes when the version is not withdrawn', () => {
+		const view = plan({ checks: [{ code: 'catalogue', ok: true }, { code: 'withdrawn', ok: true, detail: '' }, ...okChecks().slice(1)] })
+		expect(view.installable).toBe(true)
+		expect(view.checks.find(item => item.code === 'withdrawn').mark).toBe('passed')
+	})
+
+	it('says the refusal that the route returns, with data.reason', () => {
+		const failure = moduleFailure(refusal('withdrawn', { reason, checks: [{ code: 'catalogue', ok: true }, { code: 'withdrawn', ok: false, detail: reason }] }), 'en_us', { mutating: true })
+		expect(failure.message).toEqual({ key: REASONS.withdrawn, params: { reason } })
+		expect(failure.items.map(item => item.code)).toEqual(['withdrawn'])
+	})
+})
+
+describe('the sentences for the switch of the night and the tier community', () => {
+	it('says the community sentence of the constraints', () => {
+		expect(TIERS.community.sentence).toBe('Written outside ReCasaOS, reviewed when it entered the catalogue, not tested by ReCasaOS.')
+		expect(fr[TIERS.community.sentence]).toBe('Écrit hors de ReCasaOS, relu à son entrée au catalogue, non testé par ReCasaOS.')
+	})
+
+	it('refuses the switch in sentences of its own', () => {
+		expect(reasonMessage('not_foreign').key).toBe('This module is ReCasaOS\'s own: its updates follow the general setting.')
+		expect(reasonMessage('catalogue', { kind: 'autoUpdate' }).key).toBe(AUTO_UPDATE_REASONS.catalogue)
+		expect(reasonMessage('catalogue').key).toBe('ReCasaOS no longer offers this module.')
+		expect(reasonMessage('not_installed').key).toBe(REASONS.not_installed)
+		expect(reasonMessage('bad_request').key).toBe(REASONS.bad_request[1])
+	})
+
+	it('has the new texts in every language file', () => {
+		const wanted = [
+			'Written by {owner}, not by ReCasaOS.',
+			'Written outside ReCasaOS.',
+			'See its repository',
+			'Version {tag} was withdrawn from the catalogue.',
+			'Reason given: {reason}',
+			'It stays installed. Remove it, or wait for a later version.',
+			'Update it at night',
+			'Only when automatic updates are on, and 24 hours after a new version appears.',
+			'It runs with every right on this machine.',
+			'I understand that ReCasaOS did not write this module',
+			'Not withdrawn from the catalogue',
+			'ReCasaOS withdrew this version from the catalogue: {reason}',
+			'This module is ReCasaOS\'s own: its updates follow the general setting.',
+			'The catalogue cannot be read now: try again later.',
+			TIERS.community.sentence,
+		]
+		for (const key of wanted) {
+			expect(MODULE_KEYS, key).toContain(key)
+			for (const lang of [en, fr, pt])
+				expect(lang[key], key).toBeTruthy()
+			expect(en[key]).toBe(key)
+		}
+	})
+})
+
+describe('fix round 1: a withdrawn version is said with its reason, whatever the refusal carries', () => {
+	const reason = 'It loses the data of its disks.'
+	const said = { key: REASONS.withdrawn, params: { reason } }
+	const bare = { key: REASON_WITHDRAWN_BARE, params: {} }
+	const withdrawnCheck = detail => ({ code: 'withdrawn', ok: false, detail })
+
+	it('takes the reason of data.reason when the refusal lists no checks', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason }), 'en_us').message).toEqual(said)
+	})
+
+	it('takes it from data.reason when the checks lack the withdrawn item, or it passed', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason, checks: [{ code: 'catalogue', ok: true }] }), 'en_us').message).toEqual(said)
+		expect(moduleFailure(refusal('withdrawn', { reason, checks: [{ code: 'withdrawn', ok: true }] }), 'en_us').message).toEqual(said)
+	})
+
+	it('prefers the detail of the failed withdrawn check', () => {
+		expect(moduleFailure(refusal('withdrawn', { reason: 'other', checks: [withdrawnCheck(reason)] }), 'en_us').message).toEqual(said)
+	})
+
+	it('says a sentence with no colon when nothing gives a reason', () => {
+		expect(moduleFailure(refusal('withdrawn', { checks: [withdrawnCheck('')] }), 'en_us').message).toEqual(bare)
+		expect(moduleFailure(refusal('withdrawn', { reason: '  ' }), 'en_us').message).toEqual(bare)
+		expect(moduleFailure(refusal('withdrawn', {}), 'en_us').message).toEqual(bare)
+		expect(REASON_WITHDRAWN_BARE).not.toContain(':')
+	})
+
+	it('says the same on the plan path, with an empty detail', () => {
+		const checks = [{ code: 'catalogue', ok: true }, withdrawnCheck('')]
+		const view = plan({ checks, refused: 'withdrawn' })
+		expect(view.refusedMessage).toEqual(bare)
+		expect(view.checks.find(item => item.code === 'withdrawn').message).toEqual(bare)
+	})
+
+	it.each([[{}], [{ repository: null }], [{ foreign: null }], [{ repository: null, foreign: null }]])('gives no origin for %j', (changes) => {
+		expect(listView(listRaw([moduleRaw(changes)])).modules[0].origin).toBeNull()
+	})
+
+	it('says the catalogue of the switch of the night with mode autoUpdate, and the offer of the module without', () => {
+		expect(moduleFailure(refusal('catalogue', {}), 'en_us', { mode: 'autoUpdate' }).message.key).toBe(AUTO_UPDATE_REASONS.catalogue)
+		expect(moduleFailure(refusal('catalogue', {}), 'en_us').message.key).toBe(REASONS.catalogue)
 	})
 })
