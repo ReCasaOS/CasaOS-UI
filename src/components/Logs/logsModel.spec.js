@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { MAX_LINES, colorOf, cursorAt, insertRows, levelOf, parseQuery, rangeBounds, skippedMarker, toRow } from './logsModel'
 
@@ -21,6 +22,12 @@ describe('logsModel', () => {
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'stopped' }).level).toBe('warn')
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'oom-killed' }).text).toBe('a/s oom killed')
 		expect(toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', kind: 'updated', from_image: 'x:1', to_image: 'x:2' })).toMatchObject({ level: 'info', text: 'a/s updated from x:1 to x:2' })
+	})
+
+	it('names a restart the box did itself, as a warning with its icon', () => {
+		const r = toRow({ at: '2026-11-05T10:00:00Z', app: 'a', service: 's', container: 'c', kind: 'auto-restarted' })
+		expect(r).toMatchObject({ level: 'warn', text: 'a/s restarted automatically' })
+		expect(readFileSync('src/components/Logs/LogStream.vue', 'utf8')).toContain('\'auto-restarted\': \'restart-alert\'')
 	})
 
 	it('never throws on a malformed row', () => {

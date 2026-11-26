@@ -64,6 +64,8 @@
   "A new version is available!": "A new version is available!",
   "Edit Web UI port": "Edit Web UI port",
   "Automount USB Drive": "Automount USB drive",
+  "Restart an unhealthy app automatically": "Restart an unhealthy app automatically",
+  "An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.": "An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.",
   "Wallpaper": "Wallpaper",
   "Change wallpaper": "Change wallpaper",
   "Show Search Bar": "Show search bar",

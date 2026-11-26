@@ -35,6 +35,15 @@ const updates = {
 		return api.put(`${PREFIX}/auto-update`, { scan_before_update: on })
 	},
 
+	// whether an app whose health check keeps failing is restarted by the box; 404 on an older box
+	autoHeal() {
+		return api.get(`${PREFIX}/auto-heal`)
+	},
+
+	setAutoHeal(enabled) {
+		return api.put(`${PREFIX}/auto-heal`, { enabled })
+	},
+
 	setAutoUpdate(id, enabled) {
 		return api.put(`${PREFIX}/compose/${encodeURIComponent(id)}/auto-update`, { enabled })
 	},
