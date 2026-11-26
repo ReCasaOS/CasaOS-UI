@@ -18,7 +18,7 @@ const CARDS_EVERY_MS = 5 * 60 * 1000
  */
 export const cardsMixin = {
 	data() {
-		return { moduleCards: [], proven: [], cardsTimer: 0, cardsSerial: 0, cardsStale: false }
+		return { moduleCards: [], proven: [], cardsTimer: 0, cardsSerial: 0, cardsStale: false, cardsGone: [] }
 	},
 	computed: {
 		cardsAllowed() {
@@ -56,11 +56,14 @@ export const cardsMixin = {
 		},
 		// a card that the module no longer gives: it leaves, and the next reading of the list asks it again
 		cardGone(name) {
+			// a reading of the list that is on its way must not bring it back
+			this.cardsGone.push(name)
 			this.proven = this.proven.filter(item => item !== name)
 			this.moduleCards = this.moduleCards.filter(card => card.name !== name)
 		},
 		async loadCards() {
 			const serial = ++this.cardsSerial
+			this.cardsGone = []
 			if (!this.cardsAllowed) {
 				this.moduleCards = []
 				this.proven = []
@@ -75,8 +78,7 @@ export const cardsMixin = {
 			}
 			if (serial !== this.cardsSerial)
 				return
-			const proven = this.proven.filter(name => list.some(card => card.name === name))
-			const toProbe = (this.cardsToProbe ? this.cardsToProbe(list) : list).filter(card => !proven.includes(card.name))
+			const toProbe = (this.cardsToProbe ? this.cardsToProbe(list) : list).filter(card => !this.proven.includes(card.name))
 			const found = await Promise.all(toProbe.map(async (card) => {
 				try {
 					return cardView((await getCard(card.route)).data, card.route) ? card.name : ''
@@ -86,7 +88,9 @@ export const cardsMixin = {
 			}))
 			if (serial !== this.cardsSerial)
 				return
-			this.proven = [...proven, ...found.filter(Boolean)]
+			// the cards that went while the others were read stay out: what holds is what is now, not what was when this reading began
+			const left = name => !this.cardsGone.includes(name)
+			this.proven = [...new Set([...this.proven, ...found.filter(Boolean)])].filter(name => list.some(card => card.name === name) && left(name))
 			this.moduleCards = list.filter(card => this.proven.includes(card.name))
 			this.cardsRead?.()
 		},

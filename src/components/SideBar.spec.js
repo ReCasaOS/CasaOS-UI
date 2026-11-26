@@ -227,6 +227,27 @@ describe('which modules get a card on the home', () => {
 		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
 	})
 
+	it('does not bring back a card that went while the list was being read', async () => {
+		const wrapper = mountBar()
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+		let answer
+		getCards.mockResolvedValue(cardsAnswer('wake-on-lan', 'second', 'third'))
+		getCard.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		handlers.modulesChanged()
+		await flushPromises()
+		// a card is probed (third); meanwhile another one goes
+		wrapper.findAllComponents(ModuleCardStub)[1].vm.$emit('gone', 'second')
+		await flushPromises()
+		getCard.mockClear()
+		answer({ data: valid })
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'third'])
+		expect(getCard).not.toHaveBeenCalled()
+	})
+
 	it('does not hand the instance of a card to another module when a widget above it is hidden', async () => {
 		const wrapper = mountBar()
 		await flushPromises()
