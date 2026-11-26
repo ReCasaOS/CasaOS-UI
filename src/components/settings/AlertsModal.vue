@@ -167,7 +167,7 @@ export default {
 				{ key: 'fleet', label: 'Fleet' },
 				{ key: 'app-updates', label: 'The night\'s automatic updates, and newer versions of images pinned to one' },
 				{ key: 'cleanup', label: 'What the weekly cleanup freed, or why it failed' },
-				{ key: 'vulnerabilities', label: 'A critical vulnerability in an app that an update of the app fixes' },
+				{ key: 'vulnerabilities', label: 'A critical vulnerability, or one that attackers already exploit, in an app that an update of the app fixes' },
 			],
 			// the core's bounds
 			thresholds: Array.from({ length: 50 }, (_, i) => 50 + i),

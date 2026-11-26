@@ -25,6 +25,7 @@ vi.mock('@/assets/lang', () => ({
 			'{count} critical': '{count} critical',
 			'{count} high': '{count} high',
 			'{count} exploited': '{count} exploited',
+			'{count} exploited · update': '{count} exploited · update',
 			'List of exploited vulnerabilities of {date}': 'List of exploited vulnerabilities of {date}',
 			'The list of exploited vulnerabilities could not be updated: {reason}': 'The list of exploited vulnerabilities could not be updated: {reason}',
 		},
@@ -86,7 +87,23 @@ describe('the Security window of the box', () => {
 		expect(rows[0].text()).toContain('2 critical · update')
 		expect(rows[1].text()).toContain('4 critical')
 		expect(rows[1].text()).toContain('117 high')
-		expect(wrapper.find('[data-state]').text()).toBe('Some apps have a critical vulnerability that an update fixes.')
+		expect(wrapper.find('[data-state]').text()).toBe('Some apps have a critical vulnerability, or one that attackers already exploit, that an update fixes.')
+	})
+
+	it('never shows a "0 critical" tag, and folds the update into the exploited tag', async () => {
+		vulnScan.apps = {
+			a: { app: 'a', critical: 0, high: 0, exploited: 1, actionable: true },
+			b: { app: 'b', critical: 2, high: 0, exploited: 1, actionable: true },
+		}
+		const wrapper = await open()
+		const rows = wrapper.findAll('[data-app]')
+		expect(rows).toHaveLength(2)
+		for (const row of rows) {
+			expect(row.text()).toContain('1 exploited · update')
+			expect(row.text()).not.toContain('0 critical')
+			expect(row.text()).not.toContain('critical · update')
+			expect(row.text()).not.toContain('Nothing found')
+		}
 	})
 
 	it('sorts the apps by real risk', async () => {

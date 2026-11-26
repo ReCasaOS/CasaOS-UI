@@ -24,6 +24,7 @@ vi.mock('@/assets/lang', () => ({
 			'Vulnerability database of {date}': 'Vulnerability database of {date}',
 			'The last scan stopped early: {reason}': 'The last scan stopped early: {reason}',
 			'EPSS {percent} %': 'EPSS {percent} %',
+			'EPSS < 1 %': 'EPSS < 1 %',
 		},
 	},
 }))
@@ -80,6 +81,16 @@ describe('the Security window of an app', () => {
 		wrapper.unmount()
 	})
 
+	it('says EPSS under 1 % instead of 0 %', async () => {
+		const wrapper = await open({ app: detail([image([finding('CVE-2026-1', 'HIGH', { epss: 0.0004 }), finding('CVE-2026-2', 'HIGH', { epss: 0.004 }), finding('CVE-2026-3', 'HIGH', { epss: 0.005 })])]) })
+		const row = id => wrapper.findAll('[data-finding]').find(r => r.text().includes(id)).text()
+		expect(row('CVE-2026-1')).toContain('EPSS < 1 %')
+		expect(row('CVE-2026-2')).toContain('EPSS < 1 %')
+		expect(row('CVE-2026-3')).toContain('EPSS 1 %')
+		expect(wrapper.text()).not.toContain('EPSS 0 %')
+		wrapper.unmount()
+	})
+
 	it('sorts the vulnerabilities by real risk', async () => {
 		const wrapper = await open({ app: detail([image([
 			finding('A', 'CRITICAL'),
@@ -95,7 +106,7 @@ describe('the Security window of an app', () => {
 
 	it('says to update the app when an update is offered, and that none is when none is', async () => {
 		let wrapper = await open()
-		expect(wrapper.find('[data-advice]').text()).toBe('An update of this app is offered: install it to fix the critical ones.')
+		expect(wrapper.find('[data-advice]').text()).toBe('An update of this app is offered: install it to fix a critical vulnerability or one that attackers already exploit.')
 		wrapper.unmount()
 
 		vulnScan.apps = { vaultwarden: { critical: 1, high: 1, actionable: false } }

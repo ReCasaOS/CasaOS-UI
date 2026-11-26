@@ -74,7 +74,7 @@
 										{{ $t('Exploited') }}
 									</b-tag>
 									<span v-if="Number.isFinite(finding.epss)" class="ml-1 has-text-full-03">
-										{{ $t('EPSS {percent} %', { percent: Math.round(finding.epss * 100) }) }}
+										{{ finding.epss > 0 && finding.epss < 0.005 ? $t('EPSS < 1 %') : $t('EPSS {percent} %', { percent: Math.round(finding.epss * 100) }) }}
 									</span>
 								</td>
 							</tr>
@@ -134,7 +134,7 @@ export default {
 				return 'No critical or high vulnerability with a fix was found.'
 			}
 			if (this.summary?.actionable) {
-				return 'An update of this app is offered: install it to fix the critical ones.'
+				return 'An update of this app is offered: install it to fix a critical vulnerability or one that attackers already exploit.'
 			}
 			return 'No update of this app is offered yet. Its publisher has to release an image with the fixes.'
 		},
