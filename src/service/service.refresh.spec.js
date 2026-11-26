@@ -21,7 +21,7 @@ let adapter
 function outcome(call) {
 	return Promise.race([
 		call.then(() => 'answered', () => 'failed'),
-		new Promise(resolve => setTimeout(() => resolve('left waiting'), 100)),
+		new Promise(resolve => setTimeout(() => resolve('left waiting'), 2000)),
 	])
 }
 
