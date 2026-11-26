@@ -3,7 +3,7 @@
 		@click="compact && openFromCard($event)" @keydown.enter.self="compact && openFromCard($event)" @mouseleave="hover = true" @mouseover="onOver">
 		<!-- compact (beta dashboard): the whole card opens the app, not only its icon -->
 		<!-- a critical vulnerability the update fixes says more than "an update": it takes its place -->
-		<span v-if="compact && vuln && vuln.actionable && !repoBadge" class="update-chip is-critical">{{ $t('{count} critical · update', { count: vuln.critical }) }}</span>
+		<span v-if="compact && vuln && vuln.actionable && !repoBadge" class="update-chip is-critical">{{ vuln.exploited > 0 ? $t('{count} exploited · update', { count: vuln.exploited }) : $t('{count} critical · update', { count: vuln.critical }) }}</span>
 		<span v-else-if="compact && item.update_available && !repoBadge" class="update-chip">{{ $t('Available update') }}</span>
 		<!-- Action Button Start -->
 		<div v-if="item.app_type !== 'system' && !isUninstalling && hasActions" class="action-btn">
@@ -177,8 +177,8 @@
 							<!-- A git app's state, or its new commits: gitApps.js says which wins. Before
 								the image badge, since a failed build matters more than a newer image. -->
 							<CTooltip v-else-if="repoBadge" :content="repoBadge.label" :modal="repoBadge.type" class="__position __position-wide" />
-							<CTooltip v-else-if="!compact && vuln && vuln.actionable" :title="$t('Critical vulnerabilities that an update of this app fixes. See Security in its menu.')"
-								class="__position __position-wide" :content="$t('{count} critical', { count: vuln.critical })" modal="is-danger" data-vuln-badge />
+							<CTooltip v-else-if="!compact && vuln && vuln.actionable" :title="vuln.exploited > 0 ? $t('Vulnerabilities that attackers already exploit, which an update of this app fixes. See Security in its menu.') : $t('Critical vulnerabilities that an update of this app fixes. See Security in its menu.')"
+								class="__position __position-wide" :content="vuln.exploited > 0 ? $t('{count} exploited', { count: vuln.exploited }) : $t('{count} critical', { count: vuln.critical })" modal="is-danger" data-vuln-badge />
 							<CTooltip v-else-if="!compact && item.update_available" class="__position __position-wide" content="Update available" />
 							<!-- a newer version of an image pinned to one: said, chosen in the settings -->
 							<CTooltip v-else-if="!compact && newerBadge" :title="$t('{image}: {tag} is out. Choose it in the Tag list of the settings.', { image: newerBadge.image, tag: newerBadge.tag })"
