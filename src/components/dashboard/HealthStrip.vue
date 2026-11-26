@@ -146,6 +146,43 @@
 						</div>
 					</div>
 				</section>
+				<!-- the cards of the modules, in the same anatomy: the module describes its card, and this strip draws it -->
+				<ModuleCard v-for="item in shownCards" :key="item.name" :module="item" variant="panel">
+					<template #default="{ card, state, busy, run, texts }">
+						<section class="widget has-text-grey-100 panel module-panel">
+							<div class="blur-background"></div>
+							<div class="widget-content">
+								<div class="panel-head">
+									<span class="panel-tile"><b-icon :icon="card ? card.icon : cardFallbackIcon" pack="casa" /></span>
+									<span class="panel-title">
+										{{ card ? card.title : item.title }}
+										<span v-if="item.foreign && item.owner" class="module-owner">{{ $t(texts.owner, { owner: item.owner }) }}</span>
+									</span>
+									<span v-if="card && card.status" :class="`is-${card.status.level}`" class="panel-chip">{{ card.status.text }}</span>
+								</div>
+								<p v-if="state === 'unavailable'" class="panel-empty module-unavailable" role="status">{{ $t(texts.unavailable) }}</p>
+								<ul v-else-if="card.rows.length > 0" class="panel-body">
+									<li v-for="(row, index) in card.rows" :key="`row${index}`" class="panel-row">
+										<span :class="`is-${row.level || 'none'}`" class="panel-dot"></span>
+										<span class="panel-grow">{{ row.label }}</span>
+										<span v-if="row.value" class="module-value">{{ row.value }}</span>
+										<button v-if="row.action" :disabled="busy" class="module-row-action" type="button" @click="run(row.action)">{{ row.action.label }}</button>
+									</li>
+								</ul>
+								<div v-if="state !== 'unavailable' && (card.actions.length > 0 || card.link)" class="panel-foot">
+									<button v-for="(action, index) in card.actions" :key="`action${index}`" :disabled="busy" class="panel-action"
+										type="button" @click="run(action)">
+										<span class="panel-grow">{{ action.label }}</span>
+									</button>
+									<a v-if="card.link" :href="card.link.url" class="panel-action" rel="noopener noreferrer" target="_blank">
+										<span class="panel-grow">{{ card.link.label }}</span>
+										<b-icon icon="chevron-right" size="is-small" />
+									</a>
+								</div>
+							</div>
+						</section>
+					</template>
+				</ModuleCard>
 			</aside>
 
 			<div class="beta-main">
@@ -158,6 +195,9 @@
 <script>
 import { defineAsyncComponent } from 'vue'
 import escape from 'lodash/escape'
+import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
+import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { CARD_ICON_FALLBACK } from '@/components/moduleCards/moduleCards'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
@@ -175,7 +215,8 @@ const LIVE_REFRESH = 5 * 1000
 
 export default {
 	name: 'HealthStrip',
-	mixins: [mixin],
+	components: { ModuleCard },
+	mixins: [mixin, cardsMixin],
 	emits: ['attention'],
 	data() {
 		const info = this.$store.state.hardwareInfo || {}
@@ -210,9 +251,23 @@ export default {
 			snapraidState: null,
 			fleetState: null,
 			timer: 0,
+			// the choice of the widgets (hidden, order) that was saved: the cards of the modules follow it
+			savedWidgets: [],
+			cardFallbackIcon: CARD_ICON_FALLBACK,
 		}
 	},
 	computed: {
+		// the cards that are not hidden in the widgets settings, in the order that was saved there (a card not named there goes last)
+		shownCards() {
+			const saved = this.savedWidgets.filter(item => item && typeof item.name === 'string')
+			const rank = (card) => {
+				const index = saved.findIndex(item => item.name === `module:${card.name}`)
+				return index < 0 ? saved.length : index
+			}
+			return this.moduleCards
+				.filter(card => saved.find(item => item.name === `module:${card.name}`)?.show !== false)
+				.sort((a, b) => rank(a) - rank(b))
+		},
 		// the health of the system disk comes with the load of the box: without the "system" module there is no reading, not a failure
 		health() {
 			return this.mayRead('system') ? this.smartHealth(this.disk) : ''
@@ -471,6 +526,16 @@ export default {
 		clearTimeout(this.liveTimer)
 	},
 	methods: {
+		// a list of the cards has been read: the saved choice of the widgets says which are hidden, and their order
+		async cardsRead() {
+			try {
+				const res = await this.$api.users.getCustomStorage('widgets_config')
+				const saved = res?.data?.data
+				this.savedWidgets = Array.isArray(saved) ? saved : []
+			} catch {
+				this.savedWidgets = []
+			}
+		},
 		barLevel(value) {
 			if (value >= 90) {
 				return 'danger'
@@ -1073,6 +1138,50 @@ export default {
 			background: #2563eb;
 		}
 	}
+}
+
+// the cards of the modules: the module's words, drawn as the other panels draw theirs
+.module-owner {
+	display: block;
+	font-size: 0.6875rem;
+	font-weight: 400;
+	opacity: 0.7;
+}
+
+.module-value {
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	opacity: 0.85;
+}
+
+.module-unavailable {
+	padding: 0 0.875rem 0.75rem;
+	font-size: 0.8125rem;
+	opacity: 0.8;
+}
+
+.module-row-action {
+	flex-shrink: 0;
+	height: 1.5rem;
+	padding: 0 0.625rem;
+	border: 0;
+	border-radius: 0.5rem;
+	background: rgba(255, 255, 255, 0.1);
+	color: inherit;
+	font: inherit;
+	font-size: 0.75rem;
+	cursor: pointer;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.18);
+	}
+
+}
+
+.module-row-action:disabled,
+.module-panel .panel-action:disabled {
+	opacity: 0.5;
+	cursor: default;
 }
 
 // the worst alert colours the edge of the card; the ring, not a border, so nothing moves

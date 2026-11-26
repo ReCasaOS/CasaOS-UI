@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
 import HealthStrip from './HealthStrip.vue'
 import { openFleet } from '@/components/Fleet/entry'
+import { act, getCard, getCards } from '@/service/moduleCards'
 import { refreshGuard, shareGuard } from '@/service/shareGuard'
 
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn(), act: vi.fn() }))
 vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
 // the store the strip reads, and the read it asks for once a minute
 vi.mock('@/service/shareGuard', async () => {
@@ -23,7 +25,7 @@ const hardwareInfo = {
 	net: [{ name: 'eth0', bytesSent: 0, bytesRecv: 0, time: 100 }],
 }
 
-function strip({ store, getters = owner, runs = [], getRuns, getSchedules, getRunning, operations, snapraid, unreadable, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn() } = {}) {
+function strip({ store, getters = owner, runs = [], getRuns, getSchedules, getRunning, operations, snapraid, unreadable, fleet, emit = vi.fn(), buefy = {}, destinations, backupSystem = vi.fn(), users } = {}) {
 	return mount(HealthStrip, {
 		global: {
 			mocks: {
@@ -32,6 +34,7 @@ function strip({ store, getters = owner, runs = [], getRuns, getSchedules, getRu
 				$buefy: buefy,
 				$EventBus: { $emit: emit },
 				$api: {
+					...(users ? { users } : {}),
 					backup: {
 						getRuns: getRuns || (() => Promise.resolve({ data: { data: runs } })),
 						...(getSchedules ? { getSchedules } : {}),
@@ -799,4 +802,141 @@ it('follows the load read again into the store', async () => {
 	expect(wrapper.vm.cpu.percent).toBe(88)
 	expect(wrapper.vm.mem.usedPercent).toBe(7)
 	wrapper.unmount()
+})
+
+describe('the cards of the modules', () => {
+	const admin = { canWrite: true, isAdmin: true, canReadModule: () => true }
+	const entry = (name, extra = {}) => ({ name, title: `Title ${name}`, route: `/v1/${name.replace(/-/g, '_')}`, ...extra })
+	const description = (extra = {}) => ({
+		schema: 1,
+		title: 'Wake machines',
+		icon: 'network-outline',
+		status: { level: 'warning', text: '1 asleep' },
+		rows: [{ label: 'NAS', value: 'asleep', level: 'warning', action: { label: 'Wake', method: 'POST', path: '/wake', body: { mac: 'aa' } } }, { label: 'PC', level: 'ok' }],
+		actions: [{ label: 'Wake all', method: 'POST', path: '/wake-all', confirm: 'Wake <b>all</b>?' }],
+		link: { label: 'Open', path: '/ui' },
+		...extra,
+	})
+	let confirm
+	let toast
+	let saved
+
+	function cards(list, { descriptions = {}, getters = admin } = {}) {
+		getCards.mockResolvedValue({ data: { data: { modules: list } } })
+		getCard.mockImplementation((route) => {
+			const answer = descriptions[route] ?? description()
+			return typeof answer === 'number' ? Promise.reject(Object.assign(new Error('x'), { status: answer, data: null })) : Promise.resolve({ data: answer })
+		})
+		return strip({
+			getters,
+			buefy: { dialog: { confirm }, toast: { open: toast } },
+			users: { getCustomStorage: () => Promise.resolve({ status: 200, data: { data: saved } }) },
+		})
+	}
+
+	beforeEach(() => {
+		confirm = vi.fn()
+		toast = vi.fn()
+		saved = []
+		getCards.mockReset()
+		getCard.mockReset()
+		act.mockReset()
+		act.mockResolvedValue({ data: { message: 'Sent' } })
+	})
+
+	const titles = wrapper => wrapper.findAll('.module-panel .panel-title').map(el => el.text())
+	const ready = async () => {
+		await settle()
+		await settle()
+	}
+
+	it('draws a panel per card, after the others, in the anatomy of the panels', async () => {
+		const wrapper = cards([entry('wake-on-lan', { foreign: true, repository: 'inkly/recasaos-wol' })])
+		await ready()
+		const panel = wrapper.find('.module-panel')
+		expect(panel.classes()).toEqual(expect.arrayContaining(['widget', 'panel']))
+		expect(panel.find('.panel-title').text()).toContain('Wake machines')
+		expect(panel.find('.module-owner').text()).toBe('by inkly')
+		expect(panel.find('.panel-chip').classes()).toContain('is-warning')
+		expect(panel.find('.panel-chip').text()).toBe('1 asleep')
+		const rows = panel.findAll('.panel-row')
+		expect(rows[0].find('.panel-dot').classes()).toContain('is-warning')
+		expect(rows[0].text()).toContain('NAS')
+		expect(rows[0].find('.module-row-action').text()).toBe('Wake')
+		expect(rows[1].find('.panel-dot').classes()).toContain('is-ok')
+		expect(panel.find('.panel-foot button').text()).toBe('Wake all')
+		const link = panel.find('.panel-foot a')
+		expect(link.attributes()).toMatchObject({ href: '/v1/wake_on_lan/ui', target: '_blank', rel: 'noopener noreferrer' })
+		expect(wrapper.find('.beta-aside').element.lastElementChild).toBe(panel.element)
+		wrapper.unmount()
+	})
+
+	it('shows the text of a module as text', async () => {
+		const wrapper = cards([entry('a')], { descriptions: { '/v1/a': description({ title: '<img src=x>', rows: [{ label: '<b>x</b>' }] }) } })
+		await ready()
+		expect(wrapper.find('.module-panel img').exists()).toBe(false)
+		expect(wrapper.find('.module-panel').html()).not.toContain('<b>x</b>')
+		wrapper.unmount()
+	})
+
+	it('hides a card that is hidden in the widgets settings, and follows the saved order', async () => {
+		saved = [{ name: 'clock', show: true }, { name: 'module:b', show: true }, { name: 'module:a', show: false }, { name: 'module:c', show: true }]
+		const wrapper = cards([entry('a'), entry('c'), entry('b'), entry('d')], { descriptions: { '/v1/a': description({ title: 'A' }), '/v1/b': description({ title: 'B' }), '/v1/c': description({ title: 'C' }), '/v1/d': description({ title: 'D' }) } })
+		await ready()
+		// d is not named in the saved choice: it goes last
+		expect(titles(wrapper)).toEqual(['B', 'C', 'D'])
+		wrapper.unmount()
+	})
+
+	it('asks nothing and shows nothing for an account that is not the administrator', async () => {
+		const wrapper = cards([entry('a')], { getters: { canWrite: false, isAdmin: false, canReadModule: () => true } })
+		await ready()
+		expect(getCards).not.toHaveBeenCalled()
+		expect(getCard).not.toHaveBeenCalled()
+		expect(wrapper.find('.module-panel').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('reads the list once and each card once: the strip has no reading of its own besides the cards', async () => {
+		const wrapper = cards([entry('a'), entry('b')])
+		await ready()
+		expect(getCards).toHaveBeenCalledTimes(1)
+		expect(getCard).toHaveBeenCalledTimes(2)
+		wrapper.unmount()
+	})
+
+	it('says a card is unavailable for now, and drops one that the module answers 401 or 404 for', async () => {
+		const wrapper = cards([entry('a'), entry('b'), entry('tv-remote')], { descriptions: { '/v1/a': description({ evil: 1 }), '/v1/b': 404, '/v1/tv_remote': 401 } })
+		await ready()
+		expect(wrapper.findAll('.module-panel')).toHaveLength(1)
+		expect(wrapper.find('.module-unavailable').text()).toBe('This card is unavailable for now')
+		expect(wrapper.find('.module-panel .panel-foot').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('sends nothing before the confirmation, once after it, and shows the answer as text', async () => {
+		const wrapper = cards([entry('wake-on-lan')])
+		await ready()
+		await wrapper.find('.module-panel .panel-foot button').trigger('click')
+		await wrapper.find('.module-panel .panel-foot button').trigger('click')
+		expect(confirm).toHaveBeenCalledTimes(1)
+		expect(confirm.mock.calls[0][0].message).toBe('Wake &lt;b&gt;all&lt;/b&gt;?')
+		expect(act).not.toHaveBeenCalled()
+		confirm.mock.calls[0][0].onConfirm()
+		confirm.mock.calls[0][0].onConfirm()
+		await settle()
+		expect(act).toHaveBeenCalledTimes(1)
+		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/wake-all', {})
+		expect(toast).toHaveBeenCalledWith({ message: 'Sent', type: 'is-success' })
+		wrapper.unmount()
+	})
+
+	it('sends the action of a row with no confirmation, with its body', async () => {
+		const wrapper = cards([entry('wake-on-lan')])
+		await ready()
+		await wrapper.find('.module-row-action').trigger('click')
+		expect(confirm).not.toHaveBeenCalled()
+		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/wake', { mac: 'aa' })
+		wrapper.unmount()
+	})
 })

@@ -22,10 +22,9 @@ import find from 'lodash/find'
 import isEqual from 'lodash/isEqual'
 import Settings from '@/components/widgets/Settings.vue'
 import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
-import { CARD_ICON_FALLBACK, cardList } from '@/components/moduleCards/moduleCards'
+import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { CARD_ICON_FALLBACK } from '@/components/moduleCards/moduleCards'
 import { combineWidgetSettings, withAbsent } from '@/components/widgets/widgetOrder'
-import { getCards } from '@/service/moduleCards'
-import events from '@/events/events'
 
 const widgetsComponents = require.context(
 	'@/widgets',
@@ -34,11 +33,10 @@ const widgetsComponents = require.context(
 )
 
 const widgetsConfig = 'widgets_config'
-// the list of the cards is read again this often, and when the Modules window installs or removes one
-const CARDS_EVERY_MS = 5 * 60 * 1000
 
 export default {
 	name: 'SideBar',
+	mixins: [cardsMixin],
 	components: {
 		ModuleCard,
 		Settings,
@@ -49,11 +47,8 @@ export default {
 			comps: [],
 			apps: [],
 			widgetsSettings: [],
-			// the modules that have a card (cardList), and the icon each card named once read
-			moduleCards: [],
+			// the icon each card named once read
 			cardIcons: {},
-			cardsTimer: 0,
-			cardsSerial: 0,
 		}
 	},
 	computed: {
@@ -79,10 +74,6 @@ export default {
 		listedSettings() {
 			return this.widgetsSettings.filter(item => this.apps.some(o => o.app.name === item.name) || this.moduleApps.some(o => o.name === item.name))
 		},
-		// the cards are the administrator's: another account, or one whose role is not known yet, asks for none
-		cardsAllowed() {
-			return this.$store.getters.isAdmin === true && this.$store.state.roleConfirmed !== false
-		},
 		sidebarOpen() {
 			return this.$store.state.sidebarOpen
 		},
@@ -91,9 +82,6 @@ export default {
 				return item.show
 			})
 		},
-	},
-	watch: {
-		cardsAllowed: 'loadCards',
 	},
 	created() {
 		widgetsComponents.keys().forEach((fileName) => {
@@ -116,16 +104,10 @@ export default {
 	},
 	mounted() {
 		this.getConfig()
-		this.loadCards()
-		this.cardsTimer = setInterval(this.loadCards, CARDS_EVERY_MS)
-		this.$EventBus?.$on(events.MODULES_CHANGED, this.loadCards)
 
 		window.addEventListener('resize', this.handleResize)
 	},
 	beforeUnmount() {
-		clearInterval(this.cardsTimer)
-		this.cardsSerial++
-		this.$EventBus?.$off(events.MODULES_CHANGED, this.loadCards)
 		window.removeEventListener('resize', this.handleResize)
 	},
 
@@ -135,8 +117,9 @@ export default {
 		 * @return {*} void
 		 */
 		getConfig() {
-			const initData = this.getInitData()
 			this.$api.users.getCustomStorage(widgetsConfig).then((res) => {
+				// read now: the list of the cards may have come while the settings were on their way
+				const initData = this.getInitData()
 				if (res.status === 200) {
 					if (res.data === '') {
 						this.saveData(initData)
@@ -174,24 +157,8 @@ export default {
 			]
 		},
 
-		/**
-		 * @description: Read the list of the modules that have a card (administrator only), and give the new ones a place
-		 */
-		async loadCards() {
-			const serial = ++this.cardsSerial
-			if (!this.cardsAllowed) {
-				this.moduleCards = []
-				return
-			}
-			try {
-				const cards = cardList((await getCards()).data?.data)
-				if (serial !== this.cardsSerial)
-					return
-				this.moduleCards = cards
-			} catch {
-				// a list that cannot be read leaves the cards that are shown as they are: the next reading tries again
-				return
-			}
+		// a list has been read: the new cards are given a place
+		cardsRead() {
 			if (this.isLoading)
 				return
 			const combined = combineWidgetSettings(this.getInitData(), this.widgetsSettings)

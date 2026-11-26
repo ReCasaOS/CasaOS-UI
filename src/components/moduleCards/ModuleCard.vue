@@ -1,8 +1,9 @@
 <template>
-	<div v-if="state !== 'gone' && state !== 'loading'"
-		:class="variant === 'panel' ? 'module-card-panel' : 'widget has-text-white is-relative'"
-		class="module-card">
-		<div v-if="variant !== 'panel'" class="blur-background"></div>
+	<slot v-if="variant === 'panel' && state !== 'gone' && state !== 'loading'" :busy="busy" :card="card" :module="module" :run="run"
+		:state="state" :texts="texts" />
+	<div v-else-if="variant !== 'panel' && state !== 'gone' && state !== 'loading'"
+		class="module-card widget has-text-white is-relative">
+		<div class="blur-background"></div>
 		<div class="widget-content">
 			<!-- Header Start -->
 			<div class="widget-header is-flex">
@@ -54,6 +55,7 @@ import { act, getCard } from '@/service/moduleCards'
 const GONE = [401, 403, 404]
 const UNAVAILABLE_REFRESH = 60
 
+// The variant `panel` is drawn by the home that holds it, in its own markup and styles (the default slot gets the state, the card and `run`).
 export default {
 	name: 'ModuleCard',
 	props: {
