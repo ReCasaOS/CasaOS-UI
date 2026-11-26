@@ -168,7 +168,7 @@
 						<div v-if="card.module.autoUpdate !== null" class="modules-auto-update mt-3" :data-module="card.module.name">
 							<div class="is-flex is-align-items-center">
 								<span class="is-flex-grow-1 has-text-weight-semibold">{{ $t(TEXT.autoUpdate.label) }}</span>
-								<b-switch :key="`${card.module.name}-${autoRedraw}`" :disabled="Boolean(autoSaving)" :model-value="autoValue(card.module)" size="is-small" @update:model-value="setAutoUpdate(card.module, $event)">
+								<b-switch :key="`${card.module.name}-${autoRedraw[card.module.name] ?? 0}`" :disabled="Boolean(autoSaving)" :model-value="autoValue(card.module)" size="is-small" @update:model-value="setAutoUpdate(card.module, $event)">
 									<span class="is-sr-only">{{ $t(TEXT.autoUpdate.label) }}</span>
 								</b-switch>
 							</div>
@@ -689,7 +689,9 @@ export default {
 			autoSaving: '',
 			autoAnswers: {},
 			autoErrors: {},
-			autoRedraw: 0,
+			autoRedraw: {},
+			// a clock for the reads of the list and the answers of the box: an answer outlives only the lists that were read before it
+			autoClock: 0,
 			// a look for newer versions is out (getModules with refresh): one at a time
 			looking: false,
 			lookAbort: null,
@@ -860,6 +862,7 @@ export default {
 			if (this.loading || this.gone)
 				return undefined
 			this.loading = true
+			const began = ++this.autoClock
 			let view = null
 			let failure = null
 			try {
@@ -878,8 +881,9 @@ export default {
 			}
 			this.listError = null
 			this.view = view
-			// the list is what the box holds now
-			this.autoAnswers = {}
+			// the list is what the box holds now, unless an answer of the box came after this read began; a sentence about a switch the list no longer shows goes
+			this.autoAnswers = Object.fromEntries(Object.entries(this.autoAnswers).filter(([, answer]) => answer.at > began))
+			this.autoErrors = Object.fromEntries(Object.entries(this.autoErrors).filter(([name]) => view.modules.find(module => module.name === name)?.autoUpdate != null))
 			this.listSerial++
 			return true
 		},
@@ -1269,20 +1273,27 @@ export default {
 		// ---- the switch of the night ----
 
 		autoValue(module) {
-			return this.autoAnswers[module.name] ?? module.autoUpdate
+			return this.autoAnswers[module.name]?.value ?? module.autoUpdate
 		},
-		// One call at a time. The answer is what the switch shows; a call that failed says why, the switch goes back to what the list holds, and the list is read again.
+		// One call at a time. The answer is what the switch shows; a call that failed says why (aloud too), the switch goes back to what the list holds and keeps the
+		// focus, and the list is read again. Only the switch of that module is drawn again.
 		async setAutoUpdate(module, on) {
 			if (this.autoSaving || this.gone)
 				return
-			this.autoSaving = module.name
-			this.autoErrors = { ...this.autoErrors, [module.name]: '' }
+			const name = module.name
+			const redraw = () => {
+				this.autoRedraw = { ...this.autoRedraw, [name]: (this.autoRedraw[name] ?? 0) + 1 }
+				this.$nextTick(() => this.$el.querySelector?.(`.modules-auto-update[data-module="${name}"] input`)?.focus())
+			}
+			this.autoSaving = name
+			this.autoErrors = { ...this.autoErrors, [name]: '' }
 			let held = null
 			let failure = null
 			try {
-				held = (await this.$api.sys.setModuleAutoUpdate(module.name, on))?.data?.data?.auto_update
+				held = (await this.$api.sys.setModuleAutoUpdate(name, on))?.data?.data?.auto_update
+				// an answer that says nothing of the setting is a call that may have been carried out
 				if (typeof held !== 'boolean')
-					failure = moduleFailure(null, this.locale, { read: true })
+					failure = { message: { key: TEXT.call.maybe, params: {} } }
 			} catch (error) {
 				failure = moduleFailure(error, this.locale, { mode: 'autoUpdate' })
 			}
@@ -1290,14 +1301,16 @@ export default {
 				return
 			this.autoSaving = ''
 			if (!failure) {
-				this.autoAnswers = { ...this.autoAnswers, [module.name]: held }
+				this.autoAnswers = { ...this.autoAnswers, [name]: { value: held, at: ++this.autoClock } }
 				// the switch says what the box holds, not what was clicked
 				if (held !== on)
-					this.autoRedraw++
+					redraw()
 				return
 			}
-			this.autoErrors = { ...this.autoErrors, [module.name]: this.say(failure.message) }
-			this.autoRedraw++
+			const said = this.say(failure.message)
+			this.autoErrors = { ...this.autoErrors, [name]: said }
+			this.announced = said
+			redraw()
 			this.loadList()
 		},
 

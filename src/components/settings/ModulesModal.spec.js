@@ -365,6 +365,71 @@ describe('the list of modules', () => {
 			expect(input().attributes('disabled')).toBeUndefined()
 		})
 
+		it('says a failure aloud, and keeps the focus on the switch that was used', async () => {
+			await open(listRaw([owned(), owned({ name: 'other' })]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			const mine = wrapper.find('.modules-auto-update[data-module="virt"] input')
+			mine.element.focus()
+			await mine.setValue(true)
+			await settle()
+
+			expect(text('.modules-live')).toBe(REASONS.not_installed)
+			const again = wrapper.find('.modules-auto-update[data-module="virt"] input').element
+			expect(document.activeElement).toBe(again)
+		})
+
+		it('redraws only the switch of that module', async () => {
+			await open(listRaw([owned(), owned({ name: 'other' })]))
+			const other = wrapper.find('.modules-auto-update[data-module="other"] input').element
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await wrapper.find('.modules-auto-update[data-module="virt"] input').setValue(true)
+			await settle()
+
+			expect(wrapper.find('.modules-auto-update[data-module="other"] input').element).toBe(other)
+		})
+
+		it('keeps the answer of the box against a list that was read before it, and takes a list read after it', async () => {
+			await open(listRaw([owned()]))
+			const older = deferred()
+			calls.getModules.mockImplementationOnce(() => older.promise)
+			wrapper.vm.loadList()
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt', auto_update: true }))
+			await input().setValue(true)
+			await settle()
+			older.resolve({ data: { data: listRaw([owned({ auto_update: false })]) } })
+			await settle()
+			expect(input().element.checked).toBe(true)
+
+			calls.getModules.mockImplementation(() => answer(listRaw([owned({ auto_update: false })])))
+			await wrapper.vm.loadList()
+			await settle()
+			expect(input().element.checked).toBe(false)
+		})
+
+		it('forgets the sentence of a failure when the list shows no switch for the module any more', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(failure(refused('not_installed', {})))
+			await input().setValue(true)
+			await settle()
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(true)
+
+			calls.getModules.mockImplementation(() => answer(listRaw([moduleRaw()])))
+			await wrapper.vm.loadList()
+			calls.getModules.mockImplementation(() => answer(listRaw([owned()])))
+			await wrapper.vm.loadList()
+			await settle()
+			expect(wrapper.find('.modules-auto-update-error').exists()).toBe(false)
+		})
+
+		it('says the request may have gone through when the answer has no setting', async () => {
+			await open(listRaw([owned()]))
+			calls.setModuleAutoUpdate.mockImplementation(() => answer({ name: 'virt' }))
+			await input().setValue(true)
+			await settle()
+
+			expect(text('.modules-auto-update-error')).toBe(TEXT.call.maybe)
+		})
+
 		it('says the label in French', async () => {
 			i18n.global.locale = 'fr_fr'
 			await open(listRaw([owned()]))
