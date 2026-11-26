@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_ICONS, CARD_ICON_FALLBACK, CARD_TEXT, MODULE_CARD_KEYS, actionNote, cardList, cardView } from './moduleCards.js'
+import { CARD_ICONS, CARD_ICON_FALLBACK, CARD_TEXT, MODULE_CARD_KEYS, actionNote, cardList, cardView, isTileOnly } from './moduleCards.js'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import pt from '@/assets/lang/pt_BR.json'
@@ -292,5 +292,25 @@ describe('the bounds of the card format, in characters', () => {
 	it('cut the message of an action, and the title of a module, without cutting a character in two', () => {
 		expect(actionNote({ message: grin.repeat(500) })).toBe(grin.repeat(120))
 		expect(cardList({ modules: [{ name: 'a', title: grin.repeat(500), route: '/v1/a' }] })[0].title).toBe(grin.repeat(80))
+	})
+})
+
+describe('a card that is only a button', () => {
+	const view = extra => cardView({ schema: 1, title: 'Router', ...extra }, ROUTE)
+	const link = { label: 'Open', path: '/' }
+
+	it('is a link and nothing else', () => {
+		expect(isTileOnly(view({ link }))).toBe(true)
+		expect(isTileOnly(view({ link, rows: [] }))).toBe(true)
+		expect(isTileOnly(view({ link, actions: [] }))).toBe(true)
+	})
+
+	it('is not one with a status, a row or an action beside its link, nor without a link', () => {
+		expect(isTileOnly(view({ link, status: { level: 'ok', text: 'Up' } }))).toBe(false)
+		expect(isTileOnly(view({ link, rows: [{ label: 'WAN' }] }))).toBe(false)
+		expect(isTileOnly(view({ link, actions: [action()] }))).toBe(false)
+		expect(isTileOnly(view({}))).toBe(false)
+		expect(isTileOnly(cardView(full(), ROUTE))).toBe(false)
+		expect(isTileOnly(null)).toBe(false)
 	})
 })

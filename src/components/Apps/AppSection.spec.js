@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetVirtualMachines, hasVirtualMachines, listVirtualMachines } from '@/components/VirtualMachines/entry'
 import { forgetFleet, hasFleet } from '@/components/Fleet/entry'
 import { hasLogs } from '@/components/Logs/entry'
 import { forgetSecurity, hasSecurity } from '@/components/Security/entry'
 import { forgetAIAccess, hasAIAccess } from '@/components/AIAccess/entry'
 import { followRescan, refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
+import { getCard, getCards } from '@/service/moduleCards'
+import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import events from '@/events/events'
 import AppSection from '@/components/Apps/AppSection.vue'
 import GitAppModal from '@/components/Apps/GitAppModal.vue'
 
@@ -46,6 +49,8 @@ vi.mock('@/service/vulnScan', async () => {
 	const { reactive } = await import('vue')
 	return { vulnScan: reactive({ apps: {}, ok: false }), refresh: vi.fn(() => Promise.resolve()), followRescan: vi.fn(() => Promise.resolve()) }
 })
+// the cards of the modules: whatever each test says the core and the modules answer
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...await importOriginal(), getCards: vi.fn(), getCard: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({
 	...await importOriginal(),
 	hasLogs: vi.fn(() => Promise.resolve(false)),
@@ -1373,5 +1378,150 @@ describe('app section AI access card', () => {
 		await AppSection.methods.syncAIAccessCard.call(vm)
 		expect(hasAIAccess).not.toHaveBeenCalled()
 		expect(names(vm)).toEqual(['App Store'])
+	})
+})
+
+// A module whose card has a link gets a tile in the grid, like the Logs and Security cards; the grid reads the cards with cardsMixin.
+describe('app section module tiles', () => {
+	const tp = (key, params = {}) => key.replace(/\{(\w+)\}/g, (_, name) => params[name])
+	const entry = name => ({ name, title: `Title ${name}`, route: `/v1/${name.replace(/-/g, '_')}`, ...(name === 'wake-on-lan' ? { foreign: true, repository: 'inkly/recasaos-wake-on-lan' } : {}) })
+	const cardsAnswer = (...names) => ({ data: { data: { modules: names.map(entry) } } })
+	const http = status => Object.assign(new Error(`status ${status}`), { status, data: null })
+	const descriptions = {
+		'/v1/wake_on_lan': { schema: 1, title: 'Wake-on-LAN', status: { level: 'ok', text: '3 machines' }, link: { label: 'Open', path: '/ui' } },
+		'/v1/router_admin': { schema: 1, title: 'Router', icon: 'internet-outline', link: { label: 'Open', path: '/' } },
+		'/v1/no_link': { schema: 1, title: 'No link', status: { level: 'ok', text: 'fine' } },
+	}
+
+	// the section with its real methods and the mixin's, the order kept as the server would
+	function section({ savedOrder = [], admin = true } = {}) {
+		const stored = { order: savedOrder }
+		const setCustomStorage = vi.fn((key, { data }) => {
+			stored.order = data
+		})
+		const handlers = {}
+		const vm = {
+			$baseIp: 'localhost',
+			$t: tp,
+			$openAPI: { appGrid: { getAppGrid: () => Promise.resolve({ data: { data: [{ name: 'jellyfin' }] } }) } },
+			$api: { users: { getCustomStorage: () => Promise.resolve({ data: { data: { data: stored.order } } }), setCustomStorage } },
+			getLinkAppList: () => Promise.resolve([]),
+			canWrite: admin,
+			$store: { getters: { canReadModule: () => true, isAdmin: admin }, state: { roleConfirmed: true } },
+			$EventBus: { $on: (event, fn) => { handlers[event] = fn }, $off: vi.fn() },
+		}
+		Object.assign(vm, cardsMixin.data.call(vm), AppSection.data.call(vm), { appList: [], savedOrder: [] })
+		Object.defineProperty(vm, 'cardsAllowed', { get: () => cardsMixin.computed.cardsAllowed.call(vm) })
+		for (const [name, method] of Object.entries({ ...cardsMixin.methods, ...AppSection.methods })) {
+			vm[name] = method.bind(vm)
+		}
+		return { vm, stored, setCustomStorage, handlers }
+	}
+	const names = vm => vm.appList.map(app => app.name)
+	const tile = (vm, name) => vm.appList.find(app => app.name === `module:${name}`)
+
+	beforeEach(() => {
+		hasVirtualMachines.mockResolvedValue(false)
+		getCards.mockReset()
+		getCards.mockResolvedValue(cardsAnswer('wake-on-lan', 'router-admin', 'no-link'))
+		getCard.mockReset()
+		getCard.mockImplementation(route => Promise.resolve({ data: descriptions[route] }))
+	})
+
+	it('gives a tile to a module whose card has a link, with its title and its page, and none to a card without a link', async () => {
+		const { vm } = section()
+		await vm.getList()
+		await vm.loadCards()
+
+		expect(names(vm)).toEqual(expect.arrayContaining(['module:wake-on-lan', 'module:router-admin']))
+		expect(names(vm)).not.toContain('module:no-link')
+		expect(tile(vm, 'wake-on-lan')).toMatchObject({ title: { en_us: 'Wake-on-LAN' }, status: 'running', app_type: 'system', moduleLink: '/v1/wake_on_lan/ui' })
+		// a card that is only a link is a tile all the same
+		expect(tile(vm, 'router-admin')).toMatchObject({ title: { en_us: 'Router' }, moduleLink: '/v1/router_admin/' })
+	})
+
+	it('says who made a foreign module under its tile, and nothing under one of ours', async () => {
+		const { vm } = section()
+		await vm.getList()
+		await vm.loadCards()
+
+		expect(vm.systemSubtitle(tile(vm, 'wake-on-lan'))).toBe('by inkly')
+		expect(vm.systemSubtitle(tile(vm, 'router-admin'))).toBe('')
+	})
+
+	it('does not save a saved order that has a tile before the cards are read, then puts the tile at its saved place', async () => {
+		const saved = ['module:wake-on-lan', 'Files', 'App Store', 'Statistics', 'jellyfin']
+		let answer
+		getCards.mockReturnValue(new Promise((resolve) => {
+			answer = resolve
+		}))
+		const { vm, stored, setCustomStorage } = section({ savedOrder: saved })
+		const cards = vm.loadCards()
+		await vm.getList()
+		await vm.getList()
+
+		expect(setCustomStorage).not.toHaveBeenCalled()
+		expect(names(vm)).not.toContain('module:wake-on-lan')
+
+		answer(cardsAnswer('wake-on-lan'))
+		await cards
+		expect(names(vm)[0]).toBe('module:wake-on-lan')
+		// the next reading of the list keeps it there, and the order saved has it first
+		await vm.getList()
+		expect(names(vm)[0]).toBe('module:wake-on-lan')
+		expect(stored.order[0]).toBe('module:wake-on-lan')
+	})
+
+	it('puts the tile at its saved place when the cards are read before the list', async () => {
+		const { vm, stored } = section({ savedOrder: ['Files', 'module:router-admin', 'App Store', 'Statistics', 'jellyfin'] })
+		await vm.loadCards()
+		await vm.getList()
+
+		expect(names(vm).indexOf('module:router-admin')).toBe(names(vm).indexOf('Files') + 1)
+		expect(stored.order.indexOf('module:router-admin')).toBe(stored.order.indexOf('Files') + 1)
+	})
+
+	it('takes the tile away when its card goes (a 401 when it is read again), and keeps it when the module fails for now', async () => {
+		const { vm } = section()
+		await vm.getList()
+		await vm.loadCards()
+		expect(names(vm)).toContain('module:wake-on-lan')
+
+		getCard.mockImplementation(route => route === '/v1/wake_on_lan' ? Promise.reject(http(500)) : Promise.resolve({ data: descriptions[route] }))
+		await vm.loadCards()
+		expect(names(vm)).toContain('module:wake-on-lan')
+
+		getCard.mockImplementation(route => route === '/v1/wake_on_lan' ? Promise.reject(http(401)) : Promise.resolve({ data: descriptions[route] }))
+		await vm.loadCards()
+		expect(names(vm)).not.toContain('module:wake-on-lan')
+		expect(names(vm)).toContain('module:router-admin')
+	})
+
+	it('follows the modules installed and removed, without a reload', async () => {
+		const { vm, handlers } = section()
+		cardsMixin.mounted.call(vm)
+		await vi.waitFor(() => expect(getCards).toHaveBeenCalledTimes(1))
+		await vm.getList()
+		await vi.waitFor(() => expect(names(vm)).toContain('module:wake-on-lan'))
+
+		getCards.mockResolvedValue(cardsAnswer('router-admin'))
+		await handlers[events.MODULES_CHANGED]()
+		expect(names(vm)).not.toContain('module:wake-on-lan')
+		expect(names(vm)).toContain('module:router-admin')
+
+		getCards.mockResolvedValue(cardsAnswer('router-admin', 'wake-on-lan'))
+		await handlers[events.MODULES_CHANGED]()
+		expect(names(vm)).toContain('module:wake-on-lan')
+		cardsMixin.beforeUnmount.call(vm)
+	})
+
+	it('gives no tile to an account that is not the administrator, and asks nothing for it', async () => {
+		const { vm } = section({ admin: false, savedOrder: ['module:wake-on-lan', 'Files'] })
+		await vm.loadCards()
+		await vm.getList()
+
+		expect(getCards).not.toHaveBeenCalled()
+		expect(getCard).not.toHaveBeenCalled()
+		expect(names(vm).some(name => name.startsWith('module:'))).toBe(false)
 	})
 })

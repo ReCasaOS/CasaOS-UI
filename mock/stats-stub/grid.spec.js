@@ -283,10 +283,10 @@ describe('the stub of the MCP module', () => {
 })
 
 describe('the stub of the cards of the modules', () => {
-	it('lists the four modules that have a card, under the core route', () => {
+	it('lists the five modules that have a card, under the core route', () => {
 		const { status, body } = ask('GET', '/v1/sys/modules/cards')
 		expect(status).toBe(200)
-		expect(body.data.modules.map(item => item.name)).toEqual(['wake-on-lan', 'photo-sync', 'bad-card', 'tv-remote'])
+		expect(body.data.modules.map(item => item.name)).toEqual(['wake-on-lan', 'photo-sync', 'bad-card', 'tv-remote', 'router-admin'])
 	})
 
 	it('answers a valid card, a card with a confirmation, a hostile one and a 401', () => {
@@ -294,6 +294,7 @@ describe('the stub of the cards of the modules', () => {
 		expect(ask('GET', '/v1/photo_sync/card').body.actions[0].confirm).toBeTruthy()
 		expect(ask('GET', '/v1/bad_card/card').body.actions[0].path).toBe('//evil.example/x')
 		expect(ask('GET', '/v1/tv_remote/card').status).toBe(401)
+		expect(ask('GET', '/v1/router_admin/card').body).toEqual({ schema: 1, title: 'Router', icon: 'internet-outline', link: { label: 'Open', path: '/' } })
 	})
 
 	it('answers an action with its message once, then with a 500 once', () => {

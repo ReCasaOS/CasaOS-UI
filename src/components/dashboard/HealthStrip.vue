@@ -197,7 +197,7 @@ import { defineAsyncComponent } from 'vue'
 import escape from 'lodash/escape'
 import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
 import { cardsMixin } from '@/components/moduleCards/cardsMixin'
-import { CARD_ICON_FALLBACK } from '@/components/moduleCards/moduleCards'
+import { CARD_ICON_FALLBACK, isTileOnly } from '@/components/moduleCards/moduleCards'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
 import { snapraidHeld } from '@/components/Storage/snapraidPool'
@@ -267,7 +267,9 @@ export default {
 				const index = saved.findIndex(item => item.name === `module:${card.name}`)
 				return index < 0 ? saved.length : index
 			}
+			// a card that is only a button is the module's tile in the app grid, not a panel
 			return this.moduleCards
+				.filter(card => !isTileOnly(this.cardViews[card.name]))
 				.filter(card => saved.find(item => item.name === `module:${card.name}`)?.show !== false)
 				.sort((a, b) => rank(a) - rank(b))
 		},

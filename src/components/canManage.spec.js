@@ -20,6 +20,8 @@ vi.mock('@/components/VirtualMachines/entry', async importOriginal => ({
 	vmApplication: () => ({ name: 'Virtual Machines' }),
 }))
 vi.mock('@/service/logs', () => ({ logsApi: {} }))
+// the app section reads the cards of the modules (its tiles) for the admin: the core never answers here
+vi.mock('@/service/moduleCards', async importOriginal => ({ ...await importOriginal(), getCards: vi.fn(() => new Promise(() => {})) }))
 
 const never = () => new Promise(() => {})
 const never$ = new Proxy({}, { get: () => never })

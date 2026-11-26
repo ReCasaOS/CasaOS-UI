@@ -15,6 +15,7 @@ import { publicShare } from '@/service/publicShare'
 import { refresh as refreshVulnScan, vulnScan } from '@/service/vulnScan'
 import SecurityModal from '@/components/Apps/SecurityModal.vue'
 import UpdateBlockedModal from '@/components/Apps/UpdateBlockedModal.vue'
+import events from '@/events/events'
 
 vi.mock('@/components/Fleet/entry', async importOriginal => ({ ...await importOriginal(), openFleet: vi.fn() }))
 vi.mock('@/components/Logs/entry', async importOriginal => ({ ...await importOriginal(), openLogs: vi.fn(), hasLogs: vi.fn(() => Promise.resolve(false)) }))
@@ -890,6 +891,35 @@ describe('the Fleet card', () => {
 		const vm = { $buefy: { modal: { open: vi.fn() } }, $store: { state: { appLaunchInIframe: true, appLaunchExceptions: [] } } }
 		AppCard.methods.openSystemApps.call(vm, { name: FLEET_APP_NAME, app_type: 'system' })
 		expect(openFleet).toHaveBeenCalledWith(vm.$buefy, vm.$store.state)
+	})
+})
+
+describe('a module tile', () => {
+	const tile = { name: 'module:router-admin', app_type: 'system', status: 'running', title: { en_us: 'Router' }, moduleLink: '/v1/router_admin/' }
+
+	it('opens the module page in a new tab, with no opener, and never in the app window', async () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null)
+		// the app window is opened through the bus (App.vue listens for OPEN_APP_IFRAME)
+		const bus = { $emit: vi.fn(), $on: vi.fn(), $off: vi.fn() }
+		const wrapper = await card(tile, { $EventBus: bus })
+		const modal = vi.spyOn(wrapper.vm.$buefy.modal, 'open')
+
+		await wrapper.find('img').trigger('click')
+
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(open).toHaveBeenCalledWith('/v1/router_admin/', '_blank', 'noopener,noreferrer')
+		expect(bus.$emit).not.toHaveBeenCalledWith(events.OPEN_APP_IFRAME, expect.anything())
+		expect(modal).not.toHaveBeenCalled()
+		expect(wrapper.text()).toContain('Router')
+		open.mockRestore()
+		wrapper.unmount()
+	})
+
+	it('opens nothing for a system card it does not know', () => {
+		const open = vi.spyOn(window, 'open').mockReturnValue(null)
+		AppCard.methods.openSystemApps.call({ $buefy: {}, $store: { state: {} } }, { name: 'module:other', app_type: 'system' })
+		expect(open).not.toHaveBeenCalled()
+		open.mockRestore()
 	})
 })
 

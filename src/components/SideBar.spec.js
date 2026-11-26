@@ -193,6 +193,18 @@ describe('which modules get a card on the home', () => {
 		expect(setCustomStorage.mock.calls.flatMap(call => call[1].map(item => item.name)).filter(name => name.startsWith('module:'))).toEqual(['module:good'])
 	})
 
+	it('gives no widget, no settings row and no saved entry to a card that is only a link (its tile is in the app grid)', async () => {
+		getCards.mockResolvedValue(cardsAnswer('router-admin', 'good'))
+		getCard.mockImplementation(route => Promise.resolve({ data: route === '/v1/router_admin' ? { schema: 1, title: 'Router', link: { label: 'Open', path: '/' } } : { ...valid, status: { level: 'ok', text: 'Up' }, link: { label: 'Open', path: '/ui' } } }))
+		const wrapper = mountBar()
+		await flushPromises()
+		// a card with a link and something to show is in both places
+		expect(shown(wrapper)).toEqual(['good'])
+		expect(settingsNames(wrapper).filter(name => name.startsWith('module:'))).toEqual(['module:good'])
+		expect(Object.keys(wrapper.findComponent(SettingsStub).props('moduleInfo'))).toEqual(['module:good'])
+		expect(setCustomStorage.mock.calls.flatMap(call => call[1].map(item => item.name))).not.toContain('module:router-admin')
+	})
+
 	it('keeps a saved entry of a module whose card is not read yet, without offering it', async () => {
 		getCard.mockRejectedValue(http(404))
 		const wrapper = mountBar('admin', [...hidden, { name: 'module:second', show: false }])

@@ -218,6 +218,8 @@ import { VM_APP_NAME, forgetVirtualMachines, hasVirtualMachines, listVirtualMach
 import UpdateAllModal from '@/components/Apps/UpdateAllModal.vue'
 import { imageUpdateSummary } from '@/components/Apps/imageUpdateSummary'
 import events from '@/events/events'
+import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { CARD_TEXT } from '@/components/moduleCards/moduleCards'
 import business_ShowNewAppTag from '@/mixins/app/Business_ShowNewAppTag'
 import business_LinkApp from '@/mixins/app/Business_LinkApp'
 import { ice_i18n } from '@/mixins/base/common-i18n'
@@ -281,6 +283,23 @@ function withVmTiles(apps, vms) {
 	return [...apps.slice(0, at + 1), ...tiles, ...apps.slice(at + 1)]
 }
 
+// A tile per module whose card has a link, like the Logs and Security cards: it opens the module's page in a tab. The colon keeps its name
+// (and its place in the saved order) apart from a compose app and from the built-ins.
+const MODULE_TILE = 'module:'
+const isModuleTile = app => app.name.startsWith(MODULE_TILE)
+function moduleTiles(cards = [], views = {}) {
+	return cards.filter(card => views[card.name]?.link).map(card => ({
+		id: `${MODULE_TILE}${card.name}`,
+		name: `${MODULE_TILE}${card.name}`,
+		title: { en_us: views[card.name].title },
+		icon: require('@/assets/img/app/module.svg'),
+		status: 'running',
+		app_type: 'system',
+		moduleLink: views[card.name].link.url,
+		moduleOwner: card.foreign ? card.owner : '',
+	}))
+}
+
 // the compact grid's filters; a link app has no state to be running or stopped in
 const FILTERS = {
 	all: () => true,
@@ -328,7 +347,7 @@ export default {
 		// loaded with the first VM: a box without the module never downloads it
 		VmTile: defineAsyncComponent(() => import('@/components/VirtualMachines/VmTile.vue')),
 	},
-	mixins: [business_ShowNewAppTag, business_LinkApp],
+	mixins: [business_ShowNewAppTag, business_LinkApp, cardsMixin],
 	provide() {
 		return {
 			openAppStore: this.showInstall,
@@ -367,6 +386,12 @@ export default {
 			savedOrder: [],
 			// the cards whose probe has not answered yet: a save keeps their place
 			cardsProbing: [],
+			// the module tiles: this grid draws no ModuleCard, so each reading of the list reads the cards again (cardsMixin)
+			cardsReread: true,
+			// the cards were read once: until then a saved order with module tiles in it is not saved again
+			cardsKnown: false,
+			// the list was read once: the tiles of the cards that come after it have an order to take their place in
+			gridRead: false,
 			skCount: 0,
 			ListRefreshTimer: null,
 			isCheckingImages: false,
@@ -623,7 +648,8 @@ export default {
 				case VM_APP_NAME:
 					return this.vms.length > 0 ? this.$t('VMs: {count}', { count: this.vms.length }) : this.$t('Virtual Machines')
 				default:
-					return ''
+					// a module tile: who made it, for a module that is not ours
+					return app.moduleOwner ? this.$t(CARD_TEXT.owner, { owner: app.moduleOwner }) : ''
 			}
 		},
 
@@ -787,12 +813,16 @@ export default {
 					.then(res => res.data.data.data || [])
 
 				this.savedOrder = lateSortList
-				this.appList = this.sortApps(casaAppList, lateSortList)
+				// the module tiles as the cards were last read, after the last wait: a reading of the cards may have come meanwhile
+				this.appList = this.sortApps(concat(casaAppList, moduleTiles(this.moduleCards, this.cardViews)), lateSortList)
 				this.gridMissing = gridFailed
+				this.gridRead = true
+				// a module tile is known once the cards are read (cardsRead), and an account that may not read them has none
+				const hasModuleTiles = !this.cardsAllowed || this.cardsKnown || !lateSortList.some(name => name.startsWith(MODULE_TILE))
 				// a saved order that has the card is saved again only once the probe
 				// has answered, or the card would lose its place; without the grid's
 				// apps, saving would drop them from the order
-				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME)) && (hasSecurityCard || !lateSortList.includes(SECURITY_APP_NAME)) && (hasAIAccessCard || !lateSortList.includes(AI_ACCESS_APP_NAME))) {
+				if (!gridFailed && (hasVmCard || !lateSortList.includes(VM_APP_NAME)) && (hasFleetCard || !lateSortList.includes(FLEET_APP_NAME)) && (hasLogsCard || !lateSortList.includes(LOGS_APP_NAME)) && (hasSecurityCard || !lateSortList.includes(SECURITY_APP_NAME)) && (hasAIAccessCard || !lateSortList.includes(AI_ACCESS_APP_NAME)) && hasModuleTiles) {
 					this.saveSortIfChanged(lateSortList)
 				}
 				// the cards of the modules the account may read: the others are neither probed nor shown
@@ -898,6 +928,19 @@ export default {
 					this.appList = this.appList.filter(app => app.name !== FLEET_APP_NAME)
 				}
 			})
+		},
+
+		// The cards of the modules were read (cardsMixin): their tiles come, go or change at their saved place. Nothing is saved here: the
+		// next reading of the list saves the order, as it does for the other cards, once it has every app.
+		cardsRead() {
+			this.cardsKnown = true
+			if (!this.gridRead) {
+				return
+			}
+			const tiles = moduleTiles(this.moduleCards, this.cardViews)
+			if (!isEqual(tiles, this.appList.filter(isModuleTile))) {
+				this.appList = this.sortApps(concat(this.appList.filter(app => !isModuleTile(app)), tiles), this.savedOrder)
+			}
 		},
 
 		// Runs a card's probe; until it answers, a save keeps the card's saved place.
