@@ -63,7 +63,7 @@ export function showValue(shown, locale, translate, now = Date.now()) {
 	const kind = shown?.kind
 	const unit = typeof shown?.unit === 'string' && shown.unit ? ` ${shown.unit}` : ''
 	if (kind === 'text')
-		return typeof shown.text === 'string' && shown.text ? shown.text + unit : ''
+		return typeof shown.text === 'string' && shown.text ? shown.text + unit : MISSING
 	const number = shown?.number
 	if (typeof number !== 'number' || !Number.isFinite(number))
 		return MISSING

@@ -52,7 +52,7 @@ describe('showValue', () => {
 	it('adds the unit to a number and to a text, and to nothing else', () => {
 		expect(show({ kind: 'number', number: 12, unit: 'req/s' })).toBe('12 req/s')
 		expect(show({ kind: 'text', text: '4.2', unit: '°C' })).toBe('4.2 °C')
-		expect(show({ kind: 'text', text: '', unit: '°C' })).toBe('')
+		expect(show({ kind: 'text', text: '', unit: '°C' })).toBe('—')
 		expect(show({ kind: 'percent', number: 42, unit: 'x' })).toBe('42%')
 		expect(show({ kind: 'bytes', number: 1024, unit: 'x' })).toBe('1 KB')
 		expect(show({ kind: 'missing', unit: 'x' })).toBe('—')
@@ -60,7 +60,7 @@ describe('showValue', () => {
 
 	it('writes a text as it is, and a dash for what is missing or not understood', () => {
 		expect(show({ kind: 'text', text: '<b>UP</b>' })).toBe('<b>UP</b>')
-		expect(show({ kind: 'text' })).toBe('')
+		expect(show({ kind: 'text' })).toBe('—')
 		for (const shown of [{ kind: 'missing' }, { kind: 'number' }, { kind: 'number', number: '12' }, { kind: 'number', number: Number.NaN }, { kind: 'html', text: 'x' }, null, undefined, 'x'])
 			expect(show(shown)).toBe('—')
 	})
