@@ -52,6 +52,8 @@ vi.mock('@/assets/lang', () => ({
 			'Backup failed: {reason}': 'Backup failed: {reason}',
 			'{count} critical · update': '{count} critical · update',
 			'{count} critical': '{count} critical',
+			'{count} exploited · update': '{count} exploited · update',
+			'{count} exploited': '{count} exploited',
 			'{name} now runs the image that was just pulled.': '{name} now runs the image that was just pulled.',
 			'{name} already runs the newest image, so it was left as it is.': '{name} already runs the newest image, so it was left as it is.',
 			'Could not check whether a newer image exists for {name}. It keeps the image it has.': 'Could not check whether a newer image exists for {name}. It keeps the image it has.',
@@ -1223,6 +1225,48 @@ describe('app card vulnerability badge', () => {
 		expect(chips[0].text()).toBe('2 critical · update')
 		expect(chips[0].classes()).toContain('is-critical')
 		compact.unmount()
+	})
+
+	const compactCard = async () => {
+		const wrapper = mount(AppCard, {
+			props: { compact: true, item: { name: 'syncthing', app_type: 'v2app', status: 'running', title: { en_us: 'Syncthing' }, update_available: true } },
+			global: { plugins: [Buefy, i18n], provide: { homeShowFiles: () => {}, openAppStore: () => {} }, mocks: { $baseIp: 'localhost', $store: { getters: { canWrite: true, canReadModule: () => true } } } },
+			attachTo: document.body,
+		})
+		await nextTick()
+		return wrapper
+	}
+
+	it('shows the exploited chip when the app has exploited vulnerabilities', async () => {
+		found({ exploited: 3, epss_max: 0.9 })
+		const compact = await compactCard()
+		expect(compact.find('.update-chip').text()).toBe('3 exploited · update')
+		compact.unmount()
+		const classic = await card({ update_available: true })
+		expect(badges(classic)).toEqual(['3 exploited'])
+		classic.unmount()
+	})
+
+	it('never shows "0 critical" for an app actionable through an exploited high', async () => {
+		found({ critical: 0, exploited: 1, actionable: true })
+		const compact = await compactCard()
+		expect(compact.find('.update-chip').text()).toBe('1 exploited · update')
+		expect(compact.text()).not.toContain('0 critical')
+		compact.unmount()
+		const classic = await card({ update_available: true })
+		expect(badges(classic)).toEqual(['1 exploited'])
+		classic.unmount()
+	})
+
+	it('keeps today\'s chip when exploited is missing', async () => {
+		found()
+		const compact = await compactCard()
+		expect(compact.find('.update-chip').text()).toBe('2 critical · update')
+		compact.unmount()
+		found({ exploited: 0 })
+		const classic = await card({ update_available: true })
+		expect(badges(classic)).toEqual(['2 critical'])
+		classic.unmount()
 	})
 
 	it('says nothing on the card when there is nothing to do about what was found', async () => {

@@ -21,7 +21,7 @@
 						{{ $t(state) }}
 					</p>
 					<p class="is-size-7 has-text-full-03">
-						{{ $t('The images of your apps are checked for known vulnerabilities every night. An app is flagged when an update of it fixes a critical one.') }}
+						{{ $t('The images of your apps are checked for known vulnerabilities every night. An app is flagged when an update of it fixes a critical vulnerability, or one that attackers already exploit.') }}
 					</p>
 					<p v-if="status.last_run" class="is-size-7 has-text-full-03 mt-2" data-dates>
 						{{ $t('Last scan: {date}', { date: new Date(status.last_run).toLocaleString() }) }}
@@ -32,21 +32,30 @@
 					<p v-if="status.last_error" class="is-size-7 has-text-danger mt-2" data-last-error>
 						{{ $t('The last scan stopped early: {reason}', { reason: status.last_error }) }}
 					</p>
+					<p v-if="status.threat_updated_at" class="is-size-7 has-text-full-03 mt-2" data-threat>
+						{{ $t('List of exploited vulnerabilities of {date}', { date: new Date(status.threat_updated_at).toLocaleDateString() }) }}
+					</p>
+					<p v-if="status.threat_error" class="is-size-7 has-text-full-03 mt-2" data-threat-error>
+						{{ $t('The list of exploited vulnerabilities could not be updated: {reason}', { reason: status.threat_error }) }}
+					</p>
 				</div>
 
 				<div v-if="apps.length" class="settings-card">
 					<button v-for="item in apps" :key="item.app" class="security-overview__app" data-app type="button" @click="open(item.app)">
 						<span class="security-overview__name">{{ item.app }}</span>
-						<b-tag v-if="item.actionable" type="is-danger">
+						<b-tag v-if="item.exploited > 0" type="is-danger">
+							{{ $t(item.actionable ? '{count} exploited · update' : '{count} exploited', { count: item.exploited }) }}
+						</b-tag>
+						<b-tag v-if="item.actionable && item.critical > 0 && !(item.exploited > 0)" type="is-danger">
 							{{ $t('{count} critical · update', { count: item.critical }) }}
 						</b-tag>
-						<b-tag v-else-if="item.critical" type="is-danger is-light">
+						<b-tag v-else-if="item.critical > 0 && !item.actionable" type="is-danger is-light">
 							{{ $t('{count} critical', { count: item.critical }) }}
 						</b-tag>
 						<b-tag v-if="item.high" type="is-warning is-light">
 							{{ $t('{count} high', { count: item.high }) }}
 						</b-tag>
-						<span v-if="!item.critical && !item.high" class="is-size-7 has-text-full-03">{{ $t('Nothing found') }}</span>
+						<span v-if="!item.critical && !item.high && !(item.exploited > 0)" class="is-size-7 has-text-full-03">{{ $t('Nothing found') }}</span>
 						<b-icon class="ml-2" icon="chevron-right" size="is-small"></b-icon>
 					</button>
 				</div>
@@ -78,10 +87,10 @@ export default {
 	emits: ['close'],
 
 	computed: {
-		// the apps to act on first, then the most critical ones, then by name
+		// the apps an update would fix first, then real risk: exploited, then likelihood of exploitation (EPSS), then critical ones, then by name
 		apps() {
 			return Object.values(vulnScan.apps).sort((a, b) =>
-				Number(b.actionable === true) - Number(a.actionable === true) || (b.critical || 0) - (a.critical || 0) || a.app.localeCompare(b.app))
+				Number(b.actionable === true) - Number(a.actionable === true) || (b.exploited || 0) - (a.exploited || 0) || (b.epss_max ?? -1) - (a.epss_max ?? -1) || (b.critical || 0) - (a.critical || 0) || a.app.localeCompare(b.app))
 		},
 		// the one sentence that says where things stand
 		state() {
@@ -91,7 +100,7 @@ export default {
 			if (!this.status.last_run) {
 				return 'No scan has run yet.'
 			}
-			return this.apps.some(item => item.actionable) ? 'Some apps have a critical vulnerability that an update fixes.' : 'No app needs an update for a critical vulnerability.'
+			return this.apps.some(item => item.actionable) ? 'Some apps have a critical vulnerability, or one that attackers already exploit, that an update fixes.' : 'No app needs an update for a critical vulnerability.'
 		},
 	},
 

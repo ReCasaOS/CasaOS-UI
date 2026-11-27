@@ -52,7 +52,7 @@
 							</tr>
 						</thead>
 						<tbody>
-							<tr v-for="finding in image.findings" :key="`${finding.id} ${finding.package}`" data-finding>
+							<tr v-for="finding in sorted(image.findings)" :key="`${finding.id} ${finding.package}`" data-finding>
 								<td :title="finding.title">
 									<a v-if="isHttps(finding.url)" :href="finding.url" rel="noopener noreferrer" target="_blank">{{ finding.id }}</a>
 									<template v-else>
@@ -70,6 +70,12 @@
 									<b-tag :type="finding.severity === 'CRITICAL' ? 'is-danger' : 'is-warning'">
 										{{ $t(finding.severity === 'CRITICAL' ? 'Critical' : 'High') }}
 									</b-tag>
+									<b-tag v-if="finding.exploited" class="ml-1" type="is-danger">
+										{{ $t('Exploited') }}
+									</b-tag>
+									<span v-if="Number.isFinite(finding.epss)" class="ml-1 has-text-full-03">
+										{{ finding.epss > 0 && finding.epss < 0.005 ? $t('EPSS < 1 %') : $t('EPSS {percent} %', { percent: Math.round(finding.epss * 100) }) }}
+									</span>
 								</td>
 							</tr>
 						</tbody>
@@ -128,7 +134,7 @@ export default {
 				return 'No critical or high vulnerability with a fix was found.'
 			}
 			if (this.summary?.actionable) {
-				return 'An update of this app is offered: install it to fix the critical ones.'
+				return 'An update of this app is offered: install it to fix a critical vulnerability or one that attackers already exploit.'
 			}
 			return 'No update of this app is offered yet. Its publisher has to release an image with the fixes.'
 		},
@@ -139,6 +145,15 @@ export default {
 	},
 
 	methods: {
+		// exploited first, then the likelier to be exploited (EPSS), then the severity as sent
+		sorted(findings) {
+			const rank = f => [f.exploited ? 1 : 0, Number.isFinite(f.epss) ? f.epss : -1, f.severity === 'CRITICAL' ? 1 : 0]
+			return [...findings].sort((a, b) => {
+				const [x, y] = [rank(a), rank(b)]
+				return y[0] - x[0] || y[1] - x[1] || y[2] - x[2]
+			})
+		},
+
 		isHttps(url) {
 			return typeof url === 'string' && url.startsWith('https://')
 		},

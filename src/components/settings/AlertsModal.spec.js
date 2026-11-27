@@ -217,7 +217,7 @@ describe('the alerts dialog', () => {
 	it('lists the vulnerabilities category only when the core knows it', async () => {
 		const wrapper = await open({ getAlerts: answer(view({ categories: { backups: true, disks: true, updates: true, apps: true, vulnerabilities: true } })) })
 		expect(rows(wrapper)).toHaveLength(5)
-		expect(wrapper.vm.shownCategories.find(c => c.key === 'vulnerabilities').label).toBe('A critical vulnerability in an app that an update of the app fixes')
+		expect(wrapper.vm.shownCategories.find(c => c.key === 'vulnerabilities').label).toBe('A critical vulnerability, or one that attackers already exploit, in an app that an update of the app fixes')
 		const older = await open({})
 		expect(older.vm.shownCategories.map(c => c.key)).not.toContain('vulnerabilities')
 	})

@@ -23,6 +23,8 @@ vi.mock('@/assets/lang', () => ({
 			'Last scan: {date}': 'Last scan: {date}',
 			'Vulnerability database of {date}': 'Vulnerability database of {date}',
 			'The last scan stopped early: {reason}': 'The last scan stopped early: {reason}',
+			'EPSS {percent} %': 'EPSS {percent} %',
+			'EPSS < 1 %': 'EPSS < 1 %',
 		},
 	},
 }))
@@ -65,9 +67,46 @@ describe('the Security window of an app', () => {
 		wrapper.unmount()
 	})
 
+	it('marks an exploited vulnerability and shows its EPSS', async () => {
+		const wrapper = await open({ app: detail([image([
+			finding('CVE-2026-1', 'CRITICAL', { exploited: true, epss: 0.8765 }),
+			finding('CVE-2026-2', 'HIGH'),
+		])]) })
+		const rows = wrapper.findAll('[data-finding]')
+		expect(rows[0].text()).toContain('Exploited')
+		expect(rows[0].text()).toContain('EPSS 88 %')
+		expect(rows[1].text()).not.toContain('Exploited')
+		expect(rows[1].text()).not.toContain('EPSS')
+		expect(rows[1].text()).not.toContain('NaN')
+		wrapper.unmount()
+	})
+
+	it('says EPSS under 1 % instead of 0 %', async () => {
+		const wrapper = await open({ app: detail([image([finding('CVE-2026-1', 'HIGH', { epss: 0.0004 }), finding('CVE-2026-2', 'HIGH', { epss: 0.004 }), finding('CVE-2026-3', 'HIGH', { epss: 0.005 })])]) })
+		const row = id => wrapper.findAll('[data-finding]').find(r => r.text().includes(id)).text()
+		expect(row('CVE-2026-1')).toContain('EPSS < 1 %')
+		expect(row('CVE-2026-2')).toContain('EPSS < 1 %')
+		expect(row('CVE-2026-3')).toContain('EPSS 1 %')
+		expect(wrapper.text()).not.toContain('EPSS 0 %')
+		wrapper.unmount()
+	})
+
+	it('sorts the vulnerabilities by real risk', async () => {
+		const wrapper = await open({ app: detail([image([
+			finding('A', 'CRITICAL'),
+			finding('B', 'HIGH', { epss: 0.1 }),
+			finding('C', 'HIGH', { exploited: true, epss: 0.1 }),
+			finding('D', 'HIGH', { epss: 0.7 }),
+			finding('E', 'HIGH', { exploited: true, epss: 0.6 }),
+			finding('F', 'HIGH'),
+		])]) })
+		expect(wrapper.findAll('[data-finding]').map(r => r.find('td').text())).toEqual(['E', 'C', 'D', 'B', 'A', 'F'])
+		wrapper.unmount()
+	})
+
 	it('says to update the app when an update is offered, and that none is when none is', async () => {
 		let wrapper = await open()
-		expect(wrapper.find('[data-advice]').text()).toBe('An update of this app is offered: install it to fix the critical ones.')
+		expect(wrapper.find('[data-advice]').text()).toBe('An update of this app is offered: install it to fix a critical vulnerability or one that attackers already exploit.')
 		wrapper.unmount()
 
 		vulnScan.apps = { vaultwarden: { critical: 1, high: 1, actionable: false } }
