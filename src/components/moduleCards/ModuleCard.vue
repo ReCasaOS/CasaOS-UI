@@ -287,12 +287,20 @@ export default {
 	.module-card-rows.is-figures {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+		// a figure keeps its own height beside a taller one
+		align-items: start;
 		gap: 0.5rem;
 
 		li {
 			flex-direction: column;
+			// in a column the bar is a line of its own already
+			flex-wrap: nowrap;
 			min-width: 0;
 			margin: 0;
+		}
+
+		.module-card-bar {
+			flex: 0 0 auto;
 		}
 
 		.module-card-value {
