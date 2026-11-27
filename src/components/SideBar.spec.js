@@ -390,6 +390,42 @@ describe('the API widgets on the classic home', () => {
 		expect(setCustomStorage).not.toHaveBeenCalled()
 	})
 
+	it('writes nothing until the saved choice is read again, and reads it before a save', async () => {
+		const savedList = [...hidden, { name: 'module:wake-on-lan', show: true }, { name: 'module:second', show: true }, { name: KEY, show: true }]
+		const wrapper = mountBar('admin', savedList)
+		await flushPromises()
+
+		getCustomStorage.mockImplementation(() => Promise.reject(new Error('network')))
+		listWidgets.mockResolvedValue(widgets(['ab12cd34', 'My router'], ['zz99zz99', 'Second']))
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+
+		// later passes, and a move in the settings of this home, while the choice still cannot be read
+		wrapper.vm.cardsRead()
+		wrapper.findComponent(SettingsStub).vm.$emit('change', wrapper.findComponent(SettingsStub).props('modelValue').map(item => ({ ...item })).reverse())
+		await flushPromises()
+		expect(setCustomStorage).not.toHaveBeenCalled()
+
+		// it can be read again, and the widget was hidden elsewhere meanwhile
+		const elsewhere = [...savedList.slice(0, -1), { name: KEY, show: false }]
+		getCustomStorage.mockImplementation(() => Promise.resolve({ status: 200, data: { data: elsewhere } }))
+		let reads = getCustomStorage.mock.calls.length
+		wrapper.findComponent(SettingsStub).vm.$emit('change', wrapper.findComponent(SettingsStub).props('modelValue').map(item => ({ ...item })))
+		await flushPromises()
+		expect(getCustomStorage).toHaveBeenCalledTimes(reads + 1)
+		const saved = setCustomStorage.mock.calls.at(-1)[1]
+		expect(saved.find(item => item.name === KEY)).toEqual({ name: KEY, show: false })
+		expect(saved).toContainEqual({ name: 'custom:zz99zz99', show: true })
+		expect(shown(wrapper)).not.toContain(KEY)
+
+		// read: a save no longer reads first
+		reads = getCustomStorage.mock.calls.length
+		wrapper.findComponent(SettingsStub).vm.$emit('change', wrapper.findComponent(SettingsStub).props('modelValue').map(item => ({ ...item })))
+		await flushPromises()
+		expect(getCustomStorage).toHaveBeenCalledTimes(reads)
+		expect(setCustomStorage).toHaveBeenCalledTimes(2)
+	})
+
 	it('takes away a widget whose card is gone, and leaves the cards of the modules', async () => {
 		const wrapper = mountBar('admin', withCards)
 		await flushPromises()

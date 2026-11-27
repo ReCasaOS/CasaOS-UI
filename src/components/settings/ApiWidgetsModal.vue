@@ -80,6 +80,7 @@
 <script>
 import escape from 'lodash/escape'
 import { widgetKey } from '@/components/apiWidgets/format'
+import { listedWidgets } from '@/components/apiWidgets/ids'
 import events from '@/events/events'
 import { deleteWidget, listWidgets } from '@/service/apiWidgets'
 
@@ -88,8 +89,6 @@ const CONFIG = 'widgets_config'
 // the core's own limits
 const MAX_WIDGETS = 12
 const MAX_RECIPE_BYTES = 16 * 1024
-// the id the core gives: nothing else goes into a key of the settings or into an address
-const WIDGET_ID = /^[a-z0-9]{8}$/
 const text = value => (typeof value === 'string' ? value : '')
 
 /**
@@ -140,14 +139,13 @@ export default {
 			const config = failed ? null : await this.readConfig().catch(() => null)
 			if (serial !== this.serial)
 				return
-			const widgets = []
-			for (const widget of Array.isArray(list) ? list : []) {
-				if (WIDGET_ID.test(text(widget?.id)) && !widgets.some(known => known.id === widget.id))
-					widgets.push({ ...widget, base: text(widget.base), error: text(widget.error) })
-			}
 			this.failed = failed
-			this.widgets = widgets
-			this.config = config
+			// a list already shown stays when it cannot be read again, with its switches
+			if (failed && this.loaded)
+				return
+			this.widgets = listedWidgets(list).map(widget => ({ ...widget, base: text(widget.base), error: text(widget.error) }))
+			// and so does the saved choice
+			this.config = config ?? this.config
 			this.loaded = !failed
 		},
 		// a widget without a name is called by its id
@@ -209,8 +207,11 @@ export default {
 				try {
 					await deleteWidget(widget.id)
 				} catch (error) {
-					this.say(error?.message || this.$t('The widget could not be deleted.'))
-					return
+					// a widget the core no longer has was deleted elsewhere: it is as gone as one deleted here
+					if (error?.status !== 404) {
+						this.say(error?.message || this.$t('The widget could not be deleted.'))
+						return
+					}
 				}
 				this.widgets = this.widgets.filter(known => known.id !== widget.id)
 				// the widget is gone whatever comes of this: an entry left behind is one the homes neither show nor offer

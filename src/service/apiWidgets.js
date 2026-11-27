@@ -1,4 +1,5 @@
 import { api } from './service.js'
+import { isWidgetId } from '@/components/apiWidgets/ids'
 
 // The dashboard's API widgets (core, /v1/sys/widgets), owner only. A change is { base, insecure_tls, recipe, secrets }; no secret ever
 // comes back, only whether each input is filled. Every call answers the `data` of the core's answer, and a refusal is an Error with the
@@ -7,9 +8,8 @@ import { api } from './service.js'
 const PREFIX = '/sys/widgets'
 
 // The id of a widget is a path element of the core's routes: only the core's own rule goes into an address.
-const WIDGET_ID = /^[a-z0-9]{8}$/
 function widgetId(id) {
-	if (typeof id !== 'string' || !WIDGET_ID.test(id))
+	if (!isWidgetId(id))
 		throw new Error('not the id of a widget')
 	return id
 }

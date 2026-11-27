@@ -1,11 +1,10 @@
 import { widgetKey, widgetView } from './format'
+import { listedWidgets } from './ids'
 import events from '@/events/events'
 import { listWidgets, widgetCard } from '@/service/apiWidgets'
 
 // the list is read again this often, as the list of the cards of the modules is, and when the Widgets API window changes a widget
 const WIDGETS_EVERY_MS = 5 * 60 * 1000
-// the id the core gives: nothing else goes into a key of the settings
-const WIDGET_ID = /^[a-z0-9]{8}$/
 
 /**
  * The API widgets, for the two homes. The administrator's only: another account, or one whose role is not confirmed, asks nothing.
@@ -89,10 +88,8 @@ export const apiWidgetsMixin = {
 			if (serial !== this.apiWidgetsSerial)
 				return
 			const entries = []
-			for (const widget of Array.isArray(widgets) ? widgets : []) {
-				const id = widget?.id
-				if (typeof id !== 'string' || !WIDGET_ID.test(id) || entries.some(entry => entry.id === id))
-					continue
+			for (const widget of listedWidgets(widgets)) {
+				const id = widget.id
 				// a widget that changed is read at once, by a new source; a reading of the clock leaves each card to its own rhythm
 				const source = (changed ? null : this.apiWidgets.find(entry => entry.id === id)?.source) ?? {
 					// the language is the one of the page when the card is read

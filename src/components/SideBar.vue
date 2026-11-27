@@ -168,12 +168,19 @@ export default {
 
 		// The saved choice is kept in memory and written whole. When the widgets change it may have been written elsewhere (the Widgets API
 		// window shows and hides a widget): it is read again before anything is written, so that what is in memory does not go over it.
+		// Until that reading succeeds, `widgetsConfigUnread` stays set and nothing is written from memory: whatever saves reads first.
 		async apiWidgetsBefore(changed) {
-			this.widgetsConfigUnread = false
-			if (!changed || this.isLoading)
+			if (this.isLoading)
 				return
-			// not read: the choice in memory stays, and this reading of the widgets writes nothing from it
-			this.widgetsConfigUnread = true
+			if (changed)
+				this.widgetsConfigUnread = true
+			await this.widgetsConfigFresh()
+		},
+
+		// Whether the choice in memory may be written: true, unless it may have been written elsewhere and cannot be read again.
+		async widgetsConfigFresh() {
+			if (!this.widgetsConfigUnread)
+				return true
 			try {
 				const res = await this.$api.users.getCustomStorage(widgetsConfig)
 				if (res.status === 200 && Array.isArray(res.data?.data)) {
@@ -181,17 +188,19 @@ export default {
 					this.widgetsConfigUnread = false
 				}
 			} catch {}
+			return !this.widgetsConfigUnread
 		},
 
 		// a list of the API widgets has been read: the new ones are given a place
 		apiWidgetsRead() {
-			this.cardsRead(!this.widgetsConfigUnread)
+			this.cardsRead()
 		},
 
 		// a list has been read: the new cards are given a place
-		cardsRead(save = true) {
+		async cardsRead() {
 			if (this.isLoading)
 				return
+			const save = await this.widgetsConfigFresh()
 			const combined = combineWidgetSettings(this.getInitData(), this.widgetsSettings)
 			if (!isEqual(combined, this.widgetsSettings)) {
 				this.widgetsSettings = combined
@@ -221,9 +230,18 @@ export default {
 			})
 		},
 
-		handleChange(data) {
+		// what is chosen here goes over the choice as it is saved now; it stays in memory only while that one cannot be read
+		async handleChange(data) {
+			const before = this.widgetsSettings
+			const save = await this.widgetsConfigFresh()
+			// read again just now: a widget shown or hidden elsewhere, and not touched here, keeps what was chosen there
+			if (before !== this.widgetsSettings) {
+				const show = (list, name) => list.find(item => item.name === name)?.show
+				data = data.map(item => item.show === show(before, item.name) ? { ...item, show: show(this.widgetsSettings, item.name) ?? item.show } : item)
+			}
 			this.widgetsSettings = withAbsent(data, this.widgetsSettings, data.map(item => item.name))
-			this.saveData(this.widgetsSettings)
+			if (save)
+				this.saveData(this.widgetsSettings)
 		},
 
 		handleSearchBarChange(value) {

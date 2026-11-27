@@ -136,6 +136,34 @@ describe('the list of the API widgets window', () => {
 		wrapper.unmount()
 		expect(wrapper.vm.$EventBus.$off).toHaveBeenCalledWith(events.API_WIDGETS_CHANGED, handlers[events.API_WIDGETS_CHANGED])
 	})
+
+	it('keeps its widgets and their switches when a later read of the list fails, and says so until one works', async () => {
+		const wrapper = await open()
+		listWidgets.mockRejectedValue(refusal(500, 'locked'))
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(wrapper.find('[data-widgets-failed]').text()).toBe('The widgets could not be loaded: locked')
+		expect(rows(wrapper)).toHaveLength(2)
+		expect(toggle(wrapper, A).attributes('disabled')).toBeUndefined()
+		expect(toggle(wrapper, B).element.checked).toBe(false)
+		expect(wrapper.find('[data-widgets-add]').attributes('disabled')).toBeUndefined()
+
+		listWidgets.mockResolvedValue({ widgets: [listed(A, 'My router')] })
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(wrapper.find('[data-widgets-failed]').exists()).toBe(false)
+		expect(rows(wrapper)).toHaveLength(1)
+	})
+
+	it('keeps the saved choice it has when a later read of it fails', async () => {
+		const wrapper = await open()
+		getCustomStorage.mockRejectedValue(new Error('network'))
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(wrapper.find('[data-widgets-config-unread]').exists()).toBe(false)
+		expect(toggle(wrapper, B).attributes('disabled')).toBeUndefined()
+		expect(toggle(wrapper, B).element.checked).toBe(false)
+	})
 })
 
 describe('the show switch of an API widget', () => {
@@ -287,6 +315,18 @@ describe('the deletion of an API widget', () => {
 		expect(setCustomStorage).not.toHaveBeenCalled()
 		expect(emitted).toEqual([])
 		expect(row(wrapper, A).exists()).toBe(true)
+	})
+
+	it('takes a widget the core no longer has (404) as deleted', async () => {
+		const wrapper = await open()
+		deleteWidget.mockRejectedValue(refusal(404, 'no such widget'))
+		await press(wrapper)
+		confirm.mock.calls[0][0].onConfirm()
+		await flushPromises()
+		expect(toast).not.toHaveBeenCalled()
+		expect(saved().some(item => item.name === `custom:${A}`)).toBe(false)
+		expect(emitted).toEqual([[events.API_WIDGETS_CHANGED]])
+		expect(row(wrapper, A).exists()).toBe(false)
 	})
 
 	it('still says the widgets changed when the widget is deleted and the choice could not be saved', async () => {
