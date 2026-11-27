@@ -1165,7 +1165,8 @@ describe('the API widgets row of the settings', () => {
 		TopBar.methods.showApiWidgets.call({ $refs: { settingsDrop: { toggle } }, $buefy: { modal: { open } } })
 		expect(toggle).toHaveBeenCalledTimes(1)
 		expect(open).toHaveBeenCalledTimes(1)
-		expect(open.mock.calls[0][0]).toMatchObject({ component: ApiWidgetsModal, hasModalCard: true, trapFocus: true, canCancel: ['escape'] })
+		// Escape is not Buefy's: it would close this window under the editor it opens (modalStack.js)
+		expect(open.mock.calls[0][0]).toMatchObject({ component: ApiWidgetsModal, hasModalCard: true, trapFocus: true, canCancel: [], customClass: expect.stringMatching(/^vm-escape-\d+$/) })
 	})
 
 	// what the window asks for: the editor of a widget or of a new one, an import, an export

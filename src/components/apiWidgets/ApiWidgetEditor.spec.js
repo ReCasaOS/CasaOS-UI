@@ -360,6 +360,22 @@ describe('a secret', () => {
 		expect(control(parameter, '[data-pair-value]').attributes('type')).toBe('password')
 	})
 
+	it('stays one when its name becomes a harmless one: what was typed never turns into a fixed text', async () => {
+		const wrapper = await fresh()
+		await press(wrapper, '[data-pairs="query"] [data-pair-add]')
+		const [parameter] = pairs(wrapper, 'query')
+		await type(parameter, '[data-pair-name]', 'apikey')
+		await type(parameter, '[data-pair-value]', 'typed-secret')
+		await type(parameter, '[data-pair-name]', 'limit')
+		expect(control(parameter, '[data-pair-value]').attributes('type')).toBe('password')
+		expect(control(parameter, '[data-pair-secret]').element.checked).toBe(true)
+		await test(wrapper)
+		const [change] = testWidget.mock.calls[0]
+		expect(change.recipe.query).toEqual({ limit: { input: 'limit' } })
+		expect(JSON.stringify(change.recipe)).not.toContain('typed-secret')
+		expect(change.secrets).toEqual({ limit: 'typed-secret' })
+	})
+
 	it('is forgotten when its box is unticked: what was typed does not become a fixed text', async () => {
 		const wrapper = await fresh()
 		await press(wrapper, '[data-pairs="headers"] [data-pair-add]')
@@ -493,6 +509,9 @@ describe('a whole address typed in the field of the base', () => {
 		const [limit, key] = pairs(wrapper, 'query')
 		expect([control(limit, '[data-pair-name]').element.value, control(limit, '[data-pair-value]').element.value]).toEqual(['limit', '5'])
 		expect(control(key, '[data-pair-name]').element.value).toBe('apikey')
+		expect(control(key, '[data-pair-value]').attributes('type')).toBe('password')
+		// and it stays one whatever its name becomes
+		await type(key, '[data-pair-name]', 'k')
 		expect(control(key, '[data-pair-value]').attributes('type')).toBe('password')
 	})
 

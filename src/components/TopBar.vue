@@ -832,6 +832,7 @@ import FeedsModal from './settings/FeedsModal.vue'
 import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
 import ApiWidgetEditor from './apiWidgets/ApiWidgetEditor.vue'
 import { exportWidget, readImport } from './apiWidgets/share'
+import { openWithEscape } from './VirtualMachines/modalStack'
 import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
@@ -1335,14 +1336,14 @@ export default {
 			})
 		},
 
-		// the window says itself, on the bus, when a widget changes: nothing to do at its close
+		// The window says itself, on the bus, when a widget changes: nothing to do at its close. It opens the editor over itself: Escape
+		// closes it only while it is the one on top.
 		showApiWidgets() {
 			this.$refs.settingsDrop.toggle()
-			this.$buefy.modal.open({
+			openWithEscape(this.$buefy, {
 				component: ApiWidgetsModal,
 				hasModalCard: true,
 				trapFocus: true,
-				canCancel: ['escape'],
 				scroll: 'keep',
 				animation: 'zoom-in',
 				events: {
@@ -1358,8 +1359,8 @@ export default {
 			})
 		},
 
-		// The editor opens over the window of the widgets, and says itself on the bus what it saved. Escape does not close it: it would
-		// close the window under it too, and lose what was typed.
+		// The editor opens over the window of the widgets, and says itself on the bus what it saved. Escape does not close it: what was
+		// typed, secrets among it, would be lost on a key pressed by habit.
 		editApiWidget(widget, recipe = null) {
 			this.$buefy.modal.open({
 				component: ApiWidgetEditor,

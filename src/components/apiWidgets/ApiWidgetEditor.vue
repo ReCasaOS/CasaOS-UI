@@ -52,7 +52,7 @@
 						{{ group.title }}
 					</p>
 					<div v-for="(pair, index) in form[group.field]" :key="index" class="is-flex is-flex-wrap-wrap is-gap-1 is-align-items-center mb-1" data-pair>
-						<b-input v-model="pair.name" :aria-label="group.name" :placeholder="group.name" class="grows" data-pair-name size="is-small" />
+						<b-input :aria-label="group.name" :model-value="pair.name" :placeholder="group.name" class="grows" data-pair-name size="is-small" @update:model-value="rename(pair, $event)" />
 						<b-input v-model="pair.value" :aria-label="secretOf(pair) ? $t('Secret of {name}', { name: pair.name }) : $t('Value of {name}', { name: pair.name })"
 							:placeholder="secretOf(pair) ? keptText(pair) : $t('Value')" :type="secretOf(pair) ? 'password' : 'text'" autocomplete="new-password" class="grows" data-pair-value size="is-small" />
 						<b-checkbox :disabled="forced(pair)" :model-value="secretOf(pair)" data-pair-secret size="is-small" @update:model-value="setSecret(pair, $event)">
@@ -325,6 +325,13 @@ export default {
 		secretOf(entry) {
 			return entry.secret || isSecretName(entry.name)
 		},
+		// A name the core takes for a secret makes its value one, and it stays one when the name changes: what was typed in the password
+		// field must not turn into a fixed text of the recipe.
+		rename(pair, name) {
+			pair.name = name
+			if (isSecretName(name))
+				pair.secret = true
+		},
 		// what was typed as a secret does not become a text that everyone reads, and a text does not become a secret unseen
 		setSecret(entry, secret) {
 			entry.secret = secret
@@ -340,7 +347,7 @@ export default {
 				if (known)
 					known.value = value
 				else
-					this.form.query.push({ ...blankPair(), name, value })
+					this.form.query.push({ ...blankPair(), name, value, secret: isSecretName(name) })
 			}
 		},
 		leaveBase() {
