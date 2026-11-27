@@ -529,6 +529,30 @@
 								</div>
 								<!-- Automount USB Drive End  -->
 
+								<!-- Restart an unhealthy app Start: it restarts apps by itself, so it is the owner's -->
+								<div v-if="$store.getters.isAdmin && autoHeal !== null"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" icon="restart-alert" size="is-20" />
+										{{ $t("Restart an unhealthy app automatically") }}
+										<b-tooltip :label="$t('An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.')"
+											multilined
+											type="is-dark">
+											<b-icon class="ml-1" icon="question-outline" pack="casa" size="is-small" />
+										</b-tooltip>
+									</div>
+									<div>
+										<b-field>
+											<b-switch :model-value="autoHeal"
+												:disabled="autoHealSaving"
+												class="is-flex-direction-row-reverse mr-0 _small"
+												type="is-dark"
+												@update:model-value="setAutoHeal" />
+										</b-field>
+									</div>
+								</div>
+								<!-- Restart an unhealthy app End -->
+
 								<!-- Anonymous statistics Start -->
 								<div v-if="telemetryEnabled !== null" class="_row">
 									<div class="is-flex is-align-items-center">
@@ -873,6 +897,9 @@ export default {
 
 			port: '',
 			autoUsbMount: false,
+			// null until the box has answered: an older box answers 404 and the row stays hidden
+			autoHeal: null,
+			autoHealSaving: false,
 			// null until the core answers GET /v1/sys/telemetry: a core without the
 			// route shows no switch that could not work
 			telemetryEnabled: null,
@@ -1119,6 +1146,8 @@ export default {
 					this.checkVersion()
 					// the night may have moved it: waiting, updating, up to date
 					this.getAutoUpdate()
+					if (this.$store.getters.isAdmin)
+						this.getAutoHeal()
 				}
 			} else {
 				// Reset the text when the Settings layer closes
@@ -1649,6 +1678,30 @@ export default {
 		/*************************************************
 		 * PART 1-5b  Dashboard Setting - Automatic update
 		 **************************************************/
+		getAutoHeal() {
+			return this.$api.updates.autoHeal().then((res) => {
+				this.autoHeal = res.data.data.enabled
+			}).catch(() => {})
+		},
+
+		// The switch shows the new value at once and ends where the box says it is; it waits
+		// for its write, so that two answers cannot arrive out of order.
+		async setAutoHeal(enabled) {
+			if (this.autoHealSaving)
+				return
+			const before = this.autoHeal
+			this.autoHeal = enabled
+			this.autoHealSaving = true
+			try {
+				this.autoHeal = (await this.$api.updates.setAutoHeal(enabled)).data.data.enabled
+			} catch {
+				this.autoHeal = before
+				this.$buefy.toast.open({ message: this.$t('Unable to update at the moment!'), type: 'is-danger' })
+			} finally {
+				this.autoHealSaving = false
+			}
+		},
+
 		// Kept as it was when the core cannot be asked: an older core never shows
 		// the row, and a blip once it is shown does not take it away.
 		getAutoUpdate() {

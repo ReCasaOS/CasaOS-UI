@@ -2,7 +2,7 @@
 export const MAX_LINES = 20000
 
 const RANGES = { '1h': 3600000, '24h': 86400000, '7d': 7 * 86400000 }
-const EVENT_LEVELS = { 'died': 'error', 'oom-killed': 'error', 'unhealthy': 'error', 'restarting': 'error', 'stopped': 'warn', 'uninstalled': 'warn' }
+const EVENT_LEVELS = { 'died': 'error', 'oom-killed': 'error', 'unhealthy': 'error', 'restarting': 'error', 'auto-restarted': 'warn', 'stopped': 'warn', 'uninstalled': 'warn' }
 
 // djb2: a cheap, stable 32-bit hash, for keys (written base36) and colours only
 function hash(s) {
@@ -40,6 +40,9 @@ function sentence(e) {
 	const who = `${e.app}/${e.service || e.container}`
 	if (e.kind === 'died') {
 		return e.exit_code == null ? `${who} died` : `${who} died, exit code ${e.exit_code}`
+	}
+	if (e.kind === 'auto-restarted') {
+		return `${who} restarted automatically`
 	}
 	if (e.from_image && e.to_image) {
 		return `${who} ${e.kind} from ${e.from_image} to ${e.to_image}`

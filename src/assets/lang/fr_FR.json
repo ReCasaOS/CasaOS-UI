@@ -78,6 +78,8 @@
   "A new version is available!": "Une nouvelle version est disponible !",
   "Edit Web UI port": "Modifier le port de l'interface web",
   "Automount USB Drive": "Monter automatiquement le stockage USB",
+  "Restart an unhealthy app automatically": "Redémarrer automatiquement une app malade",
+  "An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.": "Une app dont le contrôle de santé échoue pendant 5 minutes est redémarrée, 3 fois au plus en 6 heures. Vous recevez une alerte à chaque fois.",
   "Wallpaper": "Fond d'écran",
   "Change wallpaper": "Changer le fond d'écran",
   "Show Search Bar": "Afficher la barre de recherche",

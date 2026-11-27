@@ -74,6 +74,7 @@ const ICONS = {
 	'started': 'play-circle-outline',
 	'stopped': 'stop-circle-outline',
 	'restarting': 'restart',
+	'auto-restarted': 'restart-alert',
 	'unhealthy': 'heart-broken',
 	'healthy': 'heart-pulse',
 	'installed': 'download',

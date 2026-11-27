@@ -208,6 +208,91 @@ describe('the anonymous statistics switch', () => {
 	})
 })
 
+describe('the restart an unhealthy app switch', () => {
+	function bar(updates, autoHeal = null) {
+		const vm = {
+			autoHeal,
+			autoHealSaving: false,
+			$t: key => key,
+			$api: { updates },
+			$buefy: { toast: { open: vi.fn() } },
+		}
+		for (const name of ['getAutoHeal', 'setAutoHeal'])
+			vm[name] = TopBar.methods[name].bind(vm)
+
+		return vm
+	}
+
+	it('is the owner\'s, and hidden until the box has answered', () => {
+		expect(source).toMatch(/<div v-if="\$store\.getters\.isAdmin && autoHeal !== null"/)
+		expect(source).toMatch(/<b-switch :model-value="autoHeal"\s+:disabled="autoHealSaving"[^>]*@update:model-value="setAutoHeal"/)
+	})
+
+	it('is read when the menu opens, by the owner only', () => {
+		for (const isAdmin of [true, false]) {
+			const vm = { canWrite: true, $store: { commit: vi.fn(), getters: { isAdmin } }, checkVersion: vi.fn(), getAutoUpdate: vi.fn(), getAutoHeal: vi.fn() }
+			TopBar.methods.onOpen.call(vm, true)
+			expect(vm.getAutoHeal).toHaveBeenCalledTimes(isAdmin ? 1 : 0)
+		}
+	})
+
+	it('waits for its write: disabled meanwhile, a second change ignored', async () => {
+		let answer
+		const setAutoHeal = vi.fn(() => new Promise((resolve) => {
+			answer = resolve
+		}))
+		const vm = bar({ setAutoHeal }, true)
+		const first = vm.setAutoHeal(false)
+		expect(vm.autoHealSaving).toBe(true)
+		await vm.setAutoHeal(true)
+		expect(setAutoHeal).toHaveBeenCalledTimes(1)
+		answer({ data: { data: { enabled: false } } })
+		await first
+		expect(vm.autoHealSaving).toBe(false)
+		expect(vm.autoHeal).toBe(false)
+	})
+
+	it('keeps the getAutoUpdate comment above getAutoUpdate', () => {
+		expect(source).toMatch(/\/\/ the row, and a blip once it is shown does not take it away\.\n\t\tgetAutoUpdate\(\)/)
+	})
+
+	it('follows the box\'s answer', async () => {
+		const vm = bar({ autoHeal: vi.fn(() => Promise.resolve({ data: { data: { enabled: false } } })) })
+		await vm.getAutoHeal()
+		expect(vm.autoHeal).toBe(false)
+	})
+
+	it('stays hidden, without an error, on a box that does not know it (404)', async () => {
+		const vm = bar({ autoHeal: vi.fn(() => Promise.reject(Object.assign(new Error('404'), { response: { status: 404 } }))) })
+		await vm.getAutoHeal()
+		expect(vm.autoHeal).toBe(null)
+		expect(vm.$buefy.toast.open).not.toHaveBeenCalled()
+	})
+
+	it('sends enabled and shows what the box answered', async () => {
+		const setAutoHeal = vi.fn(() => Promise.resolve({ data: { data: { enabled: false } } }))
+		const vm = bar({ setAutoHeal }, true)
+		await vm.setAutoHeal(false)
+		expect(setAutoHeal).toHaveBeenCalledWith(false)
+		expect(vm.autoHeal).toBe(false)
+	})
+
+	it('goes back where it was and says so when the write fails', async () => {
+		const vm = bar({ setAutoHeal: vi.fn(() => Promise.reject(new Error('offline'))) }, true)
+		await vm.setAutoHeal(false)
+		expect(vm.autoHeal).toBe(true)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledWith({ message: 'Unable to update at the moment!', type: 'is-danger' })
+	})
+
+	it('has its texts in the three language files', () => {
+		for (const lang of [en, fr, pt]) {
+			expect(lang['Restart an unhealthy app automatically']).toBeTruthy()
+			expect(lang['An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.']).toBeTruthy()
+		}
+		expect(fr['Restart an unhealthy app automatically']).toBe('Redémarrer automatiquement une app malade')
+	})
+})
+
 // GET /v1/sys/autoupdate's view, as the core answers it.
 function view(fields = {}) {
 	return { enabled: true, window: { start: '03:00', end: '05:00' }, state: 'up_to_date', next: null, last: null, ...fields }
@@ -223,7 +308,7 @@ describe('the automatic update row', () => {
 			$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
 			$api: { sys },
 			$EventBus: createEventBus(),
-			$store: { commit: vi.fn() },
+			$store: { commit: vi.fn(), getters: { isAdmin: true } },
 			$buefy: { toast: { open: vi.fn() }, modal: { open: vi.fn() } },
 			$refs: { settingsDrop: { toggle: vi.fn() } },
 			// The rest of mounted() and onOpen(), which these tests do not look at.
@@ -231,6 +316,7 @@ describe('the automatic update row', () => {
 			getUserInfo: vi.fn(),
 			getUsbStatus: vi.fn(),
 			getTelemetry: vi.fn(),
+			getAutoHeal: vi.fn(),
 			getHardwareInfo: vi.fn(),
 			onTelemetryChanged: vi.fn(),
 			getAlerts: vi.fn(),

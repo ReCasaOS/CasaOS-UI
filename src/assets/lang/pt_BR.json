@@ -64,6 +64,8 @@
   "A new version is available!": "Uma nova versão está disponível!",
   "Edit Web UI port": "Editar porta da interface web",
   "Automount USB Drive": "Montar unidade USB automaticamente",
+  "Restart an unhealthy app automatically": "Reiniciar automaticamente um app com problema",
+  "An app whose health check fails for 5 minutes is restarted, 3 times at most in 6 hours. You get an alert each time.": "Um app cuja verificação de integridade falha por 5 minutos é reiniciado, no máximo 3 vezes em 6 horas. Você recebe um alerta a cada vez.",
   "Wallpaper": "Papel de parede",
   "Change wallpaper": "Alterar papel de parede",
   "Show Search Bar": "Mostrar barra de pesquisa",
