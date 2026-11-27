@@ -11,7 +11,7 @@ vi.mock('@/service/vulnScan', async () => {
 	return {
 		vulnScan: reactive({ apps: {}, ok: true }),
 		refresh: vi.fn(() => Promise.resolve()),
-		vulnScanApi: { app: vi.fn(), status: vi.fn(), scan: vi.fn() },
+		vulnScanApi: { app: vi.fn(), status: vi.fn(), scan: vi.fn(), scanApp: vi.fn() },
 	}
 })
 
@@ -145,22 +145,28 @@ describe('the Security window of an app', () => {
 		wrapper.unmount()
 	})
 
-	it('shows the date of the last scan and of the database', async () => {
-		const wrapper = await open()
-		expect(wrapper.find('[data-dates]').text()).toContain(new Date('2026-11-24T05:31:00Z').toLocaleString())
+	it('shows the date of the last scan of the app and of the database', async () => {
+		let wrapper = await open({ app: detail([image([]), image([], { image_id: 'sha256:bb', scanned_at: '2026-11-24T09:00:00Z' })]) })
+		expect(wrapper.find('[data-dates]').text()).toContain(new Date('2026-11-24T09:00:00Z').toLocaleString())
 		expect(wrapper.find('[data-dates]').text()).toContain(new Date('2026-11-23T19:02:50Z').toLocaleDateString())
+		wrapper.unmount()
+
+		// no image scanned yet: the box's last run
+		wrapper = await open({ app: detail([image([], { scanned_at: undefined })]) })
+		expect(wrapper.find('[data-dates]').text()).toContain(new Date('2026-11-24T05:31:00Z').toLocaleString())
 		wrapper.unmount()
 	})
 
-	it('starts a scan, waits for its end and reads the results again', async () => {
+	it('starts a scan of this app only, waits for its end and reads the results again', async () => {
 		const wrapper = await open()
 		vi.useFakeTimers()
-		vulnScanApi.scan.mockImplementation(() => body(null))
+		vulnScanApi.scanApp.mockImplementation(() => body(null))
 		vulnScanApi.status.mockImplementation(() => body({ running: true, last_error: '' }))
 
 		await wrapper.find('[data-action="scan"]').trigger('click')
 		await flushPromises()
-		expect(vulnScanApi.scan).toHaveBeenCalledTimes(1)
+		expect(vulnScanApi.scanApp).toHaveBeenCalledWith('vaultwarden')
+		expect(vulnScanApi.scan).not.toHaveBeenCalled()
 		expect(wrapper.find('[data-action="scan"]').attributes('disabled')).toBeDefined()
 
 		vulnScanApi.status.mockImplementation(() => body({ running: false, last_error: '', last_run: '2026-11-24T06:10:00Z' }))
@@ -174,9 +180,21 @@ describe('the Security window of an app', () => {
 		wrapper.unmount()
 	})
 
+	it('scans every image with a module that cannot scan one app', async () => {
+		const wrapper = await open()
+		vulnScanApi.scanApp.mockImplementation(() => Promise.reject(Object.assign(new Error('not found'), { response: { status: 404 } })))
+		vulnScanApi.scan.mockImplementation(() => body(null))
+		vulnScanApi.status.mockImplementation(() => body({ running: true, last_error: '' }))
+		await wrapper.find('[data-action="scan"]').trigger('click')
+		await flushPromises()
+		expect(vulnScanApi.scan).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('[data-error]').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
 	it('joins a scan that already runs instead of failing', async () => {
 		const wrapper = await open()
-		vulnScanApi.scan.mockImplementation(() => Promise.reject(Object.assign(new Error('conflict'), { response: { status: 409 } })))
+		vulnScanApi.scanApp.mockImplementation(() => Promise.reject(Object.assign(new Error('conflict'), { response: { status: 409 } })))
 		vulnScanApi.status.mockImplementation(() => body({ running: true, last_error: '' }))
 		await wrapper.find('[data-action="scan"]').trigger('click')
 		await flushPromises()

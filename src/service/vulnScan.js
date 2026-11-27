@@ -13,6 +13,8 @@ export const vulnScanApi = {
 	app: async name => (await client()).get(`${PREFIX}/apps/${encodeURIComponent(name)}`),
 	status: async opts => (await client()).get(`${PREFIX}/status`, ...(opts ? [opts] : [])),
 	scan: async () => (await client()).post(`${PREFIX}/scan`),
+	// the images of one app only; a module before v0.2.2 has no such route and answers 404
+	scanApp: async name => (await client()).post(`${PREFIX}/apps/${encodeURIComponent(name)}/scan`),
 }
 
 // `ok` is true once the module answered; `apps` is what its last scan found, by app name. A box
