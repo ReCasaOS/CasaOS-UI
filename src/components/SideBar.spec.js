@@ -5,9 +5,12 @@ import { h, reactive } from 'vue'
 import SideBar from './SideBar.vue'
 import shipped from '@/components/widgets/shippedWidgets'
 import { getCard, getCards } from '@/service/moduleCards'
+import { listWidgets } from '@/service/apiWidgets'
+import events from '@/events/events'
 
 // the widgets are listed by SideBar, and one of them draws with lottie, which needs a real canvas
 vi.mock('lottie-web-vue', () => ({ default: { name: 'lottie-animation', template: '<div/>' } }))
+vi.mock('@/service/apiWidgets', () => ({ listWidgets: vi.fn(), widgetCard: vi.fn() }))
 vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn() }))
 
 const names = shipped.map(widget => widget.name)
@@ -283,5 +286,102 @@ describe('which modules get a card on the home', () => {
 		document.dispatchEvent(new Event('visibilitychange'))
 		await flushPromises()
 		expect(getCards).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('the API widgets on the classic home', () => {
+	const KEY = 'custom:ab12cd34'
+	// the cards of the modules have their place already: what is new is the widget
+	const withCards = [...hidden, { name: 'module:wake-on-lan', show: true }, { name: 'module:second', show: true }]
+	const widgets = (...list) => ({ widgets: list.map(([id, name]) => ({ id, base: 'https://example.org', recipe: { name }, inputs_set: {}, error: '' })) })
+
+	beforeEach(() => {
+		listWidgets.mockReset()
+		listWidgets.mockResolvedValue(widgets(['ab12cd34', 'My router']))
+	})
+
+	it('shows a widget after the cards, with what reads it, and offers it in the settings with its title', async () => {
+		const wrapper = mountBar('admin', withCards)
+		await flushPromises()
+		expect(listWidgets).toHaveBeenCalledTimes(1)
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second', KEY])
+		const card = wrapper.findAllComponents(ModuleCardStub)[2]
+		expect(card.props('module')).toMatchObject({ name: KEY, id: 'ab12cd34', title: 'My router' })
+		expect(typeof card.vm.$attrs.source.load).toBe('function')
+		// the cards of the modules are given none
+		expect(wrapper.findAllComponents(ModuleCardStub)[0].vm.$attrs.source).toBeUndefined()
+		expect(listed(wrapper).at(-1)).toBe(KEY)
+		expect(wrapper.findComponent(SettingsStub).props('moduleInfo')[KEY]).toEqual({ title: 'My router', icon: 'control-outline' })
+		// a new widget is given a place at the end, shown, and saved
+		expect(setCustomStorage.mock.calls.at(-1)[1].at(-1)).toEqual({ name: KEY, show: true })
+
+		// the icon is the one its card names, once read
+		card.vm.$emit('loaded', { name: KEY, icon: 'network-outline' })
+		await flushPromises()
+		expect(wrapper.findComponent(SettingsStub).props('moduleInfo')[KEY].icon).toBe('network-outline')
+	})
+
+	it('keeps the saved place and the hidden state of a widget, and draws no card for a hidden one', async () => {
+		listWidgets.mockResolvedValue(widgets(['ab12cd34', 'My router'], ['zz99zz99', 'Second']))
+		const wrapper = mountBar('admin', [{ name: 'custom:zz99zz99', show: true }, { name: 'module:wake-on-lan', show: true }, ...hidden, { name: KEY, show: false }, { name: 'module:second', show: false }])
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['custom:zz99zz99', 'wake-on-lan'])
+		expect(listed(wrapper)).toContain(KEY)
+		expect(setCustomStorage).not.toHaveBeenCalled()
+	})
+
+	it('keeps a saved widget that the list does not give, without showing it or offering it', async () => {
+		listWidgets.mockRejectedValue(Object.assign(new Error('refused'), { status: 404 }))
+		const wrapper = mountBar('admin', [{ name: KEY, show: false }, ...hidden])
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+		expect(listed(wrapper)).not.toContain(KEY)
+		for (const call of setCustomStorage.mock.calls)
+			expect(call[1][0]).toEqual({ name: KEY, show: false })
+	})
+
+	it.each(['user', ''])('asks nothing, and shows nothing, for an account whose role is %j', async (role) => {
+		const wrapper = mountBar(role, [{ name: KEY, show: true }, ...hidden])
+		await flushPromises()
+		expect(listWidgets).not.toHaveBeenCalled()
+		expect(wrapper.findAll('.card-stub')).toHaveLength(0)
+		expect(listed(wrapper)).not.toContain(KEY)
+	})
+
+	it('does not write over a choice that was saved elsewhere: it reads the saved choice again when the widgets change, before anything else', async () => {
+		const savedList = [...hidden, { name: 'module:wake-on-lan', show: true }, { name: 'module:second', show: true }, { name: KEY, show: true }]
+		const wrapper = mountBar('admin', savedList)
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second', KEY])
+		expect(setCustomStorage).not.toHaveBeenCalled()
+
+		// the Widgets API window hides the widget, saves the choice and says so
+		savedList[savedList.length - 1] = { name: KEY, show: false }
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+		expect(setCustomStorage).not.toHaveBeenCalled()
+
+		// a move in the settings of this home keeps what was chosen there
+		const moved = wrapper.findComponent(SettingsStub).props('modelValue').map(item => ({ ...item })).reverse()
+		wrapper.findComponent(SettingsStub).vm.$emit('change', moved)
+		await flushPromises()
+		const saved = setCustomStorage.mock.calls.at(-1)[1]
+		expect(saved[0]).toEqual({ name: KEY, show: false })
+		expect(shown(wrapper)).toEqual(['second', 'wake-on-lan'])
+	})
+
+	it('takes away a widget whose card is gone, and leaves the cards of the modules', async () => {
+		const wrapper = mountBar('admin', withCards)
+		await flushPromises()
+		getCard.mockClear()
+		wrapper.findAllComponents(ModuleCardStub)[2].vm.$emit('gone', KEY)
+		await flushPromises()
+		expect(shown(wrapper)).toEqual(['wake-on-lan', 'second'])
+		expect(listed(wrapper)).not.toContain(KEY)
+		// the next reading of the list of the modules asks no card again: none of them went
+		handlers.modulesChanged()
+		await flushPromises()
+		expect(getCard).not.toHaveBeenCalled()
 	})
 })

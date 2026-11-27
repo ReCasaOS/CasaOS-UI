@@ -147,7 +147,9 @@
 					</div>
 				</section>
 				<!-- the cards of the modules, in the same anatomy: the module describes its card, and this strip draws it -->
-				<ModuleCard v-for="item in shownCards" :key="item.name" :module="item" variant="panel" @gone="cardGone">
+				<!-- an API widget is one of them, read by its own source: it has no owner and no button -->
+				<ModuleCard v-for="item in shownCards" :key="item.name" :module="item" :source="item.source" variant="panel"
+					@gone="item.source ? apiWidgetGone($event) : cardGone($event)">
 					<template #default="{ card, state, busy, run, texts }">
 						<section class="widget has-text-grey-100 panel module-panel">
 							<div class="blur-background"></div>
@@ -155,20 +157,25 @@
 								<div class="panel-head">
 									<span class="panel-tile"><b-icon :icon="card ? card.icon : cardFallbackIcon" pack="casa" /></span>
 									<span class="panel-title">
-										{{ card ? card.title : item.title }}
+										{{ (card && card.title) || item.title }}
 										<span v-if="item.foreign && item.owner" class="module-owner">{{ $t(texts.owner, { owner: item.owner }) }}</span>
 									</span>
 									<span v-if="card && card.status" :class="`is-${card.status.level}`" class="panel-chip">{{ card.status.text }}</span>
 								</div>
 								<p v-if="state === 'unavailable'" class="panel-empty module-unavailable" role="status">{{ $t(texts.unavailable) }}</p>
-								<ul v-else-if="card.rows.length > 0" class="panel-body">
-									<li v-for="(row, index) in card.rows" :key="`row${index}`" class="panel-row">
+								<ul v-else-if="card.rows.length > 0" :class="{ 'is-figures': card.layout === 'figures' }" class="panel-body">
+									<li v-for="(row, index) in card.rows" :key="`row${index}`" :class="{ 'has-bar': typeof row.bar === 'number' }" class="panel-row">
 										<span :class="`is-${row.level || 'none'}`" class="panel-dot"></span>
 										<span class="panel-grow">{{ row.label }}</span>
 										<span v-if="row.value" class="module-value">{{ row.value }}</span>
 										<button v-if="row.action" :disabled="busy" class="module-row-action" type="button" @click="run(row.action)">{{ row.action.label }}</button>
+										<span v-if="typeof row.bar === 'number'" :aria-label="row.label" :aria-valuenow="row.bar" :class="`is-${row.level || 'none'}`"
+											aria-valuemax="100" aria-valuemin="0" class="module-bar" role="progressbar">
+											<span :style="{ width: `${row.bar}%` }"></span>
+										</span>
 									</li>
 								</ul>
+								<p v-if="state !== 'unavailable' && card.more > 0" class="module-more">+{{ card.more }}</p>
 								<div v-if="state !== 'unavailable' && (card.actions.length > 0 || card.link)" class="panel-foot">
 									<button v-for="(action, index) in card.actions" :key="`action${index}`" :disabled="busy" class="panel-action"
 										type="button" @click="run(action)">
@@ -197,6 +204,7 @@ import { defineAsyncComponent } from 'vue'
 import escape from 'lodash/escape'
 import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
 import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { apiWidgetsMixin } from '@/components/apiWidgets/apiWidgetsMixin'
 import { CARD_ICON_FALLBACK, isTileOnly } from '@/components/moduleCards/moduleCards'
 import { mixin } from '@/mixins/mixin'
 import { openFleet } from '@/components/Fleet/entry'
@@ -216,7 +224,7 @@ const LIVE_REFRESH = 5 * 1000
 export default {
 	name: 'HealthStrip',
 	components: { ModuleCard },
-	mixins: [mixin, cardsMixin],
+	mixins: [mixin, cardsMixin, apiWidgetsMixin],
 	emits: ['attention'],
 	data() {
 		const info = this.$store.state.hardwareInfo || {}
@@ -258,19 +266,21 @@ export default {
 		}
 	},
 	computed: {
-		// the cards that are not hidden in the widgets settings, in the order that was saved there (a card not named there goes last)
+		// the cards and the API widgets that are not hidden in the widgets settings, in the order that was saved there (one not named there
+		// goes last, the cards before the API widgets). A hidden one is not drawn, so its card is never asked for.
 		shownCards() {
 			if (!Array.isArray(this.savedWidgets))
 				return []
 			const saved = this.savedWidgets.filter(item => item && typeof item.name === 'string')
-			const rank = (card) => {
-				const index = saved.findIndex(item => item.name === `module:${card.name}`)
+			// an API widget (it has a source) is saved under its own name, `custom:<id>`
+			const key = item => (item.source ? item.name : `module:${item.name}`)
+			const rank = (item) => {
+				const index = saved.findIndex(entry => entry.name === key(item))
 				return index < 0 ? saved.length : index
 			}
-			// a card that is only a button is the module's tile in the app grid, not a panel
-			return this.moduleCards
-				.filter(card => !isTileOnly(this.cardViews[card.name]))
-				.filter(card => saved.find(item => item.name === `module:${card.name}`)?.show !== false)
+			// a card that is only a button is the module's tile in the app grid, not a panel; an API widget is always a panel
+			return [...this.moduleCards.filter(card => !isTileOnly(this.cardViews[card.name])), ...this.apiWidgets]
+				.filter(item => saved.find(entry => entry.name === key(item))?.show !== false)
 				.sort((a, b) => rank(a) - rank(b))
 		},
 		// the health of the system disk comes with the load of the box: without the "system" module there is no reading, not a failure
@@ -541,6 +551,10 @@ export default {
 				// not knowing which are hidden, none is shown
 				this.savedWidgets = false
 			}
+		},
+		// the widgets changed: what is hidden, and the order, may have been written by the window that changed them
+		apiWidgetsBefore(changed) {
+			return changed ? this.cardsBefore() : undefined
 		},
 		// a hidden card is not asked for
 		cardsToProbe(list) {
@@ -1168,6 +1182,84 @@ export default {
 	padding: 0 0.875rem 0.75rem;
 	font-size: 0.8125rem;
 	opacity: 0.8;
+}
+
+// an API widget: a bar under a row (a share of 100, in the colour of the row's level), the figures, and the rows left out
+.panel-row.has-bar {
+	flex-wrap: wrap;
+	row-gap: 0.25rem;
+}
+
+.module-bar {
+	display: block;
+	flex: 0 0 100%;
+	height: 0.25rem;
+	border-radius: 0.125rem;
+	background: rgba(255, 255, 255, 0.14);
+	overflow: hidden;
+
+	span {
+		display: block;
+		height: 100%;
+		border-radius: inherit;
+		background: rgba(255, 255, 255, 0.7);
+	}
+
+	&.is-ok span {
+		background: #4ade80;
+	}
+
+	&.is-info span {
+		background: #93c5fd;
+	}
+
+	&.is-warning span {
+		background: #fbbf24;
+	}
+
+	&.is-danger span {
+		background: #f87171;
+	}
+}
+
+// the value, large, over the dot and the label; two to a line whatever the width
+.panel-body.is-figures {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem 0.625rem;
+
+	.panel-row {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 0.125rem 0.375rem;
+	}
+
+	.module-value {
+		grid-row: 1;
+		grid-column: 1 / -1;
+		font-size: 1.375rem;
+		font-weight: 600;
+		line-height: 1.2;
+		opacity: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.panel-grow {
+		font-size: 0.75rem;
+		opacity: 0.75;
+	}
+
+	.module-bar {
+		grid-column: 1 / -1;
+	}
+}
+
+.module-more {
+	padding: 0 0.875rem 0.75rem;
+	font-size: 0.75rem;
+	opacity: 0.7;
 }
 
 .module-row-action {

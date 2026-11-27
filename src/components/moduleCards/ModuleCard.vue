@@ -8,7 +8,7 @@
 			<!-- Header Start -->
 			<div class="widget-header is-flex">
 				<div class="widget-title is-flex-grow-1">
-					{{ card ? card.title : module.title }}
+					{{ (card && card.title) || module.title }}
 					<div v-if="module.foreign && module.owner" class="module-card-owner is-size-7">
 						{{ $t(texts.owner, { owner: module.owner }) }}
 					</div>
@@ -23,16 +23,22 @@
 			</p>
 			<template v-else>
 				<span v-if="card.status" :class="`is-${card.status.level}`" class="tag module-card-status">{{ card.status.text }}</span>
-				<ul v-if="card.rows.length" class="module-card-rows">
-					<li v-for="(row, index) in card.rows" :key="`row${index}`" class="is-flex is-align-items-center">
+				<ul v-if="card.rows.length" :class="{ 'is-figures': card.layout === 'figures' }" class="module-card-rows">
+					<li v-for="(row, index) in card.rows" :key="`row${index}`" :class="{ 'has-bar': typeof row.bar === 'number' }"
+						class="is-flex is-align-items-center">
 						<span class="module-card-label is-flex-grow-1">{{ row.label }}</span>
 						<span v-if="row.value" :class="row.level ? `has-text-${levelColor[row.level]}` : ''" class="module-card-value">{{ row.value }}</span>
 						<b-button v-if="row.action" :disabled="busy" class="ml-2" size="is-small" type="is-primary"
 							@click="run(row.action)">
 							{{ row.action.label }}
 						</b-button>
+						<span v-if="typeof row.bar === 'number'" :aria-label="row.label" :aria-valuenow="row.bar" :class="`is-${row.level || 'none'}`"
+							aria-valuemax="100" aria-valuemin="0" class="module-card-bar" role="progressbar">
+							<span :style="{ width: `${row.bar}%` }"></span>
+						</span>
 					</li>
 				</ul>
+				<p v-if="card.more > 0" class="module-card-more is-size-7">+{{ card.more }}</p>
 				<div v-if="card.actions.length" class="module-card-actions is-flex mt-2">
 					<b-button v-for="(action, index) in card.actions" :key="`action${index}`" :disabled="busy" class="mr-2"
 						size="is-small" type="is-primary" @click="run(action)">
@@ -52,6 +58,16 @@ import { CARD_ICON_FALLBACK, CARD_TEXT, actionNote, cardView } from './moduleCar
 import { GONE, actUrl, getCard } from '@/service/moduleCards'
 
 const UNAVAILABLE_REFRESH = 60
+// the figures of an API widget: no more than this are drawn
+const MAX_FIGURES = 4
+
+// What a source gives, as it is drawn: nothing to send, and four figures at most.
+function sourceView(view) {
+	if (!view)
+		return null
+	const rows = view.layout === 'figures' ? view.rows.slice(0, MAX_FIGURES) : view.rows
+	return { ...view, rows: rows.map(row => ({ ...row, action: null })), actions: [] }
+}
 
 // The variant `panel` is drawn by the home that holds it, in its own markup and styles (the default slot gets the state, the card and `run`).
 export default {
@@ -60,6 +76,10 @@ export default {
 		// an entry of cardList
 		module: { type: Object, required: true },
 		variant: { type: String, default: 'widget' },
+		// What reads the card instead of the module's route: { load() }, a promise of the view to draw (cardView's, with `layout`, `more` and
+		// a `bar` on a row), or of null when there is none for now. A `load` that rejects with the status 404 is a card that is gone. The
+		// card of a source (an API widget) has no button, whatever the view holds. `module` is then { name, title }.
+		source: { type: Object, default: null },
 	},
 	emits: ['loaded', 'gone'],
 	data() {
@@ -99,6 +119,10 @@ export default {
 			this.stale = false
 			this.load()
 		},
+		// a new source is read at once; what is drawn stays until its answer
+		source() {
+			this.load()
+		},
 	},
 	mounted() {
 		document.addEventListener('visibilitychange', this.onVisible)
@@ -120,7 +144,7 @@ export default {
 			const serial = ++this.serial
 			let refresh = UNAVAILABLE_REFRESH
 			try {
-				const view = cardView((await getCard(this.module.route)).data, this.module.route)
+				const view = this.source ? sourceView(await this.source.load()) : cardView((await getCard(this.module.route)).data, this.module.route)
 				if (serial !== this.serial)
 					return
 				// a description that is refused is a module that does not speak the card: not available
@@ -133,7 +157,7 @@ export default {
 			} catch (error) {
 				if (serial !== this.serial)
 					return
-				if (GONE.includes(error?.status)) {
+				if (this.source ? error?.status === 404 : GONE.includes(error?.status)) {
 					this.card = null
 					this.state = 'gone'
 					this.$emit('gone', this.module.name)
@@ -217,6 +241,81 @@ export default {
 
 	.module-card-rows li {
 		margin: 0.25rem 0;
+
+		// the bar goes under the label and the value
+		&.has-bar {
+			flex-wrap: wrap;
+		}
+	}
+
+	// a share of 100, in the colour of the row's level; the widget is glass in both themes
+	.module-card-bar {
+		display: block;
+		flex: 0 0 100%;
+		align-self: stretch;
+		height: 0.25rem;
+		margin-top: 0.25rem;
+		border-radius: 0.125rem;
+		background: rgba(255, 255, 255, 0.16);
+		overflow: hidden;
+
+		span {
+			display: block;
+			height: 100%;
+			border-radius: inherit;
+			background: rgba(255, 255, 255, 0.7);
+		}
+
+		&.is-ok span {
+			background: #4ade80;
+		}
+
+		&.is-info span {
+			background: #93c5fd;
+		}
+
+		&.is-warning span {
+			background: #fbbf24;
+		}
+
+		&.is-danger span {
+			background: #f87171;
+		}
+	}
+
+	// the figures: the value, large, over its label, two to a line whatever the width
+	.module-card-rows.is-figures {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.5rem;
+
+		li {
+			flex-direction: column;
+			min-width: 0;
+			margin: 0;
+		}
+
+		.module-card-value {
+			order: -1;
+			max-width: 100%;
+			font-size: 1.5rem;
+			font-weight: 600;
+			line-height: 1.2;
+			overflow-wrap: anywhere;
+			text-align: center;
+		}
+
+		.module-card-label {
+			max-width: 100%;
+			font-size: 0.75rem;
+			opacity: 0.7;
+			overflow-wrap: anywhere;
+			text-align: center;
+		}
+	}
+
+	.module-card-more {
+		opacity: 0.7;
 	}
 
 	.module-card-owner,

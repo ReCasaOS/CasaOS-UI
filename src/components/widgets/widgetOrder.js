@@ -9,7 +9,9 @@
 // The card of a module is a widget named `module:<name>` that comes and goes with the list of cards (`shipped` holds the ones that the
 // list has now). A saved one is kept even while its module is not in `shipped` (the list is slow, or the module is stopped for a while):
 // its place and its hidden state are not lost. Nothing shows it, or offers it, until the list has it again (SideBar and Settings only know the ones of the list).
-export const MODULE_WIDGET = /^module:[a-z][a-z0-9-]{0,31}$/
+//
+// An API widget is a widget named `custom:<id>` (the id the core gives: 8 characters, a-z and 0-9), kept by the same rule.
+export const MODULE_WIDGET = /^(?:module:[a-z][a-z0-9-]{0,31}|custom:[a-z0-9]{8})$/
 
 export function combineWidgetSettings(shipped, saved) {
 	const known = new Map(shipped.map(widget => [widget.name, widget]))

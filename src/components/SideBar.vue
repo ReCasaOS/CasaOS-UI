@@ -3,8 +3,8 @@
 		<div class="widgets-content contextmenu-canvas">
 			<!-- keyed by name: hiding a widget above a card must not hand its place (and its instance) to another module -->
 			<div v-for="(item, index) in activeApps" :key="`widgets_${item.name || item.app.name}`">
-				<ModuleCard v-if="item.card" :module="item.card" :class="{ 'last-block': index === activeApps.length - 1 }"
-					@loaded="handleCardLoaded" @gone="cardGone" />
+				<ModuleCard v-if="item.card" :module="item.card" :source="item.source" :class="{ 'last-block': index === activeApps.length - 1 }"
+					@loaded="handleCardLoaded" @gone="item.source ? apiWidgetGone($event) : cardGone($event)" />
 				<component :is="item.app" v-else :class="{ 'last-block': index === activeApps.length - 1 }" />
 			</div>
 		</div>
@@ -24,6 +24,7 @@ import isEqual from 'lodash/isEqual'
 import Settings from '@/components/widgets/Settings.vue'
 import ModuleCard from '@/components/moduleCards/ModuleCard.vue'
 import { cardsMixin } from '@/components/moduleCards/cardsMixin'
+import { apiWidgetsMixin } from '@/components/apiWidgets/apiWidgetsMixin'
 import { CARD_ICON_FALLBACK, isTileOnly } from '@/components/moduleCards/moduleCards'
 import { combineWidgetSettings, withAbsent } from '@/components/widgets/widgetOrder'
 
@@ -37,7 +38,7 @@ const widgetsConfig = 'widgets_config'
 
 export default {
 	name: 'SideBar',
-	mixins: [cardsMixin],
+	mixins: [cardsMixin, apiWidgetsMixin],
 	components: {
 		ModuleCard,
 		Settings,
@@ -60,7 +61,7 @@ export default {
 			const newArray = showWidgets.map((item) => {
 				return find(this.apps, (o) => {
 					return o.app.name === item.name
-				}) ?? find(this.moduleApps, o => o.name === item.name)
+				}) ?? find(this.moduleApps, o => o.name === item.name) ?? find(this.widgetApps, o => o.name === item.name)
 			})
 			// a saved card whose module is not in the list now is kept in the settings, and not shown
 			return newArray.filter(Boolean)
@@ -69,12 +70,16 @@ export default {
 		moduleApps() {
 			return this.moduleCards.filter(card => !isTileOnly(this.cardViews[card.name])).map(card => ({ name: `module:${card.name}`, card }))
 		},
-		moduleInfo() {
-			return Object.fromEntries(this.moduleApps.map(({ name, card }) => [name, { title: card.title, icon: this.cardIcons[card.name] || CARD_ICON_FALLBACK }]))
+		// an API widget is drawn by the card of a module, read by its own source; it is never a tile of the app grid
+		widgetApps() {
+			return this.apiWidgets.map(entry => ({ name: entry.name, card: entry, source: entry.source }))
 		},
-		// what Settings lists: the widgets and the cards that exist now
+		moduleInfo() {
+			return Object.fromEntries([...this.moduleApps, ...this.widgetApps].map(({ name, card }) => [name, { title: card.title, icon: this.cardIcons[card.name] || CARD_ICON_FALLBACK }]))
+		},
+		// what Settings lists: the widgets, the cards and the API widgets that exist now
 		listedSettings() {
-			return this.widgetsSettings.filter(item => this.apps.some(o => o.app.name === item.name) || this.moduleApps.some(o => o.name === item.name))
+			return this.widgetsSettings.filter(item => this.apps.some(o => o.app.name === item.name) || this.moduleApps.some(o => o.name === item.name) || this.widgetApps.some(o => o.name === item.name))
 		},
 		sidebarOpen() {
 			return this.$store.state.sidebarOpen
@@ -156,7 +161,27 @@ export default {
 					}
 				}),
 				...this.moduleApps.map(item => ({ name: item.name, show: true })),
+				...this.widgetApps.map(item => ({ name: item.name, show: true })),
 			]
+		},
+
+		// The saved choice is kept in memory and written whole. When the widgets change it may have been written elsewhere (the Widgets API
+		// window shows and hides a widget): it is read again before anything is written, so that what is in memory does not go over it.
+		async apiWidgetsBefore(changed) {
+			if (!changed || this.isLoading)
+				return
+			try {
+				const res = await this.$api.users.getCustomStorage(widgetsConfig)
+				if (res.status === 200 && Array.isArray(res.data?.data))
+					this.widgetsSettings = combineWidgetSettings(this.getInitData(), res.data.data)
+			} catch {
+				// not read: the choice in memory stays
+			}
+		},
+
+		// a list of the API widgets has been read: the new ones are given a place
+		apiWidgetsRead() {
+			this.cardsRead()
 		},
 
 		// a list has been read: the new cards are given a place
