@@ -12,6 +12,7 @@ import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import LogsSettingsModal from './settings/LogsSettingsModal.vue'
+import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import pt from '@/assets/lang/pt_BR.json'
@@ -1139,5 +1140,30 @@ describe('the update channel (pre-releases)', () => {
 		expect(vm.updateInfo.channel).toBe('release')
 		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
 		expect(vm.checkVersion).not.toHaveBeenCalled()
+	})
+})
+
+// The API widgets are the administrator's: the row asks the box nothing, and the window says so itself when the core is too old.
+describe('the API widgets row of the settings', () => {
+	const row = source.match(/<!-- API widgets Start -->([\s\S]*?)<!-- API widgets End -->/)?.[1] ?? ''
+
+	it('is next to the footer news, for the administrator only, with a real button', () => {
+		expect(source).toMatch(/<!-- Footer news End -->\s*<!-- API widgets Start -->/)
+		expect(row).toMatch(/^\s*<div v-if="\$store\.getters\.isAdmin"/)
+		expect(row).toMatch(/\{\{ \$t\("API widgets"\) \}\}/)
+		expect(row).toMatch(/<b-button data-api-widgets-configure[^>]*@click="showApiWidgets"/)
+	})
+
+	it('asks the box nothing to show the row', () => {
+		expect(source).not.toMatch(/getApiWidgets|listWidgets/)
+	})
+
+	it('opens the window, which is left to say when the widgets change', () => {
+		const open = vi.fn()
+		const toggle = vi.fn()
+		TopBar.methods.showApiWidgets.call({ $refs: { settingsDrop: { toggle } }, $buefy: { modal: { open } } })
+		expect(toggle).toHaveBeenCalledTimes(1)
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(open.mock.calls[0][0]).toMatchObject({ component: ApiWidgetsModal, hasModalCard: true, trapFocus: true, canCancel: ['escape'] })
 	})
 })

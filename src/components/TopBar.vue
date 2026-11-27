@@ -441,6 +441,21 @@
 								</div>
 								<!-- Footer news End -->
 
+								<!-- API widgets Start -->
+								<div v-if="$store.getters.isAdmin"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="api" size="is-20" />
+										{{ $t("API widgets") }}
+									</div>
+									<div class="ml-2">
+										<b-button data-api-widgets-configure rounded size="is-small" type="is-dark" @click="showApiWidgets">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- API widgets End -->
+
 								<!-- Weather Start -->
 								<div v-if="weatherAvailable"
 									class="is-flex is-align-items-center _row _box">
@@ -814,6 +829,7 @@ import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FeedsModal from './settings/FeedsModal.vue'
+import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
 import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
@@ -1314,6 +1330,19 @@ export default {
 				animation: 'zoom-in',
 				// the footer reads the feeds again at once, not ten minutes later
 				events: { close: () => this.$EventBus.$emit('casaUI:feedsChanged') },
+			})
+		},
+
+		// the window says itself, on the bus, when a widget changes: nothing to do at its close
+		showApiWidgets() {
+			this.$refs.settingsDrop.toggle()
+			this.$buefy.modal.open({
+				component: ApiWidgetsModal,
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
 			})
 		},
 
