@@ -105,15 +105,36 @@ describe('the API widgets of a home', () => {
 		expect(wrapper.vm.apiWidgets).toEqual([])
 	})
 
-	it.each([404, 500, 0])('has no widget, and says nothing, when the list answers %i', async (status) => {
+	it('has no widget, and says nothing, when the core does not know the route (404)', async () => {
 		const wrapper = host()
 		await flushPromises()
 		expect(wrapper.vm.apiWidgets).toHaveLength(2)
-		listWidgets.mockRejectedValue(http(status))
+		listWidgets.mockRejectedValue(http(404))
 		handlers[events.API_WIDGETS_CHANGED]()
 		await flushPromises()
 		// no $buefy here: a toast would throw
 		expect(wrapper.vm.apiWidgets).toEqual([])
+	})
+
+	it.each([500, 0])('keeps the widgets it has, and says nothing, when the list answers %i', async (status) => {
+		const apiWidgetsRead = vi.fn()
+		const wrapper = host({ options: { methods: { apiWidgetsRead } } })
+		await flushPromises()
+		const before = wrapper.vm.apiWidgets
+		expect(before).toHaveLength(2)
+		apiWidgetsRead.mockClear()
+		listWidgets.mockRejectedValue(http(status))
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(wrapper.vm.apiWidgets).toEqual(before)
+		// nothing was read: the home is not told that a list came
+		expect(apiWidgetsRead).not.toHaveBeenCalled()
+	})
+
+	it('reads the list all the same when what the home does before it fails, whatever that failure says', async () => {
+		const wrapper = host({ options: { methods: { apiWidgetsBefore: () => Promise.reject(http(404)) } } })
+		await flushPromises()
+		expect(wrapper.vm.apiWidgets).toHaveLength(2)
 	})
 
 	it('believes only a list of widgets with the id of the core, each once', async () => {

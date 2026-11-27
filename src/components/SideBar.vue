@@ -46,6 +46,7 @@ export default {
 	data() {
 		return {
 			isLoading: true,
+			widgetsConfigUnread: false,
 			comps: [],
 			apps: [],
 			widgetsSettings: [],
@@ -168,30 +169,34 @@ export default {
 		// The saved choice is kept in memory and written whole. When the widgets change it may have been written elsewhere (the Widgets API
 		// window shows and hides a widget): it is read again before anything is written, so that what is in memory does not go over it.
 		async apiWidgetsBefore(changed) {
+			this.widgetsConfigUnread = false
 			if (!changed || this.isLoading)
 				return
+			// not read: the choice in memory stays, and this reading of the widgets writes nothing from it
+			this.widgetsConfigUnread = true
 			try {
 				const res = await this.$api.users.getCustomStorage(widgetsConfig)
-				if (res.status === 200 && Array.isArray(res.data?.data))
+				if (res.status === 200 && Array.isArray(res.data?.data)) {
 					this.widgetsSettings = combineWidgetSettings(this.getInitData(), res.data.data)
-			} catch {
-				// not read: the choice in memory stays
-			}
+					this.widgetsConfigUnread = false
+				}
+			} catch {}
 		},
 
 		// a list of the API widgets has been read: the new ones are given a place
 		apiWidgetsRead() {
-			this.cardsRead()
+			this.cardsRead(!this.widgetsConfigUnread)
 		},
 
 		// a list has been read: the new cards are given a place
-		cardsRead() {
+		cardsRead(save = true) {
 			if (this.isLoading)
 				return
 			const combined = combineWidgetSettings(this.getInitData(), this.widgetsSettings)
 			if (!isEqual(combined, this.widgetsSettings)) {
 				this.widgetsSettings = combined
-				this.saveData(combined)
+				if (save)
+					this.saveData(combined)
 			}
 		},
 

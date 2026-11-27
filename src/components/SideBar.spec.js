@@ -39,18 +39,20 @@ const SettingsStub = {
 }
 
 let setCustomStorage
+let getCustomStorage
 let handlers
 let store
 function mountBar(role = 'admin', savedList = [...hidden]) {
 	store = reactive({ state: { user: { role }, roleConfirmed: true, sidebarOpen: false }, getters: { isAdmin: role === 'admin', canReadModule: () => true } })
 	setCustomStorage = vi.fn((key, data) => Promise.resolve({ data: { success: 200, data } }))
+	getCustomStorage = vi.fn(() => Promise.resolve({ status: 200, data: { data: savedList } }))
 	handlers = {}
 	return mount(SideBar, {
 		global: {
 			stubs: { ModuleCard: ModuleCardStub, Settings: SettingsStub },
 			mocks: {
 				$store: store,
-				$api: { users: { getCustomStorage: () => Promise.resolve({ status: 200, data: { data: savedList } }), setCustomStorage } },
+				$api: { users: { getCustomStorage, setCustomStorage } },
 				$EventBus: { $on: (event, fn) => { handlers[event] = fn }, $off: vi.fn() },
 			},
 		},
@@ -369,6 +371,23 @@ describe('the API widgets on the classic home', () => {
 		const saved = setCustomStorage.mock.calls.at(-1)[1]
 		expect(saved[0]).toEqual({ name: KEY, show: false })
 		expect(shown(wrapper)).toEqual(['second', 'wake-on-lan'])
+	})
+
+	it.each([
+		['fails', () => Promise.reject(new Error('network'))],
+		['is not a list', () => Promise.resolve({ status: 200, data: '' })],
+	])('writes nothing from what it has in memory when the saved choice %s as the widgets change', async (_, answer) => {
+		const wrapper = mountBar('admin', [...hidden, { name: 'module:wake-on-lan', show: true }, { name: 'module:second', show: true }, { name: KEY, show: true }])
+		await flushPromises()
+		expect(setCustomStorage).not.toHaveBeenCalled()
+
+		// a widget was added elsewhere, and the saved choice cannot be read again
+		getCustomStorage.mockImplementation(answer)
+		listWidgets.mockResolvedValue(widgets(['ab12cd34', 'My router'], ['zz99zz99', 'Second']))
+		handlers[events.API_WIDGETS_CHANGED]()
+		await flushPromises()
+		expect(shown(wrapper)).toContain('custom:zz99zz99')
+		expect(setCustomStorage).not.toHaveBeenCalled()
 	})
 
 	it('takes away a widget whose card is gone, and leaves the cards of the modules', async () => {

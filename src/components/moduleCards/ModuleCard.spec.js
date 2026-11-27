@@ -417,6 +417,17 @@ describe('a card that is given what reads it (an API widget)', () => {
 		expect(wrapper.find('.widget-title').text()).toBe('Router')
 	})
 
+	it.each([0, undefined, -5, Number.NaN])('reads again after a minute when the view of its source gives the rhythm %j', async (refresh) => {
+		vi.useFakeTimers()
+		const load = vi.fn().mockResolvedValue(view({ refresh }))
+		sourced(load)
+		await flushPromises()
+		await vi.advanceTimersByTimeAsync(59000)
+		expect(load).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(1000)
+		expect(load).toHaveBeenCalledTimes(2)
+	})
+
 	it('reads again at the rhythm of the view, not while the tab is hidden, and not once it has left', async () => {
 		vi.useFakeTimers()
 		const load = vi.fn().mockResolvedValue(view({ refresh: 120 }))

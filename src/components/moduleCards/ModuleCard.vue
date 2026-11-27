@@ -151,7 +151,9 @@ export default {
 				this.card = view
 				this.state = view ? 'ok' : 'unavailable'
 				if (view) {
-					refresh = view.refresh
+					// a view with no rhythm of its own must not be read again at once, and for ever
+					if (view.refresh > 0)
+						refresh = view.refresh
 					this.$emit('loaded', { name: this.module.name, icon: view.icon })
 				}
 			} catch (error) {

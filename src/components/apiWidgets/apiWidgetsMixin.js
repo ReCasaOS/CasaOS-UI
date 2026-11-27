@@ -12,8 +12,8 @@ const WIDGET_ID = /^[a-z0-9]{8}$/
  *
  * `apiWidgets` holds one entry per widget, in the order of the core: { name: 'custom:<id>', id, title, source }. `title` is the name its
  * recipe has, and `source.load()` reads its card and gives what ModuleCard draws (null for a card whose read failed; it rejects, with the
- * HTTP `status`, when the core refuses). A list that cannot be read (a core that does not know the route answers 404) is an empty list,
- * and nothing is said.
+ * HTTP `status`, when the core refuses). A core that does not know the route answers 404: an empty list. Any other failure of the list
+ * keeps the widgets there are, as the cards of the modules do. Nothing is said of either.
  *
  * A component can define `apiWidgetsBefore(changed)`, awaited before the list is read (`changed` is true when the reading comes from
  * API_WIDGETS_CHANGED: what was saved may have been written elsewhere), and `apiWidgetsRead()`, called when a list has been read.
@@ -73,12 +73,18 @@ export const apiWidgetsMixin = {
 				this.apiWidgets = []
 				return
 			}
-			let widgets = []
 			try {
 				await this.apiWidgetsBefore?.(changed)
-				widgets = (await listWidgets())?.widgets
 			} catch {
-				// an older core, or a box that does not answer: no widget, and no word
+				// the home's own reading: its failure says nothing of the widgets
+			}
+			let widgets = []
+			try {
+				widgets = (await listWidgets())?.widgets
+			} catch (error) {
+				// a box that does not answer keeps its widgets; only an older core (404) has none. No word either way
+				if (error?.status !== 404)
+					return
 			}
 			if (serial !== this.apiWidgetsSerial)
 				return
