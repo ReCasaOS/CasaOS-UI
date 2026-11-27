@@ -6,6 +6,7 @@ import ApiWidgetsModal from './ApiWidgetsModal.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import pt from '@/assets/lang/pt_BR.json'
+import createEventBus from '@/events/eventBus'
 import events from '@/events/events'
 import { deleteWidget, listWidgets } from '@/service/apiWidgets'
 
@@ -25,14 +26,14 @@ let emitted
 let handlers
 let confirm
 let toast
-async function open() {
+async function open(bus) {
 	const wrapper = mount(ApiWidgetsModal, {
 		global: {
 			plugins: [Buefy],
 			mocks: {
 				$t: (key, params) => (params ? key.replace(/\{(\w+)\}/g, (_, k) => params[k]) : key),
 				$api: { users: { getCustomStorage, setCustomStorage } },
-				$EventBus: {
+				$EventBus: bus ?? {
 					$emit: (...args) => emitted.push(args),
 					$on: (event, fn) => {
 						handlers[event] = fn
@@ -175,6 +176,26 @@ describe('the show switch of an API widget', () => {
 		expect(emitted).toEqual([[events.API_WIDGETS_CHANGED]])
 		expect(toggle(wrapper, A).element.checked).toBe(false)
 		expect(toggle(wrapper, B).element.disabled).toBe(false)
+	})
+
+	it('hears its own word on the bus of the dashboard: the list is read once more, and the switch is what was saved', async () => {
+		const bus = createEventBus()
+		const heard = vi.fn()
+		bus.$on(events.API_WIDGETS_CHANGED, heard)
+		const wrapper = await open(bus)
+		expect(listWidgets).toHaveBeenCalledTimes(1)
+		await toggle(wrapper, A).setValue(false)
+		await flushPromises()
+		expect(heard).toHaveBeenCalledTimes(1)
+		expect(listWidgets).toHaveBeenCalledTimes(2)
+		expect(setCustomStorage).toHaveBeenCalledTimes(1)
+		expect(toggle(wrapper, A).element.checked).toBe(false)
+		expect(toggle(wrapper, B).element.disabled).toBe(false)
+		// a closed window hears nothing more
+		wrapper.unmount()
+		bus.$emit(events.API_WIDGETS_CHANGED)
+		await flushPromises()
+		expect(listWidgets).toHaveBeenCalledTimes(2)
 	})
 
 	it('adds its widget at the end of a choice that does not name it', async () => {
