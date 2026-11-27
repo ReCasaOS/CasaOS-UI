@@ -229,7 +229,8 @@ export default {
 			// the request as it is saved, and whether the core said its secrets must come again
 			savedRequest: requestOf(form, base, insecure),
 			again: false,
-			// the request of the last test that worked, and what it answered (kept out of Vue's reach: it may be 256 KiB)
+			// the request of the last test that worked, with the secrets typed then, and what it answered (kept out of Vue's reach: it
+			// may be 256 KiB)
 			testedRequest: null,
 			answer: null,
 			hasAnswer: false,
@@ -272,12 +273,16 @@ export default {
 		request() {
 			return requestOf(this.form, this.address, this.insecure)
 		},
+		// the request and the secrets typed for it: the answer of a test is the answer to both
+		asked() {
+			return this.request + JSON.stringify(secretsOf(this.form))
+		},
 		// the core keeps a saved secret only for the request it was typed for
 		secretsAgain() {
 			return this.editing && (this.again || this.request !== this.savedRequest)
 		},
 		stale() {
-			return this.testedRequest !== null && this.testedRequest !== this.request
+			return this.testedRequest !== null && this.testedRequest !== this.asked
 		},
 		sent() {
 			return sentParts(this.built)
@@ -341,17 +346,18 @@ export default {
 		keptText(entry) {
 			return this.editing && !this.secretsAgain && this.widget.inputs_set?.[entry.input] === true ? this.$t('saved — leave empty to keep') : ''
 		},
+		// the parameters typed with an address or a path: added, and none that is there is replaced
 		addQuery(query) {
 			for (const [name, value] of query) {
-				const known = this.form.query.find(pair => pair.name === name)
-				if (known)
-					known.value = value
-				else
+				if (!this.form.query.some(pair => pair.name === name))
 					this.form.query.push({ ...blankPair(), name, value, secret: isSecretName(name) })
 			}
 		},
+		// A whole address typed in the field of the base is split only while there is no path: a path that is there (a saved one, the
+		// one of an imported recipe, one typed first) is never replaced, and the base then stays as typed, which the core takes with the
+		// start of a path in it.
 		leaveBase() {
-			const split = this.baseTyped ? splitBase(this.base) : null
+			const split = this.baseTyped && this.form.path === '' ? splitBase(this.base) : null
 			this.baseTyped = false
 			if (!split)
 				return
@@ -390,7 +396,7 @@ export default {
 				return
 			this.testing = true
 			this.error = ''
-			const request = this.request
+			const request = this.asked
 			const sent = this.builtText
 			try {
 				const { response, card } = await testWidget(this.change(), this.editing ? this.widget.id : undefined)
@@ -411,6 +417,8 @@ export default {
 		},
 		// the card the recipe makes of the answer already received: the box sends nothing
 		async preview() {
+			if (this.stale)
+				return
 			const serial = ++this.serial
 			try {
 				const card = await previewWidget(this.built, this.answer)

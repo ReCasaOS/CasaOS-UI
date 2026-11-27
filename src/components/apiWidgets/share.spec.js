@@ -42,6 +42,7 @@ describe('the export of a widget', () => {
 		exportWidget(vm, widget)
 		expect(vm.$buefy.dialog.confirm).toHaveBeenCalledTimes(1)
 		const { message } = vm.$buefy.dialog.confirm.mock.calls[0][0]
+		expect(message).toContain('path: /api')
 		expect(message).toContain('query.limit: 5')
 		expect(message).toContain('base_hint: http://IP:2283')
 		expect(message).toContain('headers.X-Note: &lt;img src=x onerror=alert(1)&gt;')
@@ -65,7 +66,7 @@ describe('the export of a widget', () => {
 	})
 
 	it('says so when the recipe holds no fixed text', () => {
-		exportWidget(vm, { ...widget, recipe: { ...recipe, query: {}, headers: {}, base_hint: '' } })
+		exportWidget(vm, { ...widget, recipe: { ...recipe, path: '', query: {}, headers: {}, base_hint: '' } })
 		expect(vm.$buefy.dialog.confirm.mock.calls[0][0].message).toContain('It holds no fixed text.')
 	})
 })
@@ -79,6 +80,7 @@ describe('the reading of an imported file', () => {
 	it.each([
 		['{ not json', 'This file is not JSON.'],
 		['{"recasaos_widget":2}', 'This file is not the recipe of an API widget.'],
+		['{"recasaos_widget":1,"rows":[{"<b>labl</b>":"x"}]}', 'The recipe is refused: rows[0].&lt;b&gt;labl&lt;/b&gt; is not a field of a recipe.'],
 	])('says why a file is not taken, and gives nothing', (text, sentence) => {
 		expect(readImport(vm, text)).toBeNull()
 		expect(vm.$buefy.toast.open.mock.calls[0][0]).toMatchObject({ message: sentence, type: 'is-danger' })

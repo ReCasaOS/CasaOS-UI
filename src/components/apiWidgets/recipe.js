@@ -92,9 +92,12 @@ export function ruleTo(text) {
 
 // --- the form ---
 
+// A place of the form. The text a recipe wrote where a secret goes (under a name the core takes for one, or as the password of basic) is
+// not taken: the place is a secret, empty, to be typed. A recipe never brings a secret, and what is typed there never becomes a fixed text.
 function place(name, value, inputs, label = '') {
 	const id = str(value?.input)
-	return { name, value: id ? '' : str(value), secret: id !== '', input: id, label: id ? str(inputs.find(input => input?.id === id)?.label) : label }
+	const secret = id !== '' || isSecretName(name)
+	return { name, value: secret ? '' : str(value), secret, input: id, label: id ? str(inputs.find(input => input?.id === id)?.label) : label }
 }
 
 function shownOf(spec) {
@@ -144,7 +147,8 @@ export function formOf(recipe) {
 		headers: pairs(r.headers),
 		basicOn: r.basic !== null && typeof r.basic === 'object',
 		basicUser: place('user', basic.user, inputs, 'User'),
-		basicPassword: { ...place('password', basic.password, inputs, 'Password'), secret: true },
+		// "password" is a secret name: always an input
+		basicPassword: place('password', basic.password, inputs, 'Password'),
 		baseHint: str(r.base_hint),
 		layout: r.layout === 'figures' ? 'figures' : 'rows',
 		rows: list(r.rows).filter(row => row !== null && typeof row === 'object').map(rowOf),
@@ -273,10 +277,17 @@ export function sentParts(recipe) {
 	].map(([where, value]) => ({ where, value: typeof value === 'string' ? value : null }))
 }
 
-/** The fixed texts a recipe holds, and so shows to whoever gets it: headers, parameters, the user of basic, the hint of the address. */
+/**
+ * The fixed texts a recipe holds, and so shows to whoever gets it: the path (it can carry a token), headers, parameters, the user of basic,
+ * the hint of the address.
+ */
 export function fixedTexts(recipe) {
-	const hint = str(record(recipe).base_hint)
-	return [...sentParts(recipe).filter(part => part.value !== null), ...(hint ? [{ where: 'base_hint', value: hint }] : [])]
+	const { path, base_hint: hint } = record(recipe)
+	return [
+		...(str(path) ? [{ where: 'path', value: path }] : []),
+		...sentParts(recipe).filter(part => part.value !== null),
+		...(str(hint) ? [{ where: 'base_hint', value: hint }] : []),
+	]
 }
 
 /** The text of the file of a widget (the view the core lists): its recipe alone, never its address nor a secret. */
@@ -287,9 +298,64 @@ export function fileName(name) {
 	return `${slug || 'widget'}.recasaos-widget.json`
 }
 
+// The fields of a recipe and the JSON type of each, as the core reads them: pkg/apiwidgets/recipe.go (Recipe, RowSpec, StatusSpec, Rule,
+// Basic, Input, Value) is the source, and recipeOf above writes the same fields. An array holds the shape of its items, { map } the
+// shape of the values of an object with free keys; `value` is a header, query or basic value: a text or exactly { "input": id }; `single`
+// is what a rule compares to: a text, a number, true, false or null.
+const RULE_FIELDS = { op: 'string', to: 'single', level: 'string', text: 'string' }
+const SHOWN_FIELDS = { value: 'string', format: 'string', unit: 'string', rules: [RULE_FIELDS] }
+const RECIPE_FIELDS = {
+	recasaos_widget: 'integer',
+	name: 'string',
+	icon: 'string',
+	path: 'string',
+	query: { map: 'value' },
+	headers: { map: 'value' },
+	basic: { user: 'value', password: 'value' },
+	inputs: [{ id: 'string', label: 'string' }],
+	base_hint: 'string',
+	layout: 'string',
+	rows: [{ ...SHOWN_FIELDS, label: 'string', each: 'string', limit: 'integer', bar: 'boolean' }],
+	status: SHOWN_FIELDS,
+	refresh: 'integer',
+}
+
+const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+const KINDS = {
+	string: value => typeof value === 'string',
+	boolean: value => typeof value === 'boolean',
+	integer: value => Number.isInteger(value),
+	single: value => value === null || ['string', 'number', 'boolean'].includes(typeof value),
+	value: value => typeof value === 'string' || (isObject(value) && Object.keys(value).length === 1 && typeof value.input === 'string'),
+}
+
+// Refuses, naming it, the first field of `value` that the core does not know by that exact name, or whose value is of another JSON type.
+function readStrictly(value, shape, at) {
+	const wrongKind = () => Object.assign(new Error('The recipe is refused: {field} has a value of the wrong kind.'), { field: at })
+	if (typeof shape === 'string') {
+		if (!KINDS[shape](value))
+			throw wrongKind()
+	} else if (Array.isArray(shape)) {
+		if (!Array.isArray(value))
+			throw wrongKind()
+		value.forEach((item, index) => readStrictly(item, shape[0], `${at}[${index}]`))
+	} else {
+		if (!isObject(value))
+			throw wrongKind()
+		for (const [key, inside] of Object.entries(value)) {
+			const field = at ? `${at}.${key}` : key
+			if (!shape.map && !Object.hasOwn(shape, key))
+				throw Object.assign(new Error('The recipe is refused: {field} is not a field of a recipe.'), { field })
+			readStrictly(inside, shape.map ?? shape[key], field)
+		}
+	}
+}
+
 /**
- * The recipe a file holds. Throws, with a sentence to translate, for a text over 16 KiB, one that is not JSON, and one that is not a recipe
- * of version 1. The rest is the core's strict reading, at the first test.
+ * The recipe a file holds. Throws, with a sentence to translate (and the `field` it names), for a text over 16 KiB, one that is not JSON,
+ * one that is not a recipe of version 1, and one with a field the core does not know or a value of the wrong type: the form writes its
+ * own recipe from what it reads, so what it would drop or mend must be refused here. The values themselves are the core's to judge.
+ * shortcut: a key written twice in an object is not seen (JSON.parse keeps the last); the core refuses it, only for a recipe sent whole.
  */
 export function importRecipe(text) {
 	if (new TextEncoder().encode(text).length > MAX_RECIPE_BYTES)
@@ -302,5 +368,6 @@ export function importRecipe(text) {
 	}
 	if (record(recipe).recasaos_widget !== 1)
 		throw new Error('This file is not the recipe of an API widget.')
+	readStrictly(recipe, RECIPE_FIELDS, '')
 	return recipe
 }

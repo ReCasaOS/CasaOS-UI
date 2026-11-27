@@ -3936,5 +3936,7 @@
   "Fine (green)": "Fine (green)",
   "Information (blue)": "Information (blue)",
   "Warning (orange)": "Warning (orange)",
-  "Danger (red)": "Danger (red)"
+  "Danger (red)": "Danger (red)",
+  "The recipe is refused: {field} is not a field of a recipe.": "The recipe is refused: {field} is not a field of a recipe.",
+  "The recipe is refused: {field} has a value of the wrong kind.": "The recipe is refused: {field} has a value of the wrong kind."
 }

@@ -212,6 +212,20 @@ describe('the preview', () => {
 		expect(testWidget).toHaveBeenCalledTimes(1)
 	})
 
+	it('is greyed once a secret is typed again: the answer was read with another one', async () => {
+		const wrapper = open({ widget: view })
+		await test(wrapper)
+		await type(pairs(wrapper, 'headers')[0], '[data-pair-value]', 'another-key')
+		await type(wrapper, '[data-row-label]', 'Pictures')
+		await wait(600)
+		expect(wrapper.find('[data-editor-stale]').text()).toBe('Test again')
+		expect(wrapper.find('[data-editor-preview]').classes()).toContain('is-stale')
+		expect(previewWidget).not.toHaveBeenCalled()
+		// as it was at the test: the answer holds again
+		await type(pairs(wrapper, 'headers')[0], '[data-pair-value]', '')
+		expect(wrapper.find('[data-editor-stale]').exists()).toBe(false)
+	})
+
 	it('asks nothing once the window is closed', async () => {
 		const wrapper = open({ widget: view })
 		await test(wrapper)
@@ -515,6 +529,38 @@ describe('a whole address typed in the field of the base', () => {
 		expect(control(key, '[data-pair-value]').attributes('type')).toBe('password')
 	})
 
+	it.each([
+		['of a saved widget', () => open({ widget: view })],
+		['of an imported recipe', () => open({ recipe })],
+	])('never replaces the path %s: the address stays as it is typed, the core takes the start of a path in it', async (_, mounted) => {
+		const wrapper = mounted()
+		await type(wrapper, '[data-editor-base]', 'http://192.168.1.50:2283/immich?limit=9')
+		await control(wrapper, '[data-editor-base]').trigger('blur')
+		expect(control(wrapper, '[data-editor-base]').element.value).toBe('http://192.168.1.50:2283/immich?limit=9')
+		expect(control(wrapper, '[data-editor-path]').element.value).toBe('/api/server/statistics')
+		expect(pairs(wrapper, 'query')).toHaveLength(1)
+		expect(control(pairs(wrapper, 'query')[0], '[data-pair-value]').element.value).toBe('5')
+	})
+
+	it('never replaces a path typed first on a new widget', async () => {
+		const wrapper = open()
+		await type(wrapper, '[data-editor-path]', '/mine')
+		await type(wrapper, '[data-editor-base]', 'http://192.168.1.50/api/v1')
+		await control(wrapper, '[data-editor-base]').trigger('blur')
+		expect(control(wrapper, '[data-editor-path]').element.value).toBe('/mine')
+		expect(control(wrapper, '[data-editor-base]').element.value).toBe('http://192.168.1.50/api/v1')
+	})
+
+	it('adds the parameters of the address and replaces none', async () => {
+		const wrapper = open()
+		await press(wrapper, '[data-pairs="query"] [data-pair-add]')
+		await type(pairs(wrapper, 'query')[0], '[data-pair-name]', 'limit')
+		await type(pairs(wrapper, 'query')[0], '[data-pair-value]', '5')
+		await type(wrapper, '[data-editor-base]', 'http://192.168.1.50/api?limit=9&page=2')
+		await control(wrapper, '[data-editor-base]').trigger('blur')
+		expect(pairs(wrapper, 'query').map(pair => control(pair, '[data-pair-value]').element.value)).toEqual(['5', '2'])
+	})
+
 	it('is left alone when it was not typed here: a saved base may hold the start of a path', async () => {
 		const wrapper = open({ widget: { ...view, base: 'http://192.168.1.10/immich' } })
 		await control(wrapper, '[data-editor-base]').trigger('blur')
@@ -554,6 +600,32 @@ describe('the import of a recipe', () => {
 		const wrapper = open({ recipe: { ...recipe, name: '<img src=x>', headers: { 'X-A': '<b>bold</b>' }, rows: [{ label: '<i>x</i>', value: '/a' }] } })
 		expect(wrapper.find('img, b, i').exists()).toBe(false)
 		expect(wrapper.find('[data-editor-sent]').text()).toContain('<b>bold</b>')
+	})
+
+	it('takes no secret from the file: a fixed text under a secret name is left out, asked for, and stays a secret under another name', async () => {
+		const unsafe = { ...recipe, headers: { 'X-Api-Key': 'file-text' }, query: { token: 'file-text' }, basic: { user: 'admin', password: 'file-text' }, inputs: undefined }
+		const wrapper = open({ recipe: unsafe })
+		const [header] = pairs(wrapper, 'headers')
+		const [parameter] = pairs(wrapper, 'query')
+		for (const field of [control(header, '[data-pair-value]'), control(parameter, '[data-pair-value]'), control(wrapper, '[data-basic-password]')]) {
+			expect(field.element.value).toBe('')
+			expect(field.attributes('type')).toBe('password')
+		}
+		expect(wrapper.html()).not.toContain('file-text')
+		await type(wrapper, '[data-editor-base]', 'http://192.168.1.10:2283')
+		expect(disabled(wrapper, '[data-editor-test]')).toBe(true)
+		await type(header, '[data-pair-value]', 'real-key')
+		await type(parameter, '[data-pair-value]', 'real-token')
+		await type(wrapper, '[data-basic-password]', 'real-pass')
+		await type(header, '[data-pair-name]', 'X-Api-Ke')
+		expect(control(header, '[data-pair-value]').attributes('type')).toBe('password')
+		await test(wrapper)
+		const [change] = testWidget.mock.calls[0]
+		expect(change.recipe.headers).toEqual({ 'X-Api-Ke': { input: 'x_api_ke' } })
+		expect(change.recipe.query).toEqual({ token: { input: 'token' } })
+		expect(change.recipe.basic).toEqual({ user: 'admin', password: { input: 'basic_password' } })
+		expect(JSON.stringify(change.recipe)).not.toMatch(/file-text|real-/)
+		expect(change.secrets).toEqual({ x_api_ke: 'real-key', token: 'real-token', basic_password: 'real-pass' })
 	})
 
 	it('always makes a new widget, tested without an id', async () => {

@@ -9,7 +9,7 @@ export function readImport(vm, text) {
 	try {
 		return importRecipe(text)
 	} catch (error) {
-		vm.$buefy.toast.open({ message: escape(vm.$t(error.message)), type: 'is-danger', duration: 5000 })
+		vm.$buefy.toast.open({ message: escape(vm.$t(error.message, { field: error.field })), type: 'is-danger', duration: 5000 })
 		return null
 	}
 }

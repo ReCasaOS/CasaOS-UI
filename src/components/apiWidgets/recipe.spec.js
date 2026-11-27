@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countRow, encodePath, exportRecipe, fileName, fixedTexts, formOf, importRecipe, inputIdOf, isSecretName, leafRow, listRow, pointerOf, recipeOf, requestOf, ruleTo, secretsOf, sentParts, splitBase, splitPath } from './recipe'
+import { countRow, emptyInputs, encodePath, exportRecipe, fileName, fixedTexts, formOf, importRecipe, inputIdOf, isSecretName, leafRow, listRow, pointerOf, recipeOf, requestOf, ruleTo, secretsOf, sentParts, splitBase, splitPath } from './recipe'
 
 const immich = {
 	recasaos_widget: 1,
@@ -109,6 +109,22 @@ describe('a recipe and the form that edits it', () => {
 		expect(JSON.stringify(recipe)).not.toMatch(/typed-secret|k-123/)
 	})
 
+	it('takes no secret from a recipe: a fixed text under a name that is a secret, or as the password of basic, is left out and asked for', () => {
+		const form = formOf({ headers: { 'X-Api-Key': 'file-text' }, query: { token: 'file-text', limit: '5' }, basic: { user: 'admin', password: 'file-text' } })
+		expect(form.headers[0]).toMatchObject({ name: 'X-Api-Key', value: '', secret: true })
+		expect(form.query[0]).toMatchObject({ name: 'token', value: '', secret: true })
+		expect(form.query[1]).toMatchObject({ name: 'limit', value: '5', secret: false })
+		expect(form.basicUser).toMatchObject({ value: 'admin', secret: false })
+		expect(form.basicPassword).toMatchObject({ value: '', secret: true })
+		expect(JSON.stringify(recipeOf(form))).not.toContain('file-text')
+		expect(secretsOf(form)).toEqual({})
+		expect(emptyInputs(form)).toEqual(['x_api_key', 'token', 'basic_password'])
+		// and it stays a secret under another name
+		form.headers[0].name = 'X-Api-Ke'
+		form.headers[0].value = 'typed'
+		expect(recipeOf(form).headers).toEqual({ 'X-Api-Ke': { input: 'x_api_ke' } })
+	})
+
 	it('has only the inputs that a place uses', () => {
 		const form = formOf(immich)
 		form.headers = form.headers.filter(pair => pair.name !== 'x-api-key')
@@ -206,6 +222,7 @@ describe('the export of a recipe', () => {
 
 	it('lists the fixed texts it holds: headers, parameters, the user of basic and the hint of the address', () => {
 		expect(fixedTexts(immich)).toEqual([
+			{ where: 'path', value: '/api/server/statistics' },
 			{ where: 'headers.Accept', value: 'application/json' },
 			{ where: 'query.limit', value: '5' },
 			{ where: 'basic.user', value: 'admin' },
@@ -229,6 +246,60 @@ describe('the export of a recipe', () => {
 		expect(fileName('Immich – été 2026!')).toBe('immich-ete-2026.recasaos-widget.json')
 		expect(fileName('///')).toBe('widget.recasaos-widget.json')
 		expect(fileName(undefined)).toBe('widget.recasaos-widget.json')
+	})
+})
+
+describe('the strict reading of an imported recipe', () => {
+	const refusal = (recipe) => {
+		try {
+			importRecipe(JSON.stringify({ recasaos_widget: 1, ...recipe }))
+		} catch (error) {
+			return [error.message, error.field]
+		}
+		return null
+	}
+	const UNKNOWN = 'The recipe is refused: {field} is not a field of a recipe.'
+	const KIND = 'The recipe is refused: {field} has a value of the wrong kind.'
+
+	it('takes every field the core knows', () => {
+		expect(refusal(immich)).toBeNull()
+		expect(refusal({ name: 'x', path: '/', rows: [{ label: 'a', value: '/a', rules: [{ op: 'eq', to: null, level: 'ok' }, { op: 'eq', to: true, level: 'ok' }] }] })).toBeNull()
+	})
+
+	it.each([
+		[{ Name: 'x' }, 'Name'],
+		[{ title: 'x' }, 'title'],
+		[{ rows: [{ label: 'a', value: '/a' }, { label: 'b', valeu: '/b' }] }, 'rows[1].valeu'],
+		[{ rows: [{ rules: [{ op: 'eq', To: 1 }] }] }, 'rows[0].rules[0].To'],
+		[{ status: { label: 'x' } }, 'status.label'],
+		[{ basic: { user: 'a', pass: 'b' } }, 'basic.pass'],
+		[{ inputs: [{ id: 'a', name: 'A' }] }, 'inputs[0].name'],
+	])('refuses a key that is not exactly one of them: %j', (recipe, field) => {
+		expect(refusal(recipe)).toEqual([UNKNOWN, field])
+	})
+
+	it.each([
+		[{ name: 7 }, 'name'],
+		[{ name: null }, 'name'],
+		[{ refresh: '300' }, 'refresh'],
+		[{ refresh: 1.5 }, 'refresh'],
+		[{ rows: {} }, 'rows'],
+		[{ rows: ['x'] }, 'rows[0]'],
+		[{ rows: [{ label: 5 }] }, 'rows[0].label'],
+		[{ rows: [{ bar: 'yes' }] }, 'rows[0].bar'],
+		[{ rows: [{ limit: '3' }] }, 'rows[0].limit'],
+		[{ rows: [{ rules: [{ to: { a: 1 } }] }] }, 'rows[0].rules[0].to'],
+		[{ headers: ['a'] }, 'headers'],
+		[{ headers: { a: 5 } }, 'headers.a'],
+		[{ headers: { 'X-A': { input: 'x', extra: 1 } } }, 'headers.X-A'],
+		[{ query: { a: { Input: 'x' } } }, 'query.a'],
+		[{ query: { a: { input: 5 } } }, 'query.a'],
+		[{ basic: 'user:pass' }, 'basic'],
+		[{ basic: { user: {} } }, 'basic.user'],
+		[{ inputs: [{ id: 5 }] }, 'inputs[0].id'],
+		[{ status: [] }, 'status'],
+	])('refuses a value of the wrong kind: %j', (recipe, field) => {
+		expect(refusal(recipe)).toEqual([KIND, field])
 	})
 })
 

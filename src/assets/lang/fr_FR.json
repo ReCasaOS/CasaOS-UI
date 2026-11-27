@@ -3938,5 +3938,7 @@
   "Fine (green)": "Bon (vert)",
   "Information (blue)": "Information (bleu)",
   "Warning (orange)": "Avertissement (orange)",
-  "Danger (red)": "Danger (rouge)"
+  "Danger (red)": "Danger (rouge)",
+  "The recipe is refused: {field} is not a field of a recipe.": "La recette est refusée : {field} n'est pas un champ d'une recette.",
+  "The recipe is refused: {field} has a value of the wrong kind.": "La recette est refusée : {field} a une valeur du mauvais type."
 }
