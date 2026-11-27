@@ -301,9 +301,10 @@ export function fileName(name) {
 // The fields of a recipe and the JSON type of each, as the core reads them: pkg/apiwidgets/recipe.go (Recipe, RowSpec, StatusSpec, Rule,
 // Basic, Input, Value) is the source, and recipeOf above writes the same fields. An array holds the shape of its items, { map } the
 // shape of the values of an object with free keys; `value` is a header, query or basic value: a text or exactly { "input": id }; `single`
-// is what a rule compares to: a text, a number, true, false or null.
-const RULE_FIELDS = { op: 'string', to: 'single', level: 'string', text: 'string' }
-const SHOWN_FIELDS = { value: 'string', format: 'string', unit: 'string', rules: [RULE_FIELDS] }
+// is what a rule compares to: a text, a number, true, false or null; `format`, `op`, `level` and `layout` are one of the core's own words
+// (for none, the core takes an empty format and an empty layout, and no empty op or level).
+const RULE_FIELDS = { op: 'op', to: 'single', level: 'level', text: 'string' }
+const SHOWN_FIELDS = { value: 'string', format: 'format', unit: 'string', rules: [RULE_FIELDS] }
 const RECIPE_FIELDS = {
 	recasaos_widget: 'integer',
 	name: 'string',
@@ -314,24 +315,30 @@ const RECIPE_FIELDS = {
 	basic: { user: 'value', password: 'value' },
 	inputs: [{ id: 'string', label: 'string' }],
 	base_hint: 'string',
-	layout: 'string',
+	layout: 'layout',
 	rows: [{ ...SHOWN_FIELDS, label: 'string', each: 'string', limit: 'integer', bar: 'boolean' }],
 	status: SHOWN_FIELDS,
 	refresh: 'integer',
 }
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+const INPUT_ID = /^[a-z][a-z0-9_]{0,31}$/
 const KINDS = {
 	string: value => typeof value === 'string',
 	boolean: value => typeof value === 'boolean',
 	integer: value => Number.isInteger(value),
 	single: value => value === null || ['string', 'number', 'boolean'].includes(typeof value),
-	value: value => typeof value === 'string' || (isObject(value) && Object.keys(value).length === 1 && typeof value.input === 'string'),
+	value: value => typeof value === 'string' || (isObject(value) && Object.keys(value).length === 1 && typeof value.input === 'string' && INPUT_ID.test(value.input)),
+	format: value => value === '' || FORMATS.includes(value),
+	op: value => OPS.includes(value),
+	level: value => LEVELS.includes(value),
+	layout: value => ['', 'rows', 'figures'].includes(value),
 }
 
-// Refuses, naming it, the first field of `value` that the core does not know by that exact name, or whose value is of another JSON type.
+// Refuses, naming it, the first field of `value` that the core does not know by that exact name, or whose value is of another JSON type
+// or is not one of the words the core has for it.
 function readStrictly(value, shape, at) {
-	const wrongKind = () => Object.assign(new Error('The recipe is refused: {field} has a value of the wrong kind.'), { field: at })
+	const wrongKind = (field = at) => Object.assign(new Error('The recipe is refused: {field} has a value of the wrong kind.'), { field })
 	if (typeof shape === 'string') {
 		if (!KINDS[shape](value))
 			throw wrongKind()
@@ -348,13 +355,18 @@ function readStrictly(value, shape, at) {
 				throw Object.assign(new Error('The recipe is refused: {field} is not a field of a recipe.'), { field })
 			readStrictly(inside, shape.map ?? shape[key], field)
 		}
+		// a rule left without one would be given one by the form
+		const missing = shape === RULE_FIELDS && ['op', 'level'].find(key => !Object.hasOwn(value, key))
+		if (missing)
+			throw wrongKind(`${at}.${missing}`)
 	}
 }
 
 /**
  * The recipe a file holds. Throws, with a sentence to translate (and the `field` it names), for a text over 16 KiB, one that is not JSON,
- * one that is not a recipe of version 1, and one with a field the core does not know or a value of the wrong type: the form writes its
- * own recipe from what it reads, so what it would drop or mend must be refused here. The values themselves are the core's to judge.
+ * one that is not a recipe of version 1, and one with a field the core does not know, a value of the wrong type, or a format, an op, a
+ * level, a layout or the id of an input that the core does not take: the form writes its own recipe from what it reads, so what it would
+ * drop or mend must be refused here. The other values (lengths, pointers, limits) are the core's to judge.
  * shortcut: a key written twice in an object is not seen (JSON.parse keeps the last); the core refuses it, only for a recipe sent whole.
  */
 export function importRecipe(text) {

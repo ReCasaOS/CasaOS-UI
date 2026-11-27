@@ -301,6 +301,42 @@ describe('the strict reading of an imported recipe', () => {
 	])('refuses a value of the wrong kind: %j', (recipe, field) => {
 		expect(refusal(recipe)).toEqual([KIND, field])
 	})
+
+	// the form would mend each of these (to text, eq, info, rows, a fixed text) and the core would never see it
+	it.each([
+		[{ rows: [{ label: 'a', value: '/a', format: 'nombre' }] }, 'rows[0].format'],
+		[{ status: { value: '/s', format: 'Bytes' } }, 'status.format'],
+		[{ rows: [{ rules: [{ op: 'gte', to: 1, level: 'ok' }] }] }, 'rows[0].rules[0].op'],
+		[{ rows: [{ rules: [{ op: '', to: 1, level: 'ok' }] }] }, 'rows[0].rules[0].op'],
+		[{ rows: [{ rules: [{ to: 1, level: 'ok' }] }] }, 'rows[0].rules[0].op'],
+		[{ status: { rules: [{ op: 'eq', to: 1, level: 'error' }] } }, 'status.rules[0].level'],
+		[{ status: { rules: [{ op: 'eq', to: 1, level: '' }] } }, 'status.rules[0].level'],
+		[{ status: { rules: [{ op: 'eq', to: 1 }] } }, 'status.rules[0].level'],
+		[{ layout: 'grid' }, 'layout'],
+		[{ headers: { 'X-A': { input: '' } } }, 'headers.X-A'],
+		[{ query: { a: { input: 'Api-Key' } } }, 'query.a'],
+		[{ basic: { user: 'a', password: { input: `a${'b'.repeat(32)}` } } }, 'basic.password'],
+	])('refuses a value the core does not know: %j', (recipe, field) => {
+		expect(refusal(recipe)).toEqual([KIND, field])
+	})
+
+	it('takes every format, rule and layout the core knows, and what it takes for none', () => {
+		const formats = ['text', 'number', 'bytes', 'percent', 'ratio', 'duration', 'date', 'count']
+		const rules = [{ op: 'eq', to: 'a', level: 'ok' }, { op: 'ne', to: 'a', level: 'info' }, { op: 'lt', to: 1, level: 'warning' }]
+		const recipe = {
+			name: 'x',
+			path: '/',
+			headers: { 'X-Api-Key': { input: 'a' } },
+			query: { token: { input: `a${'0_'.repeat(15)}z` } },
+			inputs: [{ id: 'a', label: 'A' }, { id: `a${'0_'.repeat(15)}z`, label: 'Z' }],
+			rows: formats.map(format => ({ label: format, value: '/v', format, rules })),
+			status: { value: '/s', format: '', rules: [{ op: 'gt', to: 1, level: 'danger' }] },
+		}
+		expect(refusal(recipe)).toBeNull()
+		expect(refusal({ ...recipe, layout: 'rows' })).toBeNull()
+		expect(refusal({ ...recipe, layout: '' })).toBeNull()
+		expect(refusal({ ...recipe, layout: 'figures', rows: recipe.rows.slice(0, 4) })).toBeNull()
+	})
 })
 
 describe('the import of a recipe', () => {
