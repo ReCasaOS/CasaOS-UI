@@ -13,6 +13,7 @@ import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import LogsSettingsModal from './settings/LogsSettingsModal.vue'
 import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
+import ApiWidgetEditor from './apiWidgets/ApiWidgetEditor.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import pt from '@/assets/lang/pt_BR.json'
@@ -1165,5 +1166,38 @@ describe('the API widgets row of the settings', () => {
 		expect(toggle).toHaveBeenCalledTimes(1)
 		expect(open).toHaveBeenCalledTimes(1)
 		expect(open.mock.calls[0][0]).toMatchObject({ component: ApiWidgetsModal, hasModalCard: true, trapFocus: true, canCancel: ['escape'] })
+	})
+
+	// what the window asks for: the editor of a widget or of a new one, an import, an export
+	function opened() {
+		const open = vi.fn()
+		const vm = { $refs: { settingsDrop: { toggle: vi.fn() } }, $t: key => key, $buefy: { modal: { open }, toast: { open: vi.fn() }, dialog: { confirm: vi.fn() } } }
+		vm.editApiWidget = TopBar.methods.editApiWidget.bind(vm)
+		TopBar.methods.showApiWidgets.call(vm)
+		return { vm, open, asked: open.mock.calls[0][0].events }
+	}
+	const widget = { id: 'ab12cd34', base: 'http://192.168.1.10', recipe: { recasaos_widget: 1, name: 'NAS', query: { limit: '5' } } }
+
+	it('opens the editor on the widget to change, or on nothing for a new one, over the window', () => {
+		const { open, asked } = opened()
+		asked.edit(widget)
+		asked.edit(null)
+		expect(open.mock.calls[1][0]).toMatchObject({ component: ApiWidgetEditor, props: { widget, recipe: null }, hasModalCard: true, trapFocus: true, canCancel: false })
+		expect(open.mock.calls[2][0].props).toEqual({ widget: null, recipe: null })
+	})
+
+	it('opens the editor on an imported recipe, as a new widget, and on nothing for a file that is not one', () => {
+		const { vm, open, asked } = opened()
+		asked.import('{ not a recipe')
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
+		asked.import(JSON.stringify(widget.recipe))
+		expect(open.mock.calls[1][0]).toMatchObject({ component: ApiWidgetEditor, props: { widget: null, recipe: widget.recipe } })
+	})
+
+	it('shows what a recipe holds before it exports it', () => {
+		const { vm, asked } = opened()
+		asked.export(widget)
+		expect(vm.$buefy.dialog.confirm.mock.calls[0][0].message).toContain('query.limit: 5')
 	})
 })

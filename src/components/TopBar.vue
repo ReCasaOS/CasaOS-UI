@@ -830,6 +830,8 @@ import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FeedsModal from './settings/FeedsModal.vue'
 import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
+import ApiWidgetEditor from './apiWidgets/ApiWidgetEditor.vue'
+import { exportWidget, readImport } from './apiWidgets/share'
 import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
@@ -1341,6 +1343,30 @@ export default {
 				hasModalCard: true,
 				trapFocus: true,
 				canCancel: ['escape'],
+				scroll: 'keep',
+				animation: 'zoom-in',
+				events: {
+					edit: widget => this.editApiWidget(widget),
+					// an import always makes a new widget, and asks nothing of the box before its editor is open
+					import: (text) => {
+						const recipe = readImport(this, text)
+						if (recipe)
+							this.editApiWidget(null, recipe)
+					},
+					export: widget => exportWidget(this, widget),
+				},
+			})
+		},
+
+		// The editor opens over the window of the widgets, and says itself on the bus what it saved. Escape does not close it: it would
+		// close the window under it too, and lose what was typed.
+		editApiWidget(widget, recipe = null) {
+			this.$buefy.modal.open({
+				component: ApiWidgetEditor,
+				props: { widget, recipe },
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: false,
 				scroll: 'keep',
 				animation: 'zoom-in',
 			})
