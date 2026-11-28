@@ -60,7 +60,7 @@ describe('a whole address in the field of the base', () => {
 
 describe('what is a secret', () => {
 	it('is every name the core refuses as a fixed text', () => {
-		for (const name of ['Authorization', 'X-API-Key', 'api_token', 'client_secret', 'PASSWORD'])
+		for (const name of ['Authorization', 'X-API-Key', 'api_token', 'client_secret', 'PASSWORD', 'Cookie', 'X-Auth', 'appid', 'pass'])
 			expect(isSecretName(name)).toBe(true)
 		for (const name of ['Accept', 'limit', 'X-Requested-With'])
 			expect(isSecretName(name)).toBe(false)

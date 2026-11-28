@@ -20,7 +20,7 @@ export const FORMAT_LABELS = { text: 'Text', number: 'Number', bytes: 'Size in b
 export const OP_LABELS = { eq: 'is', ne: 'is not', lt: 'is below', gt: 'is above' }
 export const LEVEL_LABELS = { ok: 'Fine (green)', info: 'Information (blue)', warning: 'Warning (orange)', danger: 'Danger (red)' }
 // a header or a parameter whose name holds one of these is refused as a fixed text
-const SECRET_NAMES = ['authorization', 'key', 'token', 'secret', 'password']
+const SECRET_NAMES = ['auth', 'cookie', 'key', 'token', 'secret', 'pass', 'appid']
 const DEFAULT_REFRESH = 300
 const DEFAULT_LIMIT = 5
 
