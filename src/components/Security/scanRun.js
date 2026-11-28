@@ -1,5 +1,6 @@
 // What the two Security windows share: asking for a scan and waiting for its end. The component
 // has a `load()` that reads what it shows, and calls `wait()` from it when a scan runs already.
+// It may have a `requestScan()` of its own, to scan less than every image.
 import { refresh, vulnScanApi } from '@/service/vulnScan'
 
 const POLL_MS = 5000
@@ -22,7 +23,7 @@ export default {
 		async scan() {
 			this.scanning = true
 			try {
-				await vulnScanApi.scan()
+				await (this.requestScan ? this.requestScan() : vulnScanApi.scan())
 			} catch (e) {
 				// 409: a scan runs already, the night's or another window's: wait for that one
 				if (e?.response?.status !== 409) {

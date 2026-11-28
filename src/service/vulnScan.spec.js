@@ -163,5 +163,7 @@ describe('the vulnerability scans of this box', () => {
 		expect(instance.get).toHaveBeenCalledWith('/v2/vuln_scan/status')
 		await vulnScanApi.scan()
 		expect(instance.post).toHaveBeenCalledWith('/v2/vuln_scan/scan')
+		await vulnScanApi.scanApp('my app/../x')
+		expect(instance.post).toHaveBeenCalledWith('/v2/vuln_scan/apps/my%20app%2F..%2Fx/scan')
 	})
 })

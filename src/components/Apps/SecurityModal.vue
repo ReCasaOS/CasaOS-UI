@@ -21,8 +21,8 @@
 						{{ $t(advice) }}
 					</p>
 					<p class="is-size-7 has-text-full-03" data-dates>
-						<template v-if="status && status.last_run">
-							{{ $t('Last scan: {date}', { date: new Date(status.last_run).toLocaleString() }) }}
+						<template v-if="scannedAt">
+							{{ $t('Last scan: {date}', { date: new Date(scannedAt).toLocaleString() }) }}
 						</template>
 						<template v-if="status && status.db_updated_at">
 							· {{ $t('Vulnerability database of {date}', { date: new Date(status.db_updated_at).toLocaleDateString() }) }}
@@ -127,6 +127,11 @@ export default {
 		summary() {
 			return vulnScan.apps[this.app] || null
 		},
+		// the latest scan of this app's images: a scan of this app alone leaves the box's last run as it was
+		scannedAt() {
+			const dates = (this.detail?.images || []).map(image => image.scanned_at).filter(Boolean).sort()
+			return dates.at(-1) || this.status?.last_run || null
+		},
 		// what to do about what was found: the one sentence the window is for
 		advice() {
 			const found = this.detail.images.some(image => image.findings.length)
@@ -164,6 +169,18 @@ export default {
 				return NOTES[image.skipped] || NOTES['scan failed']
 			}
 			return image.os_only ? 'The Java libraries of this image were not checked.' : ''
+		},
+
+		// "Scan now" here scans this app's images only; a module without that route scans them all
+		async requestScan() {
+			try {
+				await vulnScanApi.scanApp(this.app)
+			} catch (e) {
+				if (e?.response?.status !== 404) {
+					throw e
+				}
+				await vulnScanApi.scan()
+			}
 		},
 
 		async load() {
