@@ -156,6 +156,8 @@ export default {
 	width: 18rem;
 	padding: 1rem 1.25rem;
 	white-space: normal;
+	// the menu's light text, not the theme's: the light theme put dark text on this dark glass (CasaOS#203)
+	color: inherit;
 }
 
 .weather-head {
