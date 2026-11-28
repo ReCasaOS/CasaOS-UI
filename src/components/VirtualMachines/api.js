@@ -85,6 +85,10 @@ const vmApi = {
 	setUSB(id, devices) {
 		return api.put(`${PREFIX}/vms/${seg(id)}/usb`, { devices })
 	},
+	// the whole list of host folders shared over virtiofs; applies at the next start
+	setShares(id, shares) {
+		return api.put(`${PREFIX}/vms/${seg(id)}/shares`, { shares })
+	},
 	createSnapshot(id, name) {
 		return api.post(`${PREFIX}/vms/${seg(id)}/snapshots`, { name })
 	},

@@ -1241,5 +1241,16 @@
   "Folders left out, one per line": "Cartelle escluse, una per riga",
   "The full path of the folder on this box, not the one inside the app. Everything in it is left out, and a restore does not write to it. A larger folder that contains it is left out whole when an app mounts it. Backups already taken keep what they copied.": "Il percorso completo della cartella su questo box, non quello dentro l'app. Tutto il suo contenuto è escluso, e un ripristino non ci scrive. Una cartella più grande che la contiene viene esclusa per intero quando un'app la monta. I backup già eseguiti conservano ciò che hanno copiato.",
   "The folders left out could not be loaded: {error}": "Impossibile caricare le cartelle escluse: {error}",
-  "This box did not answer with a list.": "Questo box non ha risposto con un elenco."
+  "This box did not answer with a list.": "Questo box non ha risposto con un elenco.",
+  "Shared folders": "Cartelle condivise",
+  "Folders of this machine the VM mounts by their tag, as it would a disk. The VM reads and writes them with this machine's file rights. Changes take effect the next time the VM starts.": "Cartelle di questa macchina che la VM monta con il loro tag, come un disco. La VM le legge e le scrive con i permessi dei file di questa macchina. Le modifiche valgono dal prossimo avvio della VM.",
+  "This machine has no virtiofsd, which sharing folders needs. Install it with:": "Su questa macchina manca virtiofsd, che serve per condividere le cartelle. Installalo con:",
+  "In the VM's /etc/fstab:": "Nel file /etc/fstab della VM:",
+  "No folders are shared with this VM.": "Nessuna cartella condivisa con questa VM.",
+  "The VM mounts the folder by this name.": "La VM monta la cartella con questo nome.",
+  "Tag": "Tag",
+  "Share a folder…": "Condividi una cartella…",
+  "The tag is 1 to 36 letters, digits, dots, dashes or underscores.": "Il tag è fatto da 1 a 36 lettere, cifre, punti, trattini o trattini bassi.",
+  "Another shared folder has this tag.": "Un'altra cartella condivisa ha già questo tag.",
+  "This folder is shared already.": "Questa cartella è già condivisa."
 }
