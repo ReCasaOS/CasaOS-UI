@@ -441,6 +441,21 @@
 								</div>
 								<!-- Footer news End -->
 
+								<!-- API widgets Start -->
+								<div v-if="$store.getters.isAdmin"
+									class="is-flex is-align-items-center _row _box">
+									<div class="is-flex is-align-items-center is-flex-grow-1 _is-normal">
+										<b-icon class="mr-1 ml-2" custom-size="is-size-5" icon="api" size="is-20" />
+										{{ $t("API widgets") }}
+									</div>
+									<div class="ml-2">
+										<b-button data-api-widgets-configure rounded size="is-small" type="is-dark" @click="showApiWidgets">
+											{{ $t("Configure") }}
+										</b-button>
+									</div>
+								</div>
+								<!-- API widgets End -->
+
 								<!-- Weather Start -->
 								<div v-if="weatherAvailable"
 									class="is-flex is-align-items-center _row _box">
@@ -838,6 +853,10 @@ import AppLaunchModal from './settings/AppLaunchModal.vue'
 import TelemetryPreviewModal from './settings/TelemetryPreviewModal.vue'
 import AlertsModal from './settings/AlertsModal.vue'
 import FeedsModal from './settings/FeedsModal.vue'
+import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
+import ApiWidgetEditor from './apiWidgets/ApiWidgetEditor.vue'
+import { exportWidget, readImport } from './apiWidgets/share'
+import { openWithEscape } from './VirtualMachines/modalStack'
 import WeatherModal from './settings/WeatherModal.vue'
 import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
@@ -1343,6 +1362,43 @@ export default {
 				animation: 'zoom-in',
 				// the footer reads the feeds again at once, not ten minutes later
 				events: { close: () => this.$EventBus.$emit('casaUI:feedsChanged') },
+			})
+		},
+
+		// The window says itself, on the bus, when a widget changes: nothing to do at its close. It opens the editor over itself: Escape
+		// closes it only while it is the one on top.
+		showApiWidgets() {
+			this.$refs.settingsDrop.toggle()
+			openWithEscape(this.$buefy, {
+				component: ApiWidgetsModal,
+				hasModalCard: true,
+				trapFocus: true,
+				scroll: 'keep',
+				animation: 'zoom-in',
+				events: {
+					edit: widget => this.editApiWidget(widget),
+					// an import always makes a new widget, and asks nothing of the box before its editor is open
+					import: (text) => {
+						const recipe = readImport(this, text)
+						if (recipe)
+							this.editApiWidget(null, recipe)
+					},
+					export: widget => exportWidget(this, widget),
+				},
+			})
+		},
+
+		// The editor opens over the window of the widgets, and says itself on the bus what it saved. Escape does not close it: what was
+		// typed, secrets among it, would be lost on a key pressed by habit.
+		editApiWidget(widget, recipe = null) {
+			this.$buefy.modal.open({
+				component: ApiWidgetEditor,
+				props: { widget, recipe },
+				hasModalCard: true,
+				trapFocus: true,
+				canCancel: false,
+				scroll: 'keep',
+				animation: 'zoom-in',
 			})
 		},
 

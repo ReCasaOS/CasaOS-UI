@@ -6,8 +6,10 @@ import HealthStrip from './HealthStrip.vue'
 import { openFleet } from '@/components/Fleet/entry'
 import { actUrl as act, getCard, getCards } from '@/service/moduleCards'
 import { refreshGuard, shareGuard } from '@/service/shareGuard'
+import { listWidgets, widgetCard } from '@/service/apiWidgets'
 
 vi.mock('@/service/moduleCards', async importOriginal => ({ ...(await importOriginal()), getCards: vi.fn(), getCard: vi.fn(), actUrl: vi.fn() }))
+vi.mock('@/service/apiWidgets', () => ({ listWidgets: vi.fn(), widgetCard: vi.fn() }))
 vi.mock('@/components/Fleet/entry', () => ({ openFleet: vi.fn() }))
 // the store the strip reads, and the read it asks for once a minute
 vi.mock('@/service/shareGuard', async () => {
@@ -984,6 +986,154 @@ describe('the cards of the modules', () => {
 		await wrapper.find('.module-row-action').trigger('click')
 		expect(confirm).not.toHaveBeenCalled()
 		expect(act).toHaveBeenCalledWith('/v1/wake_on_lan', '/v1/wake_on_lan/wake', { mac: 'aa' })
+		wrapper.unmount()
+	})
+})
+
+describe('the API widgets on the new dashboard', () => {
+	const admin = { canWrite: true, isAdmin: true, canReadModule: () => true }
+	const listed = (id, name) => ({ id, base: 'https://example.org', recipe: { name }, inputs_set: {}, error: '' })
+	const text = value => ({ kind: 'text', text: value })
+	const card = (extra = {}) => ({ title: 'Router', icon: 'network-outline', status: { value: text('UP'), level: 'ok' }, rows: [{ label: 'Clients', value: { kind: 'number', number: 12 } }], layout: 'rows', more: 0, link: 'https://router.example/', refresh: 300, ...extra })
+	let saved
+	let cardsOf
+
+	function widgets(list, { getters = admin, modules = [], getCustomStorage } = {}) {
+		listWidgets.mockResolvedValue({ widgets: list })
+		getCards.mockResolvedValue({ data: { data: { modules } } })
+		getCard.mockResolvedValue({ data: { schema: 1, title: 'Module', rows: [{ label: 'A' }] } })
+		widgetCard.mockImplementation((id) => {
+			const answer = cardsOf[id] ?? card()
+			return typeof answer === 'number' ? Promise.reject(Object.assign(new Error('refused'), { status: answer })) : Promise.resolve(answer)
+		})
+		return strip({ getters, users: { getCustomStorage: getCustomStorage || (() => Promise.resolve({ status: 200, data: { data: saved } })) } })
+	}
+
+	beforeEach(() => {
+		saved = []
+		cardsOf = {}
+		listWidgets.mockReset()
+		widgetCard.mockReset()
+		getCards.mockReset()
+		getCard.mockReset()
+	})
+
+	const titles = wrapper => wrapper.findAll('.module-panel .panel-title').map(el => el.text())
+	const ready = async () => {
+		await settle()
+		await settle()
+		await settle()
+	}
+
+	it('draws a widget as a panel: its chip, its rows and a link in a new tab, and no button', async () => {
+		const wrapper = widgets([listed('ab12cd34', 'My router')])
+		await ready()
+		expect(widgetCard).toHaveBeenCalledWith('ab12cd34')
+		const panel = wrapper.find('.module-panel')
+		expect(panel.find('.panel-title').text()).toBe('Router')
+		expect(panel.find('.panel-chip').text()).toBe('UP')
+		expect(panel.find('.panel-chip').classes()).toContain('is-ok')
+		expect(panel.find('.panel-row').text()).toContain('Clients')
+		expect(panel.find('.module-value').text()).toBe('12')
+		expect(panel.find('.panel-body').classes()).not.toContain('is-figures')
+		expect(panel.find('[role="progressbar"]').exists()).toBe(false)
+		expect(panel.find('.module-more').exists()).toBe(false)
+		expect(panel.find('a.panel-action').attributes()).toMatchObject({ href: 'https://router.example/', target: '_blank', rel: 'noopener noreferrer' })
+		expect(panel.findAll('button')).toHaveLength(0)
+		wrapper.unmount()
+	})
+
+	it('draws the figures, a bar under a row that has one, and how many rows were left out', async () => {
+		cardsOf.ab12cd34 = card({ layout: 'figures', more: 3, rows: [{ label: 'CPU', value: { kind: 'percent', number: 42 }, level: 'warning', bar: 42 }, { label: 'Up', value: { kind: 'duration', number: 90000 } }] })
+		const wrapper = widgets([listed('ab12cd34', 'My router')])
+		await ready()
+		const panel = wrapper.find('.module-panel')
+		expect(panel.find('.panel-body').classes()).toContain('is-figures')
+		expect(panel.findAll('.panel-row')).toHaveLength(2)
+		const bars = panel.findAll('[role="progressbar"]')
+		expect(bars).toHaveLength(1)
+		expect(bars[0].attributes()).toMatchObject({ 'aria-valuenow': '42', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'CPU' })
+		expect(bars[0].classes()).toContain('is-warning')
+		expect(bars[0].find('span').attributes('style')).toContain('width: 42%')
+		expect(panel.find('.module-more').text()).toBe('+3')
+		wrapper.unmount()
+	})
+
+	it('shows what a widget says as text', async () => {
+		cardsOf.ab12cd34 = card({ title: '<img src=x>', status: { value: text('<img src=x>'), level: 'info' }, rows: [{ label: '<b>x</b>', value: text('<img src=x>') }] })
+		const wrapper = widgets([listed('ab12cd34', 'My router')])
+		await ready()
+		const panel = wrapper.find('.module-panel')
+		expect(panel.find('img').exists()).toBe(false)
+		expect(panel.find('.panel-row b').exists()).toBe(false)
+		expect(panel.find('.module-value').text()).toBe('<img src=x>')
+		wrapper.unmount()
+	})
+
+	it('draws a widget that is only a link: it is never a tile of the app grid', async () => {
+		cardsOf.ab12cd34 = { title: 'Router', link: 'https://router.example/' }
+		const wrapper = widgets([listed('ab12cd34', 'My router')])
+		await ready()
+		expect(titles(wrapper)).toEqual(['Router'])
+		expect(wrapper.find('.module-panel a.panel-action').exists()).toBe(true)
+		wrapper.unmount()
+	})
+
+	it('never asks for a widget that is hidden in the widgets settings', async () => {
+		saved = [{ name: 'custom:ab12cd34', show: false }]
+		const wrapper = widgets([listed('ab12cd34', 'Hidden'), listed('zz99zz99', 'Shown')])
+		await ready()
+		expect(widgetCard.mock.calls.map(call => call[0])).toEqual(['zz99zz99'])
+		expect(wrapper.findAll('.module-panel')).toHaveLength(1)
+		wrapper.unmount()
+	})
+
+	it('follows the saved order among the panels, and puts a widget that was never ordered after them', async () => {
+		saved = [{ name: 'clock', show: true }, { name: 'custom:bbbbbbbb', show: true }, { name: 'module:m', show: true }, { name: 'custom:aaaaaaaa', show: true }]
+		cardsOf = { aaaaaaaa: card({ title: 'A' }), bbbbbbbb: card({ title: 'B' }), cccccccc: card({ title: 'C' }) }
+		const wrapper = widgets([listed('cccccccc', 'c'), listed('aaaaaaaa', 'a'), listed('bbbbbbbb', 'b')], { modules: [{ name: 'm', title: 'M', route: '/v1/m' }] })
+		await ready()
+		expect(titles(wrapper)).toEqual(['B', 'Module', 'A', 'C'])
+		wrapper.unmount()
+	})
+
+	it('shows no widget, and asks for none, when the saved settings cannot be read', async () => {
+		const wrapper = widgets([listed('ab12cd34', 'My router')], { getCustomStorage: () => Promise.reject(new Error('down')) })
+		await ready()
+		expect(widgetCard).not.toHaveBeenCalled()
+		expect(wrapper.find('.module-panel').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('asks nothing and shows nothing for an account that is not the administrator', async () => {
+		const wrapper = widgets([listed('ab12cd34', 'My router')], { getters: { canWrite: false, isAdmin: false, canReadModule: () => true } })
+		await ready()
+		expect(listWidgets).not.toHaveBeenCalled()
+		expect(widgetCard).not.toHaveBeenCalled()
+		expect(wrapper.find('.module-panel').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('says a widget is unavailable under its own name when its read failed, and takes away one that is gone', async () => {
+		cardsOf = { ab12cd34: { error: 'timeout' }, zz99zz99: 404, yy88yy88: 500 }
+		const wrapper = widgets([listed('ab12cd34', 'My router'), listed('zz99zz99', 'Gone'), listed('yy88yy88', 'Down')])
+		await ready()
+		expect(titles(wrapper)).toEqual(['My router', 'Down'])
+		expect(wrapper.findAll('.module-unavailable').map(el => el.text())).toEqual(['This card is unavailable for now', 'This card is unavailable for now'])
+		expect(wrapper.find('.module-panel .panel-chip').exists()).toBe(false)
+		expect(wrapper.find('.module-panel .panel-foot').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('reads the saved choice again when the widgets change: a widget hidden elsewhere leaves', async () => {
+		const wrapper = widgets([listed('ab12cd34', 'My router')])
+		await ready()
+		expect(titles(wrapper)).toEqual(['Router'])
+		saved = [{ name: 'custom:ab12cd34', show: false }]
+		// what the event API_WIDGETS_CHANGED calls
+		wrapper.vm.apiWidgetsChanged()
+		await ready()
+		expect(titles(wrapper)).toEqual([])
 		wrapper.unmount()
 	})
 })

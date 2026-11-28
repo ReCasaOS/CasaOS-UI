@@ -12,6 +12,8 @@ import OsSupportModal from './settings/OsSupportModal.vue'
 import ModulesModal from './settings/ModulesModal.vue'
 import UpdateModal from './settings/UpdateModal.vue'
 import LogsSettingsModal from './settings/LogsSettingsModal.vue'
+import ApiWidgetsModal from './settings/ApiWidgetsModal.vue'
+import ApiWidgetEditor from './apiWidgets/ApiWidgetEditor.vue'
 import en from '@/assets/lang/en_US.json'
 import fr from '@/assets/lang/fr_FR.json'
 import pt from '@/assets/lang/pt_BR.json'
@@ -1225,5 +1227,64 @@ describe('the update channel (pre-releases)', () => {
 		expect(vm.updateInfo.channel).toBe('release')
 		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
 		expect(vm.checkVersion).not.toHaveBeenCalled()
+	})
+})
+
+// The API widgets are the administrator's: the row asks the box nothing, and the window says so itself when the core is too old.
+describe('the API widgets row of the settings', () => {
+	const row = source.match(/<!-- API widgets Start -->([\s\S]*?)<!-- API widgets End -->/)?.[1] ?? ''
+
+	it('is next to the footer news, for the administrator only, with a real button', () => {
+		expect(source).toMatch(/<!-- Footer news End -->\s*<!-- API widgets Start -->/)
+		expect(row).toMatch(/^\s*<div v-if="\$store\.getters\.isAdmin"/)
+		expect(row).toMatch(/\{\{ \$t\("API widgets"\) \}\}/)
+		expect(row).toMatch(/<b-button data-api-widgets-configure[^>]*@click="showApiWidgets"/)
+	})
+
+	it('asks the box nothing to show the row', () => {
+		expect(source).not.toMatch(/getApiWidgets|listWidgets/)
+	})
+
+	it('opens the window, which is left to say when the widgets change', () => {
+		const open = vi.fn()
+		const toggle = vi.fn()
+		TopBar.methods.showApiWidgets.call({ $refs: { settingsDrop: { toggle } }, $buefy: { modal: { open } } })
+		expect(toggle).toHaveBeenCalledTimes(1)
+		expect(open).toHaveBeenCalledTimes(1)
+		// Escape is not Buefy's: it would close this window under the editor it opens (modalStack.js)
+		expect(open.mock.calls[0][0]).toMatchObject({ component: ApiWidgetsModal, hasModalCard: true, trapFocus: true, canCancel: [], customClass: expect.stringMatching(/^vm-escape-\d+$/) })
+	})
+
+	// what the window asks for: the editor of a widget or of a new one, an import, an export
+	function opened() {
+		const open = vi.fn()
+		const vm = { $refs: { settingsDrop: { toggle: vi.fn() } }, $t: key => key, $buefy: { modal: { open }, toast: { open: vi.fn() }, dialog: { confirm: vi.fn() } } }
+		vm.editApiWidget = TopBar.methods.editApiWidget.bind(vm)
+		TopBar.methods.showApiWidgets.call(vm)
+		return { vm, open, asked: open.mock.calls[0][0].events }
+	}
+	const widget = { id: 'ab12cd34', base: 'http://192.168.1.10', recipe: { recasaos_widget: 1, name: 'NAS', query: { limit: '5' } } }
+
+	it('opens the editor on the widget to change, or on nothing for a new one, over the window', () => {
+		const { open, asked } = opened()
+		asked.edit(widget)
+		asked.edit(null)
+		expect(open.mock.calls[1][0]).toMatchObject({ component: ApiWidgetEditor, props: { widget, recipe: null }, hasModalCard: true, trapFocus: true, canCancel: false })
+		expect(open.mock.calls[2][0].props).toEqual({ widget: null, recipe: null })
+	})
+
+	it('opens the editor on an imported recipe, as a new widget, and on nothing for a file that is not one', () => {
+		const { vm, open, asked } = opened()
+		asked.import('{ not a recipe')
+		expect(open).toHaveBeenCalledTimes(1)
+		expect(vm.$buefy.toast.open).toHaveBeenCalledTimes(1)
+		asked.import(JSON.stringify(widget.recipe))
+		expect(open.mock.calls[1][0]).toMatchObject({ component: ApiWidgetEditor, props: { widget: null, recipe: widget.recipe } })
+	})
+
+	it('shows what a recipe holds before it exports it', () => {
+		const { vm, asked } = opened()
+		asked.export(widget)
+		expect(vm.$buefy.dialog.confirm.mock.calls[0][0].message).toContain('query.limit: 5')
 	})
 })

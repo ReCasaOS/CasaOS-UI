@@ -19,6 +19,8 @@ const events = {
 	MODULES_CHANGED: 'modulesChanged',
 	// FleetModal -> AppSection: this box became, or stopped being, the master of a fleet
 	FLEET_CHANGED: 'fleetChanged',
+	// the Widgets API window -> the two homes: a widget was added, changed, removed, shown or hidden
+	API_WIDGETS_CHANGED: 'apiWidgetsChanged',
 	UPDATE_SYNC_STATUS: 'updateSyncStatus',
 	UN_SHARE: 'unShare',
 	GOTO: 'goto',

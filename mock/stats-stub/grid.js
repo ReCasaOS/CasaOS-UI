@@ -14,6 +14,7 @@ import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { imageKind } from '../../src/components/VirtualMachines/vms.js'
 import { handleSync, newSyncState } from './sync.js'
+import { handleWidgets, newWidgets } from './widgets.js'
 
 const GIB = 1073741824
 const ISO_FOLDER = '/DATA/VM/iso'
@@ -250,6 +251,7 @@ export function newGridState(demo = false) {
 		sync: newSyncState(),
 		cleanup: newCleanup(),
 		mcp: newMcp(),
+		widgets: newWidgets(),
 	}
 }
 
@@ -855,6 +857,10 @@ export function handleGrid({ method = 'GET', path = '', query = {}, body = null 
 	}
 	if (verb === 'GET' && path === '/v1/sys/weather/places') {
 		return core([{ name: 'Vinhedo', region: 'São Paulo', country: 'Brazil', latitude: -23.03, longitude: -46.97 }])
+	}
+	// the API widgets of the dashboard (widgets.js)
+	if (path.startsWith('/v1/sys/widgets')) {
+		return handleWidgets(verb, path, body, state.widgets)
 	}
 	if (path.startsWith('/v2/mcp/')) {
 		return mcp(verb, path, body, state)

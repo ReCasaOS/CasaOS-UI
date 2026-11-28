@@ -331,3 +331,157 @@ describe('a card that leaves the screen, or is given to another module', () => {
 		expect(wrapper.find('.module-card-unavailable').exists()).toBe(true)
 	})
 })
+
+describe('a card that is given what reads it (an API widget)', () => {
+	const widget = { name: 'custom:ab12cd34', id: 'ab12cd34', title: 'My router' }
+	const row = (label, value, extra = {}) => ({ label, value, level: '', bar: null, action: null, ...extra })
+	const view = (extra = {}) => ({ title: 'Router', icon: 'network-outline', status: { level: 'ok', text: 'UP' }, rows: [row('Clients', '12')], actions: [], link: { label: 'Open', url: 'https://router.example/' }, layout: 'rows', more: 0, refresh: 300, ...extra })
+	const sourced = (load, props = {}) => mountCard({ module: widget, source: { load }, ...props })
+
+	it('draws what its source gives, asks no module, and opens the link in a new tab', async () => {
+		const load = vi.fn().mockResolvedValue(view())
+		const wrapper = sourced(load)
+		await flushPromises()
+		expect(load).toHaveBeenCalledTimes(1)
+		expect(getCard).not.toHaveBeenCalled()
+		expect(wrapper.find('.widget-title').text()).toBe('Router')
+		expect(wrapper.find('.module-card-status').text()).toBe('UP')
+		expect(wrapper.find('.module-card-rows li').text()).toContain('Clients')
+		expect(wrapper.find('.module-card-rows li').text()).toContain('12')
+		expect(wrapper.find('.module-card-rows').classes()).not.toContain('is-figures')
+		expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
+		expect(wrapper.find('.module-card-more').exists()).toBe(false)
+		expect(wrapper.find('a.module-card-link').attributes()).toMatchObject({ href: 'https://router.example/', target: '_blank', rel: 'noopener noreferrer' })
+		expect(wrapper.emitted('loaded')[0][0]).toEqual({ name: 'custom:ab12cd34', icon: 'network-outline' })
+	})
+
+	it('draws the figures, four at most, a bar under a row that has one, and how many rows were left out', async () => {
+		const rows = [row('CPU', '42%', { bar: 42, level: 'warning' }), row('Zero', '0%', { bar: 0 }), row('Up', '3 days'), row('Four', '4'), row('Five', '5')]
+		const wrapper = sourced(vi.fn().mockResolvedValue(view({ layout: 'figures', rows, more: 3 })))
+		await flushPromises()
+		expect(wrapper.find('.module-card-rows').classes()).toContain('is-figures')
+		expect(wrapper.findAll('.module-card-rows li')).toHaveLength(4)
+		const bars = wrapper.findAll('[role="progressbar"]')
+		expect(bars).toHaveLength(2)
+		expect(bars[0].attributes()).toMatchObject({ 'aria-valuenow': '42', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-label': 'CPU' })
+		expect(bars[0].classes()).toContain('is-warning')
+		expect(bars[0].find('span').attributes('style')).toContain('width: 42%')
+		expect(bars[1].attributes('aria-valuenow')).toBe('0')
+		expect(wrapper.find('.module-card-more').text()).toBe('+3')
+	})
+
+	it('shows a value as text, never as markup', async () => {
+		const wrapper = sourced(vi.fn().mockResolvedValue(view({ title: '<img src=x>', status: { level: 'info', text: '<img src=x>' }, rows: [row('<b>a</b>', '<img src=x>')] })))
+		await flushPromises()
+		expect(wrapper.find('img').exists()).toBe(false)
+		expect(wrapper.find('.module-card-rows b').exists()).toBe(false)
+		expect(wrapper.find('.module-card-value').text()).toBe('<img src=x>')
+	})
+
+	it('never draws a button, whatever the view holds', async () => {
+		const action = { label: 'Run', url: '/v1/x/run', body: {}, confirm: '' }
+		const wrapper = sourced(vi.fn().mockResolvedValue(view({ actions: [action], rows: [row('A', '1', { action })] })))
+		await flushPromises()
+		expect(wrapper.find('.module-card-rows li').exists()).toBe(true)
+		expect(wrapper.findAll('button')).toHaveLength(0)
+		expect(act).not.toHaveBeenCalled()
+	})
+
+	it('leaves when its read is a 404, and only then', async () => {
+		const gone = sourced(vi.fn().mockRejectedValue(http(404)))
+		await flushPromises()
+		expect(gone.emitted('gone')[0]).toEqual(['custom:ab12cd34'])
+		expect(gone.find('.module-card').exists()).toBe(false)
+
+		for (const status of [401, 403, 500, 0]) {
+			const wrapper = sourced(vi.fn().mockRejectedValue(http(status)))
+			await flushPromises()
+			expect(wrapper.emitted('gone')).toBeUndefined()
+			expect(wrapper.find('.module-card-unavailable').exists()).toBe(true)
+		}
+	})
+
+	it('says it is unavailable under the name of the widget when the view is null, and reads again after a minute', async () => {
+		vi.useFakeTimers()
+		const load = vi.fn().mockResolvedValue(null)
+		const wrapper = sourced(load)
+		await flushPromises()
+		expect(wrapper.find('.widget-title').text()).toBe('My router')
+		expect(wrapper.find('.module-card-unavailable').text()).toBe('This card is unavailable for now')
+		expect(wrapper.find('.module-card-status').exists()).toBe(false)
+		load.mockResolvedValue(view())
+		await vi.advanceTimersByTimeAsync(59000)
+		expect(load).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(1000)
+		expect(load).toHaveBeenCalledTimes(2)
+		expect(wrapper.find('.widget-title').text()).toBe('Router')
+	})
+
+	it.each([0, undefined, -5, Number.NaN])('reads again after a minute when the view of its source gives the rhythm %j', async (refresh) => {
+		vi.useFakeTimers()
+		const load = vi.fn().mockResolvedValue(view({ refresh }))
+		sourced(load)
+		await flushPromises()
+		await vi.advanceTimersByTimeAsync(59000)
+		expect(load).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(1000)
+		expect(load).toHaveBeenCalledTimes(2)
+	})
+
+	it('reads again at the rhythm of the view, not while the tab is hidden, and not once it has left', async () => {
+		vi.useFakeTimers()
+		const load = vi.fn().mockResolvedValue(view({ refresh: 120 }))
+		const wrapper = sourced(load)
+		await flushPromises()
+		await vi.advanceTimersByTimeAsync(119000)
+		expect(load).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(1000)
+		expect(load).toHaveBeenCalledTimes(2)
+		Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+		await vi.advanceTimersByTimeAsync(600000)
+		expect(load).toHaveBeenCalledTimes(2)
+		Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+		document.dispatchEvent(new Event('visibilitychange'))
+		await flushPromises()
+		expect(load).toHaveBeenCalledTimes(3)
+		wrapper.unmount()
+		await vi.advanceTimersByTimeAsync(600000)
+		expect(load).toHaveBeenCalledTimes(3)
+	})
+
+	it('reads at once from a new source, and keeps what it shows meanwhile', async () => {
+		const wrapper = sourced(vi.fn().mockResolvedValue(view()))
+		await flushPromises()
+		let answer
+		const load = vi.fn(() => new Promise((resolve) => {
+			answer = resolve
+		}))
+		await wrapper.setProps({ source: { load } })
+		expect(load).toHaveBeenCalledTimes(1)
+		expect(wrapper.find('.widget-title').text()).toBe('Router')
+		answer(view({ title: 'Router 2' }))
+		await flushPromises()
+		expect(wrapper.find('.widget-title').text()).toBe('Router 2')
+	})
+
+	it('hands the same to the home that draws it as a panel', async () => {
+		const action = { label: 'Run', url: '/v1/x/run', body: {}, confirm: '' }
+		const rows = [row('1', 'a', { action }), row('2', 'b'), row('3', 'c'), row('4', 'd'), row('5', 'e')]
+		let given
+		mount(ModuleCard, {
+			props: { module: widget, variant: 'panel', source: { load: () => Promise.resolve(view({ layout: 'figures', rows, actions: [action] })) } },
+			slots: {
+				default: (props) => {
+					given = props
+					return ''
+				},
+			},
+			global: { plugins: [Buefy], mocks: { $t: key => key } },
+		})
+		await flushPromises()
+		expect(given.state).toBe('ok')
+		expect(given.card.rows).toHaveLength(4)
+		expect(given.card.rows.every(item => item.action === null)).toBe(true)
+		expect(given.card.actions).toEqual([])
+	})
+})

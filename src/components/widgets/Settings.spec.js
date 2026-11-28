@@ -94,3 +94,16 @@ describe('widgets settings: the cards of the modules', () => {
 		wrapper.unmount()
 	})
 })
+
+describe('widgets settings: the API widgets', () => {
+	it('lists an API widget with its title, as text, and its icon, and moves it', async () => {
+		const wrapper = settings(['clock', 'custom:ab12cd34'], { 'custom:ab12cd34': { title: 'My {router} | <b>x</b>', icon: 'network-outline' } })
+		const item = wrapper.findAll('.item.is-flex').at(1)
+		expect(item.find('b').text()).toBe('My {router} | <b>x</b>')
+		expect(item.find('b b').exists()).toBe(false)
+		expect(item.find('.casa-network-outline, [class*="network-outline"]').exists()).toBe(true)
+		await wrapper.findAll('.drag-handle')[1].trigger('keydown', { key: 'ArrowUp' })
+		expect(names(wrapper)).toEqual(['custom:ab12cd34', 'clock'])
+		wrapper.unmount()
+	})
+})

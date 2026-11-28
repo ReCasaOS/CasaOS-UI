@@ -106,3 +106,20 @@ describe('the cards of the modules among the widgets', () => {
 		expect(withAbsent(full, full, ['clock', 'cpu'])).toEqual(full)
 	})
 })
+
+describe('the API widgets among the widgets', () => {
+	it('keeps the place and the hidden state of a saved API widget that the list does not have', () => {
+		const saved = [{ name: 'clock', show: true }, { name: 'custom:ab12cd34', show: false }, { name: 'cpu', show: true }]
+		expect(combineWidgetSettings(shipped, saved).map(w => [w.name, w.show])).toEqual([['clock', true], ['custom:ab12cd34', false], ['cpu', true], ['disks', true], ['network', true]])
+	})
+
+	it('adds a new API widget after the others, shown', () => {
+		const saved = [...shipped.map(widget => ({ ...widget })), { name: 'module:wake-on-lan', show: true }]
+		expect(combineWidgetSettings([...shipped, { name: 'custom:ab12cd34', show: true }], saved).at(-1)).toEqual({ name: 'custom:ab12cd34', show: true })
+	})
+
+	it('drops a key that is not the id of an API widget', () => {
+		const saved = [{ name: 'custom:AB', show: true }, { name: 'custom:AB12CD34', show: true }, { name: 'custom:ab12cd345', show: true }, { name: 'custom:ab12-d34', show: true }, { name: 'custom:', show: true }, { name: 'xcustom:ab12cd34', show: true }]
+		expect(combineWidgetSettings(shipped, saved).map(w => w.name)).toEqual(['clock', 'cpu', 'disks', 'network'])
+	})
+})
