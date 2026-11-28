@@ -32,6 +32,7 @@
 						:title="appName"
 						allow="autoplay; fullscreen"
 						allowfullscreen
+						referrerpolicy="no-referrer"
 						class="app-iframe"></iframe>
 				</div>
 			</div>
@@ -105,7 +106,7 @@ export default {
 			}
 		},
 		openInTab() {
-			window.open(this.url, '_blank')
+			window.open(this.url, '_blank', 'noreferrer')
 			this.$emit('close')
 		},
 	},

@@ -611,7 +611,7 @@ export default {
 			if (item.app_type === 'system') {
 				this.openSystemApps(item)
 			} else if (this.isLinkApp) {
-				window.open(item.hostname, '_blank')
+				window.open(item.hostname, '_blank', 'noreferrer')
 				this.removeIdFromSessionStorage(item.name)
 			} else {
 				// type is one of 'official' or 'community'.

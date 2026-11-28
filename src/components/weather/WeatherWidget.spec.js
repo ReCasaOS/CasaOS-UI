@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
 import Buefy from 'buefy'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -68,5 +69,12 @@ describe('the weather in the top bar', () => {
 		wrapper.unmount()
 		await vi.advanceTimersByTimeAsync(RELOAD_MS)
 		expect(getWeather).toHaveBeenCalledTimes(2)
+	})
+
+	// Bulma colours a menu item by the theme: under the light theme the text came out dark on the menu's dark glass (CasaOS#203)
+	it('keeps the light text of its menu under either theme', () => {
+		const source = readFileSync('src/components/weather/WeatherWidget.vue', 'utf8')
+		expect(source).toMatch(/\.weather-widget \.weather-card \{[^}]*color: inherit;/)
+		expect(source).toMatch(/:deep\(\.dropdown-content\) \{[^}]*color: #f1f5f9;/)
 	})
 })

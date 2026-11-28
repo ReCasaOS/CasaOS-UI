@@ -65,7 +65,8 @@ export default {
 
 				// an app the box already found refusing a frame goes to a tab (frameCheck.js)
 				if (this.shouldOpenInNewWindow(appInfo) || frameRefused(url)) {
-					window.open(url, '_blank')
+					// no Referer: qBittorrent 4 answers 401 to a page asked from another origin (CasaOS#202)
+					window.open(url, '_blank', 'noreferrer')
 					this.$EventBus.$emit(events.CLOSE_APP_IFRAME)
 					return
 				}
