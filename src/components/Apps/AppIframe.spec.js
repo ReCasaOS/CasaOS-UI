@@ -41,7 +41,7 @@ describe('the app frame', () => {
 
 		const open = vi.spyOn(window, 'open').mockImplementation(() => null)
 		await wrapper.find('.app-iframe-refused button').trigger('click')
-		expect(open).toHaveBeenCalledWith(NIFI, '_blank')
+		expect(open).toHaveBeenCalledWith(NIFI, '_blank', 'noreferrer')
 		expect(wrapper.emitted('close')).toHaveLength(1)
 		open.mockRestore()
 	})
@@ -55,6 +55,8 @@ describe('the app frame', () => {
 		await flushPromises()
 
 		expect(wrapper.find('iframe').attributes('src')).toBe(NIFI)
+		// qBittorrent 4 answers 401 to a page asked with the dashboard as its Referer
+		expect(wrapper.find('iframe').attributes('referrerpolicy')).toBe('no-referrer')
 		expect(frameRefused(NIFI)).toBe(false)
 	})
 })

@@ -105,7 +105,7 @@ describe('opening an app the box found refusing a frame', () => {
 
 		ctx.openAppToNewWindow({ name: 'nifi', status: 'running', hostname: '192.168.1.50', scheme: 'https', port: '8443', index: '/nifi/' })
 
-		expect(open).toHaveBeenCalledWith('https://192.168.1.50:8443/nifi/', '_blank')
+		expect(open).toHaveBeenCalledWith('https://192.168.1.50:8443/nifi/', '_blank', 'noreferrer')
 		expect(calls.launcher.map(([event]) => event)).not.toContain('openAppIframe')
 		open.mockRestore()
 		forgetFrameChecks()
@@ -133,7 +133,7 @@ describe('opening an app whose scheme is not http or https', () => {
 
 		ctx.openAppToNewWindow({ name: 'trap', status: 'running', hostname: '192.168.1.50', scheme: script, port: '8080', index: '/' })
 
-		expect(open).toHaveBeenCalledWith('http://192.168.1.50:8080/', '_blank')
+		expect(open).toHaveBeenCalledWith('http://192.168.1.50:8080/', '_blank', 'noreferrer')
 		open.mockRestore()
 	})
 
