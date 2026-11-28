@@ -1107,6 +1107,8 @@ describe('app section system subtitles (beta dashboard)', () => {
 	it('says what each system card is for', () => {
 		expect(subtitle('Files')).toBe('Your files')
 		expect(subtitle('Statistics')).toBe('CPU, memory, disks')
+		expect(subtitle('logs')).toBe('System and app logs')
+		expect(subtitle('AIAccess')).toBe('Connect AI assistants')
 		expect(subtitle('Fleet')).toBe('')
 	})
 

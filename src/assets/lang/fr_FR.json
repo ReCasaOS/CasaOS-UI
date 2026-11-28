@@ -3063,6 +3063,8 @@
   "App catalogue": "Catalogue d’apps",
   "Your files": "Vos fichiers",
   "CPU, memory, disks": "CPU, mémoire, disques",
+  "System and app logs": "Journaux système et apps",
+  "Connect AI assistants": "Relier des assistants IA",
   "Updates: {count}": "Mises à jour : {count}",
   "VMs: {count}": "VM : {count}",
   "Manage storage": "Gérer le stockage",

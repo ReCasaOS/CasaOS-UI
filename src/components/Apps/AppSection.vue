@@ -642,6 +642,10 @@ export default {
 					return this.$t('Your files')
 				case STATS_APP_NAME:
 					return this.$t('CPU, memory, disks')
+				case LOGS_APP_NAME:
+					return this.$t('System and app logs')
+				case AI_ACCESS_APP_NAME:
+					return this.$t('Connect AI assistants')
 				case SECURITY_APP_NAME: {
 					const flagged = Object.values(vulnScan.apps).filter(item => item.actionable).length
 					return flagged > 0 ? this.$t('Apps to update: {count}', { count: flagged }) : this.$t('Vulnerability scan')
